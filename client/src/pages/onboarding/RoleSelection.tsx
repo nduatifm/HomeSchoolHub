@@ -26,29 +26,13 @@ export default function RoleSelection() {
     setIsSubmitting(true);
 
     try {
-      // Get Firebase token for authentication
-      const currentUser = await import('@/lib/firebase').then(module => module.auth.currentUser);
-      let idToken = '';
-      
-      if (currentUser) {
-        idToken = await currentUser.getIdToken();
-      }
-      
       // API call to update user role
       const response = await fetch('/api/users/me/role', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
         },
-        body: JSON.stringify({ 
-          role: selectedRole,
-          uid: currentUser?.uid,
-          email: currentUser?.email,
-          displayName: currentUser?.displayName,
-          photoURL: currentUser?.photoURL
-        }),
-        credentials: 'include' // Important for session cookies
+        body: JSON.stringify({ role: selectedRole }),
       });
 
       if (!response.ok) {

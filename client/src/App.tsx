@@ -46,21 +46,18 @@ function Router() {
     );
   }
 
-  // If we have Firebase auth but no server user yet, direct to role selection
+  // If we have Firebase auth but no server user yet, redirect to login 
+  // to complete the sign-up process properly
   if (firebaseAuthUser && !user) {
     return (
       <Switch>
+        <Route path="/" component={Login} />
         <Route path="/onboarding/role-selection" component={RoleSelection} />
         <Route path="/onboarding/student-info" component={StudentInfo} />
         <Route path="/onboarding/parent-info" component={ParentInfo} />
         <Route path="/onboarding/tutor-info" component={TutorInfo} />
         <Route path="/onboarding/preferences" component={Preferences} />
-        {/* Default to role selection for any path */}
-        <Route path="*">
-          <div className="flex flex-col items-center justify-center min-h-screen">
-            <RoleSelection />
-          </div>
-        </Route>
+        <Route path="*" component={Login} />
       </Switch>
     );
   }
