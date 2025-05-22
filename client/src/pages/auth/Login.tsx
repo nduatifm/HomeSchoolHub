@@ -6,13 +6,7 @@ import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
-  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-
-  const handleLogin = () => {
-    setIsLoading(true);
-    window.location.href = "/api/login";
-  };
   
   const handleGoogleSuccess = (user: any) => {
     toast({
@@ -48,15 +42,6 @@ export default function Login() {
           </div>
           
           <div className="grid gap-4">
-            <Button 
-              className="w-full" 
-              size="lg" 
-              onClick={handleLogin}
-              disabled={isLoading}
-            >
-              {isLoading ? "Logging in..." : "Log in with Replit"}
-            </Button>
-            
             <GoogleSignIn onSuccess={handleGoogleSuccess} />
 
             <div className="relative my-4">

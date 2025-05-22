@@ -76,16 +76,17 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
 
   return (
     <Button
-      variant="outline"
+      variant="default"
       type="button"
       disabled={loading}
       onClick={handleGoogleSignIn}
-      className="w-full"
+      className="w-full py-6 text-base"
+      size="lg"
     >
       {loading ? (
-        <span className="h-4 w-4 animate-spin" />
+        <span className="h-5 w-5 animate-spin mr-2" />
       ) : (
-        <FcGoogle className="mr-2 h-4 w-4" />
+        <FcGoogle className="mr-2 h-6 w-6" />
       )}
       Sign in with Google
     </Button>
