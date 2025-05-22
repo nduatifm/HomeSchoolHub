@@ -22,7 +22,7 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
       
       // Use redirect for mobile devices, popup for desktop
       const signInMethod = isMobile ? signInWithRedirect : signInWithPopup;
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await signInMethod(auth, googleProvider);
       
       // This gives you a Google Access Token. You can use it to access the Google API.
       const credential = GoogleAuthProvider.credentialFromResult(result);

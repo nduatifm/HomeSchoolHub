@@ -25,8 +25,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
 function Router() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, firebaseAuthUser } = useAuth();
 
+  // Show loading spinner during auth check
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -35,7 +36,8 @@ function Router() {
     );
   }
 
-  if (!isAuthenticated) {
+  // If not authenticated at all, show login page
+  if (!isAuthenticated && !firebaseAuthUser) {
     return (
       <Switch>
         <Route path="/" component={Login} />
@@ -44,7 +46,25 @@ function Router() {
     );
   }
 
-  // Role-based routing
+  // If we have Firebase auth but no server user yet, we might need onboarding
+  if (firebaseAuthUser && !user) {
+    return (
+      <Switch>
+        <Route path="/onboarding/role-selection" component={RoleSelection} />
+        <Route path="/onboarding/student-info" component={StudentInfo} />
+        <Route path="/onboarding/parent-info" component={ParentInfo} />
+        <Route path="/onboarding/tutor-info" component={TutorInfo} />
+        <Route path="/onboarding/preferences" component={Preferences} />
+        <Route path="*">
+          <div className="flex flex-col items-center justify-center min-h-screen">
+            <RoleSelection />
+          </div>
+        </Route>
+      </Switch>
+    );
+  }
+
+  // Role-based routing for fully authenticated users
   const userRole = user?.role || "student";
   
   return (
@@ -61,13 +81,6 @@ function Router() {
       <Route path="/sessions" component={Sessions} />
       <Route path="/progress" component={ProgressTracker} />
       <Route path="/messages" component={Messages} />
-      
-      {/* Onboarding routes */}
-      <Route path="/onboarding/role-selection" component={RoleSelection} />
-      <Route path="/onboarding/student-info" component={StudentInfo} />
-      <Route path="/onboarding/parent-info" component={ParentInfo} />
-      <Route path="/onboarding/tutor-info" component={TutorInfo} />
-      <Route path="/onboarding/preferences" component={Preferences} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

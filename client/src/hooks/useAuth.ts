@@ -1,37 +1,37 @@
 import { useQuery } from "@tanstack/react-query";
 import { User } from "@/types";
 import { useFirebaseAuth } from "./useFirebaseAuth";
+import { useState, useEffect } from "react";
 
 export function useAuth() {
-  // Try Replit Auth first
+  const [initialized, setInitialized] = useState(false);
+  const { user: firebaseAuthUser, loading: firebaseLoading } = useFirebaseAuth();
+  
+  // Only try to fetch user data if we have a Firebase user
   const { 
-    data: replitUser, 
-    isLoading: isReplitLoading 
-  } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    retry: false,
-  });
-
-  // Then try Firebase Auth
-  const {
-    data: firebaseUser,
-    isLoading: isFirebaseLoading
+    data: serverUser, 
+    isLoading: isServerLoading,
+    isError
   } = useQuery<User>({
     queryKey: ["/api/auth/firebase-user"],
-    retry: false,
+    enabled: !!firebaseAuthUser && initialized,
+    retry: 1,
   });
 
-  // Get Firebase state for Google login
-  const { user: firebaseAuthUser } = useFirebaseAuth();
+  // Initialize after Firebase auth has loaded
+  useEffect(() => {
+    if (!firebaseLoading) {
+      setInitialized(true);
+    }
+  }, [firebaseLoading]);
 
-  // Combine the authentication states - use either auth method
-  const user = replitUser || firebaseUser;
-  const isLoading = isReplitLoading || isFirebaseLoading;
-
+  const isLoading = firebaseLoading || (initialized && !!firebaseAuthUser && isServerLoading);
+  const user = serverUser;
+  
   return {
     user,
     isLoading,
-    isAuthenticated: !!user || !!firebaseAuthUser,
+    isAuthenticated: !!user || (!!firebaseAuthUser && !isError),
     firebaseAuthUser
   };
 }
