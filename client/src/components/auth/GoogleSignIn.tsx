@@ -31,11 +31,15 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
       // The signed-in user info
       const user = result.user;
       
+      // Get Firebase ID token for server authentication
+      const idToken = await user.getIdToken();
+      
       // Now call our server to create/update user in our database
       const response = await fetch("/api/auth/firebase-login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}` // Add auth header
         },
         body: JSON.stringify({
           uid: user.uid,
@@ -43,6 +47,7 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
           displayName: user.displayName,
           photoURL: user.photoURL,
         }),
+        credentials: 'include' // Important! Include cookies in the request
       });
       
       if (!response.ok) {
