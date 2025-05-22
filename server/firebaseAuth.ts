@@ -92,8 +92,23 @@ export function isFirebaseAuthenticated(req: Request, res: Response, next: NextF
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     // Bearer token is present, consider authenticated for this request
-    // In a production app, we would verify the token with Firebase Admin SDK
-    // For now, we'll trust the token presence and let the request proceed
+    
+    // Extract token and set it in session for future requests
+    const token = authHeader.split(' ')[1];
+    
+    // In a production app, we would verify the token with Firebase Admin
+    // and extract user details from it. For now, if a token is present in the 
+    // Authorization header and we don't have user data in the request body,
+    // we'll extract it from the request body if available
+    if (req.body && req.body.uid && !req.session.firebaseUser) {
+      req.session.firebaseUser = {
+        uid: req.body.uid,
+        email: req.body.email || null,
+        displayName: req.body.displayName || null,
+        photoURL: req.body.photoURL || null
+      };
+    }
+    
     return next();
   }
 
