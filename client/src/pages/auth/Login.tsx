@@ -7,10 +7,23 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleLogin = () => {
     setIsLoading(true);
     window.location.href = "/api/login";
+  };
+  
+  const handleGoogleSuccess = (user: any) => {
+    toast({
+      title: "Success!",
+      description: "Redirecting to dashboard...",
+    });
+    
+    // Wait a moment and then refresh the page to show the dashboard
+    setTimeout(() => {
+      window.location.href = "/";
+    }, 1000);
   };
 
   return (
@@ -43,6 +56,8 @@ export default function Login() {
             >
               {isLoading ? "Logging in..." : "Log in with Replit"}
             </Button>
+            
+            <GoogleSignIn onSuccess={handleGoogleSuccess} />
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">

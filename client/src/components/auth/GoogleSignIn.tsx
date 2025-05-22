@@ -2,7 +2,7 @@ import { useState } from "react";
 import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup, signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { FcGoogle } from "react-icons/fc";
 import { useToast } from "@/hooks/use-toast";
 

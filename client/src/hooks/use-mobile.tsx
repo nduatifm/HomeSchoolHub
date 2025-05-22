@@ -1,19 +1,34 @@
-import * as React from "react"
+import { useState, useEffect } from "react";
 
-const MOBILE_BREAKPOINT = 768
-
+// Hook to detect if the current device is mobile
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+  const [isMobile, setIsMobile] = useState(false);
 
-  React.useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
-    const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    }
-    mql.addEventListener("change", onChange)
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    return () => mql.removeEventListener("change", onChange)
-  }, [])
+  useEffect(() => {
+    // Function to check if device is mobile
+    const checkIfMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      
+      // Check if userAgent matches common mobile patterns
+      const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+      
+      // Also check screen width for responsive layouts
+      const isMobileDevice = mobileRegex.test(userAgent) || window.innerWidth <= 768;
+      
+      setIsMobile(isMobileDevice);
+    };
 
-  return !!isMobile
+    // Initial check
+    checkIfMobile();
+    
+    // Check on resize
+    window.addEventListener("resize", checkIfMobile);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener("resize", checkIfMobile);
+    };
+  }, []);
+
+  return isMobile;
 }
