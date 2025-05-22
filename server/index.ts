@@ -1,8 +1,29 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
 
 const app = express();
+
+// Setup sessions for authentication
+const PgSession = connectPg(session);
+app.use(session({
+  store: new PgSession({
+    pool: pool,
+    tableName: 'sessions', // Use the existing sessions table
+  }),
+  secret: process.env.SESSION_SECRET || 'homeschool-sync-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // Set to true if using HTTPS
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+    httpOnly: true
+  },
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
