@@ -21,16 +21,33 @@ export async function handleFirebaseLogin(req: Request, res: Response) {
       lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : null;
     }
 
-    // Upsert the user in our database
-    const userData: UpsertUser = {
-      id: uid,
-      email,
-      firstName,
-      lastName,
-      profileImageUrl: photoURL || null,
-    };
+    // First check if a user with this email already exists
+    let existingUser = null;
+    if (email) {
+      try {
+        existingUser = await storage.getUserByEmail(email);
+      } catch (error) {
+        console.log("Error checking for existing user:", error);
+      }
+    }
 
-    const user = await storage.upsertUser(userData);
+    let user;
+    if (existingUser) {
+      // If a user with this email already exists, just return that user
+      user = existingUser;
+      console.log("Using existing user account with email:", email);
+    } else {
+      // Otherwise create a new user
+      const userData: UpsertUser = {
+        id: uid,
+        email,
+        firstName,
+        lastName,
+        profileImageUrl: photoURL || null,
+      };
+
+      user = await storage.upsertUser(userData);
+    }
 
     // Set user in session
     if (req.session) {
