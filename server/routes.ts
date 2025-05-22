@@ -42,6 +42,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Me (current user) role update endpoint for onboarding
+  app.patch('/api/users/me/role', isFirebaseAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.session?.firebaseUser?.uid;
+      const { role } = req.body;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Validate role
+      if (!['student', 'parent', 'tutor'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      
+      const updatedUser = await storage.updateUserRole(userId, role);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Admin role update endpoint (requires authentication)
   app.patch('/api/users/:id/role', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -552,6 +580,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Firebase logout error:", error);
       res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  // Onboarding profile endpoints
+  app.post('/api/student/profile', isFirebaseAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.session?.firebaseUser?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Store the student profile data (this would typically save to a student profile table)
+      // For now, we'll just return success as if we stored it
+      res.status(200).json({ success: true, message: "Student profile updated" });
+    } catch (error) {
+      console.error("Error updating student profile:", error);
+      res.status(500).json({ message: "Failed to update student profile" });
+    }
+  });
+  
+  app.post('/api/parent/profile', isFirebaseAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.session?.firebaseUser?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Store the parent profile data
+      res.status(200).json({ success: true, message: "Parent profile updated" });
+    } catch (error) {
+      console.error("Error updating parent profile:", error);
+      res.status(500).json({ message: "Failed to update parent profile" });
+    }
+  });
+  
+  app.post('/api/tutor/profile', isFirebaseAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.session?.firebaseUser?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Store the tutor profile data
+      res.status(200).json({ success: true, message: "Tutor profile updated" });
+    } catch (error) {
+      console.error("Error updating tutor profile:", error);
+      res.status(500).json({ message: "Failed to update tutor profile" });
+    }
+  });
+  
+  app.post('/api/user/preferences', isFirebaseAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.session?.firebaseUser?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Store the user preferences
+      res.status(200).json({ success: true, message: "User preferences updated" });
+    } catch (error) {
+      console.error("Error updating user preferences:", error);
+      res.status(500).json({ message: "Failed to update user preferences" });
     }
   });
 

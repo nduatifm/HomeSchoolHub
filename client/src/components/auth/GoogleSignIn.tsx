@@ -49,6 +49,15 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
         throw new Error("Failed to authenticate with server");
       }
 
+      // Check if this is a new user (if they don't have a role set)
+      const userData = await response.json();
+      
+      // If it's a new user (no role set), redirect to onboarding flow
+      if (!userData.role) {
+        window.location.href = "/onboarding/role-selection";
+        return;
+      }
+
       if (onSuccess) {
         onSuccess(user);
       }

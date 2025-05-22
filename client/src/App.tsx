@@ -14,6 +14,13 @@ import Sessions from "@/pages/sessions/Sessions";
 import ProgressTracker from "@/pages/progress/Progress";
 import Messages from "@/pages/messages/Messages";
 
+// Onboarding pages
+import RoleSelection from "@/pages/onboarding/RoleSelection";
+import StudentInfo from "@/pages/onboarding/StudentInfo";
+import ParentInfo from "@/pages/onboarding/ParentInfo";
+import TutorInfo from "@/pages/onboarding/TutorInfo";
+import Preferences from "@/pages/onboarding/Preferences";
+
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 
@@ -54,6 +61,13 @@ function Router() {
       <Route path="/sessions" component={Sessions} />
       <Route path="/progress" component={ProgressTracker} />
       <Route path="/messages" component={Messages} />
+      
+      {/* Onboarding routes */}
+      <Route path="/onboarding/role-selection" component={RoleSelection} />
+      <Route path="/onboarding/student-info" component={StudentInfo} />
+      <Route path="/onboarding/parent-info" component={ParentInfo} />
+      <Route path="/onboarding/tutor-info" component={TutorInfo} />
+      <Route path="/onboarding/preferences" component={Preferences} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
