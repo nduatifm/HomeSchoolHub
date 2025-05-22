@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { handleFirebaseLogin, handleFirebaseLogout, isFirebaseAuthenticated } from "./firebaseAuth";
 import { generateSessionSummary } from "./openai";
 import multer from "multer";
 import { z } from "zod";
@@ -532,6 +533,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating student progress:", error);
       res.status(500).json({ message: "Failed to update student progress" });
+    }
+  });
+
+  // Firebase authentication routes
+  app.post('/api/auth/firebase-login', async (req, res) => {
+    try {
+      return handleFirebaseLogin(req, res);
+    } catch (error) {
+      console.error("Firebase login error:", error);
+      res.status(500).json({ message: "Authentication failed" });
+    }
+  });
+
+  app.post('/api/auth/firebase-logout', async (req, res) => {
+    try {
+      return handleFirebaseLogout(req, res);
+    } catch (error) {
+      console.error("Firebase logout error:", error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  // Firebase user endpoint - alternative to Replit Auth user endpoint
+  app.get('/api/auth/firebase-user', isFirebaseAuthenticated, async (req: any, res) => {
+    try {
+      if (req.session?.firebaseUser) {
+        const userId = req.session.firebaseUser.uid;
+        const user = await storage.getUser(userId);
+        res.json(user);
+      } else {
+        res.status(401).json({ message: "Unauthorized" });
+      }
+    } catch (error) {
+      console.error("Error fetching Firebase user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
