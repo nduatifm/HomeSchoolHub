@@ -1,0 +1,186 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Session storage table for auth
+model Session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.JsonB
+  expire DateTime
+
+  @@index([expire], name: "IDX_session_expire")
+  @@map("sessions")
+}
+
+// User model
+model User {
+  id              String    @id @db.VarChar
+  email           String?   @unique @db.VarChar
+  firstName       String?   @map("first_name") @db.VarChar
+  lastName        String?   @map("last_name") @db.VarChar
+  profileImageUrl String?   @map("profile_image_url") @db.VarChar
+  role            String?   @db.VarChar // "parent", "student", "tutor"
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @map("updated_at")
+
+  // Relations
+  studentsAsUser       Student[]              @relation("UserAsStudent")
+  studentsAsParent     Student[]              @relation("UserAsParent")
+  assignmentsAsTutor   Assignment[]           @relation("TutorAssignments")
+  studentAssignments   StudentAssignment[]
+  sessionsAsTutor      TutoringSession[]      @relation("TutorSessions")
+  sessionsAsStudent    TutoringSession[]      @relation("StudentSessions")
+  sentMessages         Message[]              @relation("SentMessages")
+  receivedMessages     Message[]              @relation("ReceivedMessages")
+  studentProgress      StudentProgress[]
+
+  @@map("users")
+}
+
+// Students table
+model Student {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id") @db.VarChar
+  parentId  String?  @map("parent_id") @db.VarChar
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  user   User  @relation("UserAsStudent", fields: [userId], references: [id])
+  parent User? @relation("UserAsParent", fields: [parentId], references: [id])
+
+  @@map("students")
+}
+
+// Subject model
+model Subject {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  assignments        Assignment[]
+  tutoringSessions   TutoringSession[]
+  studentProgress    StudentProgress[]
+
+  @@map("subjects")
+}
+
+// Assignments model
+model Assignment {
+  id          Int       @id @default(autoincrement())
+  title       String    @db.VarChar
+  description String?   @db.Text
+  subjectId   Int?      @map("subject_id")
+  tutorId     String    @map("tutor_id") @db.VarChar
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+
+  subject            Subject?            @relation(fields: [subjectId], references: [id])
+  tutor              User                @relation("TutorAssignments", fields: [tutorId], references: [id])
+  studentAssignments StudentAssignment[]
+
+  @@map("assignments")
+}
+
+// Student assignments join table
+model StudentAssignment {
+  id             Int       @id @default(autoincrement())
+  studentId      String    @map("student_id") @db.VarChar
+  assignmentId   Int?      @map("assignment_id")
+  status         String?   @default("assigned") @db.VarChar // "assigned", "in_progress", "completed", "overdue"
+  submissionText String?   @map("submission_text") @db.Text
+  submissionUrl  String?   @map("submission_url") @db.VarChar
+  feedback       String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @map("updated_at")
+
+  student    User        @relation(fields: [studentId], references: [id])
+  assignment Assignment? @relation(fields: [assignmentId], references: [id])
+
+  @@unique([studentId, assignmentId], name: "student_assignment_idx")
+  @@map("student_assignments")
+}
+
+// Tutoring sessions model
+model TutoringSession {
+  id        Int       @id @default(autoincrement())
+  title     String    @db.VarChar
+  subjectId Int?      @map("subject_id")
+  tutorId   String    @map("tutor_id") @db.VarChar
+  studentId String    @map("student_id") @db.VarChar
+  startTime DateTime  @map("start_time")
+  endTime   DateTime  @map("end_time")
+  meetLink  String?   @map("meet_link") @db.VarChar
+  status    String?   @default("scheduled") @db.VarChar // "scheduled", "completed", "cancelled"
+  notes     String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @map("updated_at")
+
+  subject         Subject?          @relation(fields: [subjectId], references: [id])
+  tutor           User              @relation("TutorSessions", fields: [tutorId], references: [id])
+  student         User              @relation("StudentSessions", fields: [studentId], references: [id])
+  sessionSummary  SessionSummary[]
+
+  @@map("tutoring_sessions")
+}
+
+// Session summaries model
+model SessionSummary {
+  id              Int       @id @default(autoincrement())
+  sessionId       Int?      @map("session_id")
+  summary         String?   @db.Text
+  keyConcepts     String[]  @map("key_concepts")
+  homeworkAssigned String?  @map("homework_assigned") @db.Text
+  engagementLevel Int?      @map("engagement_level") // 1-5
+  recordingUrl    String?   @map("recording_url") @db.VarChar
+  aiGenerated     Boolean?  @default(false) @map("ai_generated")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @map("updated_at")
+
+  session TutoringSession? @relation(fields: [sessionId], references: [id])
+
+  @@map("session_summaries")
+}
+
+// Messages model
+model Message {
+  id         Int      @id @default(autoincrement())
+  senderId   String   @map("sender_id") @db.VarChar
+  receiverId String   @map("receiver_id") @db.VarChar
+  content    String   @db.Text
+  read       Boolean? @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@map("messages")
+}
+
+// Student progress model
+model StudentProgress {
+  id                   Int      @id @default(autoincrement())
+  studentId            String   @map("student_id") @db.VarChar
+  subjectId            Int?     @map("subject_id")
+  week                 Int
+  totalWeeks           Int      @map("total_weeks")
+  completionPercentage Int?     @default(0) @map("completion_percentage")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @default(now()) @map("updated_at")
+
+  student User     @relation(fields: [studentId], references: [id])
+  subject Subject? @relation(fields: [subjectId], references: [id])
+
+  @@unique([studentId, subjectId], name: "student_subject_idx")
+  @@map("student_progress")
+}
