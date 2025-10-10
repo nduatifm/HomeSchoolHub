@@ -87,10 +87,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    const { id, ...updateData } = userData;
     const user = await prisma.user.upsert({
-      where: { id: userData.id },
+      where: { id },
       update: {
-        ...userData,
+        ...updateData,
         updatedAt: new Date(),
       },
       create: userData,

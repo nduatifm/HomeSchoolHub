@@ -14,8 +14,8 @@ HomeschoolSync follows a modern web application architecture with clear separati
 
 1. **Frontend**: React-based single-page application (SPA) with role-based views
 2. **Backend**: Express.js server providing RESTful API endpoints
-3. **Database**: PostgreSQL database with Drizzle ORM for data access
-4. **Authentication**: Replit Auth for user authentication and session management
+3. **Database**: PostgreSQL database with Prisma ORM for data access
+4. **Authentication**: Firebase Authentication for user authentication and session management
 5. **Real-time Features**: Currently limited, but the architecture supports expansion
 
 The application uses a monorepo structure with client, server, and shared code folders. This enables strong type sharing between frontend and backend while maintaining separation of concerns.
@@ -52,11 +52,11 @@ The application uses a monorepo structure with client, server, and shared code f
    - Integration with OpenAI for session summaries
 
 2. **Database Access**
-   - Drizzle ORM for type-safe database operations
+   - Prisma ORM for type-safe database operations
    - Repository pattern through storage.ts
 
 3. **Auth System**
-   - Leverages Replit Auth for authentication
+   - Leverages Firebase Authentication for user authentication
    - Session management with PostgreSQL-backed sessions
 
 ### Database Schema
@@ -100,14 +100,14 @@ The database schema includes tables for:
 
 3. **Database**
    - PostgreSQL for data storage
-   - Drizzle ORM for database access
+   - Prisma ORM for database access
    - Neon Serverless Postgres client
 
 4. **AI Integration**
    - OpenAI API for generating session summaries
 
 5. **Authentication**
-   - Replit Auth for user authentication
+   - Firebase Authentication for user authentication
 
 ## Deployment Strategy
 
@@ -146,8 +146,9 @@ To set up and run the application:
    - Maintain consistent error responses
 
 3. **Database Migrations**
-   - Use Drizzle Kit for schema migrations
-   - Run `npm run db:push` to apply schema changes
+   - Use Prisma Migrate for schema migrations
+   - Run `npx prisma db push` to sync schema changes
+   - Run `npx prisma generate` to regenerate Prisma Client after schema changes
 
 4. **UI Development**
    - Use ShadCN/UI components
