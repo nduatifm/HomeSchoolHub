@@ -7,14 +7,25 @@ export function useAuth() {
   const [initialized, setInitialized] = useState(false);
   const { user: firebaseAuthUser, loading: firebaseLoading } = useFirebaseAuth();
   
-  // Only try to fetch user data if we have a Firebase user
+  // Try to fetch Firebase user data
   const { 
-    data: serverUser, 
-    isLoading: isServerLoading,
-    isError
+    data: firebaseServerUser, 
+    isLoading: isFirebaseServerLoading,
+    isError: isFirebaseError
   } = useQuery<User>({
     queryKey: ["/api/auth/firebase-user"],
     enabled: !!firebaseAuthUser && initialized,
+    retry: 1,
+  });
+
+  // Also try to fetch email/password user data
+  const { 
+    data: emailServerUser, 
+    isLoading: isEmailServerLoading,
+    isError: isEmailError
+  } = useQuery<User>({
+    queryKey: ["/api/auth/email-user"],
+    enabled: initialized && !firebaseAuthUser,
     retry: 1,
   });
 
@@ -25,13 +36,17 @@ export function useAuth() {
     }
   }, [firebaseLoading]);
 
-  const isLoading = firebaseLoading || (initialized && !!firebaseAuthUser && isServerLoading);
-  const user = serverUser;
+  const isLoading = firebaseLoading || 
+    (initialized && !!firebaseAuthUser && isFirebaseServerLoading) ||
+    (initialized && !firebaseAuthUser && isEmailServerLoading);
+  
+  const user = firebaseServerUser || emailServerUser;
+  const isAuthenticated = !!user || (!!firebaseAuthUser && !isFirebaseError);
   
   return {
     user,
     isLoading,
-    isAuthenticated: !!user || (!!firebaseAuthUser && !isError),
+    isAuthenticated,
     firebaseAuthUser
   };
 }

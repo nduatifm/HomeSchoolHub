@@ -24,8 +24,11 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  createUser(userData: { email: string; password: string; firstName?: string; lastName?: string }): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   getUsersByRole(role: string): Promise<User[]>;
+  updateUserVerification(id: string, verified: boolean, verificationToken?: string | null, verificationTokenExpiry?: Date | null): Promise<User | undefined>;
+  getUserByVerificationToken(token: string): Promise<User | undefined>;
   
   // Student operations
   getStudentsByParentId(parentId: string): Promise<User[]>;
@@ -111,6 +114,45 @@ export class DatabaseStorage implements IStorage {
     return await prisma.user.findMany({
       where: { role }
     });
+  }
+
+  async createUser(userData: { email: string; password: string; firstName?: string; lastName?: string }): Promise<User> {
+    const { randomUUID } = await import('crypto');
+    return await prisma.user.create({
+      data: {
+        id: randomUUID(),
+        email: userData.email,
+        password: userData.password,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        emailVerified: false,
+      }
+    });
+  }
+
+  async updateUserVerification(id: string, verified: boolean, verificationToken?: string | null, verificationTokenExpiry?: Date | null): Promise<User | undefined> {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        emailVerified: verified,
+        verificationToken: verificationToken,
+        verificationTokenExpiry: verificationTokenExpiry,
+        updatedAt: new Date()
+      }
+    });
+    return user ?? undefined;
+  }
+
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const user = await prisma.user.findFirst({
+      where: {
+        verificationToken: token,
+        verificationTokenExpiry: {
+          gte: new Date()
+        }
+      }
+    });
+    return user ?? undefined;
   }
 
   // Student operations

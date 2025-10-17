@@ -3,6 +3,14 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { handleFirebaseLogin, handleFirebaseLogout, isFirebaseAuthenticated } from "./firebaseAuth";
+import { 
+  handleEmailPasswordSignup, 
+  handleEmailPasswordLogin, 
+  handleEmailVerification, 
+  handleResendVerification,
+  handleEmailPasswordLogout,
+  isEmailPasswordAuthenticated 
+} from "./emailPasswordAuth";
 import { generateSessionSummary } from "./openai";
 import multer from "multer";
 import { z } from "zod";
@@ -42,15 +50,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Me (current user) role update endpoint for onboarding
-  app.patch('/api/users/me/role', isFirebaseAuthenticated, async (req: any, res) => {
+  // Me (current user) role update endpoint for onboarding - supports both auth methods
+  app.patch('/api/users/me/role', async (req: any, res) => {
     try {
-      const userId = req.session?.firebaseUser?.uid;
-      const { role } = req.body;
+      let userId: string | undefined;
+      
+      // Check Firebase auth first
+      if (req.session?.firebaseUser?.uid) {
+        userId = req.session.firebaseUser.uid;
+      } 
+      // Then check email/password auth
+      else if (req.session?.emailPasswordUser?.id) {
+        userId = req.session.emailPasswordUser.id;
+      }
       
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
+      
+      const { role } = req.body;
       
       // Validate role
       if (!['student', 'parent', 'tutor'].includes(role)) {
@@ -580,6 +598,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Firebase logout error:", error);
       res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  // Email/Password authentication routes
+  app.post('/api/auth/email-signup', async (req, res) => {
+    try {
+      return handleEmailPasswordSignup(req, res);
+    } catch (error) {
+      console.error("Email signup error:", error);
+      res.status(500).json({ message: "Signup failed" });
+    }
+  });
+
+  app.post('/api/auth/email-login', async (req, res) => {
+    try {
+      return handleEmailPasswordLogin(req, res);
+    } catch (error) {
+      console.error("Email login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post('/api/auth/verify-email', async (req, res) => {
+    try {
+      return handleEmailVerification(req, res);
+    } catch (error) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ message: "Email verification failed" });
+    }
+  });
+
+  app.post('/api/auth/resend-verification', async (req, res) => {
+    try {
+      return handleResendVerification(req, res);
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to resend verification" });
+    }
+  });
+
+  app.post('/api/auth/email-logout', async (req, res) => {
+    try {
+      return handleEmailPasswordLogout(req, res);
+    } catch (error) {
+      console.error("Email logout error:", error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  // Email/Password user endpoint
+  app.get('/api/auth/email-user', isEmailPasswordAuthenticated, async (req: any, res) => {
+    try {
+      if (req.session?.emailPasswordUser) {
+        const userId = req.session.emailPasswordUser.id;
+        const user = await storage.getUser(userId);
+        res.json(user);
+      } else {
+        res.status(401).json({ message: "Unauthorized" });
+      }
+    } catch (error) {
+      console.error("Error fetching email user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/auth/Login";
+import VerifyEmail from "@/pages/auth/VerifyEmail";
 import TutorDashboard from "@/pages/dashboard/TutorDashboard";
 import ParentDashboard from "@/pages/dashboard/ParentDashboard";
 import StudentDashboard from "@/pages/dashboard/StudentDashboard";
@@ -36,11 +37,13 @@ function Router() {
     );
   }
 
-  // If not authenticated at all, show login page
+  // If not authenticated at all, show login page or verify email
   if (!isAuthenticated && !firebaseAuthUser) {
     return (
       <Switch>
         <Route path="/" component={Login} />
+        <Route path="/verify-email" component={VerifyEmail} />
+        <Route path="/login" component={Login} />
         <Route path="*" component={Login} />
       </Switch>
     );
