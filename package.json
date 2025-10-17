@@ -9,7 +9,8 @@
     "dev": "npm run prisma:migration:up && NODE_ENV=development tsx server/index.ts",
     "start": "npm run prisma:migration:deploy && NODE_ENV=production node dist/index.js",
     "prisma:migration:up": "prisma migrate dev --skip-generate",
-    "prisma:migration:deploy": "prisma migrate deploy && prisma generate"
+    "prisma:migration:deploy": "prisma migrate deploy && prisma generate",
+    "prisma:reset": "prisma migrate reset"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
