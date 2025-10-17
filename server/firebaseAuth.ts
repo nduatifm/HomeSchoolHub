@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import { sanitizeUser } from "./utils/sanitizeUser";
 import { UpsertUser } from "@shared/schema";
 
 // Handle Firebase login
@@ -49,6 +50,14 @@ export async function handleFirebaseLogin(req: Request, res: Response) {
       user = await storage.upsertUser(userData);
     }
 
+    // Regenerate session to prevent session fixation
+    await new Promise<void>((resolve, reject) => {
+      req.session.regenerate((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
     // Set user in session
     if (req.session) {
       req.session.firebaseUser = {
@@ -59,7 +68,7 @@ export async function handleFirebaseLogin(req: Request, res: Response) {
       };
     }
 
-    return res.status(200).json(user);
+    return res.status(200).json(sanitizeUser(user));
   } catch (error) {
     console.error("Firebase login error:", error);
     return res.status(500).json({ message: "Authentication failed" });
@@ -69,10 +78,13 @@ export async function handleFirebaseLogin(req: Request, res: Response) {
 // Handle Firebase logout
 export async function handleFirebaseLogout(req: Request, res: Response) {
   try {
-    // Clear the firebase user from session
-    if (req.session) {
-      delete req.session.firebaseUser;
-    }
+    // Destroy the entire session for security
+    await new Promise<void>((resolve, reject) => {
+      req.session.destroy((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
 
     return res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {

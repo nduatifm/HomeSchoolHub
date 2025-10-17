@@ -12,6 +12,7 @@ import {
   isEmailPasswordAuthenticated 
 } from "./emailPasswordAuth";
 import { generateSessionSummary } from "./openai";
+import { sanitizeUser, sanitizeUsers } from "./utils/sanitizeUser";
 import multer from "multer";
 import { z } from "zod";
 import { insertSessionSummarySchema } from "@shared/schema";
@@ -31,7 +32,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json(user);
+      if (user) {
+        res.json(sanitizeUser(user));
+      } else {
+        res.status(404).json({ message: "User not found" });
+      }
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -43,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { role } = req.params;
       const users = await storage.getUsersByRole(role);
-      res.json(users);
+      res.json(sanitizeUsers(users));
     } catch (error) {
       console.error("Error fetching users by role:", error);
       res.status(500).json({ message: "Failed to fetch users by role" });
@@ -80,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      res.json(updatedUser);
+      res.json(sanitizeUser(updatedUser));
     } catch (error) {
       console.error("Error updating user role:", error);
       res.status(500).json({ message: "Failed to update user role" });
@@ -103,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      res.json(updatedUser);
+      res.json(sanitizeUser(updatedUser));
     } catch (error) {
       console.error("Error updating user role:", error);
       res.status(500).json({ message: "Failed to update user role" });
@@ -115,7 +120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { parentId } = req.params;
       const students = await storage.getStudentsByParentId(parentId);
-      res.json(students);
+      res.json(sanitizeUsers(students));
     } catch (error) {
       console.error("Error fetching students by parent:", error);
       res.status(500).json({ message: "Failed to fetch students by parent" });
@@ -126,7 +131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { tutorId } = req.params;
       const students = await storage.getStudentsByTutorId(tutorId);
-      res.json(students);
+      res.json(sanitizeUsers(students));
     } catch (error) {
       console.error("Error fetching students by tutor:", error);
       res.status(500).json({ message: "Failed to fetch students by tutor" });
@@ -653,7 +658,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.session?.emailPasswordUser) {
         const userId = req.session.emailPasswordUser.id;
         const user = await storage.getUser(userId);
-        res.json(user);
+        
+        if (user) {
+          res.json(sanitizeUser(user));
+        } else {
+          res.status(404).json({ message: "User not found" });
+        }
       } else {
         res.status(401).json({ message: "Unauthorized" });
       }
@@ -735,7 +745,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.session?.firebaseUser) {
         const userId = req.session.firebaseUser.uid;
         const user = await storage.getUser(userId);
-        res.json(user);
+        
+        if (user) {
+          res.json(sanitizeUser(user));
+        } else {
+          res.status(404).json({ message: "User not found" });
+        }
       } else {
         res.status(401).json({ message: "Unauthorized" });
       }

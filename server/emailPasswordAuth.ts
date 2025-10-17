@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { sendVerificationEmail } from "./emailService";
+import { sanitizeUser } from "./utils/sanitizeUser";
 import { randomBytes } from "crypto";
 
 export async function handleEmailPasswordSignup(req: Request, res: Response) {
@@ -83,17 +84,24 @@ export async function handleEmailPasswordLogin(req: Request, res: Response) {
       });
     }
 
+    // Regenerate session to prevent session fixation
+    await new Promise<void>((resolve, reject) => {
+      req.session.regenerate((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
     if (req.session) {
       req.session.emailPasswordUser = {
         id: user.id,
-        email: user.email,
+        email: user.email || '',
         firstName: user.firstName,
         lastName: user.lastName,
       };
     }
 
-    const { password: _, ...userWithoutPassword } = user;
-    return res.status(200).json(userWithoutPassword);
+    return res.status(200).json(sanitizeUser(user));
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Login failed" });
@@ -176,9 +184,14 @@ export async function handleResendVerification(req: Request, res: Response) {
 
 export async function handleEmailPasswordLogout(req: Request, res: Response) {
   try {
-    if (req.session) {
-      delete req.session.emailPasswordUser;
-    }
+    // Destroy the entire session for security
+    await new Promise<void>((resolve, reject) => {
+      req.session.destroy((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    
     return res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);

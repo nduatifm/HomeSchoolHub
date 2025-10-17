@@ -48,7 +48,7 @@ The application uses a monorepo structure with client, server, and shared code f
 1. **API Server**
    - Express.js based REST API
    - Structured route handlers
-   - Session-based authentication with Replit Auth
+   - Session-based authentication with multiple providers
    - Integration with OpenAI for session summaries
 
 2. **Database Access**
@@ -56,8 +56,19 @@ The application uses a monorepo structure with client, server, and shared code f
    - Repository pattern through storage.ts
 
 3. **Auth System**
-   - Leverages Firebase Authentication for user authentication
-   - Session management with PostgreSQL-backed sessions
+   - **Multiple Authentication Methods:**
+     - Google OAuth via Firebase Authentication
+     - Email/Password authentication with email verification
+   - **Security Features:**
+     - Password hashing with bcrypt (10 rounds)
+     - Email verification required for email/password signups
+     - Session regeneration on login to prevent session fixation
+     - Verification tokens with 24-hour expiry
+     - Sanitized API responses (no password/token leakage)
+   - **Session Management:**
+     - PostgreSQL-backed sessions via connect-pg-simple
+     - Secure session destruction on logout
+     - Session-based authentication middleware
 
 ### Database Schema
 
@@ -75,9 +86,31 @@ The database schema includes tables for:
 ## Data Flow
 
 1. **Authentication Flow**
-   - User logs in via Replit Auth
-   - Server creates a session and stores it in the database
-   - Frontend receives user data and renders appropriate role-based view
+   - **Google OAuth:**
+     - User clicks "Sign in with Google"
+     - Firebase handles OAuth flow
+     - Server receives user info and creates/updates user record
+     - Session regenerated and user info stored
+     - Frontend receives sanitized user data
+   
+   - **Email/Password Signup:**
+     - User submits signup form with email and password
+     - Server hashes password and generates verification token
+     - Verification email sent via SMTP
+     - User clicks verification link in email
+     - Email verified, user can now log in
+   
+   - **Email/Password Login:**
+     - User submits credentials
+     - Server validates password and checks email verification
+     - If verified, session regenerated and user authenticated
+     - Frontend receives sanitized user data
+   
+   - **Role-Based Onboarding:**
+     - After any authentication method, if user has no role
+     - User redirected to role selection page
+     - User selects role (student, parent, or tutor)
+     - Role saved and user redirected to appropriate dashboard
 
 2. **Data CRUD Operations**
    - Frontend sends requests to the REST API
@@ -107,7 +140,10 @@ The database schema includes tables for:
    - OpenAI API for generating session summaries
 
 5. **Authentication**
-   - Firebase Authentication for user authentication
+   - Firebase Authentication for Google OAuth
+   - Bcrypt for password hashing
+   - Nodemailer for email verification
+   - SMTP integration (requires SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM secrets)
 
 ## Deployment Strategy
 

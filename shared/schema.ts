@@ -16,6 +16,10 @@ export type StudentProgress = Prisma.StudentProgressGetPayload<{}>;
 export type UpsertUser = {
   id: string;
   email?: string | null;
+  password?: string | null;
+  emailVerified?: boolean;
+  verificationToken?: string | null;
+  verificationTokenExpiry?: Date | null;
   firstName?: string | null;
   lastName?: string | null;
   profileImageUrl?: string | null;
