@@ -65,6 +65,21 @@ function Router() {
     );
   }
 
+  // If user is authenticated but has no role, show onboarding routes
+  if (user && !user.role) {
+    return (
+      <Switch>
+        <Route path="/" component={RoleSelection} />
+        <Route path="/onboarding/role-selection" component={RoleSelection} />
+        <Route path="/onboarding/student-info" component={StudentInfo} />
+        <Route path="/onboarding/parent-info" component={ParentInfo} />
+        <Route path="/onboarding/tutor-info" component={TutorInfo} />
+        <Route path="/onboarding/preferences" component={Preferences} />
+        <Route path="*" component={RoleSelection} />
+      </Switch>
+    );
+  }
+
   // Role-based routing for fully authenticated users
   const userRole = user?.role || "student";
   
