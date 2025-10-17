@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,15 @@ export default function VerifyEmail() {
   const [message, setMessage] = useState('');
   const [resendingEmail, setResendingEmail] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const verificationAttempted = useRef(false);
 
   useEffect(() => {
+    // Prevent double execution in React StrictMode
+    if (verificationAttempted.current) {
+      return;
+    }
+    verificationAttempted.current = true;
+
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
 

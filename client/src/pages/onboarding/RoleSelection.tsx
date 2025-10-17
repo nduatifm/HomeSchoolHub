@@ -4,6 +4,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { OnboardingLayout } from "@/components/onboarding/OnboardingLayout";
 import { Users, GraduationCap, User } from "lucide-react";
 
@@ -38,6 +39,10 @@ export default function RoleSelection() {
       if (!response.ok) {
         throw new Error('Failed to update role');
       }
+
+      // Invalidate user queries to refetch updated user data
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/firebase-user"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/email-user"] });
 
       // Navigate to the next step based on role
       switch (selectedRole) {

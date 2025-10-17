@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { queryClient } from "@/lib/queryClient";
 import { OnboardingLayout } from "@/components/onboarding/OnboardingLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,13 +66,17 @@ export default function Preferences() {
         description: "Your preferences have been saved successfully",
       });
 
+      // Invalidate user queries to refetch updated user data
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/firebase-user"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/email-user"] });
+
       // Show completion state
       setIsComplete(true);
       
       // After a short delay, redirect to dashboard
       setTimeout(() => {
         setLocation('/');
-      }, 3000);
+      }, 1500);
     } catch (error) {
       console.error('Error updating preferences:', error);
       toast({

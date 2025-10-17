@@ -13,6 +13,7 @@ import {
 } from "./emailPasswordAuth";
 import { generateSessionSummary } from "./openai";
 import { sanitizeUser, sanitizeUsers } from "./utils/sanitizeUser";
+import { isUniversallyAuthenticated, getUserIdFromSession } from "./authMiddleware";
 import multer from "multer";
 import { z } from "zod";
 import { insertSessionSummarySchema } from "@shared/schema";
@@ -674,9 +675,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Onboarding profile endpoints
-  app.post('/api/student/profile', isFirebaseAuthenticated, async (req: any, res) => {
+  app.post('/api/student/profile', isUniversallyAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.session?.firebaseUser?.uid;
+      const userId = getUserIdFromSession(req);
       
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -691,9 +692,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post('/api/parent/profile', isFirebaseAuthenticated, async (req: any, res) => {
+  app.post('/api/parent/profile', isUniversallyAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.session?.firebaseUser?.uid;
+      const userId = getUserIdFromSession(req);
       
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -707,9 +708,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post('/api/tutor/profile', isFirebaseAuthenticated, async (req: any, res) => {
+  app.post('/api/tutor/profile', isUniversallyAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.session?.firebaseUser?.uid;
+      const userId = getUserIdFromSession(req);
       
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -723,9 +724,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post('/api/user/preferences', isFirebaseAuthenticated, async (req: any, res) => {
+  app.post('/api/user/preferences', isUniversallyAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.session?.firebaseUser?.uid;
+      const userId = getUserIdFromSession(req);
       
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });

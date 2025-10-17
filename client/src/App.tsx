@@ -85,6 +85,13 @@ function Router() {
   
   return (
     <Switch>
+      {/* Onboarding routes - allow access even with role to complete onboarding */}
+      <Route path="/onboarding/role-selection" component={RoleSelection} />
+      <Route path="/onboarding/student-info" component={StudentInfo} />
+      <Route path="/onboarding/parent-info" component={ParentInfo} />
+      <Route path="/onboarding/tutor-info" component={TutorInfo} />
+      <Route path="/onboarding/preferences" component={Preferences} />
+      
       {/* Dashboard routes based on role */}
       <Route path="/">
         {userRole === "tutor" && <TutorDashboard />}
