@@ -1,7 +1,7 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
-import { sendVerificationEmail } from "./emailService";
+import { sendVerificationEmail, sendPasswordResetEmail } from "./emailService";
 import { sanitizeUser } from "./utils/sanitizeUser";
 import { randomBytes } from "crypto";
 
@@ -196,6 +196,80 @@ export async function handleEmailPasswordLogout(req: Request, res: Response) {
   } catch (error) {
     console.error("Logout error:", error);
     return res.status(500).json({ message: "Logout failed" });
+  }
+}
+
+export async function handleForgotPassword(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await storage.getUserByEmail(email);
+    
+    // Don't reveal if user exists for security
+    if (!user) {
+      return res.status(200).json({ 
+        message: "If an account with that email exists, a password reset link has been sent." 
+      });
+    }
+
+    // Generate reset token
+    const resetToken = randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiry
+
+    await storage.updateUserPasswordReset(user.id, resetToken, resetTokenExpiry);
+
+    try {
+      await sendPasswordResetEmail(email, resetToken, user.firstName || undefined);
+    } catch (emailError) {
+      console.error("Failed to send password reset email:", emailError);
+      return res.status(500).json({ message: "Failed to send password reset email" });
+    }
+
+    return res.status(200).json({ 
+      message: "If an account with that email exists, a password reset link has been sent." 
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({ message: "Failed to process password reset request" });
+  }
+}
+
+export async function handleResetPassword(req: Request, res: Response) {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    const user = await storage.getUserByPasswordResetToken(token);
+    
+    if (!user || !user.passwordResetTokenExpiry) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    if (new Date() > user.passwordResetTokenExpiry) {
+      return res.status(400).json({ message: "Reset token has expired" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update password and clear reset token
+    await storage.updateUserPassword(user.id, hashedPassword);
+    await storage.updateUserPasswordReset(user.id, null, null);
+
+    return res.status(200).json({ message: "Password has been reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Failed to reset password" });
   }
 }
 

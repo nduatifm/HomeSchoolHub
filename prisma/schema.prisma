@@ -27,6 +27,8 @@ model User {
   emailVerified   Boolean   @default(false) @map("email_verified")
   verificationToken String? @map("verification_token") @db.VarChar
   verificationTokenExpiry DateTime? @map("verification_token_expiry")
+  passwordResetToken String? @map("password_reset_token") @db.VarChar
+  passwordResetTokenExpiry DateTime? @map("password_reset_token_expiry")
   firstName       String?   @map("first_name") @db.VarChar
   lastName        String?   @map("last_name") @db.VarChar
   profileImageUrl String?   @map("profile_image_url") @db.VarChar

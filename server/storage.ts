@@ -29,6 +29,10 @@ export interface IStorage {
   getUsersByRole(role: string): Promise<User[]>;
   updateUserVerification(id: string, verified: boolean, verificationToken?: string | null, verificationTokenExpiry?: Date | null): Promise<User | undefined>;
   getUserByVerificationToken(token: string): Promise<User | undefined>;
+  updateUserPassword(id: string, password: string): Promise<User | undefined>;
+  updateUserPasswordReset(id: string, resetToken: string | null, resetTokenExpiry: Date | null): Promise<User | undefined>;
+  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
+  deleteUnverifiedExpiredUsers(): Promise<number>;
   
   // Student operations
   getStudentsByParentId(parentId: string): Promise<User[]>;
@@ -153,6 +157,56 @@ export class DatabaseStorage implements IStorage {
       }
     });
     return user ?? undefined;
+  }
+
+  async updateUserPassword(id: string, password: string): Promise<User | undefined> {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        password,
+        updatedAt: new Date()
+      }
+    });
+    return user ?? undefined;
+  }
+
+  async updateUserPasswordReset(id: string, resetToken: string | null, resetTokenExpiry: Date | null): Promise<User | undefined> {
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetTokenExpiry: resetTokenExpiry,
+        updatedAt: new Date()
+      }
+    });
+    return user ?? undefined;
+  }
+
+  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetTokenExpiry: {
+          gte: new Date()
+        }
+      }
+    });
+    return user ?? undefined;
+  }
+
+  async deleteUnverifiedExpiredUsers(): Promise<number> {
+    const result = await prisma.user.deleteMany({
+      where: {
+        emailVerified: false,
+        verificationTokenExpiry: {
+          lt: new Date()
+        },
+        password: {
+          not: null
+        }
+      }
+    });
+    return result.count;
   }
 
   // Student operations

@@ -9,6 +9,8 @@ import {
   handleEmailVerification, 
   handleResendVerification,
   handleEmailPasswordLogout,
+  handleForgotPassword,
+  handleResetPassword,
   isEmailPasswordAuthenticated 
 } from "./emailPasswordAuth";
 import { generateSessionSummary } from "./openai";
@@ -650,6 +652,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Email logout error:", error);
       res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      return handleForgotPassword(req, res);
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Failed to process request" });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      return handleResetPassword(req, res);
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
     }
   });
 

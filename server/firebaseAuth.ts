@@ -33,9 +33,11 @@ export async function handleFirebaseLogin(req: Request, res: Response) {
     }
 
     let user;
+    let isExistingUser = false;
     if (existingUser) {
-      // If a user with this email already exists, just return that user
+      // If a user with this email already exists, use that user
       user = existingUser;
+      isExistingUser = true;
       console.log("Using existing user account with email:", email);
     } else {
       // Otherwise create a new user
@@ -68,7 +70,10 @@ export async function handleFirebaseLogin(req: Request, res: Response) {
       };
     }
 
-    return res.status(200).json(sanitizeUser(user));
+    return res.status(200).json({
+      ...sanitizeUser(user),
+      isExistingUser
+    });
   } catch (error) {
     console.error("Firebase login error:", error);
     return res.status(500).json({ message: "Authentication failed" });

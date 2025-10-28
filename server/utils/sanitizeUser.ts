@@ -6,6 +6,8 @@ export function sanitizeUser(user: User) {
     password: _, 
     verificationToken: __, 
     verificationTokenExpiry: ___, 
+    passwordResetToken: ____,
+    passwordResetTokenExpiry: _____,
     ...safeUser 
   } = user;
   
