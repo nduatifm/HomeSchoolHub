@@ -90,6 +90,11 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
     
     // Schedule cleanup jobs to run every 6 hours
-    scheduleCleanupJobs(6);
+    // Wrap in try/catch to prevent unhandled promise rejections
+    try {
+      scheduleCleanupJobs(6);
+    } catch (error) {
+      console.error('[server] Failed to schedule cleanup jobs:', error);
+    }
   });
 })();

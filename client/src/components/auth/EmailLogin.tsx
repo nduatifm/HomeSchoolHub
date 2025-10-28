@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -102,7 +103,18 @@ export function EmailLogin({ onSuccess, onNeedsVerification }: EmailLoginProps) 
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <div className="flex items-center justify-between">
+                <FormLabel>Password</FormLabel>
+                <Link href="/forgot-password">
+                  <button 
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    data-testid="link-forgot-password"
+                  >
+                    Forgot password?
+                  </button>
+                </Link>
+              </div>
               <FormControl>
                 <Input 
                   {...field} 

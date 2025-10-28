@@ -67,10 +67,14 @@ export async function cleanupExpiredPasswordResetTokens() {
  * Run all cleanup jobs
  */
 export async function runCleanupJobs() {
-  console.log('[cleanup] Running cleanup jobs...');
-  await cleanupExpiredVerificationTokens();
-  await cleanupExpiredPasswordResetTokens();
-  console.log('[cleanup] Cleanup jobs completed');
+  try {
+    console.log('[cleanup] Running cleanup jobs...');
+    await cleanupExpiredVerificationTokens();
+    await cleanupExpiredPasswordResetTokens();
+    console.log('[cleanup] Cleanup jobs completed');
+  } catch (error) {
+    console.error('[cleanup] Error running cleanup jobs:', error);
+  }
 }
 
 /**
@@ -80,12 +84,16 @@ export async function runCleanupJobs() {
 export function scheduleCleanupJobs(intervalHours: number = 6) {
   const intervalMs = intervalHours * 60 * 60 * 1000;
   
-  // Run immediately on startup
-  runCleanupJobs();
+  // Run immediately on startup (wrapped in catch to prevent unhandled rejections)
+  runCleanupJobs().catch(error => {
+    console.error('[cleanup] Initial cleanup job failed:', error);
+  });
   
   // Then schedule to run periodically
   setInterval(() => {
-    runCleanupJobs();
+    runCleanupJobs().catch(error => {
+      console.error('[cleanup] Scheduled cleanup job failed:', error);
+    });
   }, intervalMs);
   
   console.log(`[cleanup] Scheduled cleanup jobs to run every ${intervalHours} hours`);
