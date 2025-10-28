@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
+import { scheduleCleanupJobs } from "./cleanupJobs";
 
 const app = express();
 
@@ -87,5 +88,8 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Schedule cleanup jobs to run every 6 hours
+    scheduleCleanupJobs(6);
   });
 })();
