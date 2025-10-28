@@ -16,13 +16,17 @@ export default function ResetPassword() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetComplete, setResetComplete] = useState(false);
   const [tokenInvalid, setTokenInvalid] = useState(false);
+  const [isValidating, setIsValidating] = useState(true);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const resetToken = urlParams.get('token');
     
-    if (!resetToken) {
+    // Real reset tokens are 64 characters (32 bytes hex encoded)
+    // Reject if token is missing or obviously invalid (too short)
+    if (!resetToken || resetToken.length < 32) {
       setTokenInvalid(true);
+      setIsValidating(false);
       toast({
         title: "Invalid link",
         description: "This password reset link is invalid or has expired",
@@ -30,6 +34,7 @@ export default function ResetPassword() {
       });
     } else {
       setToken(resetToken);
+      setIsValidating(false);
     }
   }, [toast]);
 
@@ -100,6 +105,18 @@ export default function ResetPassword() {
       setIsSubmitting(false);
     }
   };
+
+  if (isValidating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (tokenInvalid) {
     return (
