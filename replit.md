@@ -89,9 +89,13 @@ The database schema includes tables for:
    - **Google OAuth:**
      - User clicks "Sign in with Google"
      - Firebase handles OAuth flow
-     - Server receives user info and creates/updates user record
+     - Server receives user info and checks for existing account
+     - If account already exists: Modal popup appears asking user to confirm login
+       - "Continue" → Proceeds with login
+       - "Cancel" → Signs out from Firebase, no login
+     - If new account: Creates user record
      - Session regenerated and user info stored
-     - Frontend receives sanitized user data
+     - Frontend receives sanitized user data with `isExistingUser` flag
    
    - **Email/Password Signup:**
      - User submits signup form with email and password

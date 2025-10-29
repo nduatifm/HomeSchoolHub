@@ -1,10 +1,20 @@
 import { useState } from "react";
 import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithPopup, signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FcGoogle } from "react-icons/fc";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface GoogleSignInProps {
   onSuccess?: (user: any) => void;
@@ -15,6 +25,8 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  const [showExistingUserDialog, setShowExistingUserDialog] = useState(false);
+  const [pendingUserData, setPendingUserData] = useState<any>(null);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -57,6 +69,14 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
       // Check if this is a new user (if they don't have a role set)
       const userData = await response.json();
       
+      // If user already exists, show confirmation modal
+      if (userData.isExistingUser) {
+        setPendingUserData({ userData, firebaseUser: user });
+        setShowExistingUserDialog(true);
+        setLoading(false);
+        return;
+      }
+      
       // If it's a new user (no role set), redirect to onboarding flow
       if (!userData.role) {
         window.location.href = "/onboarding/role-selection";
@@ -88,21 +108,98 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
     }
   };
 
+  const handleContinueLogin = () => {
+    setShowExistingUserDialog(false);
+    
+    if (pendingUserData) {
+      const { userData, firebaseUser } = pendingUserData;
+      
+      // If it's a new user (no role set), redirect to onboarding flow
+      if (!userData.role) {
+        window.location.href = "/onboarding/role-selection";
+        return;
+      }
+
+      if (onSuccess) {
+        onSuccess(firebaseUser);
+      }
+      
+      toast({
+        title: "Successfully signed in",
+        description: `Welcome back, ${firebaseUser.displayName || firebaseUser.email}!`,
+      });
+      
+      setPendingUserData(null);
+    }
+  };
+
+  const handleCancelLogin = async () => {
+    setShowExistingUserDialog(false);
+    
+    try {
+      // Sign out from Firebase
+      await firebaseSignOut(auth);
+      
+      // Also sign out from server if there's a session
+      await fetch("/api/auth/firebase-logout", {
+        method: "POST",
+        credentials: 'include'
+      });
+      
+      toast({
+        title: "Sign in cancelled",
+        description: "You were not logged in.",
+      });
+    } catch (error) {
+      console.error("Error cancelling login:", error);
+    }
+    
+    setPendingUserData(null);
+  };
+
   return (
-    <Button
-      variant="default"
-      type="button"
-      disabled={loading}
-      onClick={handleGoogleSignIn}
-      className="w-full py-6 text-base"
-      size="lg"
-    >
-      {loading ? (
-        <span className="h-5 w-5 animate-spin mr-2" />
-      ) : (
-        <FcGoogle className="mr-2 h-6 w-6" />
-      )}
-      Sign in with Google
-    </Button>
+    <>
+      <Button
+        variant="default"
+        type="button"
+        disabled={loading}
+        onClick={handleGoogleSignIn}
+        className="w-full py-6 text-base"
+        size="lg"
+        data-testid="button-google-signin"
+      >
+        {loading ? (
+          <span className="h-5 w-5 animate-spin mr-2" />
+        ) : (
+          <FcGoogle className="mr-2 h-6 w-6" />
+        )}
+        Sign in with Google
+      </Button>
+
+      <AlertDialog open={showExistingUserDialog} onOpenChange={setShowExistingUserDialog}>
+        <AlertDialogContent data-testid="dialog-existing-user">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Account Already Exists</AlertDialogTitle>
+            <AlertDialogDescription>
+              An account with this email already exists. Would you like to continue and sign in?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={handleCancelLogin}
+              data-testid="button-cancel-login"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleContinueLogin}
+              data-testid="button-continue-login"
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
