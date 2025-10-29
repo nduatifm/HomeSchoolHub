@@ -15,7 +15,12 @@ export function useAuth() {
   } = useQuery<User>({
     queryKey: ["/api/auth/firebase-user"],
     enabled: !!firebaseAuthUser && initialized,
-    retry: 1,
+    retry: false,
+    refetchOnWindowFocus: false,
+    meta: {
+      // Suppress 401 errors in console - they're expected when not using Firebase auth
+      suppressErrors: true,
+    }
   });
 
   // Also try to fetch email/password user data
@@ -26,7 +31,12 @@ export function useAuth() {
   } = useQuery<User>({
     queryKey: ["/api/auth/email-user"],
     enabled: initialized && !firebaseAuthUser,
-    retry: 1,
+    retry: false,
+    refetchOnWindowFocus: false,
+    meta: {
+      // Suppress 401 errors in console - they're expected when not using email/password auth
+      suppressErrors: true,
+    }
   });
 
   // Initialize after Firebase auth has loaded
