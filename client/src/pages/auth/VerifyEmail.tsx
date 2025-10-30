@@ -20,15 +20,8 @@ export default function VerifyEmail() {
   const [message, setMessage] = useState("");
   const [resendingEmail, setResendingEmail] = useState(false);
   const [userEmail, setUserEmail] = useState("");
-  const verificationAttempted = useRef(false);
 
   useEffect(() => {
-    // Prevent double execution in React StrictMode
-    if (verificationAttempted.current) {
-      return;
-    }
-    verificationAttempted.current = true;
-
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get("token");
 
@@ -38,10 +31,30 @@ export default function VerifyEmail() {
       return;
     }
 
+    // Check if this token verification is in progress or already completed
+    const verifiedKey = `email_verified_${token}`;
+    const verificationStatus = sessionStorage.getItem(verifiedKey);
+    
+    if (verificationStatus === "success") {
+      setStatus("success");
+      setMessage("Email verified successfully! You can now log in.");
+      return;
+    }
+    
+    if (verificationStatus === "in_progress") {
+      // Already attempting verification, don't duplicate
+      return;
+    }
+
+    // Mark verification as in progress before making the request
+    sessionStorage.setItem(verifiedKey, "in_progress");
+
     verifyEmail(token);
   }, []);
 
   const verifyEmail = async (token: string) => {
+    const verifiedKey = `email_verified_${token}`;
+    
     try {
       const response = await fetch("/api/auth/verify-email", {
         method: "POST",
@@ -55,13 +68,22 @@ export default function VerifyEmail() {
       const result = await response.json();
 
       if (response.ok) {
+        // Mark verification as successful
+        sessionStorage.setItem(verifiedKey, "success");
+        
         setStatus("success");
         setMessage(result.message || "Email verified successfully!");
       } else {
+        // Clear in_progress status on failure so user can retry
+        sessionStorage.removeItem(verifiedKey);
+        
         setStatus("error");
         setMessage(result.message || "Verification failed");
       }
     } catch (error: any) {
+      // Clear in_progress status on error so user can retry
+      sessionStorage.removeItem(verifiedKey);
+      
       setStatus("error");
       setMessage("An error occurred during verification");
     }

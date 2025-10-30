@@ -91,6 +91,11 @@ export async function handleFirebaseLogout(req: Request, res: Response) {
       });
     });
 
+    // Clear the session cookie with matching options
+    res.clearCookie('connect.sid', {
+      path: '/',
+    });
+
     return res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     console.error("Firebase logout error:", error);

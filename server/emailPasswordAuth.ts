@@ -122,6 +122,15 @@ export async function handleEmailVerification(req: Request, res: Response) {
       return res.status(400).json({ message: "Invalid or expired verification token" });
     }
 
+    // If already verified, return success (idempotent behavior)
+    if (user.emailVerified) {
+      return res.status(200).json({ 
+        message: "Email already verified! You can now log in.",
+        verified: true,
+        alreadyVerified: true
+      });
+    }
+
     await storage.updateUserVerification(user.id, true, null, null);
 
     return res.status(200).json({ 
@@ -190,6 +199,11 @@ export async function handleEmailPasswordLogout(req: Request, res: Response) {
         if (err) reject(err);
         else resolve();
       });
+    });
+    
+    // Clear the session cookie with matching options
+    res.clearCookie('connect.sid', {
+      path: '/',
     });
     
     return res.status(200).json({ message: "Logged out successfully" });
