@@ -53,7 +53,7 @@ function Router() {
     );
   }
 
-  // If we have Firebase auth but no server user yet, redirect to login 
+  // If we have Firebase auth but no server user yet, redirect to login
   // to complete the sign-up process properly
   if (firebaseAuthUser && !user) {
     return (
@@ -86,7 +86,7 @@ function Router() {
 
   // Role-based routing for fully authenticated users
   const userRole = user?.role || "student";
-  
+
   return (
     <Switch>
       {/* Onboarding routes - allow access even with role to complete onboarding */}
@@ -95,20 +95,20 @@ function Router() {
       <Route path="/onboarding/parent-info" component={ParentInfo} />
       <Route path="/onboarding/tutor-info" component={TutorInfo} />
       <Route path="/onboarding/preferences" component={Preferences} />
-      
+
       {/* Dashboard routes based on role */}
       <Route path="/">
         {userRole === "tutor" && <TutorDashboard />}
         {userRole === "parent" && <ParentDashboard />}
         {userRole === "student" && <StudentDashboard />}
       </Route>
-      
+
       {/* Common routes for all authenticated users */}
       <Route path="/assignments" component={Assignments} />
       <Route path="/sessions" component={Sessions} />
       <Route path="/progress" component={ProgressTracker} />
       <Route path="/messages" component={Messages} />
-      
+
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

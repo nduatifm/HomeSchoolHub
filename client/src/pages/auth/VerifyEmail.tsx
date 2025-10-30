@@ -1,6 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Loader2, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -8,10 +14,12 @@ import { useToast } from "@/hooks/use-toast";
 export default function VerifyEmail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<"loading" | "success" | "error">(
+    "loading",
+  );
+  const [message, setMessage] = useState("");
   const [resendingEmail, setResendingEmail] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
+  const [userEmail, setUserEmail] = useState("");
   const verificationAttempted = useRef(false);
 
   useEffect(() => {
@@ -22,11 +30,11 @@ export default function VerifyEmail() {
     verificationAttempted.current = true;
 
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    const token = urlParams.get("token");
 
     if (!token) {
-      setStatus('error');
-      setMessage('No verification token provided');
+      setStatus("error");
+      setMessage("No verification token provided");
       return;
     }
 
@@ -35,27 +43,27 @@ export default function VerifyEmail() {
 
   const verifyEmail = async (token: string) => {
     try {
-      const response = await fetch('/api/auth/verify-email', {
-        method: 'POST',
+      const response = await fetch("/api/auth/verify-email", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ token }),
-        credentials: 'include'
+        credentials: "include",
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        setStatus('success');
-        setMessage(result.message || 'Email verified successfully!');
+        setStatus("success");
+        setMessage(result.message || "Email verified successfully!");
       } else {
-        setStatus('error');
-        setMessage(result.message || 'Verification failed');
+        setStatus("error");
+        setMessage(result.message || "Verification failed");
       }
     } catch (error: any) {
-      setStatus('error');
-      setMessage('An error occurred during verification');
+      setStatus("error");
+      setMessage("An error occurred during verification");
     }
   };
 
@@ -71,13 +79,13 @@ export default function VerifyEmail() {
 
     try {
       setResendingEmail(true);
-      const response = await fetch('/api/auth/resend-verification', {
-        method: 'POST',
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email: userEmail }),
-        credentials: 'include'
+        credentials: "include",
       });
 
       const result = await response.json();
@@ -110,42 +118,53 @@ export default function VerifyEmail() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            {status === 'loading' && (
-              <Loader2 className="h-16 w-16 text-primary animate-spin" data-testid="loader-verifying" />
+            {status === "loading" && (
+              <Loader2
+                className="h-16 w-16 text-primary animate-spin"
+                data-testid="loader-verifying"
+              />
             )}
-            {status === 'success' && (
-              <CheckCircle2 className="h-16 w-16 text-green-500" data-testid="icon-success" />
+            {status === "success" && (
+              <CheckCircle2
+                className="h-16 w-16 text-green-500"
+                data-testid="icon-success"
+              />
             )}
-            {status === 'error' && (
-              <XCircle className="h-16 w-16 text-red-500" data-testid="icon-error" />
+            {status === "error" && (
+              <XCircle
+                className="h-16 w-16 text-red-500"
+                data-testid="icon-error"
+              />
             )}
           </div>
           <CardTitle className="text-2xl font-bold">
-            {status === 'loading' && 'Verifying Email'}
-            {status === 'success' && 'Email Verified!'}
-            {status === 'error' && 'Verification Failed'}
+            {status === "loading" && "Verifying Email"}
+            {status === "success" && "Email Verified!"}
+            {status === "error" && "Verification Failed"}
           </CardTitle>
           <CardDescription className="mt-2" data-testid="text-message">
-            {status === 'loading' && 'Please wait while we verify your email address...'}
-            {status === 'success' && message}
-            {status === 'error' && message}
+            {status === "loading" &&
+              "Please wait while we verify your email address..."}
+            {status === "success" && message}
+            {status === "error" && message}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {status === 'success' && (
-            <Button 
-              className="w-full" 
-              onClick={() => setLocation('/login')}
+          {status === "success" && (
+            <Button
+              className="w-full"
+              onClick={() => setLocation("/login")}
               data-testid="button-go-to-login"
             >
               Go to Login
             </Button>
           )}
-          
-          {status === 'error' && (
+
+          {status === "error" && (
             <div className="space-y-4">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Your verification link may have expired. Enter your email to receive a new verification link.
+                Your verification link may have expired. Enter your email to
+                receive a new verification link.
               </div>
               <div className="flex gap-2">
                 <input
@@ -156,7 +175,7 @@ export default function VerifyEmail() {
                   className="flex-1 px-3 py-2 border rounded-md"
                   data-testid="input-resend-email"
                 />
-                <Button 
+                <Button
                   onClick={handleResendVerification}
                   disabled={resendingEmail}
                   data-testid="button-resend-verification"
@@ -169,7 +188,11 @@ export default function VerifyEmail() {
                 </Button>
               </div>
               <Link href="/login">
-                <Button variant="outline" className="w-full" data-testid="link-back-to-login">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  data-testid="link-back-to-login"
+                >
                   Back to Login
                 </Button>
               </Link>
