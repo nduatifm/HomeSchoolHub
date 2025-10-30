@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { FcGoogle } from "react-icons/fc";
 import { useToast } from "@/hooks/use-toast";
+import { clearAllStorage } from "@/lib/storage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -145,6 +146,9 @@ export function GoogleSignIn({ onSuccess, onError }: GoogleSignInProps) {
         method: "POST",
         credentials: 'include'
       });
+      
+      // Clear all browser storage
+      clearAllStorage();
       
       toast({
         title: "Sign in cancelled",
