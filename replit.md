@@ -65,10 +65,16 @@ The application uses a monorepo structure with client, server, and shared code f
      - Session regeneration on login to prevent session fixation
      - Verification tokens with 24-hour expiry
      - Sanitized API responses (no password/token leakage)
+     - Automatic storage clearing on logout and session expiration
    - **Session Management:**
      - PostgreSQL-backed sessions via connect-pg-simple
      - Secure session destruction on logout
      - Session-based authentication middleware
+   - **Storage Security:**
+     - Global fetch interceptor clears localStorage and sessionStorage on any 401 response
+     - All logout handlers (Replit OAuth, Firebase, Email/Password) clear browser storage
+     - Defense-in-depth with storage clearing in both queryClient and global fetch interceptor
+     - Implemented in `client/src/lib/storage.ts` and `client/src/lib/fetchInterceptor.ts`
 
 ### Database Schema
 
