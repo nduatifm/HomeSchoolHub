@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { clearAllStorage } from "@/lib/storage";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,11 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const toggleMobileMenu = () => {
     setShowMobileMenu(!showMobileMenu);
     onMobileMenuToggle();
+  };
+  
+  const handleLogout = () => {
+    clearAllStorage();
+    window.location.href = "/api/logout";
   };
 
   return (
@@ -67,8 +73,8 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                   {theme === 'dark' ? 'Light Theme' : 'Dark Theme'}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <a href="/api/logout">Logout</a>
+                <DropdownMenuItem onClick={handleLogout} data-testid="menuitem-logout">
+                  Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

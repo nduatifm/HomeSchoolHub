@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { clearAllStorage } from "@/lib/storage";
 import { 
   Home, 
   BookOpen, 
@@ -18,6 +19,11 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
+  
+  const handleLogout = () => {
+    clearAllStorage();
+    window.location.href = "/api/logout";
+  };
   
   const navItems = [
     {
@@ -122,10 +128,14 @@ export function Sidebar({ className }: SidebarProps) {
           <Settings className="h-5 w-5 mr-3" />
           Settings
         </a>
-        <a href="/api/logout" className="flex items-center px-3 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md mt-2">
+        <button 
+          onClick={handleLogout} 
+          className="w-full flex items-center px-3 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md mt-2"
+          data-testid="button-logout"
+        >
           <LogOut className="h-5 w-5 mr-3" />
           Logout
-        </a>
+        </button>
       </div>
     </aside>
   );
