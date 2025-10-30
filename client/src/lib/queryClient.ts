@@ -1,7 +1,12 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { clearAllStorage } from "@/lib/storage";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Clear storage on session expiration (401 Unauthorized)
+    if (res.status === 401) {
+      clearAllStorage();
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -33,8 +38,13 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401) {
+      // Clear storage on session expiration
+      clearAllStorage();
+      
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
     }
 
     await throwIfResNotOk(res);
