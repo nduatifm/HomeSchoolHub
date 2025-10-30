@@ -6,6 +6,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { clearAllStorage } from "@/lib/storage";
 
 export function useFirebaseAuth() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -30,6 +31,9 @@ export function useFirebaseAuth() {
       await fetch("/api/auth/firebase-logout", {
         method: "POST",
       });
+      
+      // Clear all browser storage
+      clearAllStorage();
       
       toast({
         title: "Signed out successfully",
