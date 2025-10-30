@@ -3,6 +3,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clearAllStorage } from "@/lib/storage";
+import { signOut as firebaseSignOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +20,7 @@ interface HeaderProps {
 }
 
 export function Header({ onMobileMenuToggle }: HeaderProps) {
-  const { user } = useAuth();
+  const { user, firebaseAuthUser } = useAuth();
   const { theme, setTheme } = useTheme();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
@@ -27,9 +29,28 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     onMobileMenuToggle();
   };
   
-  const handleLogout = () => {
-    clearAllStorage();
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      // If user is authenticated via Firebase, sign out from Firebase
+      if (firebaseAuthUser) {
+        await firebaseSignOut(auth);
+        await fetch("/api/auth/firebase-logout", {
+          method: "POST",
+          credentials: 'include'
+        });
+      }
+      
+      // Clear all browser storage
+      clearAllStorage();
+      
+      // Redirect to home page
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Still clear storage and redirect even if there's an error
+      clearAllStorage();
+      window.location.href = "/";
+    }
   };
 
   return (

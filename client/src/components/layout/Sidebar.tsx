@@ -2,6 +2,8 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { clearAllStorage } from "@/lib/storage";
+import { signOut as firebaseSignOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { 
   Home, 
   BookOpen, 
@@ -18,11 +20,30 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, firebaseAuthUser } = useAuth();
   
-  const handleLogout = () => {
-    clearAllStorage();
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      // If user is authenticated via Firebase, sign out from Firebase
+      if (firebaseAuthUser) {
+        await firebaseSignOut(auth);
+        await fetch("/api/auth/firebase-logout", {
+          method: "POST",
+          credentials: 'include'
+        });
+      }
+      
+      // Clear all browser storage
+      clearAllStorage();
+      
+      // Redirect to home page
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Still clear storage and redirect even if there's an error
+      clearAllStorage();
+      window.location.href = "/";
+    }
   };
   
   const navItems = [
