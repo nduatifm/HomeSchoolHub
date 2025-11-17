@@ -706,6 +706,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get approved tutors for a parent (for messaging)
+  app.get('/api/tutors/approved/parent/:parentId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { parentId } = req.params;
+      
+      // Authorization: Only allow users to access their own approved tutors
+      if (authUserId !== parentId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Get tutor requests and filter for approved ones FIRST
+      const tutorRequests = await storage.getTutorRequestsByParent(parentId);
+      const approvedTutorIds = tutorRequests
+        .filter(req => req.status === 'approved')
+        .map(req => req.tutorId);
+      
+      // Only fetch tutors for approved requests
+      const tutors = await Promise.all(
+        approvedTutorIds.map(async (id) => {
+          const user = await storage.getUserById(id);
+          return user ? sanitizeUser(user) : null;
+        })
+      );
+      
+      // Filter out nulls and return sanitized tutors
+      res.json(tutors.filter(Boolean));
+    } catch (error) {
+      console.error("Error fetching approved tutors for parent:", error);
+      res.status(500).json({ message: "Failed to fetch approved tutors" });
+    }
+  });
+
+  // Get approved tutors for a student (for messaging)
+  app.get('/api/tutors/approved/student/:studentId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { studentId } = req.params;
+      
+      // Get student to find their parent
+      const student = await storage.getStudentById(studentId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Authorization: Allow both the student and their parent to access
+      if (authUserId !== studentId && authUserId !== student.parentId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Get tutor requests from parent and filter for approved ones FIRST
+      const tutorRequests = await storage.getTutorRequestsByParent(student.parentId);
+      const approvedTutorIds = tutorRequests
+        .filter(req => req.status === 'approved' && (!req.studentId || req.studentId === studentId))
+        .map(req => req.tutorId);
+      
+      // Only fetch tutors for approved requests
+      const tutors = await Promise.all(
+        approvedTutorIds.map(async (id) => {
+          const user = await storage.getUserById(id);
+          return user ? sanitizeUser(user) : null;
+        })
+      );
+      
+      // Filter out nulls and return sanitized tutors
+      res.json(tutors.filter(Boolean));
+    } catch (error) {
+      console.error("Error fetching approved tutors for student:", error);
+      res.status(500).json({ message: "Failed to fetch approved tutors" });
+    }
+  });
+
   // Notification routes
   app.get('/api/notifications/user/:userId', isUniversallyAuthenticated, async (req, res) => {
     try {

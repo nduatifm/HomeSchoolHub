@@ -75,17 +75,17 @@ export default function Messages() {
   const isTutor = user?.role === "tutor";
   const isParent = user?.role === "parent";
 
-  // Get appropriate recipient list based on role
+  // Get appropriate recipient list based on role with relationship filtering
   const recipientQueryKey = isTutor 
-    ? [`/api/students/tutor/${user?.id}`] 
+    ? `/api/students/tutor/${user?.id}` 
     : isStudent
-      ? ["/api/users/role/tutor"]
+      ? `/api/tutors/approved/student/${user?.id}`
       : isParent
-        ? ["/api/users/role/tutor"]
-        : null;
+        ? `/api/tutors/approved/parent/${user?.id}`
+        : "";
 
   const { data: recipients, isLoading: isLoadingRecipients } = useQuery<User[]>({
-    queryKey: recipientQueryKey,
+    queryKey: [recipientQueryKey],
     enabled: !!user?.id && !!recipientQueryKey,
   });
 
@@ -104,7 +104,6 @@ export default function Messages() {
       toast({
         title: "Message Sent",
         description: "Your message has been sent successfully.",
-        variant: "success",
       });
     },
     onError: (error) => {
@@ -130,7 +129,6 @@ export default function Messages() {
       toast({
         title: "Reply Sent",
         description: "Your reply has been sent successfully.",
-        variant: "success",
       });
     },
     onError: (error) => {

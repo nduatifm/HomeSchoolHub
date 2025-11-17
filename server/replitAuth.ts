@@ -128,9 +128,21 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  const session = req.session as any;
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  // Check for Firebase authentication
+  if (session?.firebaseUser?.uid) {
+    return next();
+  }
+
+  // Check for Email/Password authentication
+  if (session?.emailPasswordUser?.id) {
+    return next();
+  }
+
+  // Check for Replit OAuth authentication
+  if (!req.isAuthenticated() || !user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

@@ -111,16 +111,17 @@ export function Sidebar({ className }: SidebarProps) {
         <ul className="space-y-2">
           {navItems.map((item) => (
             <li key={item.href}>
-              <Link href={item.href}>
-                <a className={cn(
+              <Link 
+                href={item.href}
+                className={cn(
                   "flex items-center px-3 py-2 rounded-md",
                   location === item.href 
                     ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20 dark:text-primary-400 font-medium" 
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                )}>
-                  {item.icon}
-                  {item.title}
-                </a>
+                )}
+              >
+                {item.icon}
+                {item.title}
               </Link>
             </li>
           ))}

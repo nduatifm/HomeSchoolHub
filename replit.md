@@ -137,6 +137,20 @@ The database schema includes tables for:
    - User roles (student, parent, tutor) determine accessible views and actions
    - Data visibility is filtered based on relationships (e.g., parents see only their children's data)
 
+4. **Messaging System with Relationship-Based Filtering**
+   - **Parent Messaging:**
+     - Parents can only message tutors with approved tutor request relationships
+     - Fetches approved tutors via `/api/tutors/approved/parent/:parentId`
+   - **Student Messaging:**
+     - Students can only message tutors with approved relationships (through their parent)
+     - Fetches approved tutors via `/api/tutors/approved/student/:studentId`
+   - **Tutor Messaging:**
+     - Tutors can message their assigned students
+     - Fetches students via `/api/students/tutor/:tutorId`
+   - **Authorization:**
+     - All messaging endpoints verify user identity matches the resource owner
+     - Only users with established relationships can communicate
+
 ## External Dependencies
 
 1. **UI Components**
