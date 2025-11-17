@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -146,7 +146,6 @@ export default function Sessions() {
       toast({
         title: "Session Scheduled",
         description: "The session has been scheduled successfully.",
-        variant: "success",
       });
     },
     onError: (error) => {
@@ -194,7 +193,6 @@ export default function Sessions() {
         description: recordingFile 
           ? "Session notes saved and AI summary generated."
           : "Session notes have been saved.",
-        variant: "success",
       });
     },
     onError: (error) => {
@@ -397,14 +395,14 @@ export default function Sessions() {
                                       </SelectTrigger>
                                       <SelectContent>
                                         {Array.from({ length: 24 }).map((_, hour) => (
-                                          <React.Fragment key={hour}>
+                                          <Fragment key={hour}>
                                             <SelectItem value={`${hour.toString().padStart(2, '0')}:00`}>
                                               {hour.toString().padStart(2, '0')}:00
                                             </SelectItem>
                                             <SelectItem value={`${hour.toString().padStart(2, '0')}:30`}>
                                               {hour.toString().padStart(2, '0')}:30
                                             </SelectItem>
-                                          </React.Fragment>
+                                          </Fragment>
                                         ))}
                                       </SelectContent>
                                     </Select>
@@ -465,14 +463,14 @@ export default function Sessions() {
                                       </SelectTrigger>
                                       <SelectContent>
                                         {Array.from({ length: 24 }).map((_, hour) => (
-                                          <React.Fragment key={hour}>
+                                          <Fragment key={hour}>
                                             <SelectItem value={`${hour.toString().padStart(2, '0')}:00`}>
                                               {hour.toString().padStart(2, '0')}:00
                                             </SelectItem>
                                             <SelectItem value={`${hour.toString().padStart(2, '0')}:30`}>
                                               {hour.toString().padStart(2, '0')}:30
                                             </SelectItem>
-                                          </React.Fragment>
+                                          </Fragment>
                                         ))}
                                       </SelectContent>
                                     </Select>
