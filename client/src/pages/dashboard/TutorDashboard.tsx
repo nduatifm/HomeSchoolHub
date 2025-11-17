@@ -6,10 +6,15 @@ import { ProgressCard } from "@/components/dashboard/ProgressCard";
 import { AISummaryCard } from "@/components/dashboard/AISummaryCard";
 import { MessagesCard } from "@/components/dashboard/MessagesCard";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { TutoringSession } from "@/types";
-import { Users, Calendar, BookOpen, Clock } from "lucide-react";
+import { TutorRequest } from "@shared/schema";
+import { Users, Calendar, BookOpen, Clock, CheckCircle, XCircle, User, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 export default function TutorDashboard() {
   const { user } = useAuth();
@@ -21,12 +26,47 @@ export default function TutorDashboard() {
     enabled: !!user?.id,
   });
 
+  // Fetch tutor requests
+  const { data: tutorRequests, isLoading: isLoadingRequests } = useQuery<TutorRequest[]>({
+    queryKey: [`/api/tutor-requests/tutor/${user?.id}`],
+    enabled: !!user?.id,
+  });
+
+  // Update tutor request status mutation
+  const updateRequestStatus = useMutation({
+    mutationFn: async ({ requestId, status }: { requestId: number; status: string }) => {
+      return apiRequest("PATCH", `/api/tutor-requests/${requestId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/tutor-requests/tutor/${user?.id}`] });
+      toast({
+        title: "Request Updated",
+        description: "The tutor request has been updated successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update request: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleApproveRequest = (requestId: number) => {
+    updateRequestStatus.mutate({ requestId, status: "approved" });
+  };
+
+  const handleRejectRequest = (requestId: number) => {
+    updateRequestStatus.mutate({ requestId, status: "rejected" });
+  };
+
   // Sample data for other components (would be fetched from API in a real app)
   const assignments = [
-    { id: 1, title: "Weekly Math Problems (Set 3)", status: "completed", timeAgo: "2 hours ago", studentName: "Alex Thompson", action: "Review" },
-    { id: 2, title: "English Essay: Character Analysis", status: "in_progress", timeAgo: "Yesterday", studentName: "Emma Davis", action: "Review" },
-    { id: 3, title: "Science Lab Report", status: "overdue", timeAgo: "3 days ago", studentName: "Nathan Wilson", action: "Remind" },
-    { id: 4, title: "History Timeline Project", status: "new", timeAgo: "Just now", action: "Edit" },
+    { id: 1, title: "Weekly Math Problems (Set 3)", status: "completed" as const, timeAgo: "2 hours ago", studentName: "Alex Thompson", action: "Review" },
+    { id: 2, title: "English Essay: Character Analysis", status: "in_progress" as const, timeAgo: "Yesterday", studentName: "Emma Davis", action: "Review" },
+    { id: 3, title: "Science Lab Report", status: "overdue" as const, timeAgo: "3 days ago", studentName: "Nathan Wilson", action: "Remind" },
+    { id: 4, title: "History Timeline Project", status: "new" as const, timeAgo: "Just now", action: "Edit" },
   ];
 
   const progressData = [
@@ -69,7 +109,6 @@ export default function TutorDashboard() {
     toast({
       title: "Share with Parent",
       description: "Summary has been shared with parent",
-      variant: "success",
     });
   };
 
@@ -117,6 +156,74 @@ export default function TutorDashboard() {
             loading={isLoadingSessions}
             emptyMessage="No sessions scheduled for today. Would you like to schedule a new session?"
           />
+
+          {/* Tutor Requests */}
+          <Card>
+            <CardHeader className="px-6 py-4 border-b">
+              <CardTitle className="text-lg font-semibold">Parent Requests</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 divide-y divide-gray-100 dark:divide-gray-800">
+              {isLoadingRequests ? (
+                <div className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Loading requests...
+                </div>
+              ) : tutorRequests?.filter(r => r.status === 'pending').length === 0 ? (
+                <div className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No pending requests at the moment.
+                </div>
+              ) : (
+                <>
+                  {(tutorRequests || []).filter(r => r.status === 'pending').map((request) => (
+                    <div key={request.id} className="px-6 py-4" data-testid={`tutor-request-${request.id}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <User className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            <h4 className="text-sm font-medium" data-testid={`text-parent-name-${request.id}`}>
+                              Tutoring Request from Parent
+                            </h4>
+                            <Badge variant="outline" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400" data-testid={`status-${request.status}-${request.id}`}>
+                              Pending
+                            </Badge>
+                          </div>
+                          {request.message && (
+                            <div className="flex items-start gap-2 mt-2">
+                              <MessageSquare className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                              <p className="text-sm text-gray-600 dark:text-gray-400" data-testid={`text-message-${request.id}`}>
+                                {request.message}
+                              </p>
+                            </div>
+                          )}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleApproveRequest(request.id)}
+                              disabled={updateRequestStatus.isPending}
+                              data-testid={`button-approve-${request.id}`}
+                              className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive"
+                              onClick={() => handleRejectRequest(request.id)}
+                              disabled={updateRequestStatus.isPending}
+                              data-testid={`button-reject-${request.id}`}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Recent Assignment Activity */}
           <AssignmentsCard 

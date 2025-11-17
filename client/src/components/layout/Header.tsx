@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Bell, Menu } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clearAllStorage } from "@/lib/storage";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -14,6 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Notification } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface HeaderProps {
   onMobileMenuToggle: () => void;
@@ -23,11 +28,41 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const { user, firebaseAuthUser } = useAuth();
   const { theme, setTheme } = useTheme();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   
   const toggleMobileMenu = () => {
     setShowMobileMenu(!showMobileMenu);
     onMobileMenuToggle();
   };
+
+  // Fetch unread notifications
+  const { data: notifications } = useQuery<Notification[]>({
+    queryKey: [`/api/notifications/unread/${user?.id}`],
+    enabled: !!user?.id,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Mark notification as read mutation
+  const markAsRead = useMutation({
+    mutationFn: async (notificationId: number) => {
+      return apiRequest("PATCH", `/api/notifications/${notificationId}/read`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/notifications/unread/${user?.id}`] });
+    },
+  });
+
+  // Mark all notifications as read mutation
+  const markAllAsRead = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PATCH", `/api/notifications/read-all/${user?.id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/notifications/unread/${user?.id}`] });
+    },
+  });
+
+  const unreadCount = notifications?.length || 0;
   
   const handleLogout = async () => {
     try {
@@ -64,12 +99,68 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
         </div>
 
         <div className="flex-1 flex justify-end items-center space-x-4">
-          <div className="relative">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">3</span>
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
+                <Bell className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                {unreadCount > 0 && (
+                  <span 
+                    className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full"
+                    data-testid="text-notification-count"
+                  >
+                    {unreadCount}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <div className="flex items-center justify-between px-2 py-2">
+                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                {unreadCount > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => markAllAsRead.mutate()}
+                    className="h-8 text-xs"
+                    data-testid="button-mark-all-read"
+                  >
+                    Mark all as read
+                  </Button>
+                )}
+              </div>
+              <DropdownMenuSeparator />
+              <ScrollArea className="h-[300px]">
+                {!notifications || notifications.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No new notifications
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {notifications.map((notification) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                        onClick={() => markAsRead.mutate(notification.id)}
+                        data-testid={`notification-${notification.id}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-medium text-sm" data-testid={`text-notification-title-${notification.id}`}>
+                            {notification.title}
+                          </span>
+                          {!notification.read && (
+                            <Badge variant="default" className="h-2 w-2 p-0 rounded-full bg-primary" />
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400" data-testid={`text-notification-message-${notification.id}`}>
+                          {notification.message}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <div className="hidden sm:flex items-center">
             <DropdownMenu>
