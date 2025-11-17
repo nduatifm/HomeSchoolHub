@@ -66,14 +66,16 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   
   const handleLogout = async () => {
     try {
-      // If user is authenticated via Firebase, sign out from Firebase
+      // If user is authenticated via Firebase, sign out from Firebase first
       if (firebaseAuthUser) {
         await firebaseSignOut(auth);
-        await fetch("/api/auth/firebase-logout", {
-          method: "POST",
-          credentials: 'include'
-        });
       }
+      
+      // Call universal logout endpoint to destroy session (works for all auth methods)
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: 'include'
+      });
       
       // Clear all browser storage
       clearAllStorage();

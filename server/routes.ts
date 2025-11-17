@@ -726,7 +726,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Only fetch tutors for approved requests
       const tutors = await Promise.all(
         approvedTutorIds.map(async (id) => {
-          const user = await storage.getUserById(id);
+          const user = await storage.getUser(id);
           return user ? sanitizeUser(user) : null;
         })
       );
@@ -745,19 +745,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authUserId = getUserIdFromSession(req);
       const { studentId } = req.params;
       
-      // Get student to find their parent
-      const student = await storage.getStudentById(studentId);
-      if (!student) {
-        return res.status(404).json({ message: "Student not found" });
+      // Get student record to find their parent
+      const studentRecord = await storage.getStudentByUserId(studentId);
+      if (!studentRecord || !studentRecord.parentId) {
+        return res.status(404).json({ message: "Student not found or has no parent" });
       }
       
       // Authorization: Allow both the student and their parent to access
-      if (authUserId !== studentId && authUserId !== student.parentId) {
+      if (authUserId !== studentId && authUserId !== studentRecord.parentId) {
         return res.status(403).json({ message: "Forbidden" });
       }
       
       // Get tutor requests from parent and filter for approved ones FIRST
-      const tutorRequests = await storage.getTutorRequestsByParent(student.parentId);
+      const tutorRequests = await storage.getTutorRequestsByParent(studentRecord.parentId);
       const approvedTutorIds = tutorRequests
         .filter(req => req.status === 'approved' && (!req.studentId || req.studentId === studentId))
         .map(req => req.tutorId);
@@ -765,7 +765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Only fetch tutors for approved requests
       const tutors = await Promise.all(
         approvedTutorIds.map(async (id) => {
-          const user = await storage.getUserById(id);
+          const user = await storage.getUser(id);
           return user ? sanitizeUser(user) : null;
         })
       );
@@ -1026,6 +1026,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Email logout error:", error);
       res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  // Universal logout endpoint that works for all auth methods
+  app.post('/api/auth/logout', async (req, res) => {
+    try {
+      // Destroy the entire session for security (works for all auth methods)
+      await new Promise<void>((resolve, reject) => {
+        req.session.destroy((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      
+      // Clear the session cookie
+      res.clearCookie('connect.sid', {
+        path: '/',
+      });
+      
+      return res.status(200).json({ message: "Logged out successfully" });
+    } catch (error) {
+      console.error("Universal logout error:", error);
+      return res.status(500).json({ message: "Logout failed" });
     }
   });
 

@@ -41,6 +41,7 @@ export interface IStorage {
   deleteUnverifiedExpiredUsers(): Promise<number>;
   
   // Student operations
+  getStudentByUserId(userId: string): Promise<{ id: number; userId: string; parentId: string | null } | undefined>;
   getStudentsByParentId(parentId: string): Promise<User[]>;
   getStudentsByTutorId(tutorId: string): Promise<User[]>;
   
@@ -238,6 +239,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Student operations
+  async getStudentByUserId(userId: string): Promise<{ id: number; userId: string; parentId: string | null } | undefined> {
+    const student = await prisma.student.findFirst({
+      where: { userId },
+      select: { id: true, userId: true, parentId: true }
+    });
+    
+    return student ?? undefined;
+  }
+
   async getStudentsByParentId(parentId: string): Promise<User[]> {
     const studentRecords = await prisma.student.findMany({
       where: { parentId },
