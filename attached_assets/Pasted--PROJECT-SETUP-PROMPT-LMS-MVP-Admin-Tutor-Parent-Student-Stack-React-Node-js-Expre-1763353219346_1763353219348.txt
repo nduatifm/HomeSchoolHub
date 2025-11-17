@@ -1,0 +1,275 @@
+# 🚀 PROJECT SETUP PROMPT — LMS MVP (Admin, Tutor, Parent, Student)
+# Stack: React + Node.js + Express + Prisma + PostgreSQL + Cloudinary + Nodemailer
+# Rule: Students are created ONLY by Parents
+
+# ==========================================
+# 🏗️ 1. PROJECT STRUCTURE
+# ==========================================
+mkdir -p server/src/{routes,controllers,utils,middlewares}
+mkdir -p client/src/{pages,components,utils}
+
+cd server && npm init -y
+npm install express cors dotenv prisma @prisma/client bcryptjs jsonwebtoken nodemailer cloudinary multer
+npx prisma init
+
+cd ..
+npx create-react-app client
+cd client && npm install axios react-router-dom jwt-decode tailwindcss
+npx tailwindcss init -p
+
+# ==========================================
+# ⚙️ 2. PRISMA SCHEMA (server/prisma/schema.prisma)
+# ==========================================
+cat > prisma/schema.prisma <<'EOF'
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int        @id @default(autoincrement())
+  name       String
+  email      String     @unique
+  password   String
+  role       Role
+  parentId   Int?       // only for students
+  parent     User?      @relation("ParentStudents", fields: [parentId], references: [id])
+  students   User[]     @relation("ParentStudents")
+  assignments Assignment[]
+  messages   Message[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Assignment {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  fileUrl     String?
+  feedback    String?
+  studentId   Int
+  tutorId     Int
+  student     User     @relation("StudentAssignments", fields: [studentId], references: [id])
+  tutor       User     @relation("TutorAssignments", fields: [tutorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  content    String
+  senderId   Int
+  receiverId Int
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  TUTOR
+  PARENT
+  STUDENT
+}
+EOF
+
+# ==========================================
+# ⚙️ 3. SERVER STARTUP (server/src/app.mjs)
+# ==========================================
+cat > src/app.mjs <<'EOF'
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { PrismaClient } from "@prisma/client";
+import authRoutes from "./routes/auth.mjs";
+import parentRoutes from "./routes/parents.mjs";
+import tutorRoutes from "./routes/tutors.mjs";
+import assignmentRoutes from "./routes/assignments.mjs";
+import chatRoutes from "./routes/chat.mjs";
+
+dotenv.config();
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+export const prisma = new PrismaClient();
+
+app.get("/", (req, res) => res.send("🚀 LMS Backend Running"));
+app.use("/auth", authRoutes);
+app.use("/parents", parentRoutes);
+app.use("/tutors", tutorRoutes);
+app.use("/assignments", assignmentRoutes);
+app.use("/chat", chatRoutes);
+
+app.listen(process.env.PORT || 5000, () => {
+  console.log(`Server running on port ${process.env.PORT || 5000}`);
+});
+EOF
+
+# ==========================================
+# ⚙️ 4. AUTH ROUTES (server/src/routes/auth.mjs)
+# ==========================================
+cat > src/routes/auth.mjs <<'EOF'
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { prisma } from "../app.mjs";
+
+const router = express.Router();
+
+// 🔑 Generic register for Admin, Tutor, Parent
+router.post("/register", async (req, res) => {
+  const { name, email, password, role } = req.body;
+  try {
+    if (role === "STUDENT") {
+      return res.status(403).json({ error: "Students must be invited by parents" });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashed, role },
+    });
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 🔐 Login
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET);
+    res.json({ token, user });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+export default router;
+EOF
+
+# ==========================================
+# ⚙️ 5. PARENT ROUTES — Invite Students (server/src/routes/parents.mjs)
+# ==========================================
+cat > src/routes/parents.mjs <<'EOF'
+import express from "express";
+import bcrypt from "bcryptjs";
+import { prisma } from "../app.mjs";
+import { sendMail } from "../utils/mailer.mjs";
+
+const router = express.Router();
+
+// 👨‍👩‍👧 Parent creates (invites) student
+router.post("/invite-student", async (req, res) => {
+  const { parentId, name, email, password } = req.body;
+  try {
+    const parent = await prisma.user.findUnique({ where: { id: parentId } });
+    if (!parent || parent.role !== "PARENT") {
+      return res.status(403).json({ error: "Only parents can invite students" });
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    const student = await prisma.user.create({
+      data: { name, email, password: hashed, role: "STUDENT", parentId: parent.id },
+    });
+
+    await sendMail(email, "Welcome to LMS", `Hi ${name}, your parent has created your account.`);
+    res.json(student);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.get("/my-students/:parentId", async (req, res) => {
+  const { parentId } = req.params;
+  const students = await prisma.user.findMany({ where: { parentId: Number(parentId) } });
+  res.json(students);
+});
+
+export default router;
+EOF
+
+# ==========================================
+# ⚙️ 6. TUTOR ROUTES (server/src/routes/tutors.mjs)
+# ==========================================
+cat > src/routes/tutors.mjs <<'EOF'
+import express from "express";
+import { prisma } from "../app.mjs";
+
+const router = express.Router();
+
+// 🧑‍🏫 Tutor views assigned students (basic MVP)
+router.get("/students", async (req, res) => {
+  const students = await prisma.user.findMany({ where: { role: "STUDENT" } });
+  res.json(students);
+});
+
+export default router;
+EOF
+
+# ==========================================
+# ⚙️ 7. UTILITIES (server/src/utils/mailer.mjs + cloudinary.mjs)
+# ==========================================
+mkdir -p src/utils
+
+cat > src/utils/mailer.mjs <<'EOF'
+import nodemailer from "nodemailer";
+export const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
+});
+export const sendMail = async (to, subject, text) => {
+  await transporter.sendMail({ from: process.env.MAIL_USER, to, subject, text });
+};
+EOF
+
+cat > src/utils/cloudinary.mjs <<'EOF'
+import { v2 as cloudinary } from "cloudinary";
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+export default cloudinary;
+EOF
+
+# ==========================================
+# ⚙️ 8. .ENV TEMPLATE
+# ==========================================
+cat > .env <<'EOF'
+DATABASE_URL="postgresql://user:password@host:port/dbname?schema=public"
+CLOUDINARY_CLOUD_NAME="your_cloud_name"
+CLOUDINARY_API_KEY="your_api_key"
+CLOUDINARY_API_SECRET="your_api_secret"
+MAIL_USER="your_email@gmail.com"
+MAIL_PASS="your_email_password"
+JWT_SECRET="supersecret"
+PORT=5000
+EOF
+
+# ==========================================
+# ⚙️ 9. START SERVER
+# ==========================================
+npx prisma migrate dev --name init
+node src/app.mjs
+
+# ==========================================
+# ✅ MVP COMPLETE WHEN:
+# ADMIN:
+#   - Can view all users and their roles (future)
+# PARENT:
+#   - Registers via /auth/register (role=PARENT)
+#   - Invites student via /parents/invite-student
+#   - Views own students
+# STUDENT:
+#   - Can login after invite
+#   - View assignments and chat (future)
+# TUTOR:
+#   - Login via /auth/register
+#   - View students and send feedback (future)
+# ==========================================
