@@ -46,6 +46,11 @@ model User {
   sentMessages         Message[]              @relation("SentMessages")
   receivedMessages     Message[]              @relation("ReceivedMessages")
   studentProgress      StudentProgress[]
+  tutorRequestsAsParent TutorRequest[]        @relation("ParentRequests")
+  tutorRequestsAsTutor  TutorRequest[]        @relation("TutorRequests")
+  notificationsSent     Notification[]        @relation("NotificationsSent")
+  notificationsReceived Notification[]        @relation("NotificationsReceived")
+  learningMaterials     LearningMaterial[]
 
   @@map("users")
 }
@@ -75,6 +80,8 @@ model Subject {
   assignments        Assignment[]
   tutoringSessions   TutoringSession[]
   studentProgress    StudentProgress[]
+  tutorRequests      TutorRequest[]
+  learningMaterials  LearningMaterial[]
 
   @@map("subjects")
 }
@@ -189,4 +196,60 @@ model StudentProgress {
 
   @@unique([studentId, subjectId], name: "student_subject_idx")
   @@map("student_progress")
+}
+
+// Tutor request model - Parents send requests to tutors
+model TutorRequest {
+  id          Int       @id @default(autoincrement())
+  parentId    String    @map("parent_id") @db.VarChar
+  tutorId     String    @map("tutor_id") @db.VarChar
+  studentId   String?   @map("student_id") @db.VarChar // which child needs the tutor
+  subjectId   Int?      @map("subject_id")
+  message     String?   @db.Text
+  status      String    @default("pending") @db.VarChar // "pending", "approved", "rejected"
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+
+  parent  User     @relation("ParentRequests", fields: [parentId], references: [id])
+  tutor   User     @relation("TutorRequests", fields: [tutorId], references: [id])
+  subject Subject? @relation(fields: [subjectId], references: [id])
+
+  @@map("tutor_requests")
+}
+
+// Notifications model - For all user notifications
+model Notification {
+  id         Int      @id @default(autoincrement())
+  userId     String   @map("user_id") @db.VarChar
+  senderId   String?  @map("sender_id") @db.VarChar // who triggered the notification
+  type       String   @db.VarChar // "assignment_added", "assignment_graded", "session_scheduled", etc.
+  title      String   @db.VarChar
+  message    String   @db.Text
+  link       String?  @db.VarChar // optional link to related resource
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user   User  @relation("NotificationsReceived", fields: [userId], references: [id])
+  sender User? @relation("NotificationsSent", fields: [senderId], references: [id])
+
+  @@map("notifications")
+}
+
+// Learning materials model - Resources shared by tutors
+model LearningMaterial {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar
+  description String?  @db.Text
+  fileUrl     String?  @map("file_url") @db.VarChar
+  fileType    String?  @map("file_type") @db.VarChar // "pdf", "video", "link", "image", etc.
+  subjectId   Int?     @map("subject_id")
+  tutorId     String   @map("tutor_id") @db.VarChar
+  studentIds  String[] @map("student_ids") // students who can access this material
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  subject Subject? @relation(fields: [subjectId], references: [id])
+  tutor   User     @relation(fields: [tutorId], references: [id])
+
+  @@map("learning_materials")
 }
