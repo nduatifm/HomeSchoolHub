@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Bell, Menu, X } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clearAllStorage } from "@/lib/storage";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -92,7 +92,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     <header className="bg-white dark:bg-gray-900 shadow-sm z-10">
       <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
         <div className="flex items-center md:hidden">
-          <Button variant="ghost" size="icon" onClick={toggleMobileMenu}>
+          <Button variant="ghost" size="icon" onClick={toggleMobileMenu} data-testid="button-mobile-menu">
             <Menu className="h-6 w-6 text-gray-500 dark:text-gray-400" />
           </Button>
           <h1 className="text-lg font-semibold text-primary ml-3 md:hidden">HomeschoolSync</h1>
@@ -165,7 +165,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           <div className="hidden sm:flex items-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 flex items-center space-x-2">
+                <Button variant="ghost" className="relative h-8 flex items-center space-x-2" data-testid="button-profile-menu">
                   <img 
                     src={user?.profileImageUrl || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=120&h=120"} 
                     alt="User profile" 
@@ -179,9 +179,9 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                <DropdownMenuItem data-testid="menuitem-profile">Profile</DropdownMenuItem>
+                <DropdownMenuItem data-testid="menuitem-settings">Settings</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} data-testid="menuitem-theme">
                   {theme === 'dark' ? 'Light Theme' : 'Dark Theme'}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

@@ -177,7 +177,7 @@ export default function ParentDashboard() {
           <Card>
             <CardHeader className="px-6 py-4 border-b flex justify-between items-center">
               <CardTitle className="text-lg font-semibold">My Children</CardTitle>
-              <Button variant="link" className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium p-0">
+              <Button variant="link" className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium p-0" data-testid="button-add-child">
                 Add Child
               </Button>
             </CardHeader>
@@ -212,10 +212,10 @@ export default function ParentDashboard() {
                       </div>
                       <div className="ml-4 flex-shrink-0 flex space-x-2">
                         <Link href={`/progress/student/${child.id}`}>
-                          <Button size="sm" variant="outline">View Progress</Button>
+                          <Button size="sm" variant="outline" data-testid={`button-view-progress-${child.id}`}>View Progress</Button>
                         </Link>
                         <Link href={`/schedule/student/${child.id}`}>
-                          <Button size="sm" variant="default">Schedule Session</Button>
+                          <Button size="sm" variant="default" data-testid={`button-schedule-session-${child.id}`}>Schedule Session</Button>
                         </Link>
                       </div>
                     </div>
@@ -260,7 +260,7 @@ export default function ParentDashboard() {
                               </FormControl>
                               <SelectContent>
                                 {isLoadingTutors ? (
-                                  <SelectItem value="loading">Loading tutors...</SelectItem>
+                                  <SelectItem value="loading" data-testid="select-tutor-loading">Loading tutors...</SelectItem>
                                 ) : (tutors || []).map((tutor) => (
                                   <SelectItem key={tutor.id} value={tutor.id} data-testid={`select-tutor-${tutor.id}`}>
                                     {tutor.firstName} {tutor.lastName}
@@ -286,7 +286,7 @@ export default function ParentDashboard() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="" data-testid="select-student-none">None</SelectItem>
                                 {(children || []).map((child) => (
                                   <SelectItem key={child.id} value={child.id} data-testid={`select-student-${child.id}`}>
                                     {child.firstName} {child.lastName}
@@ -312,9 +312,9 @@ export default function ParentDashboard() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="" data-testid="select-subject-none">None</SelectItem>
                                 {isLoadingSubjects ? (
-                                  <SelectItem value="loading">Loading subjects...</SelectItem>
+                                  <SelectItem value="loading" data-testid="select-subject-loading">Loading subjects...</SelectItem>
                                 ) : (subjects || []).map((subject) => (
                                   <SelectItem key={subject.id} value={subject.id.toString()} data-testid={`select-subject-${subject.id}`}>
                                     {subject.name}
@@ -350,7 +350,7 @@ export default function ParentDashboard() {
                       />
                       
                       <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setRequestDialogOpen(false)}>Cancel</Button>
+                        <Button type="button" variant="outline" onClick={() => setRequestDialogOpen(false)} data-testid="button-cancel-request">Cancel</Button>
                         <Button type="submit" disabled={createTutorRequest.isPending} data-testid="button-submit-request">
                           {createTutorRequest.isPending ? "Sending..." : "Send Request"}
                         </Button>
