@@ -32,11 +32,14 @@ The application uses a monorepo structure with client, server, and shared code f
    - Implements role-based views (student, parent, tutor)
 
 2. **Key Pages**
-   - Role-specific dashboards
+   - Role-specific dashboards (Student, Parent, Tutor)
    - Assignments management
    - Session tracking and management
    - Progress visualization
    - Messaging system
+   - Tutor request system (Parent/Tutor)
+   - Learning materials management (Tutor upload/share, Student view/download)
+   - Notifications center
 
 3. **State Management**
    - Uses React Query for server state
@@ -88,6 +91,9 @@ The database schema includes tables for:
 7. Session Summaries
 8. Messages
 9. Student Progress
+10. Tutor Requests (parent-tutor request/approval system)
+11. Notifications (real-time notification system)
+12. Learning Materials (file uploads and sharing system)
 
 ## Data Flow
 

@@ -8,10 +8,12 @@ import { MessagesCard } from "@/components/dashboard/MessagesCard";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { TutoringSession, StudentAssignment, StudentProgress, Subject } from "@/types";
-import { BookOpen, Calendar, Clock, Award } from "lucide-react";
+import { BookOpen, Calendar, Clock, Award, FileText, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { LearningMaterial } from "@shared/schema";
+import { Button } from "@/components/ui/button";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -40,12 +42,18 @@ export default function StudentDashboard() {
     enabled: !!user?.id,
   });
 
+  // Fetch learning materials shared with student
+  const { data: learningMaterials, isLoading: isLoadingMaterials } = useQuery<LearningMaterial[]>({
+    queryKey: [`/api/learning-materials/student/${user?.id}`],
+    enabled: !!user?.id,
+  });
+
   // Sample data for other components (would be fetched from API in a real app)
   const formattedAssignments = [
-    { id: 1, title: "Weekly Math Problems (Set 3)", status: "completed", timeAgo: "Yesterday", action: "View" },
-    { id: 2, title: "English Essay: Character Analysis", status: "in_progress", timeAgo: "3 days ago", action: "Continue" },
-    { id: 3, title: "Science Lab Report", status: "overdue", timeAgo: "1 week ago", action: "Start" },
-    { id: 4, title: "History Timeline Project", status: "new", timeAgo: "Just now", action: "Start" },
+    { id: 1, title: "Weekly Math Problems (Set 3)", status: "completed" as const, timeAgo: "Yesterday", action: "View" },
+    { id: 2, title: "English Essay: Character Analysis", status: "in_progress" as const, timeAgo: "3 days ago", action: "Continue" },
+    { id: 3, title: "Science Lab Report", status: "overdue" as const, timeAgo: "1 week ago", action: "Start" },
+    { id: 4, title: "History Timeline Project", status: "new" as const, timeAgo: "Just now", action: "Start" },
   ];
 
   const progressData = [
@@ -163,6 +171,63 @@ export default function StudentDashboard() {
             assignments={formattedAssignments}
             viewAllLink="/assignments"
           />
+
+          {/* Learning Materials */}
+          <Card>
+            <CardHeader className="px-6 py-4 border-b">
+              <CardTitle className="text-lg font-semibold">Learning Materials</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 divide-y divide-gray-100 dark:divide-gray-800">
+              {isLoadingMaterials ? (
+                <div className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Loading materials...
+                </div>
+              ) : !learningMaterials || learningMaterials.length === 0 ? (
+                <div className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No learning materials shared with you yet.
+                </div>
+              ) : (
+                <>
+                  {learningMaterials.map((material) => (
+                    <div key={material.id} className="px-6 py-4" data-testid={`material-${material.id}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <FileText className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            <h4 className="text-sm font-medium" data-testid={`text-material-title-${material.id}`}>
+                              {material.title}
+                            </h4>
+                          </div>
+                          {material.description && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1" data-testid={`text-material-description-${material.id}`}>
+                              {material.description}
+                            </p>
+                          )}
+                          {material.fileUrl && (
+                            <div className="mt-3">
+                              <a 
+                                href={material.fileUrl} 
+                                download
+                                data-testid={`button-download-${material.id}`}
+                              >
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  <Download className="h-4 w-4 mr-1" />
+                                  Download
+                                </Button>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column (1/3 width on large screens) */}
