@@ -590,6 +590,308 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tutor request routes
+  app.post('/api/tutor-requests', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserIdFromSession(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const { tutorId, studentId, subjectId, message } = req.body;
+      
+      const newRequest = await storage.createTutorRequest({
+        parentId: userId,
+        tutorId,
+        studentId: studentId || undefined,
+        subjectId: subjectId ? Number(subjectId) : undefined,
+        message: message || undefined,
+        status: 'pending'
+      });
+      
+      // Create notification for tutor
+      await storage.createNotification({
+        userId: tutorId,
+        senderId: userId,
+        type: 'tutor_request',
+        title: 'New Tutor Request',
+        message: `You have a new tutoring request${subjectId ? ' for a subject' : ''}`,
+        link: `/tutor-requests/${newRequest.id}`
+      });
+      
+      res.status(201).json(newRequest);
+    } catch (error) {
+      console.error("Error creating tutor request:", error);
+      res.status(500).json({ message: "Failed to create tutor request" });
+    }
+  });
+
+  app.get('/api/tutor-requests/parent/:parentId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserIdFromSession(req);
+      const { parentId } = req.params;
+      
+      // Authorization: Only allow users to access their own requests
+      if (userId !== parentId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const requests = await storage.getTutorRequestsByParent(parentId);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching parent tutor requests:", error);
+      res.status(500).json({ message: "Failed to fetch tutor requests" });
+    }
+  });
+
+  app.get('/api/tutor-requests/tutor/:tutorId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserIdFromSession(req);
+      const { tutorId } = req.params;
+      
+      // Authorization: Only allow users to access their own requests
+      if (userId !== tutorId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const requests = await storage.getTutorRequestsByTutor(tutorId);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching tutor requests:", error);
+      res.status(500).json({ message: "Failed to fetch tutor requests" });
+    }
+  });
+
+  app.patch('/api/tutor-requests/:id/status', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const userId = getUserIdFromSession(req);
+      
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      if (!['pending', 'approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      
+      // Get the request first to check authorization
+      const request = await storage.getTutorRequest(Number(id));
+      if (!request) {
+        return res.status(404).json({ message: "Request not found" });
+      }
+      
+      // Authorization: Only the tutor can update the status
+      if (request.tutorId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const updatedRequest = await storage.updateTutorRequestStatus(Number(id), status);
+      
+      // Create notification for parent
+      await storage.createNotification({
+        userId: updatedRequest!.parentId,
+        senderId: userId,
+        type: 'tutor_request_response',
+        title: `Tutor Request ${status}`,
+        message: `Your tutor request has been ${status}`,
+        link: `/tutor-requests/${id}`
+      });
+      
+      res.json(updatedRequest);
+    } catch (error) {
+      console.error("Error updating tutor request:", error);
+      res.status(500).json({ message: "Failed to update tutor request" });
+    }
+  });
+
+  // Notification routes
+  app.get('/api/notifications/user/:userId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { userId } = req.params;
+      
+      // Authorization: Only allow users to access their own notifications
+      if (authUserId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const notifications = await storage.getNotificationsByUser(userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get('/api/notifications/unread/:userId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { userId } = req.params;
+      
+      // Authorization: Only allow users to access their own notifications
+      if (authUserId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const notifications = await storage.getUnreadNotificationsByUser(userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching unread notifications:", error);
+      res.status(500).json({ message: "Failed to fetch unread notifications" });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { id } = req.params;
+      
+      // Get notification first to check ownership
+      const notification = await storage.getNotification(Number(id));
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      // Authorization: Only allow users to mark their own notifications as read
+      if (notification.userId !== authUserId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const updatedNotification = await storage.markNotificationAsRead(Number(id));
+      res.json(updatedNotification);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.patch('/api/notifications/read-all/:userId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { userId } = req.params;
+      
+      // Authorization: Only allow users to mark their own notifications as read
+      if (authUserId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const count = await storage.markAllNotificationsAsRead(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Learning material routes
+  app.get('/api/learning-materials/tutor/:tutorId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { tutorId } = req.params;
+      
+      // Authorization: Only allow tutors to access their own materials
+      if (authUserId !== tutorId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const materials = await storage.getLearningMaterialsByTutor(tutorId);
+      res.json(materials);
+    } catch (error) {
+      console.error("Error fetching tutor learning materials:", error);
+      res.status(500).json({ message: "Failed to fetch learning materials" });
+    }
+  });
+
+  app.get('/api/learning-materials/student/:studentId', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { studentId } = req.params;
+      
+      // Authorization: Only allow students to access their own materials
+      if (authUserId !== studentId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const materials = await storage.getLearningMaterialsByStudent(studentId);
+      res.json(materials);
+    } catch (error) {
+      console.error("Error fetching student learning materials:", error);
+      res.status(500).json({ message: "Failed to fetch learning materials" });
+    }
+  });
+
+  app.post('/api/learning-materials', isUniversallyAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      const userId = getUserIdFromSession(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const { title, description, fileType, subjectId, studentIds } = req.body;
+      
+      let fileUrl: string | undefined = undefined;
+      if (req.file) {
+        // Convert buffer to base64 for storage (in production, use cloud storage)
+        fileUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      }
+      
+      const studentIdsArray = typeof studentIds === 'string' ? JSON.parse(studentIds) : studentIds;
+      
+      const newMaterial = await storage.createLearningMaterial({
+        title,
+        description: description || undefined,
+        fileUrl,
+        fileType: fileType || undefined,
+        subjectId: subjectId ? Number(subjectId) : undefined,
+        tutorId: userId,
+        studentIds: studentIdsArray
+      });
+      
+      // Create notifications for students
+      for (const studentId of studentIdsArray) {
+        await storage.createNotification({
+          userId: studentId,
+          senderId: userId,
+          type: 'learning_material_shared',
+          title: 'New Learning Material',
+          message: `New learning material "${title}" has been shared with you`,
+          link: `/learning-materials/${newMaterial.id}`
+        });
+      }
+      
+      res.status(201).json(newMaterial);
+    } catch (error) {
+      console.error("Error creating learning material:", error);
+      res.status(500).json({ message: "Failed to create learning material" });
+    }
+  });
+
+  app.delete('/api/learning-materials/:id', isUniversallyAuthenticated, async (req, res) => {
+    try {
+      const authUserId = getUserIdFromSession(req);
+      const { id } = req.params;
+      
+      // Get material first to check ownership
+      const material = await storage.getLearningMaterial(Number(id));
+      if (!material) {
+        return res.status(404).json({ message: "Learning material not found" });
+      }
+      
+      // Authorization: Only allow tutors to delete their own materials
+      if (material.tutorId !== authUserId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const success = await storage.deleteLearningMaterial(Number(id));
+      res.json({ message: "Learning material deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting learning material:", error);
+      res.status(500).json({ message: "Failed to delete learning material" });
+    }
+  });
+
   // Firebase authentication routes
   app.post('/api/auth/firebase-login', async (req, res) => {
     try {

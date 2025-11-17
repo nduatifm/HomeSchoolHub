@@ -11,6 +11,9 @@ export type TutoringSession = Prisma.TutoringSessionGetPayload<{}>;
 export type SessionSummary = Prisma.SessionSummaryGetPayload<{}>;
 export type Message = Prisma.MessageGetPayload<{}>;
 export type StudentProgress = Prisma.StudentProgressGetPayload<{}>;
+export type TutorRequest = Prisma.TutorRequestGetPayload<{}>;
+export type Notification = Prisma.NotificationGetPayload<{}>;
+export type LearningMaterial = Prisma.LearningMaterialGetPayload<{}>;
 
 // UpsertUser type (for user creation/update)
 export type UpsertUser = {
@@ -98,3 +101,35 @@ export const insertStudentProgressSchema = z.object({
   completionPercentage: z.number().optional().nullable(),
 });
 export type InsertStudentProgress = z.infer<typeof insertStudentProgressSchema>;
+
+export const insertTutorRequestSchema = z.object({
+  parentId: z.string(),
+  tutorId: z.string(),
+  studentId: z.string().optional(),
+  subjectId: z.number().optional(),
+  message: z.string().optional(),
+  status: z.string().optional(),
+});
+export type InsertTutorRequest = z.infer<typeof insertTutorRequestSchema>;
+
+export const insertNotificationSchema = z.object({
+  userId: z.string(),
+  senderId: z.string().optional(),
+  type: z.string(),
+  title: z.string(),
+  message: z.string(),
+  link: z.string().optional(),
+  read: z.boolean().optional(),
+});
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export const insertLearningMaterialSchema = z.object({
+  title: z.string(),
+  description: z.string().optional().nullable(),
+  fileUrl: z.string().optional().nullable(),
+  fileType: z.string().optional().nullable(),
+  subjectId: z.number().optional().nullable(),
+  tutorId: z.string(),
+  studentIds: z.array(z.string()),
+});
+export type InsertLearningMaterial = z.infer<typeof insertLearningMaterialSchema>;

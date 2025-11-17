@@ -14,7 +14,13 @@ import {
   type Message, 
   type InsertMessage, 
   type StudentProgress, 
-  type InsertStudentProgress
+  type InsertStudentProgress,
+  type TutorRequest,
+  type InsertTutorRequest,
+  type Notification,
+  type InsertNotification,
+  type LearningMaterial,
+  type InsertLearningMaterial
 } from "@shared/schema";
 import { prisma } from "./prisma";
 
@@ -75,6 +81,28 @@ export interface IStorage {
   getStudentProgress(studentId: string): Promise<StudentProgress[]>;
   updateStudentProgress(id: number, progress: Partial<InsertStudentProgress>): Promise<StudentProgress | undefined>;
   createStudentProgress(progress: InsertStudentProgress): Promise<StudentProgress>;
+  
+  // Tutor request operations
+  getTutorRequest(id: number): Promise<TutorRequest | undefined>;
+  getTutorRequestsByParent(parentId: string): Promise<TutorRequest[]>;
+  getTutorRequestsByTutor(tutorId: string): Promise<TutorRequest[]>;
+  createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest>;
+  updateTutorRequestStatus(id: number, status: string): Promise<TutorRequest | undefined>;
+  
+  // Notification operations
+  getNotification(id: number): Promise<Notification | undefined>;
+  getNotificationsByUser(userId: string): Promise<Notification[]>;
+  getUnreadNotificationsByUser(userId: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: number): Promise<Notification | undefined>;
+  markAllNotificationsAsRead(userId: string): Promise<number>;
+  
+  // Learning material operations
+  getLearningMaterial(id: number): Promise<LearningMaterial | undefined>;
+  getLearningMaterialsByTutor(tutorId: string): Promise<LearningMaterial[]>;
+  getLearningMaterialsByStudent(studentId: string): Promise<LearningMaterial[]>;
+  createLearningMaterial(material: InsertLearningMaterial): Promise<LearningMaterial>;
+  deleteLearningMaterial(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -427,6 +455,159 @@ export class DatabaseStorage implements IStorage {
     return await prisma.studentProgress.create({
       data: progress
     });
+  }
+
+  // Tutor request operations
+  async getTutorRequest(id: number): Promise<TutorRequest | undefined> {
+    const request = await prisma.tutorRequest.findUnique({
+      where: { id },
+      include: {
+        parent: true,
+        tutor: true,
+        subject: true
+      }
+    });
+    return request ?? undefined;
+  }
+
+  async getTutorRequestsByParent(parentId: string): Promise<TutorRequest[]> {
+    return await prisma.tutorRequest.findMany({
+      where: { parentId },
+      include: {
+        tutor: true,
+        subject: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async getTutorRequestsByTutor(tutorId: string): Promise<TutorRequest[]> {
+    return await prisma.tutorRequest.findMany({
+      where: { tutorId },
+      include: {
+        parent: true,
+        subject: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest> {
+    return await prisma.tutorRequest.create({
+      data: request
+    });
+  }
+
+  async updateTutorRequestStatus(id: number, status: string): Promise<TutorRequest | undefined> {
+    const updated = await prisma.tutorRequest.update({
+      where: { id },
+      data: { status, updatedAt: new Date() }
+    });
+    return updated ?? undefined;
+  }
+
+  // Notification operations
+  async getNotification(id: number): Promise<Notification | undefined> {
+    const notification = await prisma.notification.findUnique({
+      where: { id }
+    });
+    return notification ?? undefined;
+  }
+
+  async getNotificationsByUser(userId: string): Promise<Notification[]> {
+    return await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async getUnreadNotificationsByUser(userId: string): Promise<Notification[]> {
+    return await prisma.notification.findMany({
+      where: {
+        userId,
+        read: false
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    return await prisma.notification.create({
+      data: notification
+    });
+  }
+
+  async markNotificationAsRead(id: number): Promise<Notification | undefined> {
+    const updated = await prisma.notification.update({
+      where: { id },
+      data: { read: true }
+    });
+    return updated ?? undefined;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<number> {
+    const result = await prisma.notification.updateMany({
+      where: {
+        userId,
+        read: false
+      },
+      data: { read: true }
+    });
+    return result.count;
+  }
+
+  // Learning material operations
+  async getLearningMaterial(id: number): Promise<LearningMaterial | undefined> {
+    const material = await prisma.learningMaterial.findUnique({
+      where: { id },
+      include: {
+        subject: true,
+        tutor: true
+      }
+    });
+    return material ?? undefined;
+  }
+
+  async getLearningMaterialsByTutor(tutorId: string): Promise<LearningMaterial[]> {
+    return await prisma.learningMaterial.findMany({
+      where: { tutorId },
+      include: {
+        subject: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async getLearningMaterialsByStudent(studentId: string): Promise<LearningMaterial[]> {
+    return await prisma.learningMaterial.findMany({
+      where: {
+        studentIds: {
+          has: studentId
+        }
+      },
+      include: {
+        subject: true,
+        tutor: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  async createLearningMaterial(material: InsertLearningMaterial): Promise<LearningMaterial> {
+    return await prisma.learningMaterial.create({
+      data: material
+    });
+  }
+
+  async deleteLearningMaterial(id: number): Promise<boolean> {
+    try {
+      await prisma.learningMaterial.delete({
+        where: { id }
+      });
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 }
 
