@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut } from "lucide-react";
+import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut, MessageSquare, Send, BarChart, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TeacherDashboard() {
@@ -25,6 +25,8 @@ export default function TeacherDashboard() {
   const { data: sessions = [] } = useQuery({ queryKey: ["/api/sessions/teacher"] });
   const { data: tutorRequests = [] } = useQuery({ queryKey: ["/api/tutor-requests/teacher"] });
   const { data: earnings = [] } = useQuery({ queryKey: ["/api/earnings/teacher"] });
+  const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
+  const { data: progressReports = [] } = useQuery({ queryKey: ["/api/progress-reports/teacher"] });
 
   // Create assignment
   const [assignmentForm, setAssignmentForm] = useState({
@@ -89,6 +91,65 @@ export default function TeacherDashboard() {
       setSessionForm({ subject: "", date: "", startTime: "", endTime: "", studentIds: [], notes: "", status: "scheduled" });
     },
   });
+
+  // Send message
+  const [messageForm, setMessageForm] = useState({
+    receiverId: 0,
+    content: ""
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/messages", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      toast({ title: "Message sent!", type: "success" });
+      setMessageForm({ receiverId: 0, content: "" });
+    },
+  });
+
+  // Generate progress report
+  const [reportForm, setReportForm] = useState({
+    studentId: 0,
+    reportDate: new Date().toISOString().split('T')[0],
+    overallGrade: "",
+    comments: "",
+    strengths: "",
+    improvements: ""
+  });
+
+  const generateReportMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/progress-reports", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/progress-reports/teacher"] });
+      toast({ title: "Progress report created!", type: "success" });
+      setReportForm({
+        studentId: 0,
+        reportDate: new Date().toISOString().split('T')[0],
+        overallGrade: "",
+        comments: "",
+        strengths: "",
+        improvements: ""
+      });
+    },
+  });
+
+  // Download report as JSON
+  const downloadReport = (report: any) => {
+    const dataStr = JSON.stringify(report, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `progress-report-${report.id}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const totalEarnings = earnings.reduce((sum: number, e: any) => sum + e.amount, 0);
 
@@ -162,6 +223,8 @@ export default function TeacherDashboard() {
             <TabsTrigger value="students" data-testid="tab-students">Students</TabsTrigger>
             <TabsTrigger value="sessions" data-testid="tab-sessions">Sessions</TabsTrigger>
             <TabsTrigger value="requests" data-testid="tab-requests">Tutor Requests</TabsTrigger>
+            <TabsTrigger value="reports" data-testid="tab-reports">Progress Reports</TabsTrigger>
+            <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
           </TabsList>
 
           <TabsContent value="assignments">
@@ -478,6 +541,243 @@ export default function TeacherDashboard() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Progress Reports & Analytics</CardTitle>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-create-report">
+                      <BarChart className="h-4 w-4 mr-2" />
+                      Create Report
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Generate Progress Report</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium">Select Student</label>
+                        <select
+                          className="w-full mt-1 p-2 border rounded-md"
+                          value={reportForm.studentId}
+                          onChange={(e) => setReportForm({ ...reportForm, studentId: parseInt(e.target.value) })}
+                          data-testid="select-report-student"
+                        >
+                          <option value={0}>Select a student</option>
+                          {students.map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Report Date</label>
+                        <Input
+                          type="date"
+                          value={reportForm.reportDate}
+                          onChange={(e) => setReportForm({ ...reportForm, reportDate: e.target.value })}
+                          data-testid="input-report-date"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Overall Grade</label>
+                        <Input
+                          placeholder="e.g., A, B+, 85%"
+                          value={reportForm.overallGrade}
+                          onChange={(e) => setReportForm({ ...reportForm, overallGrade: e.target.value })}
+                          data-testid="input-overall-grade"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Comments</label>
+                        <Textarea
+                          placeholder="General comments about student performance..."
+                          value={reportForm.comments}
+                          onChange={(e) => setReportForm({ ...reportForm, comments: e.target.value })}
+                          rows={3}
+                          data-testid="input-report-comments"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Strengths</label>
+                        <Textarea
+                          placeholder="List student's strengths..."
+                          value={reportForm.strengths}
+                          onChange={(e) => setReportForm({ ...reportForm, strengths: e.target.value })}
+                          rows={2}
+                          data-testid="input-report-strengths"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Areas for Improvement</label>
+                        <Textarea
+                          placeholder="List areas where student can improve..."
+                          value={reportForm.improvements}
+                          onChange={(e) => setReportForm({ ...reportForm, improvements: e.target.value })}
+                          rows={2}
+                          data-testid="input-report-improvements"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => generateReportMutation.mutate(reportForm)}
+                        disabled={!reportForm.studentId || generateReportMutation.isPending}
+                        className="w-full"
+                        data-testid="button-generate-report"
+                      >
+                        {generateReportMutation.isPending ? "Generating..." : "Generate Report"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600">Total Reports</p>
+                          <p className="text-3xl font-bold">{progressReports.length}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600">Students Tracked</p>
+                          <p className="text-3xl font-bold">{students.length}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600">Total Earnings</p>
+                          <p className="text-3xl font-bold">${totalEarnings}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  <h3 className="text-lg font-semibold mb-3">Recent Progress Reports</h3>
+                  {progressReports.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No reports generated yet</p>
+                  ) : (
+                    progressReports.map((report: any) => (
+                      <div key={report.id} className="p-4 border rounded-lg" data-testid={`card-report-${report.id}`}>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="font-medium">Report #{report.id}</h4>
+                              <Badge>{report.overallGrade}</Badge>
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              Date: {new Date(report.reportDate).toLocaleDateString()}
+                            </p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm"><strong>Comments:</strong> {report.comments}</p>
+                              <p className="text-sm"><strong>Strengths:</strong> {report.strengths}</p>
+                              <p className="text-sm"><strong>Improvements:</strong> {report.improvements}</p>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => downloadReport(report)}
+                            data-testid={`button-download-${report.id}`}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="messages">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Messages</CardTitle>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-new-message">
+                      <Send className="h-4 w-4 mr-2" />
+                      New Message
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Send Message</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium">To (User ID)</label>
+                        <Input
+                          type="number"
+                          placeholder="Receiver ID"
+                          value={messageForm.receiverId || ""}
+                          onChange={(e) => setMessageForm({ ...messageForm, receiverId: parseInt(e.target.value) || 0 })}
+                          data-testid="input-receiver-id"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Message</label>
+                        <Textarea
+                          placeholder="Type your message..."
+                          value={messageForm.content}
+                          onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
+                          rows={4}
+                          data-testid="input-message-content"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => sendMessageMutation.mutate(messageForm)}
+                        disabled={sendMessageMutation.isPending || !messageForm.receiverId || !messageForm.content}
+                        className="w-full"
+                        data-testid="button-send-message"
+                      >
+                        {sendMessageMutation.isPending ? "Sending..." : "Send"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[500px] overflow-y-auto space-y-3">
+                  {messages.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No messages yet</p>
+                  ) : (
+                    messages.map((msg: any) => (
+                      <div 
+                        key={msg.id} 
+                        className={`p-4 rounded-lg border ${msg.senderId === user?.id ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'}`}
+                        data-testid={`message-${msg.id}`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium text-sm">
+                            {msg.senderId === user?.id ? 'You' : `User #${msg.senderId}`}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(msg.sentDate).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm" data-testid={`text-message-content-${msg.id}`}>{msg.content}</p>
+                        {!msg.isRead && msg.receiverId === user?.id && (
+                          <Badge variant="secondary" className="mt-2">Unread</Badge>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Award, BookOpen, Calendar, LogOut, Trophy } from "lucide-react";
+import { FileText, Award, BookOpen, Calendar, LogOut, Trophy, MessageSquare, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function StudentDashboard() {
@@ -43,6 +43,7 @@ export default function StudentDashboard() {
     queryKey: ["/api/clarifications/student", student?.id],
     enabled: !!student,
   });
+  const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
 
   // Submit assignment
   const [submissionForm, setSubmissionForm] = useState({
@@ -78,6 +79,24 @@ export default function StudentDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/clarifications/student", student?.id] });
       toast({ title: "Clarification requested!", type: "success" });
       setClarificationForm({ assignmentId: 0, question: "" });
+    },
+  });
+
+  // Send message
+  const [messageForm, setMessageForm] = useState({
+    receiverId: 0,
+    content: ""
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/messages", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      toast({ title: "Message sent!", type: "success" });
+      setMessageForm({ receiverId: 0, content: "" });
     },
   });
 
@@ -155,6 +174,7 @@ export default function StudentDashboard() {
             <TabsTrigger value="feedback" data-testid="tab-feedback">Feedback & Grades</TabsTrigger>
             <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
             <TabsTrigger value="clarifications" data-testid="tab-clarifications">Ask Questions</TabsTrigger>
+            <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
           </TabsList>
 
           <TabsContent value="assignments">
@@ -459,6 +479,85 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="messages">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Messages</CardTitle>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-new-message">
+                      <Send className="h-4 w-4 mr-2" />
+                      New Message
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Send Message</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium">To (User ID)</label>
+                        <Input
+                          type="number"
+                          placeholder="Receiver ID"
+                          value={messageForm.receiverId || ""}
+                          onChange={(e) => setMessageForm({ ...messageForm, receiverId: parseInt(e.target.value) || 0 })}
+                          data-testid="input-receiver-id"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Message</label>
+                        <Textarea
+                          placeholder="Type your message..."
+                          value={messageForm.content}
+                          onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
+                          rows={4}
+                          data-testid="input-message-content"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => sendMessageMutation.mutate(messageForm)}
+                        disabled={sendMessageMutation.isPending || !messageForm.receiverId || !messageForm.content}
+                        className="w-full"
+                        data-testid="button-send-message"
+                      >
+                        {sendMessageMutation.isPending ? "Sending..." : "Send"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[500px] overflow-y-auto space-y-3">
+                  {messages.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No messages yet</p>
+                  ) : (
+                    messages.map((msg: any) => (
+                      <div 
+                        key={msg.id} 
+                        className={`p-4 rounded-lg border ${msg.senderId === user?.id ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'}`}
+                        data-testid={`message-${msg.id}`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium text-sm">
+                            {msg.senderId === user?.id ? 'You' : `User #${msg.senderId}`}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(msg.sentDate).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm" data-testid={`text-message-content-${msg.id}`}>{msg.content}</p>
+                        {!msg.isRead && msg.receiverId === user?.id && (
+                          <Badge variant="secondary" className="mt-2">Unread</Badge>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
