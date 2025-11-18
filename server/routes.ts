@@ -1,1183 +1,1018 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
+import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { handleFirebaseLogin, handleFirebaseLogout, isFirebaseAuthenticated } from "./firebaseAuth";
 import { 
-  handleEmailPasswordSignup, 
-  handleEmailPasswordLogin, 
-  handleEmailVerification, 
-  handleResendVerification,
-  handleEmailPasswordLogout,
-  handleForgotPassword,
-  handleResetPassword,
-  isEmailPasswordAuthenticated 
-} from "./emailPasswordAuth";
-import { generateSessionSummary } from "./openai";
-import { sanitizeUser, sanitizeUsers } from "./utils/sanitizeUser";
-import { isUniversallyAuthenticated, getUserIdFromSession } from "./authMiddleware";
-import multer from "multer";
-import { z } from "zod";
-import { insertSessionSummarySchema } from "@shared/schema";
+  insertUserSchema, 
+  insertStudentSchema,
+  insertAssignmentSchema,
+  insertStudentAssignmentSchema,
+  insertMaterialSchema,
+  insertScheduleSchema,
+  insertSessionSchema,
+  insertFeedbackSchema,
+  insertAttendanceSchema,
+  insertPaymentSchema,
+  insertTutorRequestSchema,
+  insertMessageSchema,
+  insertProgressReportSchema,
+  insertClarificationSchema,
+  insertParentalControlSchema,
+  insertTutorRatingSchema,
+  insertEarningsSchema,
+  insertStudentInviteSchema,
+} from "@shared/schema";
+import crypto from "crypto";
 
-// Set up file upload
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10 MB limit
-});
+// Simple session management
+const sessions = new Map<string, number>();
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+// Auth middleware
+function requireAuth(req: Request, res: Response, next: Function) {
+  const sessionId = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionId || !sessions.has(sessionId)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  req.session = { userId: sessions.get(sessionId)! };
+  next();
+}
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+// Hash password (simple version - in production use bcrypt)
+function hashPassword(password: string): string {
+  return crypto.createHash("sha256").update(password).digest("hex");
+}
+
+export function registerRoutes(app: Express) {
+  
+  // ========== AUTH ROUTES ==========
+  
+  // Teacher/Parent signup
+  app.post("/api/auth/signup", async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (user) {
-        res.json(sanitizeUser(user));
-      } else {
-        res.status(404).json({ message: "User not found" });
+      const { email, password, name, role } = req.body;
+      
+      if (!["teacher", "parent"].includes(role)) {
+        return res.status(400).json({ error: "Only teachers and parents can sign up" });
       }
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
 
-  // User routes
-  app.get('/api/users/role/:role', isAuthenticated, async (req, res) => {
-    try {
-      const { role } = req.params;
-      const users = await storage.getUsersByRole(role);
-      res.json(sanitizeUsers(users));
-    } catch (error) {
-      console.error("Error fetching users by role:", error);
-      res.status(500).json({ message: "Failed to fetch users by role" });
-    }
-  });
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
 
-  // Me (current user) role update endpoint for onboarding - supports both auth methods
-  app.patch('/api/users/me/role', async (req: any, res) => {
-    try {
-      let userId: string | undefined;
-      
-      // Check Firebase auth first
-      if (req.session?.firebaseUser?.uid) {
-        userId = req.session.firebaseUser.uid;
-      } 
-      // Then check email/password auth
-      else if (req.session?.emailPasswordUser?.id) {
-        userId = req.session.emailPasswordUser.id;
-      }
-      
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      const { role } = req.body;
-      
-      // Validate role
-      if (!['student', 'parent', 'tutor'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role" });
-      }
-      
-      const updatedUser = await storage.updateUserRole(userId, role);
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      res.json(sanitizeUser(updatedUser));
-    } catch (error) {
-      console.error("Error updating user role:", error);
-      res.status(500).json({ message: "Failed to update user role" });
-    }
-  });
-
-  // Admin role update endpoint (requires authentication)
-  app.patch('/api/users/:id/role', isAuthenticated, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const { role } = req.body;
-      
-      // Validate role
-      if (!['student', 'parent', 'tutor'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role" });
-      }
-      
-      const updatedUser = await storage.updateUserRole(id, role);
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      res.json(sanitizeUser(updatedUser));
-    } catch (error) {
-      console.error("Error updating user role:", error);
-      res.status(500).json({ message: "Failed to update user role" });
-    }
-  });
-
-  // Student routes
-  app.get('/api/students/parent/:parentId', isAuthenticated, async (req, res) => {
-    try {
-      const { parentId } = req.params;
-      const students = await storage.getStudentsByParentId(parentId);
-      res.json(sanitizeUsers(students));
-    } catch (error) {
-      console.error("Error fetching students by parent:", error);
-      res.status(500).json({ message: "Failed to fetch students by parent" });
-    }
-  });
-
-  app.get('/api/students/tutor/:tutorId', isAuthenticated, async (req, res) => {
-    try {
-      const { tutorId } = req.params;
-      const students = await storage.getStudentsByTutorId(tutorId);
-      res.json(sanitizeUsers(students));
-    } catch (error) {
-      console.error("Error fetching students by tutor:", error);
-      res.status(500).json({ message: "Failed to fetch students by tutor" });
-    }
-  });
-
-  // Subject routes
-  app.get('/api/subjects', isAuthenticated, async (req, res) => {
-    try {
-      const subjects = await storage.getSubjects();
-      res.json(subjects);
-    } catch (error) {
-      console.error("Error fetching subjects:", error);
-      res.status(500).json({ message: "Failed to fetch subjects" });
-    }
-  });
-
-  app.get('/api/subjects/:id', isAuthenticated, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const subject = await storage.getSubject(Number(id));
-      
-      if (!subject) {
-        return res.status(404).json({ message: "Subject not found" });
-      }
-      
-      res.json(subject);
-    } catch (error) {
-      console.error("Error fetching subject:", error);
-      res.status(500).json({ message: "Failed to fetch subject" });
-    }
-  });
-
-  app.post('/api/subjects', isAuthenticated, async (req, res) => {
-    try {
-      const { name, description } = req.body;
-      
-      if (!name) {
-        return res.status(400).json({ message: "Subject name is required" });
-      }
-      
-      const newSubject = await storage.createSubject({
+      const user = await storage.createUser({
+        email,
+        password: hashPassword(password),
         name,
-        description,
+        role,
       });
-      
-      res.status(201).json(newSubject);
-    } catch (error) {
-      console.error("Error creating subject:", error);
-      res.status(500).json({ message: "Failed to create subject" });
+
+      const sessionId = crypto.randomUUID();
+      sessions.set(sessionId, user.id);
+
+      res.json({ 
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        sessionId 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // Assignment routes
-  app.get('/api/assignments/tutor/:tutorId', isAuthenticated, async (req, res) => {
+  // Login
+  app.post("/api/auth/login", async (req, res) => {
     try {
-      const { tutorId } = req.params;
-      const assignments = await storage.getAssignmentsByTutor(tutorId);
+      const { email, password } = req.body;
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user || user.password !== hashPassword(password)) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const sessionId = crypto.randomUUID();
+      sessions.set(sessionId, user.id);
+
+      res.json({ 
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        sessionId 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Student signup via invite
+  app.post("/api/auth/signup/student", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      const invite = await storage.getStudentInviteByToken(token);
+      if (!invite || invite.status === "accepted") {
+        return res.status(400).json({ error: "Invalid or expired invite" });
+      }
+
+      // Check if invite is expired
+      if (new Date(invite.expiresDate) < new Date()) {
+        return res.status(400).json({ error: "Invite has expired" });
+      }
+
+      // Create user account
+      const user = await storage.createUser({
+        email: invite.email,
+        password: hashPassword(password),
+        name: invite.studentName,
+        role: "student",
+      });
+
+      // Create student profile
+      const student = await storage.createStudent({
+        userId: user.id,
+        parentId: invite.parentId,
+        name: invite.studentName,
+        gradeLevel: invite.gradeLevel,
+        badges: [],
+        points: 0,
+      });
+
+      // Mark invite as accepted
+      await storage.updateStudentInvite(invite.id, { status: "accepted" });
+
+      const sessionId = crypto.randomUUID();
+      sessions.set(sessionId, user.id);
+
+      res.json({ 
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        student,
+        sessionId 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get current user
+  app.get("/api/auth/me", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      let profile = null;
+      if (user.role === "student") {
+        profile = await storage.getStudentByUserId(user.id);
+      }
+
+      res.json({ 
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        profile 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", requireAuth, (req, res) => {
+    const sessionId = req.headers.authorization?.replace("Bearer ", "");
+    if (sessionId) {
+      sessions.delete(sessionId);
+    }
+    res.json({ success: true });
+  });
+
+  // ========== STUDENT INVITE ROUTES ==========
+  
+  app.post("/api/invites/student", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "parent") {
+        return res.status(403).json({ error: "Only parents can invite students" });
+      }
+
+      const data = insertStudentInviteSchema.parse(req.body);
+      const token = crypto.randomUUID();
+      const expiresDate = new Date();
+      expiresDate.setDate(expiresDate.getDate() + 7); // 7 days expiry
+
+      const invite = await storage.createStudentInvite({
+        ...data,
+        parentId: user.id,
+        token,
+        status: "pending",
+        createdDate: new Date().toISOString(),
+        expiresDate: expiresDate.toISOString(),
+      });
+
+      res.json(invite);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/invites/student/parent", requireAuth, async (req, res) => {
+    try {
+      const invites = await storage.getStudentInvitesByParent(req.session.userId!);
+      res.json(invites);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/invites/student/:token", async (req, res) => {
+    try {
+      const invite = await storage.getStudentInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found" });
+      }
+      res.json(invite);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== STUDENT ROUTES ==========
+  
+  app.get("/api/students/parent", requireAuth, async (req, res) => {
+    try {
+      const students = await storage.getStudentsByParent(req.session.userId!);
+      res.json(students);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/students/teacher", requireAuth, async (req, res) => {
+    try {
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+      res.json(students);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/students/:id", requireAuth, async (req, res) => {
+    try {
+      const student = await storage.getStudentById(parseInt(req.params.id));
+      res.json(student);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/students/:id", requireAuth, async (req, res) => {
+    try {
+      const student = await storage.updateStudent(parseInt(req.params.id), req.body);
+      res.json(student);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== ASSIGNMENT ROUTES ==========
+  
+  app.post("/api/assignments", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can create assignments" });
+      }
+
+      const data = insertAssignmentSchema.parse({
+        ...req.body,
+        teacherId: user.id,
+      });
+
+      const assignment = await storage.createAssignment(data);
+
+      // Auto-assign to students with matching grade level
+      const students = await storage.getStudentsByTeacher(user.id);
+      const matchingStudents = students.filter(s => s.gradeLevel === assignment.gradeLevel);
+      
+      for (const student of matchingStudents) {
+        await storage.createStudentAssignment({
+          assignmentId: assignment.id,
+          studentId: student.id,
+          submission: null,
+          grade: null,
+          feedback: null,
+          status: "pending",
+          submittedAt: null,
+        });
+      }
+
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/assignments/teacher", requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getAssignmentsByTeacher(req.session.userId!);
       res.json(assignments);
-    } catch (error) {
-      console.error("Error fetching assignments by tutor:", error);
-      res.status(500).json({ message: "Failed to fetch assignments by tutor" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.get('/api/assignments/student/:studentId', isAuthenticated, async (req, res) => {
+  app.get("/api/assignments/student/:studentId", requireAuth, async (req, res) => {
     try {
-      const { studentId } = req.params;
-      const assignments = await storage.getAssignmentsByStudent(studentId);
+      const studentAssignments = await storage.getStudentAssignmentsByStudent(parseInt(req.params.studentId));
+      
+      // Get full assignment details
+      const assignments = await Promise.all(
+        studentAssignments.map(async (sa) => {
+          const assignment = await storage.getAssignmentById(sa.assignmentId);
+          return { ...assignment, studentAssignment: sa };
+        })
+      );
+
       res.json(assignments);
-    } catch (error) {
-      console.error("Error fetching assignments by student:", error);
-      res.status(500).json({ message: "Failed to fetch assignments by student" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/assignments', isAuthenticated, async (req: any, res) => {
+  app.patch("/api/assignments/:id", requireAuth, async (req, res) => {
     try {
-      const { title, description, subjectId, dueDate } = req.body;
-      const tutorId = req.user.claims.sub;
-      
-      if (!title) {
-        return res.status(400).json({ message: "Assignment title is required" });
-      }
-      
-      const newAssignment = await storage.createAssignment({
-        title,
-        description,
-        subjectId: subjectId ? Number(subjectId) : null,
-        tutorId,
-        dueDate: dueDate ? new Date(dueDate) : null,
+      const assignment = await storage.updateAssignment(parseInt(req.params.id), req.body);
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/assignments/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteAssignment(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== STUDENT ASSIGNMENT ROUTES ==========
+  
+  app.patch("/api/student-assignments/:id/submit", requireAuth, async (req, res) => {
+    try {
+      const { submission } = req.body;
+      const sa = await storage.updateStudentAssignment(parseInt(req.params.id), {
+        submission,
+        status: "submitted",
+        submittedAt: new Date().toISOString(),
       });
-      
-      res.status(201).json(newAssignment);
-    } catch (error) {
-      console.error("Error creating assignment:", error);
-      res.status(500).json({ message: "Failed to create assignment" });
+      res.json(sa);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/assignments/:assignmentId/assign', isAuthenticated, async (req, res) => {
+  app.patch("/api/student-assignments/:id/grade", requireAuth, async (req, res) => {
     try {
-      const { assignmentId } = req.params;
-      const { studentId } = req.body;
-      
-      if (!studentId) {
-        return res.status(400).json({ message: "Student ID is required" });
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can grade assignments" });
       }
-      
-      const assignment = await storage.getAssignment(Number(assignmentId));
-      if (!assignment) {
-        return res.status(404).json({ message: "Assignment not found" });
-      }
-      
-      const studentAssignment = await storage.assignToStudent({
-        studentId,
-        assignmentId: Number(assignmentId),
-        status: "assigned",
-      });
-      
-      res.status(201).json(studentAssignment);
-    } catch (error) {
-      console.error("Error assigning assignment to student:", error);
-      res.status(500).json({ message: "Failed to assign assignment to student" });
-    }
-  });
 
-  app.patch('/api/student-assignments/:id', isAuthenticated, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { status, submissionText, submissionUrl, feedback } = req.body;
-      
-      const updatedAssignment = await storage.updateStudentAssignment(Number(id), {
-        status,
-        submissionText,
-        submissionUrl,
+      const { grade, feedback } = req.body;
+      const sa = await storage.updateStudentAssignment(parseInt(req.params.id), {
+        grade,
         feedback,
+        status: "graded",
       });
-      
-      if (!updatedAssignment) {
-        return res.status(404).json({ message: "Student assignment not found" });
+
+      // Award points to student
+      const studentAssignment = await storage.getStudentAssignmentById(parseInt(req.params.id));
+      if (studentAssignment) {
+        const assignment = await storage.getAssignmentById(studentAssignment.assignmentId);
+        const student = await storage.getStudentById(studentAssignment.studentId);
+        if (assignment && student && grade >= 70) {
+          await storage.updateStudent(student.id, {
+            points: student.points + assignment.points,
+          });
+        }
       }
-      
-      res.json(updatedAssignment);
-    } catch (error) {
-      console.error("Error updating student assignment:", error);
-      res.status(500).json({ message: "Failed to update student assignment" });
+
+      res.json(sa);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // Session routes
-  app.get('/api/sessions/tutor/:tutorId', isAuthenticated, async (req, res) => {
+  app.get("/api/student-assignments/assignment/:assignmentId", requireAuth, async (req, res) => {
     try {
-      const { tutorId } = req.params;
-      const sessions = await storage.getSessionsByTutor(tutorId);
+      const studentAssignments = await storage.getStudentAssignmentsByAssignment(parseInt(req.params.assignmentId));
+      
+      // Get student details for each
+      const withStudents = await Promise.all(
+        studentAssignments.map(async (sa) => {
+          const student = await storage.getStudentById(sa.studentId);
+          return { ...sa, student };
+        })
+      );
+
+      res.json(withStudents);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== MATERIAL ROUTES ==========
+  
+  app.post("/api/materials", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can upload materials" });
+      }
+
+      const data = insertMaterialSchema.parse({
+        ...req.body,
+        teacherId: user.id,
+        uploadDate: new Date().toISOString(),
+      });
+
+      const material = await storage.createMaterial(data);
+      res.json(material);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/materials/teacher", requireAuth, async (req, res) => {
+    try {
+      const materials = await storage.getMaterialsByTeacher(req.session.userId!);
+      res.json(materials);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/materials/student/:studentId", requireAuth, async (req, res) => {
+    try {
+      const student = await storage.getStudentById(parseInt(req.params.studentId));
+      if (!student) {
+        return res.status(404).json({ error: "Student not found" });
+      }
+
+      const materials = await storage.getMaterialsByGradeLevel(student.gradeLevel);
+      res.json(materials);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/materials/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteMaterial(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== SCHEDULE ROUTES ==========
+  
+  app.post("/api/schedules", requireAuth, async (req, res) => {
+    try {
+      const data = insertScheduleSchema.parse(req.body);
+      const schedule = await storage.createSchedule(data);
+      res.json(schedule);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/schedules/teacher", requireAuth, async (req, res) => {
+    try {
+      const schedules = await storage.getSchedulesByTeacher(req.session.userId!);
+      res.json(schedules);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/schedules/student/:studentId", requireAuth, async (req, res) => {
+    try {
+      const schedules = await storage.getSchedulesByStudent(parseInt(req.params.studentId));
+      res.json(schedules);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/schedules/:id", requireAuth, async (req, res) => {
+    try {
+      const schedule = await storage.updateSchedule(parseInt(req.params.id), req.body);
+      res.json(schedule);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/schedules/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteSchedule(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== SESSION ROUTES ==========
+  
+  app.post("/api/sessions", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can create sessions" });
+      }
+
+      const data = insertSessionSchema.parse({
+        ...req.body,
+        teacherId: user.id,
+      });
+
+      const session = await storage.createSession(data);
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/sessions/teacher", requireAuth, async (req, res) => {
+    try {
+      const sessions = await storage.getSessionsByTeacher(req.session.userId!);
       res.json(sessions);
-    } catch (error) {
-      console.error("Error fetching sessions by tutor:", error);
-      res.status(500).json({ message: "Failed to fetch sessions by tutor" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.get('/api/sessions/student/:studentId', isAuthenticated, async (req, res) => {
+  app.get("/api/sessions/student/:studentId", requireAuth, async (req, res) => {
     try {
-      const { studentId } = req.params;
-      const sessions = await storage.getSessionsByStudent(studentId);
+      const sessions = await storage.getSessionsByStudent(parseInt(req.params.studentId));
       res.json(sessions);
-    } catch (error) {
-      console.error("Error fetching sessions by student:", error);
-      res.status(500).json({ message: "Failed to fetch sessions by student" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.get('/api/sessions/upcoming/tutor/:tutorId', isAuthenticated, async (req, res) => {
+  app.patch("/api/sessions/:id", requireAuth, async (req, res) => {
     try {
-      const { tutorId } = req.params;
-      const sessions = await storage.getUpcomingSessionsByTutor(tutorId);
-      res.json(sessions);
-    } catch (error) {
-      console.error("Error fetching upcoming sessions by tutor:", error);
-      res.status(500).json({ message: "Failed to fetch upcoming sessions by tutor" });
+      const session = await storage.updateSession(parseInt(req.params.id), req.body);
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.get('/api/sessions/upcoming/student/:studentId', isAuthenticated, async (req, res) => {
+  // ========== FEEDBACK ROUTES ==========
+  
+  app.post("/api/feedback", requireAuth, async (req, res) => {
     try {
-      const { studentId } = req.params;
-      const sessions = await storage.getUpcomingSessionsByStudent(studentId);
-      res.json(sessions);
-    } catch (error) {
-      console.error("Error fetching upcoming sessions by student:", error);
-      res.status(500).json({ message: "Failed to fetch upcoming sessions by student" });
-    }
-  });
-
-  app.post('/api/sessions', isAuthenticated, async (req: any, res) => {
-    try {
-      const { title, subjectId, studentId, startTime, endTime, meetLink } = req.body;
-      const tutorId = req.user.claims.sub;
-      
-      if (!title || !studentId || !startTime || !endTime) {
-        return res.status(400).json({ message: "Required fields are missing" });
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can give feedback" });
       }
-      
-      const newSession = await storage.createSession({
-        title,
-        subjectId: subjectId ? Number(subjectId) : null,
-        tutorId,
-        studentId,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
-        meetLink,
-        status: "scheduled",
+
+      const data = insertFeedbackSchema.parse({
+        ...req.body,
+        teacherId: user.id,
+        date: new Date().toISOString(),
       });
-      
-      res.status(201).json(newSession);
-    } catch (error) {
-      console.error("Error creating session:", error);
-      res.status(500).json({ message: "Failed to create session" });
+
+      const feedback = await storage.createFeedback(data);
+      res.json(feedback);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.patch('/api/sessions/:id', isAuthenticated, async (req, res) => {
+  app.get("/api/feedback/student/:studentId", requireAuth, async (req, res) => {
     try {
-      const { id } = req.params;
-      const { title, subjectId, startTime, endTime, meetLink, status, notes } = req.body;
-      
-      const updatedSession = await storage.updateSession(Number(id), {
-        title,
-        subjectId: subjectId ? Number(subjectId) : undefined,
-        startTime: startTime ? new Date(startTime) : undefined,
-        endTime: endTime ? new Date(endTime) : undefined,
-        meetLink,
-        status,
-        notes,
+      const feedback = await storage.getFeedbackByStudent(parseInt(req.params.studentId));
+      res.json(feedback);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/feedback/teacher", requireAuth, async (req, res) => {
+    try {
+      const feedback = await storage.getFeedbackByTeacher(req.session.userId!);
+      res.json(feedback);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== ATTENDANCE ROUTES ==========
+  
+  app.post("/api/attendance", requireAuth, async (req, res) => {
+    try {
+      const data = insertAttendanceSchema.parse(req.body);
+      const attendance = await storage.createAttendance(data);
+      res.json(attendance);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/attendance/student/:studentId", requireAuth, async (req, res) => {
+    try {
+      const attendance = await storage.getAttendanceByStudent(parseInt(req.params.studentId));
+      res.json(attendance);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/attendance/:id", requireAuth, async (req, res) => {
+    try {
+      const attendance = await storage.updateAttendance(parseInt(req.params.id), req.body);
+      res.json(attendance);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== PAYMENT ROUTES ==========
+  
+  app.post("/api/payments", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "parent") {
+        return res.status(403).json({ error: "Only parents can make payments" });
+      }
+
+      const data = insertPaymentSchema.parse({
+        ...req.body,
+        parentId: user.id,
+        date: new Date().toISOString(),
       });
-      
-      if (!updatedSession) {
-        return res.status(404).json({ message: "Session not found" });
+
+      const payment = await storage.createPayment(data);
+
+      // If payment is for teacher, create earnings record
+      if (data.teacherId) {
+        await storage.createEarnings({
+          teacherId: data.teacherId,
+          amount: data.amount,
+          date: new Date().toISOString(),
+          source: "parent_payment",
+          description: data.description,
+        });
       }
-      
-      res.json(updatedSession);
-    } catch (error) {
-      console.error("Error updating session:", error);
-      res.status(500).json({ message: "Failed to update session" });
+
+      res.json(payment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // Session summary routes
-  app.get('/api/session-summaries/:id', isAuthenticated, async (req, res) => {
+  app.get("/api/payments/parent", requireAuth, async (req, res) => {
     try {
-      const { id } = req.params;
-      const summary = await storage.getSessionSummary(Number(id));
-      
-      if (!summary) {
-        return res.status(404).json({ message: "Session summary not found" });
-      }
-      
-      res.json(summary);
-    } catch (error) {
-      console.error("Error fetching session summary:", error);
-      res.status(500).json({ message: "Failed to fetch session summary" });
+      const payments = await storage.getPaymentsByParent(req.session.userId!);
+      res.json(payments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.get('/api/session-summaries/session/:sessionId', isAuthenticated, async (req, res) => {
+  app.get("/api/payments/teacher", requireAuth, async (req, res) => {
     try {
-      const { sessionId } = req.params;
-      const summary = await storage.getSessionSummaryBySessionId(Number(sessionId));
-      
-      if (!summary) {
-        return res.status(404).json({ message: "Session summary not found" });
-      }
-      
-      res.json(summary);
-    } catch (error) {
-      console.error("Error fetching session summary by session:", error);
-      res.status(500).json({ message: "Failed to fetch session summary by session" });
+      const payments = await storage.getPaymentsByTeacher(req.session.userId!);
+      res.json(payments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.post('/api/session-summaries', isAuthenticated, async (req, res) => {
+  app.patch("/api/payments/:id", requireAuth, async (req, res) => {
     try {
-      const summaryData = req.body;
-      
-      // Validate the summary data using zod
-      const validatedData = insertSessionSummarySchema.parse(summaryData);
-      
-      const newSummary = await storage.createSessionSummary(validatedData);
-      res.status(201).json(newSummary);
-    } catch (error) {
-      console.error("Error creating session summary:", error);
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid session summary data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create session summary" });
+      const payment = await storage.updatePayment(parseInt(req.params.id), req.body);
+      res.json(payment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // AI-generated session summary
-  app.post('/api/ai-summary', isAuthenticated, upload.single('recording'), async (req, res) => {
+  // ========== TUTOR REQUEST ROUTES ==========
+  
+  app.post("/api/tutor-requests", requireAuth, async (req, res) => {
     try {
-      const { sessionId, notes } = req.body;
-      
-      if (!sessionId) {
-        return res.status(400).json({ message: "Session ID is required" });
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "parent") {
+        return res.status(403).json({ error: "Only parents can request tutors" });
       }
-      
-      // Get the session details
-      const session = await storage.getSession(Number(sessionId));
-      if (!session) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-      
-      // Generate AI summary
-      let aiSummary;
-      if (req.file) {
-        // If there's a recording file, use it for summary generation
-        const recordingBuffer = req.file.buffer;
-        // Convert buffer to base64 (in a real app, you'd store the file and use its URL)
-        const base64Recording = recordingBuffer.toString('base64');
-        
-        aiSummary = await generateSessionSummary(notes || "", base64Recording);
-      } else if (notes) {
-        // If no recording but notes provided, use notes for summary generation
-        aiSummary = await generateSessionSummary(notes);
-      } else {
-        return res.status(400).json({ message: "Either notes or a recording file is required" });
-      }
-      
-      // Create the session summary
-      const summary = await storage.createSessionSummary({
-        sessionId: Number(sessionId),
-        summary: aiSummary.summary,
-        keyConcepts: aiSummary.keyConcepts,
-        homeworkAssigned: aiSummary.homeworkAssigned,
-        engagementLevel: aiSummary.engagementLevel,
-        recordingUrl: req.file ? "Recording processed via AI" : undefined,
-        aiGenerated: true
+
+      const data = insertTutorRequestSchema.parse({
+        ...req.body,
+        parentId: user.id,
+        status: "pending",
+        requestDate: new Date().toISOString(),
+        responseDate: null,
       });
-      
-      res.status(201).json(summary);
-    } catch (error) {
-      console.error("Error generating AI summary:", error);
-      res.status(500).json({ message: "Failed to generate AI summary" });
+
+      const request = await storage.createTutorRequest(data);
+      res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // Message routes
-  app.get('/api/messages/user/:userId', isAuthenticated, async (req, res) => {
+  app.get("/api/tutor-requests/parent", requireAuth, async (req, res) => {
     try {
-      const { userId } = req.params;
-      const messages = await storage.getMessagesByUser(userId);
-      res.json(messages);
-    } catch (error) {
-      console.error("Error fetching messages by user:", error);
-      res.status(500).json({ message: "Failed to fetch messages by user" });
-    }
-  });
-
-  app.post('/api/messages', isAuthenticated, async (req: any, res) => {
-    try {
-      const { receiverId, content } = req.body;
-      const senderId = req.user.claims.sub;
-      
-      if (!receiverId || !content) {
-        return res.status(400).json({ message: "Receiver ID and content are required" });
-      }
-      
-      const newMessage = await storage.createMessage({
-        senderId,
-        receiverId,
-        content,
-        read: false
-      });
-      
-      res.status(201).json(newMessage);
-    } catch (error) {
-      console.error("Error creating message:", error);
-      res.status(500).json({ message: "Failed to create message" });
-    }
-  });
-
-  app.patch('/api/messages/:id/read', isAuthenticated, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const message = await storage.markMessageAsRead(Number(id));
-      
-      if (!message) {
-        return res.status(404).json({ message: "Message not found" });
-      }
-      
-      res.json(message);
-    } catch (error) {
-      console.error("Error marking message as read:", error);
-      res.status(500).json({ message: "Failed to mark message as read" });
-    }
-  });
-
-  // Progress routes
-  app.get('/api/progress/student/:studentId', isAuthenticated, async (req, res) => {
-    try {
-      const { studentId } = req.params;
-      const progress = await storage.getStudentProgress(studentId);
-      res.json(progress);
-    } catch (error) {
-      console.error("Error fetching student progress:", error);
-      res.status(500).json({ message: "Failed to fetch student progress" });
-    }
-  });
-
-  app.post('/api/progress', isAuthenticated, async (req, res) => {
-    try {
-      const { studentId, subjectId, week, totalWeeks, completionPercentage } = req.body;
-      
-      if (!studentId || !subjectId || !week || !totalWeeks) {
-        return res.status(400).json({ message: "Required fields are missing" });
-      }
-      
-      const newProgress = await storage.createStudentProgress({
-        studentId,
-        subjectId: Number(subjectId),
-        week: Number(week),
-        totalWeeks: Number(totalWeeks),
-        completionPercentage: completionPercentage ? Number(completionPercentage) : 0
-      });
-      
-      res.status(201).json(newProgress);
-    } catch (error) {
-      console.error("Error creating student progress:", error);
-      res.status(500).json({ message: "Failed to create student progress" });
-    }
-  });
-
-  app.patch('/api/progress/:id', isAuthenticated, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { week, completionPercentage } = req.body;
-      
-      const updatedProgress = await storage.updateStudentProgress(Number(id), {
-        week: week ? Number(week) : undefined,
-        completionPercentage: completionPercentage ? Number(completionPercentage) : undefined
-      });
-      
-      if (!updatedProgress) {
-        return res.status(404).json({ message: "Progress record not found" });
-      }
-      
-      res.json(updatedProgress);
-    } catch (error) {
-      console.error("Error updating student progress:", error);
-      res.status(500).json({ message: "Failed to update student progress" });
-    }
-  });
-
-  // Tutor request routes
-  app.post('/api/tutor-requests', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const userId = getUserIdFromSession(req);
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      const { tutorId, studentId, subjectId, message } = req.body;
-      
-      const newRequest = await storage.createTutorRequest({
-        parentId: userId,
-        tutorId,
-        studentId: studentId || undefined,
-        subjectId: subjectId ? Number(subjectId) : undefined,
-        message: message || undefined,
-        status: 'pending'
-      });
-      
-      // Create notification for tutor
-      await storage.createNotification({
-        userId: tutorId,
-        senderId: userId,
-        type: 'tutor_request',
-        title: 'New Tutor Request',
-        message: `You have a new tutoring request${subjectId ? ' for a subject' : ''}`,
-        link: `/tutor-requests/${newRequest.id}`
-      });
-      
-      res.status(201).json(newRequest);
-    } catch (error) {
-      console.error("Error creating tutor request:", error);
-      res.status(500).json({ message: "Failed to create tutor request" });
-    }
-  });
-
-  app.get('/api/tutor-requests/parent/:parentId', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const userId = getUserIdFromSession(req);
-      const { parentId } = req.params;
-      
-      // Authorization: Only allow users to access their own requests
-      if (userId !== parentId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const requests = await storage.getTutorRequestsByParent(parentId);
+      const requests = await storage.getTutorRequestsByParent(req.session.userId!);
       res.json(requests);
-    } catch (error) {
-      console.error("Error fetching parent tutor requests:", error);
-      res.status(500).json({ message: "Failed to fetch tutor requests" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.get('/api/tutor-requests/tutor/:tutorId', isUniversallyAuthenticated, async (req, res) => {
+  app.get("/api/tutor-requests/teacher", requireAuth, async (req, res) => {
     try {
-      const userId = getUserIdFromSession(req);
-      const { tutorId } = req.params;
-      
-      // Authorization: Only allow users to access their own requests
-      if (userId !== tutorId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const requests = await storage.getTutorRequestsByTutor(tutorId);
+      const requests = await storage.getTutorRequestsByTeacher(req.session.userId!);
       res.json(requests);
-    } catch (error) {
-      console.error("Error fetching tutor requests:", error);
-      res.status(500).json({ message: "Failed to fetch tutor requests" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.patch('/api/tutor-requests/:id/status', isUniversallyAuthenticated, async (req, res) => {
+  app.patch("/api/tutor-requests/:id", requireAuth, async (req, res) => {
     try {
-      const { id } = req.params;
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can respond to requests" });
+      }
+
       const { status } = req.body;
-      const userId = getUserIdFromSession(req);
-      
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      if (!['pending', 'approved', 'rejected'].includes(status)) {
-        return res.status(400).json({ message: "Invalid status" });
-      }
-      
-      // Get the request first to check authorization
-      const request = await storage.getTutorRequest(Number(id));
-      if (!request) {
-        return res.status(404).json({ message: "Request not found" });
-      }
-      
-      // Authorization: Only the tutor can update the status
-      if (request.tutorId !== userId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const updatedRequest = await storage.updateTutorRequestStatus(Number(id), status);
-      
-      // Create notification for parent
-      await storage.createNotification({
-        userId: updatedRequest!.parentId,
-        senderId: userId,
-        type: 'tutor_request_response',
-        title: `Tutor Request ${status}`,
-        message: `Your tutor request has been ${status}`,
-        link: `/tutor-requests/${id}`
+      const request = await storage.updateTutorRequest(parseInt(req.params.id), {
+        status,
+        responseDate: new Date().toISOString(),
       });
-      
-      res.json(updatedRequest);
-    } catch (error) {
-      console.error("Error updating tutor request:", error);
-      res.status(500).json({ message: "Failed to update tutor request" });
+
+      res.json(request);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // Get approved tutors for a parent (for messaging)
-  app.get('/api/tutors/approved/parent/:parentId', isUniversallyAuthenticated, async (req, res) => {
+  // ========== MESSAGE ROUTES ==========
+  
+  app.post("/api/messages", requireAuth, async (req, res) => {
     try {
-      const authUserId = getUserIdFromSession(req);
-      const { parentId } = req.params;
-      
-      // Authorization: Only allow users to access their own approved tutors
-      if (authUserId !== parentId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      // Get tutor requests and filter for approved ones FIRST
-      const tutorRequests = await storage.getTutorRequestsByParent(parentId);
-      const approvedTutorIds = tutorRequests
-        .filter(req => req.status === 'approved')
-        .map(req => req.tutorId);
-      
-      // Only fetch tutors for approved requests
-      const tutors = await Promise.all(
-        approvedTutorIds.map(async (id) => {
-          const user = await storage.getUser(id);
-          return user ? sanitizeUser(user) : null;
-        })
+      const data = insertMessageSchema.parse({
+        ...req.body,
+        senderId: req.session.userId!,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+      });
+
+      const message = await storage.createMessage(data);
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/messages/:userId", requireAuth, async (req, res) => {
+    try {
+      const messages = await storage.getMessagesBetweenUsers(
+        req.session.userId!,
+        parseInt(req.params.userId)
       );
-      
-      // Filter out nulls and return sanitized tutors
-      res.json(tutors.filter(Boolean));
-    } catch (error) {
-      console.error("Error fetching approved tutors for parent:", error);
-      res.status(500).json({ message: "Failed to fetch approved tutors" });
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  // Get approved tutors for a student (for messaging)
-  app.get('/api/tutors/approved/student/:studentId', isUniversallyAuthenticated, async (req, res) => {
+  app.get("/api/messages", requireAuth, async (req, res) => {
     try {
-      const authUserId = getUserIdFromSession(req);
-      const { studentId } = req.params;
+      const messages = await storage.getMessagesByUser(req.session.userId!);
       
-      // Get student record to find their parent
-      const studentRecord = await storage.getStudentByUserId(studentId);
-      if (!studentRecord || !studentRecord.parentId) {
-        return res.status(404).json({ message: "Student not found or has no parent" });
-      }
-      
-      // Authorization: Allow both the student and their parent to access
-      if (authUserId !== studentId && authUserId !== studentRecord.parentId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      // Get tutor requests from parent and filter for approved ones FIRST
-      const tutorRequests = await storage.getTutorRequestsByParent(studentRecord.parentId);
-      const approvedTutorIds = tutorRequests
-        .filter(req => req.status === 'approved' && (!req.studentId || req.studentId === studentId))
-        .map(req => req.tutorId);
-      
-      // Only fetch tutors for approved requests
-      const tutors = await Promise.all(
-        approvedTutorIds.map(async (id) => {
-          const user = await storage.getUser(id);
-          return user ? sanitizeUser(user) : null;
-        })
-      );
-      
-      // Filter out nulls and return sanitized tutors
-      res.json(tutors.filter(Boolean));
-    } catch (error) {
-      console.error("Error fetching approved tutors for student:", error);
-      res.status(500).json({ message: "Failed to fetch approved tutors" });
-    }
-  });
-
-  // Notification routes
-  app.get('/api/notifications/user/:userId', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const authUserId = getUserIdFromSession(req);
-      const { userId } = req.params;
-      
-      // Authorization: Only allow users to access their own notifications
-      if (authUserId !== userId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const notifications = await storage.getNotificationsByUser(userId);
-      res.json(notifications);
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-      res.status(500).json({ message: "Failed to fetch notifications" });
-    }
-  });
-
-  app.get('/api/notifications/unread/:userId', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const authUserId = getUserIdFromSession(req);
-      const { userId } = req.params;
-      
-      // Authorization: Only allow users to access their own notifications
-      if (authUserId !== userId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const notifications = await storage.getUnreadNotificationsByUser(userId);
-      res.json(notifications);
-    } catch (error) {
-      console.error("Error fetching unread notifications:", error);
-      res.status(500).json({ message: "Failed to fetch unread notifications" });
-    }
-  });
-
-  app.patch('/api/notifications/:id/read', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const authUserId = getUserIdFromSession(req);
-      const { id } = req.params;
-      
-      // Get notification first to check ownership
-      const notification = await storage.getNotification(Number(id));
-      if (!notification) {
-        return res.status(404).json({ message: "Notification not found" });
-      }
-      
-      // Authorization: Only allow users to mark their own notifications as read
-      if (notification.userId !== authUserId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const updatedNotification = await storage.markNotificationAsRead(Number(id));
-      res.json(updatedNotification);
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
-      res.status(500).json({ message: "Failed to mark notification as read" });
-    }
-  });
-
-  app.patch('/api/notifications/read-all/:userId', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const authUserId = getUserIdFromSession(req);
-      const { userId } = req.params;
-      
-      // Authorization: Only allow users to mark their own notifications as read
-      if (authUserId !== userId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const count = await storage.markAllNotificationsAsRead(userId);
-      res.json({ count });
-    } catch (error) {
-      console.error("Error marking all notifications as read:", error);
-      res.status(500).json({ message: "Failed to mark all notifications as read" });
-    }
-  });
-
-  // Learning material routes
-  app.get('/api/learning-materials/tutor/:tutorId', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const authUserId = getUserIdFromSession(req);
-      const { tutorId } = req.params;
-      
-      // Authorization: Only allow tutors to access their own materials
-      if (authUserId !== tutorId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const materials = await storage.getLearningMaterialsByTutor(tutorId);
-      res.json(materials);
-    } catch (error) {
-      console.error("Error fetching tutor learning materials:", error);
-      res.status(500).json({ message: "Failed to fetch learning materials" });
-    }
-  });
-
-  app.get('/api/learning-materials/student/:studentId', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const authUserId = getUserIdFromSession(req);
-      const { studentId } = req.params;
-      
-      // Authorization: Only allow students to access their own materials
-      if (authUserId !== studentId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const materials = await storage.getLearningMaterialsByStudent(studentId);
-      res.json(materials);
-    } catch (error) {
-      console.error("Error fetching student learning materials:", error);
-      res.status(500).json({ message: "Failed to fetch learning materials" });
-    }
-  });
-
-  app.post('/api/learning-materials', isUniversallyAuthenticated, upload.single('file'), async (req, res) => {
-    try {
-      const userId = getUserIdFromSession(req);
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      const { title, description, fileType, subjectId, studentIds } = req.body;
-      
-      let fileUrl: string | undefined = undefined;
-      if (req.file) {
-        // Convert buffer to base64 for storage (in production, use cloud storage)
-        fileUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-      }
-      
-      const studentIdsArray = typeof studentIds === 'string' ? JSON.parse(studentIds) : studentIds;
-      
-      const newMaterial = await storage.createLearningMaterial({
-        title,
-        description: description || undefined,
-        fileUrl,
-        fileType: fileType || undefined,
-        subjectId: subjectId ? Number(subjectId) : undefined,
-        tutorId: userId,
-        studentIds: studentIdsArray
-      });
-      
-      // Create notifications for students
-      for (const studentId of studentIdsArray) {
-        await storage.createNotification({
-          userId: studentId,
-          senderId: userId,
-          type: 'learning_material_shared',
-          title: 'New Learning Material',
-          message: `New learning material "${title}" has been shared with you`,
-          link: `/learning-materials/${newMaterial.id}`
-        });
-      }
-      
-      res.status(201).json(newMaterial);
-    } catch (error) {
-      console.error("Error creating learning material:", error);
-      res.status(500).json({ message: "Failed to create learning material" });
-    }
-  });
-
-  app.delete('/api/learning-materials/:id', isUniversallyAuthenticated, async (req, res) => {
-    try {
-      const authUserId = getUserIdFromSession(req);
-      const { id } = req.params;
-      
-      // Get material first to check ownership
-      const material = await storage.getLearningMaterial(Number(id));
-      if (!material) {
-        return res.status(404).json({ message: "Learning material not found" });
-      }
-      
-      // Authorization: Only allow tutors to delete their own materials
-      if (material.tutorId !== authUserId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const success = await storage.deleteLearningMaterial(Number(id));
-      res.json({ message: "Learning material deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting learning material:", error);
-      res.status(500).json({ message: "Failed to delete learning material" });
-    }
-  });
-
-  // Firebase authentication routes
-  app.post('/api/auth/firebase-login', async (req, res) => {
-    try {
-      return handleFirebaseLogin(req, res);
-    } catch (error) {
-      console.error("Firebase login error:", error);
-      res.status(500).json({ message: "Authentication failed" });
-    }
-  });
-
-  app.post('/api/auth/firebase-logout', async (req, res) => {
-    try {
-      return handleFirebaseLogout(req, res);
-    } catch (error) {
-      console.error("Firebase logout error:", error);
-      res.status(500).json({ message: "Logout failed" });
-    }
-  });
-
-  // Email/Password authentication routes
-  app.post('/api/auth/email-signup', async (req, res) => {
-    try {
-      return handleEmailPasswordSignup(req, res);
-    } catch (error) {
-      console.error("Email signup error:", error);
-      res.status(500).json({ message: "Signup failed" });
-    }
-  });
-
-  app.post('/api/auth/email-login', async (req, res) => {
-    try {
-      return handleEmailPasswordLogin(req, res);
-    } catch (error) {
-      console.error("Email login error:", error);
-      res.status(500).json({ message: "Login failed" });
-    }
-  });
-
-  app.post('/api/auth/verify-email', async (req, res) => {
-    try {
-      return handleEmailVerification(req, res);
-    } catch (error) {
-      console.error("Email verification error:", error);
-      res.status(500).json({ message: "Email verification failed" });
-    }
-  });
-
-  app.post('/api/auth/resend-verification', async (req, res) => {
-    try {
-      return handleResendVerification(req, res);
-    } catch (error) {
-      console.error("Resend verification error:", error);
-      res.status(500).json({ message: "Failed to resend verification" });
-    }
-  });
-
-  app.post('/api/auth/email-logout', async (req, res) => {
-    try {
-      return handleEmailPasswordLogout(req, res);
-    } catch (error) {
-      console.error("Email logout error:", error);
-      res.status(500).json({ message: "Logout failed" });
-    }
-  });
-
-  // Universal logout endpoint that works for all auth methods
-  app.post('/api/auth/logout', async (req, res) => {
-    try {
-      // Destroy the entire session for security (works for all auth methods)
-      await new Promise<void>((resolve, reject) => {
-        req.session.destroy((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-      
-      // Clear the session cookie
-      res.clearCookie('connect.sid', {
-        path: '/',
-      });
-      
-      return res.status(200).json({ message: "Logged out successfully" });
-    } catch (error) {
-      console.error("Universal logout error:", error);
-      return res.status(500).json({ message: "Logout failed" });
-    }
-  });
-
-  app.post('/api/auth/forgot-password', async (req, res) => {
-    try {
-      return handleForgotPassword(req, res);
-    } catch (error) {
-      console.error("Forgot password error:", error);
-      res.status(500).json({ message: "Failed to process request" });
-    }
-  });
-
-  app.post('/api/auth/reset-password', async (req, res) => {
-    try {
-      return handleResetPassword(req, res);
-    } catch (error) {
-      console.error("Reset password error:", error);
-      res.status(500).json({ message: "Failed to reset password" });
-    }
-  });
-
-  // Email/Password user endpoint
-  app.get('/api/auth/email-user', isEmailPasswordAuthenticated, async (req: any, res) => {
-    try {
-      if (req.session?.emailPasswordUser) {
-        const userId = req.session.emailPasswordUser.id;
-        const user = await storage.getUser(userId);
-        
-        if (user) {
-          res.json(sanitizeUser(user));
-        } else {
-          res.status(404).json({ message: "User not found" });
+      // Group by conversation
+      const conversations = new Map();
+      for (const msg of messages) {
+        const otherId = msg.senderId === req.session.userId! ? msg.receiverId : msg.senderId;
+        if (!conversations.has(otherId)) {
+          const otherUser = await storage.getUserById(otherId);
+          conversations.set(otherId, {
+            userId: otherId,
+            userName: otherUser?.name,
+            lastMessage: msg,
+            unreadCount: 0,
+          });
         }
-      } else {
-        res.status(401).json({ message: "Unauthorized" });
-      }
-    } catch (error) {
-      console.error("Error fetching email user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
-  // Onboarding profile endpoints
-  app.post('/api/student/profile', isUniversallyAuthenticated, async (req: any, res) => {
-    try {
-      const userId = getUserIdFromSession(req);
-      
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      // Store the student profile data (this would typically save to a student profile table)
-      // For now, we'll just return success as if we stored it
-      res.status(200).json({ success: true, message: "Student profile updated" });
-    } catch (error) {
-      console.error("Error updating student profile:", error);
-      res.status(500).json({ message: "Failed to update student profile" });
-    }
-  });
-  
-  app.post('/api/parent/profile', isUniversallyAuthenticated, async (req: any, res) => {
-    try {
-      const userId = getUserIdFromSession(req);
-      
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      // Store the parent profile data
-      res.status(200).json({ success: true, message: "Parent profile updated" });
-    } catch (error) {
-      console.error("Error updating parent profile:", error);
-      res.status(500).json({ message: "Failed to update parent profile" });
-    }
-  });
-  
-  app.post('/api/tutor/profile', isUniversallyAuthenticated, async (req: any, res) => {
-    try {
-      const userId = getUserIdFromSession(req);
-      
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      // Store the tutor profile data
-      res.status(200).json({ success: true, message: "Tutor profile updated" });
-    } catch (error) {
-      console.error("Error updating tutor profile:", error);
-      res.status(500).json({ message: "Failed to update tutor profile" });
-    }
-  });
-  
-  app.post('/api/user/preferences', isUniversallyAuthenticated, async (req: any, res) => {
-    try {
-      const userId = getUserIdFromSession(req);
-      
-      if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      
-      // Store the user preferences
-      res.status(200).json({ success: true, message: "User preferences updated" });
-    } catch (error) {
-      console.error("Error updating user preferences:", error);
-      res.status(500).json({ message: "Failed to update user preferences" });
-    }
-  });
-
-  // Firebase user endpoint - alternative to Replit Auth user endpoint
-  app.get('/api/auth/firebase-user', isFirebaseAuthenticated, async (req: any, res) => {
-    try {
-      if (req.session?.firebaseUser) {
-        const userId = req.session.firebaseUser.uid;
-        const user = await storage.getUser(userId);
-        
-        if (user) {
-          res.json(sanitizeUser(user));
-        } else {
-          res.status(404).json({ message: "User not found" });
+        if (!msg.isRead && msg.receiverId === req.session.userId!) {
+          conversations.get(otherId).unreadCount++;
         }
-      } else {
-        res.status(401).json({ message: "Unauthorized" });
       }
-    } catch (error) {
-      console.error("Error fetching Firebase user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+
+      res.json(Array.from(conversations.values()));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  app.patch("/api/messages/:id/read", requireAuth, async (req, res) => {
+    try {
+      const message = await storage.markMessageAsRead(parseInt(req.params.id));
+      res.json(message);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== PROGRESS REPORT ROUTES ==========
+  
+  app.post("/api/progress-reports", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can create reports" });
+      }
+
+      const data = insertProgressReportSchema.parse({
+        ...req.body,
+        teacherId: user.id,
+        date: new Date().toISOString(),
+      });
+
+      const report = await storage.createProgressReport(data);
+      res.json(report);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/progress-reports/student/:studentId", requireAuth, async (req, res) => {
+    try {
+      const reports = await storage.getProgressReportsByStudent(parseInt(req.params.studentId));
+      res.json(reports);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/progress-reports/teacher", requireAuth, async (req, res) => {
+    try {
+      const reports = await storage.getProgressReportsByTeacher(req.session.userId!);
+      res.json(reports);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== CLARIFICATION ROUTES ==========
+  
+  app.post("/api/clarifications", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      const student = await storage.getStudentByUserId(user!.id);
+      if (!student) {
+        return res.status(403).json({ error: "Only students can request clarifications" });
+      }
+
+      const data = insertClarificationSchema.parse({
+        ...req.body,
+        studentId: student.id,
+        answer: null,
+        askedDate: new Date().toISOString(),
+        answeredDate: null,
+        status: "pending",
+      });
+
+      const clarification = await storage.createClarification(data);
+      res.json(clarification);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/clarifications/student/:studentId", requireAuth, async (req, res) => {
+    try {
+      const clarifications = await storage.getClarificationsByStudent(parseInt(req.params.studentId));
+      res.json(clarifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/clarifications/assignment/:assignmentId", requireAuth, async (req, res) => {
+    try {
+      const clarifications = await storage.getClarificationsByAssignment(parseInt(req.params.assignmentId));
+      res.json(clarifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/clarifications/:id", requireAuth, async (req, res) => {
+    try {
+      const { answer } = req.body;
+      const clarification = await storage.updateClarification(parseInt(req.params.id), {
+        answer,
+        answeredDate: new Date().toISOString(),
+        status: "answered",
+      });
+      res.json(clarification);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== PARENTAL CONTROL ROUTES ==========
+  
+  app.post("/api/parental-controls", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "parent") {
+        return res.status(403).json({ error: "Only parents can set controls" });
+      }
+
+      const data = insertParentalControlSchema.parse({
+        ...req.body,
+        parentId: user.id,
+      });
+
+      const control = await storage.createParentalControl(data);
+      res.json(control);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/parental-controls/student/:studentId", requireAuth, async (req, res) => {
+    try {
+      const control = await storage.getParentalControlByStudent(parseInt(req.params.studentId));
+      res.json(control);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/parental-controls/:id", requireAuth, async (req, res) => {
+    try {
+      const control = await storage.updateParentalControl(parseInt(req.params.id), req.body);
+      res.json(control);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== TUTOR RATING ROUTES ==========
+  
+  app.post("/api/tutor-ratings", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "parent") {
+        return res.status(403).json({ error: "Only parents can rate tutors" });
+      }
+
+      const data = insertTutorRatingSchema.parse({
+        ...req.body,
+        parentId: user.id,
+        date: new Date().toISOString(),
+      });
+
+      const rating = await storage.createTutorRating(data);
+      res.json(rating);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tutor-ratings/teacher/:teacherId", requireAuth, async (req, res) => {
+    try {
+      const ratings = await storage.getRatingsByTeacher(parseInt(req.params.teacherId));
+      res.json(ratings);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== EARNINGS ROUTES ==========
+  
+  app.get("/api/earnings/teacher", requireAuth, async (req, res) => {
+    try {
+      const earnings = await storage.getEarningsByTeacher(req.session.userId!);
+      res.json(earnings);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== TEACHERS LIST ==========
+  
+  app.get("/api/teachers", requireAuth, async (req, res) => {
+    try {
+      // This would normally query all teachers, for now return empty
+      // In a real app, you'd have a proper users table query
+      res.json([]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 }

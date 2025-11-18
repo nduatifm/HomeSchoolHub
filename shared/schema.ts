@@ -1,135 +1,281 @@
 import { z } from "zod";
-import type { Prisma } from "@prisma/client";
 
-// Export Prisma-generated types
-export type User = Prisma.UserGetPayload<{}>;
-export type Student = Prisma.StudentGetPayload<{}>;
-export type Subject = Prisma.SubjectGetPayload<{}>;
-export type Assignment = Prisma.AssignmentGetPayload<{}>;
-export type StudentAssignment = Prisma.StudentAssignmentGetPayload<{}>;
-export type TutoringSession = Prisma.TutoringSessionGetPayload<{}>;
-export type SessionSummary = Prisma.SessionSummaryGetPayload<{}>;
-export type Message = Prisma.MessageGetPayload<{}>;
-export type StudentProgress = Prisma.StudentProgressGetPayload<{}>;
-export type TutorRequest = Prisma.TutorRequestGetPayload<{}>;
-export type Notification = Prisma.NotificationGetPayload<{}>;
-export type LearningMaterial = Prisma.LearningMaterialGetPayload<{}>;
+// User roles
+export const userRoles = ["teacher", "parent", "student"] as const;
+export type UserRole = typeof userRoles[number];
 
-// UpsertUser type (for user creation/update)
-export type UpsertUser = {
-  id: string;
-  email?: string | null;
-  password?: string | null;
-  emailVerified?: boolean;
-  verificationToken?: string | null;
-  verificationTokenExpiry?: Date | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  profileImageUrl?: string | null;
-  role?: string | null;
-};
-
-// Zod schemas for insert operations
-export const insertStudentSchema = z.object({
-  userId: z.string(),
-  parentId: z.string().optional().nullable(),
+// User schema
+export const userSchema = z.object({
+  id: z.number(),
+  email: z.string().email(),
+  password: z.string(),
+  name: z.string(),
+  role: z.enum(userRoles).nullable(),
 });
+
+export const insertUserSchema = userSchema.omit({ id: true });
+export type User = z.infer<typeof userSchema>;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+// Student schema
+export const studentSchema = z.object({
+  id: z.number(),
+  userId: z.number(),
+  parentId: z.number(),
+  name: z.string(),
+  gradeLevel: z.string(),
+  badges: z.array(z.string()),
+  points: z.number(),
+});
+
+export const insertStudentSchema = studentSchema.omit({ id: true });
+export type Student = z.infer<typeof studentSchema>;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
 
-export const insertSubjectSchema = z.object({
-  name: z.string(),
-  description: z.string().optional().nullable(),
-});
-export type InsertSubject = z.infer<typeof insertSubjectSchema>;
-
-export const insertAssignmentSchema = z.object({
+// Assignment schema
+export const assignmentSchema = z.object({
+  id: z.number(),
   title: z.string(),
-  description: z.string().optional().nullable(),
-  subjectId: z.number().optional().nullable(),
-  tutorId: z.string(),
-  dueDate: z.coerce.date().optional().nullable(),
+  description: z.string(),
+  subject: z.string(),
+  dueDate: z.string(),
+  teacherId: z.number(),
+  gradeLevel: z.string(),
+  points: z.number(),
 });
+
+export const insertAssignmentSchema = assignmentSchema.omit({ id: true });
+export type Assignment = z.infer<typeof assignmentSchema>;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 
-export const insertStudentAssignmentSchema = z.object({
-  studentId: z.string(),
-  assignmentId: z.number().optional().nullable(),
-  status: z.string().optional().nullable(),
-  submissionText: z.string().optional().nullable(),
-  submissionUrl: z.string().optional().nullable(),
-  feedback: z.string().optional().nullable(),
+// Student Assignment schema
+export const studentAssignmentSchema = z.object({
+  id: z.number(),
+  assignmentId: z.number(),
+  studentId: z.number(),
+  submission: z.string().nullable(),
+  grade: z.number().nullable(),
+  feedback: z.string().nullable(),
+  status: z.enum(["pending", "submitted", "graded"]),
+  submittedAt: z.string().nullable(),
 });
+
+export const insertStudentAssignmentSchema = studentAssignmentSchema.omit({ id: true });
+export type StudentAssignment = z.infer<typeof studentAssignmentSchema>;
 export type InsertStudentAssignment = z.infer<typeof insertStudentAssignmentSchema>;
 
-export const insertSessionSchema = z.object({
+// Study Material schema
+export const materialSchema = z.object({
+  id: z.number(),
   title: z.string(),
-  subjectId: z.number().optional().nullable(),
-  tutorId: z.string(),
-  studentId: z.string(),
-  startTime: z.coerce.date(),
-  endTime: z.coerce.date(),
-  meetLink: z.string().optional().nullable(),
-  status: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
+  description: z.string(),
+  fileUrl: z.string(),
+  subject: z.string(),
+  teacherId: z.number(),
+  uploadDate: z.string(),
+  gradeLevel: z.string(),
 });
+
+export const insertMaterialSchema = materialSchema.omit({ id: true });
+export type Material = z.infer<typeof materialSchema>;
+export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
+
+// Schedule schema
+export const scheduleSchema = z.object({
+  id: z.number(),
+  teacherId: z.number(),
+  studentId: z.number(),
+  dayOfWeek: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  subject: z.string(),
+});
+
+export const insertScheduleSchema = scheduleSchema.omit({ id: true });
+export type Schedule = z.infer<typeof scheduleSchema>;
+export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
+
+// Session schema
+export const sessionSchema = z.object({
+  id: z.number(),
+  teacherId: z.number(),
+  studentIds: z.array(z.number()),
+  subject: z.string(),
+  date: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  notes: z.string().nullable(),
+  status: z.enum(["scheduled", "completed", "cancelled"]),
+});
+
+export const insertSessionSchema = sessionSchema.omit({ id: true });
+export type Session = z.infer<typeof sessionSchema>;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 
-export const insertSessionSummarySchema = z.object({
-  sessionId: z.number().optional().nullable(),
-  summary: z.string().optional().nullable(),
-  keyConcepts: z.array(z.string()),
-  homeworkAssigned: z.string().optional().nullable(),
-  engagementLevel: z.number().optional().nullable(),
-  recordingUrl: z.string().optional().nullable(),
-  aiGenerated: z.boolean().optional().nullable(),
+// Feedback schema
+export const feedbackSchema = z.object({
+  id: z.number(),
+  teacherId: z.number(),
+  studentId: z.number(),
+  message: z.string(),
+  date: z.string(),
+  type: z.enum(["positive", "constructive", "general"]),
 });
-export type InsertSessionSummary = z.infer<typeof insertSessionSummarySchema>;
 
-export const insertMessageSchema = z.object({
-  senderId: z.string(),
-  receiverId: z.string(),
-  content: z.string(),
-  read: z.boolean().optional().nullable(),
-});
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export const insertFeedbackSchema = feedbackSchema.omit({ id: true });
+export type Feedback = z.infer<typeof feedbackSchema>;
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 
-export const insertStudentProgressSchema = z.object({
-  studentId: z.string(),
-  subjectId: z.number().optional().nullable(),
-  week: z.number(),
-  totalWeeks: z.number(),
-  completionPercentage: z.number().optional().nullable(),
+// Attendance schema
+export const attendanceSchema = z.object({
+  id: z.number(),
+  studentId: z.number(),
+  sessionId: z.number().nullable(),
+  date: z.string(),
+  status: z.enum(["present", "absent", "late"]),
+  notes: z.string().nullable(),
 });
-export type InsertStudentProgress = z.infer<typeof insertStudentProgressSchema>;
 
-export const insertTutorRequestSchema = z.object({
-  parentId: z.string(),
-  tutorId: z.string(),
-  studentId: z.string().optional(),
-  subjectId: z.number().optional(),
-  message: z.string().optional(),
-  status: z.string().optional(),
+export const insertAttendanceSchema = attendanceSchema.omit({ id: true });
+export type Attendance = z.infer<typeof attendanceSchema>;
+export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
+
+// Payment schema
+export const paymentSchema = z.object({
+  id: z.number(),
+  parentId: z.number(),
+  teacherId: z.number().nullable(),
+  amount: z.number(),
+  date: z.string(),
+  status: z.enum(["pending", "completed", "failed"]),
+  description: z.string(),
+  subscriptionType: z.string().nullable(),
 });
+
+export const insertPaymentSchema = paymentSchema.omit({ id: true });
+export type Payment = z.infer<typeof paymentSchema>;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+// Tutor Request schema
+export const tutorRequestSchema = z.object({
+  id: z.number(),
+  parentId: z.number(),
+  teacherId: z.number(),
+  studentId: z.number().nullable(),
+  status: z.enum(["pending", "approved", "rejected"]),
+  message: z.string(),
+  requestDate: z.string(),
+  responseDate: z.string().nullable(),
+});
+
+export const insertTutorRequestSchema = tutorRequestSchema.omit({ id: true });
+export type TutorRequest = z.infer<typeof tutorRequestSchema>;
 export type InsertTutorRequest = z.infer<typeof insertTutorRequestSchema>;
 
-export const insertNotificationSchema = z.object({
-  userId: z.string(),
-  senderId: z.string().optional(),
-  type: z.string(),
-  title: z.string(),
+// Message schema
+export const messageSchema = z.object({
+  id: z.number(),
+  senderId: z.number(),
+  receiverId: z.number(),
   message: z.string(),
-  link: z.string().optional(),
-  read: z.boolean().optional(),
+  timestamp: z.string(),
+  isRead: z.boolean(),
 });
-export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
-export const insertLearningMaterialSchema = z.object({
-  title: z.string(),
-  description: z.string().optional().nullable(),
-  fileUrl: z.string().optional().nullable(),
-  fileType: z.string().optional().nullable(),
-  subjectId: z.number().optional().nullable(),
-  tutorId: z.string(),
-  studentIds: z.array(z.string()),
+export const insertMessageSchema = messageSchema.omit({ id: true });
+export type Message = z.infer<typeof messageSchema>;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+
+// Progress Report schema
+export const progressReportSchema = z.object({
+  id: z.number(),
+  studentId: z.number(),
+  teacherId: z.number(),
+  period: z.string(),
+  content: z.string(),
+  date: z.string(),
+  grades: z.record(z.string(), z.number()),
 });
-export type InsertLearningMaterial = z.infer<typeof insertLearningMaterialSchema>;
+
+export const insertProgressReportSchema = progressReportSchema.omit({ id: true });
+export type ProgressReport = z.infer<typeof progressReportSchema>;
+export type InsertProgressReport = z.infer<typeof insertProgressReportSchema>;
+
+// Clarification schema
+export const clarificationSchema = z.object({
+  id: z.number(),
+  studentId: z.number(),
+  assignmentId: z.number(),
+  question: z.string(),
+  answer: z.string().nullable(),
+  askedDate: z.string(),
+  answeredDate: z.string().nullable(),
+  status: z.enum(["pending", "answered"]),
+});
+
+export const insertClarificationSchema = clarificationSchema.omit({ id: true });
+export type Clarification = z.infer<typeof clarificationSchema>;
+export type InsertClarification = z.infer<typeof insertClarificationSchema>;
+
+// Parental Control schema
+export const parentalControlSchema = z.object({
+  id: z.number(),
+  studentId: z.number(),
+  parentId: z.number(),
+  screenTimeLimit: z.number().nullable(),
+  allowedDays: z.array(z.string()),
+  allowedTimes: z.object({
+    start: z.string(),
+    end: z.string(),
+  }),
+  blockedFeatures: z.array(z.string()),
+});
+
+export const insertParentalControlSchema = parentalControlSchema.omit({ id: true });
+export type ParentalControl = z.infer<typeof parentalControlSchema>;
+export type InsertParentalControl = z.infer<typeof insertParentalControlSchema>;
+
+// Tutor Rating schema
+export const tutorRatingSchema = z.object({
+  id: z.number(),
+  parentId: z.number(),
+  teacherId: z.number(),
+  rating: z.number(),
+  review: z.string().nullable(),
+  date: z.string(),
+});
+
+export const insertTutorRatingSchema = tutorRatingSchema.omit({ id: true });
+export type TutorRating = z.infer<typeof tutorRatingSchema>;
+export type InsertTutorRating = z.infer<typeof insertTutorRatingSchema>;
+
+// Earnings schema
+export const earningsSchema = z.object({
+  id: z.number(),
+  teacherId: z.number(),
+  amount: z.number(),
+  date: z.string(),
+  source: z.string(),
+  description: z.string(),
+});
+
+export const insertEarningsSchema = earningsSchema.omit({ id: true });
+export type Earnings = z.infer<typeof earningsSchema>;
+export type InsertEarnings = z.infer<typeof insertEarningsSchema>;
+
+// Student Invite schema
+export const studentInviteSchema = z.object({
+  id: z.number(),
+  parentId: z.number(),
+  email: z.string().email(),
+  studentName: z.string(),
+  gradeLevel: z.string(),
+  token: z.string(),
+  status: z.enum(["pending", "accepted"]),
+  createdDate: z.string(),
+  expiresDate: z.string(),
+});
+
+export const insertStudentInviteSchema = studentInviteSchema.omit({ id: true });
+export type StudentInvite = z.infer<typeof studentInviteSchema>;
+export type InsertStudentInvite = z.infer<typeof insertStudentInviteSchema>;

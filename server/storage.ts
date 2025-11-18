@@ -1,624 +1,583 @@
-import { 
-  type User, 
-  type UpsertUser, 
-  type Subject, 
-  type InsertSubject, 
-  type Assignment, 
-  type InsertAssignment, 
-  type StudentAssignment, 
-  type InsertStudentAssignment, 
-  type TutoringSession, 
-  type InsertSession, 
-  type SessionSummary, 
-  type InsertSessionSummary, 
-  type Message, 
-  type InsertMessage, 
-  type StudentProgress, 
-  type InsertStudentProgress,
-  type TutorRequest,
-  type InsertTutorRequest,
-  type Notification,
-  type InsertNotification,
-  type LearningMaterial,
-  type InsertLearningMaterial
+import type {
+  User, InsertUser,
+  Student, InsertStudent,
+  Assignment, InsertAssignment,
+  StudentAssignment, InsertStudentAssignment,
+  Material, InsertMaterial,
+  Schedule, InsertSchedule,
+  Session, InsertSession,
+  Feedback, InsertFeedback,
+  Attendance, InsertAttendance,
+  Payment, InsertPayment,
+  TutorRequest, InsertTutorRequest,
+  Message, InsertMessage,
+  ProgressReport, InsertProgressReport,
+  Clarification, InsertClarification,
+  ParentalControl, InsertParentalControl,
+  TutorRating, InsertTutorRating,
+  Earnings, InsertEarnings,
+  StudentInvite, InsertStudentInvite,
 } from "@shared/schema";
-import { prisma } from "./prisma";
 
-// Interface for storage operations
 export interface IStorage {
   // User operations
-  getUser(id: string): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
-  createUser(userData: { email: string; password: string; firstName?: string; lastName?: string }): Promise<User>;
-  updateUserRole(id: string, role: string): Promise<User | undefined>;
-  getUsersByRole(role: string): Promise<User[]>;
-  updateUserVerification(id: string, verified: boolean, verificationToken?: string | null, verificationTokenExpiry?: Date | null): Promise<User | undefined>;
-  getUserByVerificationToken(token: string): Promise<User | undefined>;
-  updateUserPassword(id: string, password: string): Promise<User | undefined>;
-  updateUserPasswordReset(id: string, resetToken: string | null, resetTokenExpiry: Date | null): Promise<User | undefined>;
-  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
-  deleteUnverifiedExpiredUsers(): Promise<number>;
+  createUser(user: InsertUser): Promise<User>;
+  getUserById(id: number): Promise<User | null>;
+  getUserByEmail(email: string): Promise<User | null>;
+  updateUser(id: number, user: Partial<User>): Promise<User>;
   
   // Student operations
-  getStudentByUserId(userId: string): Promise<{ id: number; userId: string; parentId: string | null } | undefined>;
-  getStudentsByParentId(parentId: string): Promise<User[]>;
-  getStudentsByTutorId(tutorId: string): Promise<User[]>;
-  
-  // Subject operations
-  getSubject(id: number): Promise<Subject | undefined>;
-  getSubjects(): Promise<Subject[]>;
-  createSubject(subject: InsertSubject): Promise<Subject>;
+  createStudent(student: InsertStudent): Promise<Student>;
+  getStudentById(id: number): Promise<Student | null>;
+  getStudentByUserId(userId: number): Promise<Student | null>;
+  getStudentsByParent(parentId: number): Promise<Student[]>;
+  getStudentsByTeacher(teacherId: number): Promise<Student[]>;
+  updateStudent(id: number, student: Partial<Student>): Promise<Student>;
   
   // Assignment operations
-  getAssignment(id: number): Promise<Assignment | undefined>;
-  getAssignmentsByTutor(tutorId: string): Promise<Assignment[]>;
-  getAssignmentsByStudent(studentId: string): Promise<StudentAssignment[]>;
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
-  assignToStudent(studentAssignment: InsertStudentAssignment): Promise<StudentAssignment>;
-  updateStudentAssignment(id: number, studentAssignment: Partial<InsertStudentAssignment>): Promise<StudentAssignment | undefined>;
+  getAssignmentById(id: number): Promise<Assignment | null>;
+  getAssignmentsByTeacher(teacherId: number): Promise<Assignment[]>;
+  getAssignmentsByGradeLevel(gradeLevel: string): Promise<Assignment[]>;
+  updateAssignment(id: number, assignment: Partial<Assignment>): Promise<Assignment>;
+  deleteAssignment(id: number): Promise<void>;
+  
+  // Student Assignment operations
+  createStudentAssignment(studentAssignment: InsertStudentAssignment): Promise<StudentAssignment>;
+  getStudentAssignmentById(id: number): Promise<StudentAssignment | null>;
+  getStudentAssignmentsByStudent(studentId: number): Promise<StudentAssignment[]>;
+  getStudentAssignmentsByAssignment(assignmentId: number): Promise<StudentAssignment[]>;
+  updateStudentAssignment(id: number, studentAssignment: Partial<StudentAssignment>): Promise<StudentAssignment>;
+  
+  // Material operations
+  createMaterial(material: InsertMaterial): Promise<Material>;
+  getMaterialById(id: number): Promise<Material | null>;
+  getMaterialsByTeacher(teacherId: number): Promise<Material[]>;
+  getMaterialsBySubject(subject: string): Promise<Material[]>;
+  getMaterialsByGradeLevel(gradeLevel: string): Promise<Material[]>;
+  deleteMaterial(id: number): Promise<void>;
+  
+  // Schedule operations
+  createSchedule(schedule: InsertSchedule): Promise<Schedule>;
+  getSchedulesByTeacher(teacherId: number): Promise<Schedule[]>;
+  getSchedulesByStudent(studentId: number): Promise<Schedule[]>;
+  updateSchedule(id: number, schedule: Partial<Schedule>): Promise<Schedule>;
+  deleteSchedule(id: number): Promise<void>;
   
   // Session operations
-  getSession(id: number): Promise<TutoringSession | undefined>;
-  getSessionsByTutor(tutorId: string): Promise<TutoringSession[]>;
-  getSessionsByStudent(studentId: string): Promise<TutoringSession[]>;
-  getUpcomingSessionsByTutor(tutorId: string): Promise<TutoringSession[]>;
-  getUpcomingSessionsByStudent(studentId: string): Promise<TutoringSession[]>;
-  createSession(session: InsertSession): Promise<TutoringSession>;
-  updateSession(id: number, session: Partial<InsertSession>): Promise<TutoringSession | undefined>;
+  createSession(session: InsertSession): Promise<Session>;
+  getSessionById(id: number): Promise<Session | null>;
+  getSessionsByTeacher(teacherId: number): Promise<Session[]>;
+  getSessionsByStudent(studentId: number): Promise<Session[]>;
+  updateSession(id: number, session: Partial<Session>): Promise<Session>;
   
-  // Session summary operations
-  getSessionSummary(id: number): Promise<SessionSummary | undefined>;
-  getSessionSummaryBySessionId(sessionId: number): Promise<SessionSummary | undefined>;
-  createSessionSummary(summary: InsertSessionSummary): Promise<SessionSummary>;
+  // Feedback operations
+  createFeedback(feedback: InsertFeedback): Promise<Feedback>;
+  getFeedbackByStudent(studentId: number): Promise<Feedback[]>;
+  getFeedbackByTeacher(teacherId: number): Promise<Feedback[]>;
+  
+  // Attendance operations
+  createAttendance(attendance: InsertAttendance): Promise<Attendance>;
+  getAttendanceByStudent(studentId: number): Promise<Attendance[]>;
+  getAttendanceBySession(sessionId: number): Promise<Attendance[]>;
+  updateAttendance(id: number, attendance: Partial<Attendance>): Promise<Attendance>;
+  
+  // Payment operations
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  getPaymentsByParent(parentId: number): Promise<Payment[]>;
+  getPaymentsByTeacher(teacherId: number): Promise<Payment[]>;
+  updatePayment(id: number, payment: Partial<Payment>): Promise<Payment>;
+  
+  // Tutor Request operations
+  createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest>;
+  getTutorRequestById(id: number): Promise<TutorRequest | null>;
+  getTutorRequestsByParent(parentId: number): Promise<TutorRequest[]>;
+  getTutorRequestsByTeacher(teacherId: number): Promise<TutorRequest[]>;
+  updateTutorRequest(id: number, request: Partial<TutorRequest>): Promise<TutorRequest>;
   
   // Message operations
-  getMessage(id: number): Promise<Message | undefined>;
-  getMessagesByUser(userId: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
-  markMessageAsRead(id: number): Promise<Message | undefined>;
+  getMessagesBetweenUsers(user1Id: number, user2Id: number): Promise<Message[]>;
+  getMessagesByUser(userId: number): Promise<Message[]>;
+  markMessageAsRead(id: number): Promise<Message>;
   
-  // Progress operations
-  getStudentProgress(studentId: string): Promise<StudentProgress[]>;
-  updateStudentProgress(id: number, progress: Partial<InsertStudentProgress>): Promise<StudentProgress | undefined>;
-  createStudentProgress(progress: InsertStudentProgress): Promise<StudentProgress>;
+  // Progress Report operations
+  createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
+  getProgressReportsByStudent(studentId: number): Promise<ProgressReport[]>;
+  getProgressReportsByTeacher(teacherId: number): Promise<ProgressReport[]>;
   
-  // Tutor request operations
-  getTutorRequest(id: number): Promise<TutorRequest | undefined>;
-  getTutorRequestsByParent(parentId: string): Promise<TutorRequest[]>;
-  getTutorRequestsByTutor(tutorId: string): Promise<TutorRequest[]>;
-  createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest>;
-  updateTutorRequestStatus(id: number, status: string): Promise<TutorRequest | undefined>;
+  // Clarification operations
+  createClarification(clarification: InsertClarification): Promise<Clarification>;
+  getClarificationsByStudent(studentId: number): Promise<Clarification[]>;
+  getClarificationsByAssignment(assignmentId: number): Promise<Clarification[]>;
+  updateClarification(id: number, clarification: Partial<Clarification>): Promise<Clarification>;
   
-  // Notification operations
-  getNotification(id: number): Promise<Notification | undefined>;
-  getNotificationsByUser(userId: string): Promise<Notification[]>;
-  getUnreadNotificationsByUser(userId: string): Promise<Notification[]>;
-  createNotification(notification: InsertNotification): Promise<Notification>;
-  markNotificationAsRead(id: number): Promise<Notification | undefined>;
-  markAllNotificationsAsRead(userId: string): Promise<number>;
+  // Parental Control operations
+  createParentalControl(control: InsertParentalControl): Promise<ParentalControl>;
+  getParentalControlByStudent(studentId: number): Promise<ParentalControl | null>;
+  updateParentalControl(id: number, control: Partial<ParentalControl>): Promise<ParentalControl>;
   
-  // Learning material operations
-  getLearningMaterial(id: number): Promise<LearningMaterial | undefined>;
-  getLearningMaterialsByTutor(tutorId: string): Promise<LearningMaterial[]>;
-  getLearningMaterialsByStudent(studentId: string): Promise<LearningMaterial[]>;
-  createLearningMaterial(material: InsertLearningMaterial): Promise<LearningMaterial>;
-  deleteLearningMaterial(id: number): Promise<boolean>;
+  // Tutor Rating operations
+  createTutorRating(rating: InsertTutorRating): Promise<TutorRating>;
+  getRatingsByTeacher(teacherId: number): Promise<TutorRating[]>;
+  getRatingsByParent(parentId: number): Promise<TutorRating[]>;
+  
+  // Earnings operations
+  createEarnings(earnings: InsertEarnings): Promise<Earnings>;
+  getEarningsByTeacher(teacherId: number): Promise<Earnings[]>;
+  
+  // Student Invite operations
+  createStudentInvite(invite: InsertStudentInvite): Promise<StudentInvite>;
+  getStudentInviteByToken(token: string): Promise<StudentInvite | null>;
+  getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]>;
+  updateStudentInvite(id: number, invite: Partial<StudentInvite>): Promise<StudentInvite>;
 }
 
-export class DatabaseStorage implements IStorage {
-  // User operations
-  async getUser(id: string): Promise<User | undefined> {
-    const user = await prisma.user.findUnique({
-      where: { id }
-    });
-    return user ?? undefined;
-  }
+// In-memory storage implementation
+class MemStorage implements IStorage {
+  private users: User[] = [];
+  private students: Student[] = [];
+  private assignments: Assignment[] = [];
+  private studentAssignments: StudentAssignment[] = [];
+  private materials: Material[] = [];
+  private schedules: Schedule[] = [];
+  private sessions: Session[] = [];
+  private feedbacks: Feedback[] = [];
+  private attendances: Attendance[] = [];
+  private payments: Payment[] = [];
+  private tutorRequests: TutorRequest[] = [];
+  private messages: Message[] = [];
+  private progressReports: ProgressReport[] = [];
+  private clarifications: Clarification[] = [];
+  private parentalControls: ParentalControl[] = [];
+  private tutorRatings: TutorRating[] = [];
+  private earningsRecords: Earnings[] = [];
+  private studentInvites: StudentInvite[] = [];
   
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
-    return user ?? undefined;
+  private nextId = {
+    user: 1,
+    student: 1,
+    assignment: 1,
+    studentAssignment: 1,
+    material: 1,
+    schedule: 1,
+    session: 1,
+    feedback: 1,
+    attendance: 1,
+    payment: 1,
+    tutorRequest: 1,
+    message: 1,
+    progressReport: 1,
+    clarification: 1,
+    parentalControl: 1,
+    tutorRating: 1,
+    earnings: 1,
+    studentInvite: 1,
+  };
+
+  // User operations
+  async createUser(user: InsertUser): Promise<User> {
+    const newUser: User = { ...user, id: this.nextId.user++, role: user.role || null };
+    this.users.push(newUser);
+    return newUser;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const { id, ...updateData } = userData;
-    const user = await prisma.user.upsert({
-      where: { id },
-      update: {
-        ...updateData,
-        updatedAt: new Date(),
-      },
-      create: userData,
-    });
-    return user;
+  async getUserById(id: number): Promise<User | null> {
+    return this.users.find(u => u.id === id) || null;
   }
 
-  async updateUserRole(id: string, role: string): Promise<User | undefined> {
-    const user = await prisma.user.update({
-      where: { id },
-      data: { role, updatedAt: new Date() }
-    });
-    return user ?? undefined;
+  async getUserByEmail(email: string): Promise<User | null> {
+    return this.users.find(u => u.email === email) || null;
   }
 
-  async getUsersByRole(role: string): Promise<User[]> {
-    return await prisma.user.findMany({
-      where: { role }
-    });
-  }
-
-  async createUser(userData: { email: string; password: string; firstName?: string; lastName?: string }): Promise<User> {
-    const { randomUUID } = await import('crypto');
-    return await prisma.user.create({
-      data: {
-        id: randomUUID(),
-        email: userData.email,
-        password: userData.password,
-        firstName: userData.firstName || null,
-        lastName: userData.lastName || null,
-        emailVerified: false,
-      }
-    });
-  }
-
-  async updateUserVerification(id: string, verified: boolean, verificationToken?: string | null, verificationTokenExpiry?: Date | null): Promise<User | undefined> {
-    const user = await prisma.user.update({
-      where: { id },
-      data: {
-        emailVerified: verified,
-        verificationToken: verificationToken,
-        verificationTokenExpiry: verificationTokenExpiry,
-        updatedAt: new Date()
-      }
-    });
-    return user ?? undefined;
-  }
-
-  async getUserByVerificationToken(token: string): Promise<User | undefined> {
-    const user = await prisma.user.findFirst({
-      where: {
-        verificationToken: token,
-        verificationTokenExpiry: {
-          gte: new Date()
-        }
-      }
-    });
-    return user ?? undefined;
-  }
-
-  async updateUserPassword(id: string, password: string): Promise<User | undefined> {
-    const user = await prisma.user.update({
-      where: { id },
-      data: {
-        password,
-        updatedAt: new Date()
-      }
-    });
-    return user ?? undefined;
-  }
-
-  async updateUserPasswordReset(id: string, resetToken: string | null, resetTokenExpiry: Date | null): Promise<User | undefined> {
-    const user = await prisma.user.update({
-      where: { id },
-      data: {
-        passwordResetToken: resetToken,
-        passwordResetTokenExpiry: resetTokenExpiry,
-        updatedAt: new Date()
-      }
-    });
-    return user ?? undefined;
-  }
-
-  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
-    const user = await prisma.user.findFirst({
-      where: {
-        passwordResetToken: token,
-        passwordResetTokenExpiry: {
-          gte: new Date()
-        }
-      }
-    });
-    return user ?? undefined;
-  }
-
-  async deleteUnverifiedExpiredUsers(): Promise<number> {
-    const result = await prisma.user.deleteMany({
-      where: {
-        emailVerified: false,
-        verificationTokenExpiry: {
-          lt: new Date()
-        },
-        password: {
-          not: null
-        }
-      }
-    });
-    return result.count;
+  async updateUser(id: number, user: Partial<User>): Promise<User> {
+    const index = this.users.findIndex(u => u.id === id);
+    if (index === -1) throw new Error("User not found");
+    this.users[index] = { ...this.users[index], ...user };
+    return this.users[index];
   }
 
   // Student operations
-  async getStudentByUserId(userId: string): Promise<{ id: number; userId: string; parentId: string | null } | undefined> {
-    const student = await prisma.student.findFirst({
-      where: { userId },
-      select: { id: true, userId: true, parentId: true }
-    });
-    
-    return student ?? undefined;
+  async createStudent(student: InsertStudent): Promise<Student> {
+    const newStudent: Student = { ...student, id: this.nextId.student++ };
+    this.students.push(newStudent);
+    return newStudent;
   }
 
-  async getStudentsByParentId(parentId: string): Promise<User[]> {
-    const studentRecords = await prisma.student.findMany({
-      where: { parentId },
-      include: { user: true }
-    });
-    
-    return studentRecords.map(s => s.user);
+  async getStudentById(id: number): Promise<Student | null> {
+    return this.students.find(s => s.id === id) || null;
   }
 
-  async getStudentsByTutorId(tutorId: string): Promise<User[]> {
-    const studentSessions = await prisma.tutoringSession.findMany({
-      where: { tutorId },
-      select: { studentId: true },
-      distinct: ['studentId']
-    });
-    
-    const studentIds = studentSessions.map(s => s.studentId);
-    
-    if (studentIds.length === 0) return [];
-    
-    return await prisma.user.findMany({
-      where: { id: { in: studentIds } }
-    });
+  async getStudentByUserId(userId: number): Promise<Student | null> {
+    return this.students.find(s => s.userId === userId) || null;
   }
 
-  // Subject operations
-  async getSubject(id: number): Promise<Subject | undefined> {
-    const subject = await prisma.subject.findUnique({
-      where: { id }
-    });
-    return subject ?? undefined;
+  async getStudentsByParent(parentId: number): Promise<Student[]> {
+    return this.students.filter(s => s.parentId === parentId);
   }
 
-  async getSubjects(): Promise<Subject[]> {
-    return await prisma.subject.findMany();
+  async getStudentsByTeacher(teacherId: number): Promise<Student[]> {
+    const approvedRequests = this.tutorRequests.filter(
+      r => r.teacherId === teacherId && r.status === "approved"
+    );
+    const studentIds = approvedRequests.map(r => r.studentId).filter(id => id !== null) as number[];
+    return this.students.filter(s => studentIds.includes(s.id));
   }
 
-  async createSubject(subject: InsertSubject): Promise<Subject> {
-    return await prisma.subject.create({
-      data: subject
-    });
+  async updateStudent(id: number, student: Partial<Student>): Promise<Student> {
+    const index = this.students.findIndex(s => s.id === id);
+    if (index === -1) throw new Error("Student not found");
+    this.students[index] = { ...this.students[index], ...student };
+    return this.students[index];
   }
 
   // Assignment operations
-  async getAssignment(id: number): Promise<Assignment | undefined> {
-    const assignment = await prisma.assignment.findUnique({
-      where: { id }
-    });
-    return assignment ?? undefined;
-  }
-
-  async getAssignmentsByTutor(tutorId: string): Promise<Assignment[]> {
-    return await prisma.assignment.findMany({
-      where: { tutorId },
-      orderBy: { createdAt: 'desc' }
-    });
-  }
-
-  async getAssignmentsByStudent(studentId: string): Promise<StudentAssignment[]> {
-    return await prisma.studentAssignment.findMany({
-      where: { studentId },
-      orderBy: { createdAt: 'desc' }
-    });
-  }
-
   async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
-    return await prisma.assignment.create({
-      data: assignment
-    });
+    const newAssignment: Assignment = { ...assignment, id: this.nextId.assignment++ };
+    this.assignments.push(newAssignment);
+    return newAssignment;
   }
 
-  async assignToStudent(studentAssignment: InsertStudentAssignment): Promise<StudentAssignment> {
-    return await prisma.studentAssignment.create({
-      data: studentAssignment
-    });
+  async getAssignmentById(id: number): Promise<Assignment | null> {
+    return this.assignments.find(a => a.id === id) || null;
   }
 
-  async updateStudentAssignment(id: number, studentAssignment: Partial<InsertStudentAssignment>): Promise<StudentAssignment | undefined> {
-    const updated = await prisma.studentAssignment.update({
-      where: { id },
-      data: { ...studentAssignment, updatedAt: new Date() }
-    });
-    return updated ?? undefined;
+  async getAssignmentsByTeacher(teacherId: number): Promise<Assignment[]> {
+    return this.assignments.filter(a => a.teacherId === teacherId);
+  }
+
+  async getAssignmentsByGradeLevel(gradeLevel: string): Promise<Assignment[]> {
+    return this.assignments.filter(a => a.gradeLevel === gradeLevel);
+  }
+
+  async updateAssignment(id: number, assignment: Partial<Assignment>): Promise<Assignment> {
+    const index = this.assignments.findIndex(a => a.id === id);
+    if (index === -1) throw new Error("Assignment not found");
+    this.assignments[index] = { ...this.assignments[index], ...assignment };
+    return this.assignments[index];
+  }
+
+  async deleteAssignment(id: number): Promise<void> {
+    this.assignments = this.assignments.filter(a => a.id !== id);
+  }
+
+  // Student Assignment operations
+  async createStudentAssignment(studentAssignment: InsertStudentAssignment): Promise<StudentAssignment> {
+    const newSA: StudentAssignment = { ...studentAssignment, id: this.nextId.studentAssignment++ };
+    this.studentAssignments.push(newSA);
+    return newSA;
+  }
+
+  async getStudentAssignmentById(id: number): Promise<StudentAssignment | null> {
+    return this.studentAssignments.find(sa => sa.id === id) || null;
+  }
+
+  async getStudentAssignmentsByStudent(studentId: number): Promise<StudentAssignment[]> {
+    return this.studentAssignments.filter(sa => sa.studentId === studentId);
+  }
+
+  async getStudentAssignmentsByAssignment(assignmentId: number): Promise<StudentAssignment[]> {
+    return this.studentAssignments.filter(sa => sa.assignmentId === assignmentId);
+  }
+
+  async updateStudentAssignment(id: number, studentAssignment: Partial<StudentAssignment>): Promise<StudentAssignment> {
+    const index = this.studentAssignments.findIndex(sa => sa.id === id);
+    if (index === -1) throw new Error("Student assignment not found");
+    this.studentAssignments[index] = { ...this.studentAssignments[index], ...studentAssignment };
+    return this.studentAssignments[index];
+  }
+
+  // Material operations
+  async createMaterial(material: InsertMaterial): Promise<Material> {
+    const newMaterial: Material = { ...material, id: this.nextId.material++ };
+    this.materials.push(newMaterial);
+    return newMaterial;
+  }
+
+  async getMaterialById(id: number): Promise<Material | null> {
+    return this.materials.find(m => m.id === id) || null;
+  }
+
+  async getMaterialsByTeacher(teacherId: number): Promise<Material[]> {
+    return this.materials.filter(m => m.teacherId === teacherId);
+  }
+
+  async getMaterialsBySubject(subject: string): Promise<Material[]> {
+    return this.materials.filter(m => m.subject === subject);
+  }
+
+  async getMaterialsByGradeLevel(gradeLevel: string): Promise<Material[]> {
+    return this.materials.filter(m => m.gradeLevel === gradeLevel);
+  }
+
+  async deleteMaterial(id: number): Promise<void> {
+    this.materials = this.materials.filter(m => m.id !== id);
+  }
+
+  // Schedule operations
+  async createSchedule(schedule: InsertSchedule): Promise<Schedule> {
+    const newSchedule: Schedule = { ...schedule, id: this.nextId.schedule++ };
+    this.schedules.push(newSchedule);
+    return newSchedule;
+  }
+
+  async getSchedulesByTeacher(teacherId: number): Promise<Schedule[]> {
+    return this.schedules.filter(s => s.teacherId === teacherId);
+  }
+
+  async getSchedulesByStudent(studentId: number): Promise<Schedule[]> {
+    return this.schedules.filter(s => s.studentId === studentId);
+  }
+
+  async updateSchedule(id: number, schedule: Partial<Schedule>): Promise<Schedule> {
+    const index = this.schedules.findIndex(s => s.id === id);
+    if (index === -1) throw new Error("Schedule not found");
+    this.schedules[index] = { ...this.schedules[index], ...schedule };
+    return this.schedules[index];
+  }
+
+  async deleteSchedule(id: number): Promise<void> {
+    this.schedules = this.schedules.filter(s => s.id !== id);
   }
 
   // Session operations
-  async getSession(id: number): Promise<TutoringSession | undefined> {
-    const session = await prisma.tutoringSession.findUnique({
-      where: { id }
-    });
-    return session ?? undefined;
+  async createSession(session: InsertSession): Promise<Session> {
+    const newSession: Session = { ...session, id: this.nextId.session++ };
+    this.sessions.push(newSession);
+    return newSession;
   }
 
-  async getSessionsByTutor(tutorId: string): Promise<TutoringSession[]> {
-    return await prisma.tutoringSession.findMany({
-      where: { tutorId },
-      orderBy: { startTime: 'desc' }
-    });
+  async getSessionById(id: number): Promise<Session | null> {
+    return this.sessions.find(s => s.id === id) || null;
   }
 
-  async getSessionsByStudent(studentId: string): Promise<TutoringSession[]> {
-    return await prisma.tutoringSession.findMany({
-      where: { studentId },
-      orderBy: { startTime: 'desc' }
-    });
+  async getSessionsByTeacher(teacherId: number): Promise<Session[]> {
+    return this.sessions.filter(s => s.teacherId === teacherId);
   }
 
-  async getUpcomingSessionsByTutor(tutorId: string): Promise<TutoringSession[]> {
-    const now = new Date();
-    return await prisma.tutoringSession.findMany({
-      where: {
-        tutorId,
-        startTime: { gte: now }
-      },
-      orderBy: { startTime: 'asc' }
-    });
+  async getSessionsByStudent(studentId: number): Promise<Session[]> {
+    return this.sessions.filter(s => s.studentIds.includes(studentId));
   }
 
-  async getUpcomingSessionsByStudent(studentId: string): Promise<TutoringSession[]> {
-    const now = new Date();
-    return await prisma.tutoringSession.findMany({
-      where: {
-        studentId,
-        startTime: { gte: now }
-      },
-      orderBy: { startTime: 'asc' }
-    });
+  async updateSession(id: number, session: Partial<Session>): Promise<Session> {
+    const index = this.sessions.findIndex(s => s.id === id);
+    if (index === -1) throw new Error("Session not found");
+    this.sessions[index] = { ...this.sessions[index], ...session };
+    return this.sessions[index];
   }
 
-  async createSession(session: InsertSession): Promise<TutoringSession> {
-    return await prisma.tutoringSession.create({
-      data: session
-    });
+  // Feedback operations
+  async createFeedback(feedback: InsertFeedback): Promise<Feedback> {
+    const newFeedback: Feedback = { ...feedback, id: this.nextId.feedback++ };
+    this.feedbacks.push(newFeedback);
+    return newFeedback;
   }
 
-  async updateSession(id: number, session: Partial<InsertSession>): Promise<TutoringSession | undefined> {
-    const updated = await prisma.tutoringSession.update({
-      where: { id },
-      data: { ...session, updatedAt: new Date() }
-    });
-    return updated ?? undefined;
+  async getFeedbackByStudent(studentId: number): Promise<Feedback[]> {
+    return this.feedbacks.filter(f => f.studentId === studentId);
   }
 
-  // Session summary operations
-  async getSessionSummary(id: number): Promise<SessionSummary | undefined> {
-    const summary = await prisma.sessionSummary.findUnique({
-      where: { id }
-    });
-    return summary ?? undefined;
+  async getFeedbackByTeacher(teacherId: number): Promise<Feedback[]> {
+    return this.feedbacks.filter(f => f.teacherId === teacherId);
   }
 
-  async getSessionSummaryBySessionId(sessionId: number): Promise<SessionSummary | undefined> {
-    const summary = await prisma.sessionSummary.findFirst({
-      where: { sessionId }
-    });
-    return summary ?? undefined;
+  // Attendance operations
+  async createAttendance(attendance: InsertAttendance): Promise<Attendance> {
+    const newAttendance: Attendance = { ...attendance, id: this.nextId.attendance++ };
+    this.attendances.push(newAttendance);
+    return newAttendance;
   }
 
-  async createSessionSummary(summary: InsertSessionSummary): Promise<SessionSummary> {
-    return await prisma.sessionSummary.create({
-      data: summary
-    });
+  async getAttendanceByStudent(studentId: number): Promise<Attendance[]> {
+    return this.attendances.filter(a => a.studentId === studentId);
+  }
+
+  async getAttendanceBySession(sessionId: number): Promise<Attendance[]> {
+    return this.attendances.filter(a => a.sessionId === sessionId);
+  }
+
+  async updateAttendance(id: number, attendance: Partial<Attendance>): Promise<Attendance> {
+    const index = this.attendances.findIndex(a => a.id === id);
+    if (index === -1) throw new Error("Attendance not found");
+    this.attendances[index] = { ...this.attendances[index], ...attendance };
+    return this.attendances[index];
+  }
+
+  // Payment operations
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const newPayment: Payment = { ...payment, id: this.nextId.payment++ };
+    this.payments.push(newPayment);
+    return newPayment;
+  }
+
+  async getPaymentsByParent(parentId: number): Promise<Payment[]> {
+    return this.payments.filter(p => p.parentId === parentId);
+  }
+
+  async getPaymentsByTeacher(teacherId: number): Promise<Payment[]> {
+    return this.payments.filter(p => p.teacherId === teacherId);
+  }
+
+  async updatePayment(id: number, payment: Partial<Payment>): Promise<Payment> {
+    const index = this.payments.findIndex(p => p.id === id);
+    if (index === -1) throw new Error("Payment not found");
+    this.payments[index] = { ...this.payments[index], ...payment };
+    return this.payments[index];
+  }
+
+  // Tutor Request operations
+  async createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest> {
+    const newRequest: TutorRequest = { ...request, id: this.nextId.tutorRequest++ };
+    this.tutorRequests.push(newRequest);
+    return newRequest;
+  }
+
+  async getTutorRequestById(id: number): Promise<TutorRequest | null> {
+    return this.tutorRequests.find(r => r.id === id) || null;
+  }
+
+  async getTutorRequestsByParent(parentId: number): Promise<TutorRequest[]> {
+    return this.tutorRequests.filter(r => r.parentId === parentId);
+  }
+
+  async getTutorRequestsByTeacher(teacherId: number): Promise<TutorRequest[]> {
+    return this.tutorRequests.filter(r => r.teacherId === teacherId);
+  }
+
+  async updateTutorRequest(id: number, request: Partial<TutorRequest>): Promise<TutorRequest> {
+    const index = this.tutorRequests.findIndex(r => r.id === id);
+    if (index === -1) throw new Error("Tutor request not found");
+    this.tutorRequests[index] = { ...this.tutorRequests[index], ...request };
+    return this.tutorRequests[index];
   }
 
   // Message operations
-  async getMessage(id: number): Promise<Message | undefined> {
-    const message = await prisma.message.findUnique({
-      where: { id }
-    });
-    return message ?? undefined;
-  }
-
-  async getMessagesByUser(userId: string): Promise<Message[]> {
-    return await prisma.message.findMany({
-      where: {
-        OR: [
-          { senderId: userId },
-          { receiverId: userId }
-        ]
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-  }
-
   async createMessage(message: InsertMessage): Promise<Message> {
-    return await prisma.message.create({
-      data: message
-    });
+    const newMessage: Message = { ...message, id: this.nextId.message++ };
+    this.messages.push(newMessage);
+    return newMessage;
   }
 
-  async markMessageAsRead(id: number): Promise<Message | undefined> {
-    const message = await prisma.message.update({
-      where: { id },
-      data: { read: true, updatedAt: new Date() }
-    });
-    return message ?? undefined;
+  async getMessagesBetweenUsers(user1Id: number, user2Id: number): Promise<Message[]> {
+    return this.messages.filter(
+      m => (m.senderId === user1Id && m.receiverId === user2Id) ||
+           (m.senderId === user2Id && m.receiverId === user1Id)
+    ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }
 
-  // Progress operations
-  async getStudentProgress(studentId: string): Promise<StudentProgress[]> {
-    return await prisma.studentProgress.findMany({
-      where: { studentId }
-    });
+  async getMessagesByUser(userId: number): Promise<Message[]> {
+    return this.messages.filter(m => m.senderId === userId || m.receiverId === userId);
   }
 
-  async updateStudentProgress(id: number, progress: Partial<InsertStudentProgress>): Promise<StudentProgress | undefined> {
-    const updated = await prisma.studentProgress.update({
-      where: { id },
-      data: { ...progress, updatedAt: new Date() }
-    });
-    return updated ?? undefined;
+  async markMessageAsRead(id: number): Promise<Message> {
+    const index = this.messages.findIndex(m => m.id === id);
+    if (index === -1) throw new Error("Message not found");
+    this.messages[index].isRead = true;
+    return this.messages[index];
   }
 
-  async createStudentProgress(progress: InsertStudentProgress): Promise<StudentProgress> {
-    return await prisma.studentProgress.create({
-      data: progress
-    });
+  // Progress Report operations
+  async createProgressReport(report: InsertProgressReport): Promise<ProgressReport> {
+    const newReport: ProgressReport = { ...report, id: this.nextId.progressReport++ };
+    this.progressReports.push(newReport);
+    return newReport;
   }
 
-  // Tutor request operations
-  async getTutorRequest(id: number): Promise<TutorRequest | undefined> {
-    const request = await prisma.tutorRequest.findUnique({
-      where: { id },
-      include: {
-        parent: true,
-        tutor: true,
-        subject: true
-      }
-    });
-    return request ?? undefined;
+  async getProgressReportsByStudent(studentId: number): Promise<ProgressReport[]> {
+    return this.progressReports.filter(r => r.studentId === studentId);
   }
 
-  async getTutorRequestsByParent(parentId: string): Promise<TutorRequest[]> {
-    return await prisma.tutorRequest.findMany({
-      where: { parentId },
-      include: {
-        tutor: true,
-        subject: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+  async getProgressReportsByTeacher(teacherId: number): Promise<ProgressReport[]> {
+    return this.progressReports.filter(r => r.teacherId === teacherId);
   }
 
-  async getTutorRequestsByTutor(tutorId: string): Promise<TutorRequest[]> {
-    return await prisma.tutorRequest.findMany({
-      where: { tutorId },
-      include: {
-        parent: true,
-        subject: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+  // Clarification operations
+  async createClarification(clarification: InsertClarification): Promise<Clarification> {
+    const newClarification: Clarification = { ...clarification, id: this.nextId.clarification++ };
+    this.clarifications.push(newClarification);
+    return newClarification;
   }
 
-  async createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest> {
-    return await prisma.tutorRequest.create({
-      data: request
-    });
+  async getClarificationsByStudent(studentId: number): Promise<Clarification[]> {
+    return this.clarifications.filter(c => c.studentId === studentId);
   }
 
-  async updateTutorRequestStatus(id: number, status: string): Promise<TutorRequest | undefined> {
-    const updated = await prisma.tutorRequest.update({
-      where: { id },
-      data: { status, updatedAt: new Date() }
-    });
-    return updated ?? undefined;
+  async getClarificationsByAssignment(assignmentId: number): Promise<Clarification[]> {
+    return this.clarifications.filter(c => c.assignmentId === assignmentId);
   }
 
-  // Notification operations
-  async getNotification(id: number): Promise<Notification | undefined> {
-    const notification = await prisma.notification.findUnique({
-      where: { id }
-    });
-    return notification ?? undefined;
+  async updateClarification(id: number, clarification: Partial<Clarification>): Promise<Clarification> {
+    const index = this.clarifications.findIndex(c => c.id === id);
+    if (index === -1) throw new Error("Clarification not found");
+    this.clarifications[index] = { ...this.clarifications[index], ...clarification };
+    return this.clarifications[index];
   }
 
-  async getNotificationsByUser(userId: string): Promise<Notification[]> {
-    return await prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' }
-    });
+  // Parental Control operations
+  async createParentalControl(control: InsertParentalControl): Promise<ParentalControl> {
+    const newControl: ParentalControl = { ...control, id: this.nextId.parentalControl++ };
+    this.parentalControls.push(newControl);
+    return newControl;
   }
 
-  async getUnreadNotificationsByUser(userId: string): Promise<Notification[]> {
-    return await prisma.notification.findMany({
-      where: {
-        userId,
-        read: false
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+  async getParentalControlByStudent(studentId: number): Promise<ParentalControl | null> {
+    return this.parentalControls.find(c => c.studentId === studentId) || null;
   }
 
-  async createNotification(notification: InsertNotification): Promise<Notification> {
-    return await prisma.notification.create({
-      data: notification
-    });
+  async updateParentalControl(id: number, control: Partial<ParentalControl>): Promise<ParentalControl> {
+    const index = this.parentalControls.findIndex(c => c.id === id);
+    if (index === -1) throw new Error("Parental control not found");
+    this.parentalControls[index] = { ...this.parentalControls[index], ...control };
+    return this.parentalControls[index];
   }
 
-  async markNotificationAsRead(id: number): Promise<Notification | undefined> {
-    const updated = await prisma.notification.update({
-      where: { id },
-      data: { read: true }
-    });
-    return updated ?? undefined;
+  // Tutor Rating operations
+  async createTutorRating(rating: InsertTutorRating): Promise<TutorRating> {
+    const newRating: TutorRating = { ...rating, id: this.nextId.tutorRating++ };
+    this.tutorRatings.push(newRating);
+    return newRating;
   }
 
-  async markAllNotificationsAsRead(userId: string): Promise<number> {
-    const result = await prisma.notification.updateMany({
-      where: {
-        userId,
-        read: false
-      },
-      data: { read: true }
-    });
-    return result.count;
+  async getRatingsByTeacher(teacherId: number): Promise<TutorRating[]> {
+    return this.tutorRatings.filter(r => r.teacherId === teacherId);
   }
 
-  // Learning material operations
-  async getLearningMaterial(id: number): Promise<LearningMaterial | undefined> {
-    const material = await prisma.learningMaterial.findUnique({
-      where: { id },
-      include: {
-        subject: true,
-        tutor: true
-      }
-    });
-    return material ?? undefined;
+  async getRatingsByParent(parentId: number): Promise<TutorRating[]> {
+    return this.tutorRatings.filter(r => r.parentId === parentId);
   }
 
-  async getLearningMaterialsByTutor(tutorId: string): Promise<LearningMaterial[]> {
-    return await prisma.learningMaterial.findMany({
-      where: { tutorId },
-      include: {
-        subject: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+  // Earnings operations
+  async createEarnings(earnings: InsertEarnings): Promise<Earnings> {
+    const newEarnings: Earnings = { ...earnings, id: this.nextId.earnings++ };
+    this.earningsRecords.push(newEarnings);
+    return newEarnings;
   }
 
-  async getLearningMaterialsByStudent(studentId: string): Promise<LearningMaterial[]> {
-    return await prisma.learningMaterial.findMany({
-      where: {
-        studentIds: {
-          has: studentId
-        }
-      },
-      include: {
-        subject: true,
-        tutor: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+  async getEarningsByTeacher(teacherId: number): Promise<Earnings[]> {
+    return this.earningsRecords.filter(e => e.teacherId === teacherId);
   }
 
-  async createLearningMaterial(material: InsertLearningMaterial): Promise<LearningMaterial> {
-    return await prisma.learningMaterial.create({
-      data: material
-    });
+  // Student Invite operations
+  async createStudentInvite(invite: InsertStudentInvite): Promise<StudentInvite> {
+    const newInvite: StudentInvite = { ...invite, id: this.nextId.studentInvite++ };
+    this.studentInvites.push(newInvite);
+    return newInvite;
   }
 
-  async deleteLearningMaterial(id: number): Promise<boolean> {
-    try {
-      await prisma.learningMaterial.delete({
-        where: { id }
-      });
-      return true;
-    } catch (error) {
-      return false;
-    }
+  async getStudentInviteByToken(token: string): Promise<StudentInvite | null> {
+    return this.studentInvites.find(i => i.token === token) || null;
+  }
+
+  async getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]> {
+    return this.studentInvites.filter(i => i.parentId === parentId);
+  }
+
+  async updateStudentInvite(id: number, invite: Partial<StudentInvite>): Promise<StudentInvite> {
+    const index = this.studentInvites.findIndex(i => i.id === id);
+    if (index === -1) throw new Error("Student invite not found");
+    this.studentInvites[index] = { ...this.studentInvites[index], ...invite };
+    return this.studentInvites[index];
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();

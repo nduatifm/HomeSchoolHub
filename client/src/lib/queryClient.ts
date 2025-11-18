@@ -1,66 +1,39 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { clearAllStorage } from "@/lib/storage";
+import { QueryClient } from "@tanstack/react-query";
 
-async function throwIfResNotOk(res: Response) {
-  if (!res.ok) {
-    // Clear storage on session expiration (401 Unauthorized)
-    if (res.status === 401) {
-      clearAllStorage();
-    }
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+export async function apiRequest(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem("sessionId");
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
-}
 
-export async function apiRequest(
-  method: string,
-  url: string,
-  data?: unknown | undefined,
-): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+  const response = await fetch(url, {
+    ...options,
+    headers,
   });
 
-  await throwIfResNotOk(res);
-  return res;
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(error.error || "Request failed");
+  }
+
+  return response.json();
 }
 
-type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-    });
-
-    if (res.status === 401) {
-      // Clear storage on session expiration
-      clearAllStorage();
-      
-      if (unauthorizedBehavior === "returnNull") {
-        return null;
-      }
-    }
-
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
+async function defaultQueryFn({ queryKey }: { queryKey: any[] }) {
+  const url = queryKey[0];
+  return apiRequest(url);
+}
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
+      queryFn: defaultQueryFn,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
-    },
-    mutations: {
       retry: false,
     },
   },
