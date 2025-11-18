@@ -21,6 +21,7 @@ import {
   insertStudentInviteSchema,
 } from "@shared/schema";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 // Simple session management
 const sessions = new Map<string, number>();
@@ -35,9 +36,14 @@ function requireAuth(req: Request, res: Response, next: Function) {
   next();
 }
 
-// Hash password (simple version - in production use bcrypt)
-function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password).digest("hex");
+// Hash password with bcrypt
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, 10);
+}
+
+// Verify password with bcrypt
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return await bcrypt.compare(password, hash);
 }
 
 export function registerRoutes(app: Express) {
@@ -58,9 +64,10 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Email already registered" });
       }
 
+      const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
         email,
-        password: hashPassword(password),
+        password: hashedPassword,
         name,
         role,
       });
@@ -83,7 +90,12 @@ export function registerRoutes(app: Express) {
       const { email, password } = req.body;
       
       const user = await storage.getUserByEmail(email);
-      if (!user || user.password !== hashPassword(password)) {
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const isValid = await verifyPassword(password, user.password);
+      if (!isValid) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -115,9 +127,10 @@ export function registerRoutes(app: Express) {
       }
 
       // Create user account
+      const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
         email: invite.email,
-        password: hashPassword(password),
+        password: hashedPassword,
         name: invite.studentName,
         role: "student",
       });
