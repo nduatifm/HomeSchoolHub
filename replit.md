@@ -197,8 +197,26 @@ npm run start
 - Communication style: Simple, everyday language
 - Avoid technical jargon when explaining features to users
 
-## Recent Changes (November 18, 2024)
+## Recent Changes (November 18, 2025)
 
+### Latest Update
+- **Messaging System**: Added full messaging functionality to all three dashboards (Teacher, Parent, Student)
+  - Users can send messages to each other by specifying receiver ID
+  - Messages displayed in chat-like interface with sender/receiver differentiation
+  - Unread badge for new messages
+  
+- **Progress Reports & Analytics**: Implemented comprehensive reporting system
+  - Teacher Dashboard: Create progress reports with grades, comments, strengths, and areas for improvement
+  - Teacher Dashboard: Analytics dashboard showing total reports, students tracked, and earnings
+  - Parent Dashboard: View child-specific progress reports
+  - Both roles can download reports in JSON format
+  
+- **Bug Fixes**: 
+  - Fixed student invite schema to properly handle auto-generated fields (parentId, token, status, dates)
+  - Updated parent dashboard to display full invite tokens (previously truncated)
+  - Upgraded password security from SHA-256 to bcrypt with proper salting
+
+### Initial Implementation
 - Complete rebuild of the platform with fresh codebase
 - Implemented comprehensive database schema with Prisma
 - Created role-based dashboards for all three user types

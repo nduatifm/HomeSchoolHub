@@ -276,6 +276,13 @@ export const studentInviteSchema = z.object({
   expiresDate: z.string(),
 });
 
-export const insertStudentInviteSchema = studentInviteSchema.omit({ id: true });
+export const insertStudentInviteSchema = studentInviteSchema.omit({ 
+  id: true, 
+  parentId: true, 
+  token: true, 
+  status: true, 
+  createdDate: true, 
+  expiresDate: true 
+});
 export type StudentInvite = z.infer<typeof studentInviteSchema>;
 export type InsertStudentInvite = z.infer<typeof insertStudentInviteSchema>;

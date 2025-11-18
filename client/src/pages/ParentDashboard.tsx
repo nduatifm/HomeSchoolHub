@@ -285,7 +285,7 @@ export default function ParentDashboard() {
                           <TableCell>{i.email}</TableCell>
                           <TableCell><Badge>{i.status}</Badge></TableCell>
                           <TableCell className="font-mono text-xs" data-testid={`text-invite-token-${i.id}`}>
-                            {i.token.slice(0, 8)}...
+                            {i.token}
                           </TableCell>
                         </TableRow>
                       ))}
