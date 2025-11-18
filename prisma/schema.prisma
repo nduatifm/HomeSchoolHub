@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
+  password String
+  name     String
+  role     String?
+
+  student        Student?
+  teacherAssignments Assignment[]
+  teacherMaterials Material[]
+  teacherSessions Session[]
+  teacherFeedback Feedback[]
+  teacherSchedules Schedule[] @relation("TeacherSchedules")
+  tutorRequests TutorRequest[] @relation("TeacherRequests")
+  parentStudents Student[] @relation("ParentStudents")
+  parentInvites StudentInvite[]
+  parentPayments Payment[]
+  parentTutorRequests TutorRequest[] @relation("ParentRequests")
+  parentControls ParentalControl[]
+  parentRatings TutorRating[]
+  teacherEarnings Earnings[]
+  sentMessages Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  teacherReports ProgressReport[]
+
+  @@index([email])
+}
+
+model Student {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  parentId   Int
+  name       String
+  gradeLevel String
+  badges     String[]
+  points     Int      @default(0)
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent             User               @relation("ParentStudents", fields: [parentId], references: [id], onDelete: Cascade)
+  assignments        StudentAssignment[]
+  schedules          Schedule[]
+  feedback           Feedback[]
+  attendance         Attendance[]
+  clarifications     Clarification[]
+  parentalControls   ParentalControl[]
+  progressReports    ProgressReport[]
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Assignment {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  subject     String
+  dueDate     String
+  teacherId   Int
+  gradeLevel  String
+  points      Int      @default(100)
+
+  teacher            User               @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  studentAssignments StudentAssignment[]
+  clarifications     Clarification[]
+
+  @@index([teacherId])
+  @@index([gradeLevel])
+}
+
+model StudentAssignment {
+  id           Int     @id @default(autoincrement())
+  assignmentId Int
+  studentId    Int
+  submission   String?
+  grade        Int?
+  feedback     String?
+  status       String  @default("pending")
+  submittedAt  String?
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+model Material {
+  id          Int    @id @default(autoincrement())
+  title       String
+  description String
+  fileUrl     String
+  subject     String
+  teacherId   Int
+  uploadDate  String
+  gradeLevel  String
+
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([gradeLevel])
+}
+
+model Schedule {
+  id        Int    @id @default(autoincrement())
+  teacherId Int
+  studentId Int
+  dayOfWeek String
+  startTime String
+  endTime   String
+  subject   String
+
+  teacher User    @relation("TeacherSchedules", fields: [teacherId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([studentId])
+}
+
+model Session {
+  id         Int    @id @default(autoincrement())
+  teacherId  Int
+  studentIds Int[]
+  subject    String
+  date       String
+  startTime  String
+  endTime    String
+  notes      String?
+  status     String  @default("scheduled")
+
+  teacher    User         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  attendance Attendance[]
+
+  @@index([teacherId])
+}
+
+model Feedback {
+  id        Int    @id @default(autoincrement())
+  teacherId Int
+  studentId Int
+  message   String
+  date      String
+  type      String
+
+  teacher User    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+  @@index([studentId])
+}
+
+model Attendance {
+  id        Int     @id @default(autoincrement())
+  studentId Int
+  sessionId Int?
+  date      String
+  status    String
+  notes     String?
+
+  student Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([sessionId])
+}
+
+model Payment {
+  id               Int     @id @default(autoincrement())
+  parentId         Int
+  teacherId        Int?
+  amount           Float
+  date             String
+  status           String
+  description      String
+  subscriptionType String?
+
+  parent User @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([parentId])
+  @@index([teacherId])
+}
+
+model TutorRequest {
+  id           Int     @id @default(autoincrement())
+  parentId     Int
+  teacherId    Int
+  studentId    Int?
+  status       String  @default("pending")
+  message      String
+  requestDate  String
+  responseDate String?
+
+  parent  User @relation("ParentRequests", fields: [parentId], references: [id], onDelete: Cascade)
+  teacher User @relation("TeacherRequests", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([parentId])
+  @@index([teacherId])
+}
+
+model Message {
+  id         Int     @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  message    String
+  timestamp  String
+  isRead     Boolean @default(false)
+
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model ProgressReport {
+  id        Int    @id @default(autoincrement())
+  studentId Int
+  teacherId Int
+  period    String
+  content   String
+  date      String
+  grades    Json
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher User    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([teacherId])
+}
+
+model Clarification {
+  id           Int     @id @default(autoincrement())
+  studentId    Int
+  assignmentId Int
+  question     String
+  answer       String?
+  askedDate    String
+  answeredDate String?
+  status       String  @default("pending")
+
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([assignmentId])
+}
+
+model ParentalControl {
+  id               Int    @id @default(autoincrement())
+  studentId        Int    @unique
+  parentId         Int
+  screenTimeLimit  Int?
+  allowedDays      String[]
+  allowedTimes     Json
+  blockedFeatures  String[]
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parent  User    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([parentId])
+}
+
+model TutorRating {
+  id        Int     @id @default(autoincrement())
+  parentId  Int
+  teacherId Int
+  rating    Int
+  review    String?
+  date      String
+
+  parent User @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([parentId])
+  @@index([teacherId])
+}
+
+model Earnings {
+  id          Int    @id @default(autoincrement())
+  teacherId   Int
+  amount      Float
+  date        String
+  source      String
+  description String
+
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([teacherId])
+}
+
+model StudentInvite {
+  id          Int    @id @default(autoincrement())
+  parentId    Int
+  email       String
+  studentName String
+  gradeLevel  String
+  token       String @unique
+  status      String @default("pending")
+  createdDate String
+  expiresDate String
+
+  parent User @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([parentId])
+  @@index([token])
+}
