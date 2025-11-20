@@ -24,17 +24,42 @@ export default function Profile() {
 
   // Bio and role-specific fields
   const [bio, setBio] = useState(user?.bio || "");
-  const [teachingSubjects, setTeachingSubjects] = useState<string[]>(user?.teachingSubjects || []);
+  const [teachingSubjects, setTeachingSubjects] = useState<string[]>(Array.isArray(user?.teachingSubjects) ? user.teachingSubjects : []);
   const [subjectInput, setSubjectInput] = useState("");
-  const [yearsExperience, setYearsExperience] = useState(user?.yearsExperience?.toString() || "");
+  const [yearsExperience, setYearsExperience] = useState(user?.yearsExperience !== undefined && user?.yearsExperience !== null ? user.yearsExperience.toString() : "");
   const [qualifications, setQualifications] = useState(user?.qualifications || "");
   const [specialization, setSpecialization] = useState(user?.specialization || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [preferredContact, setPreferredContact] = useState(user?.preferredContact || "");
-  const [interests, setInterests] = useState<string[]>(user?.interests || []);
+  const [interests, setInterests] = useState<string[]>(Array.isArray(user?.interests) ? user.interests : []);
   const [interestInput, setInterestInput] = useState("");
   const [favoriteSubject, setFavoriteSubject] = useState(user?.favoriteSubject || "");
   const [learningGoals, setLearningGoals] = useState(user?.learningGoals || "");
+
+  // Helper functions for array management
+  const addSubject = () => {
+    const trimmed = subjectInput.trim();
+    if (trimmed && !teachingSubjects.includes(trimmed)) {
+      setTeachingSubjects([...teachingSubjects, trimmed]);
+      setSubjectInput("");
+    }
+  };
+
+  const removeSubject = (index: number) => {
+    setTeachingSubjects(teachingSubjects.filter((_, i) => i !== index));
+  };
+
+  const addInterest = () => {
+    const trimmed = interestInput.trim();
+    if (trimmed && !interests.includes(trimmed)) {
+      setInterests([...interests, trimmed]);
+      setInterestInput("");
+    }
+  };
+
+  const removeInterest = (index: number) => {
+    setInterests(interests.filter((_, i) => i !== index));
+  };
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { name: string }) => {
@@ -120,21 +145,36 @@ export default function Profile() {
   const handleDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const detailsData: any = { bio };
+    // Client-side validation for teacher experience
+    if (user?.role === "teacher" && yearsExperience) {
+      const experience = parseInt(yearsExperience);
+      if (isNaN(experience) || experience < 0 || experience > 100) {
+        toast({
+          title: "Invalid input",
+          description: "Years of experience must be between 0 and 100",
+          type: "error",
+        });
+        return;
+      }
+    }
     
-    // Add role-specific fields
+    const detailsData: any = { 
+      bio: bio
+    };
+    
+    // Always send all role-specific fields (including empty values) to allow deletion
     if (user?.role === "teacher") {
       detailsData.teachingSubjects = teachingSubjects;
-      if (yearsExperience) detailsData.yearsExperience = parseInt(yearsExperience);
-      if (qualifications) detailsData.qualifications = qualifications;
-      if (specialization) detailsData.specialization = specialization;
+      detailsData.yearsExperience = yearsExperience ? parseInt(yearsExperience) : null;
+      detailsData.qualifications = qualifications;
+      detailsData.specialization = specialization;
     } else if (user?.role === "parent") {
-      if (phone) detailsData.phone = phone;
-      if (preferredContact) detailsData.preferredContact = preferredContact;
+      detailsData.phone = phone;
+      detailsData.preferredContact = preferredContact;
     } else if (user?.role === "student") {
       detailsData.interests = interests;
-      if (favoriteSubject) detailsData.favoriteSubject = favoriteSubject;
-      if (learningGoals) detailsData.learningGoals = learningGoals;
+      detailsData.favoriteSubject = favoriteSubject;
+      detailsData.learningGoals = learningGoals;
     }
     
     updateDetailsMutation.mutate(detailsData);
@@ -374,21 +414,13 @@ export default function Profile() {
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
-                                  if (subjectInput.trim() && !teachingSubjects.includes(subjectInput.trim())) {
-                                    setTeachingSubjects([...teachingSubjects, subjectInput.trim()]);
-                                    setSubjectInput("");
-                                  }
+                                  addSubject();
                                 }
                               }}
                             />
                             <Button
                               type="button"
-                              onClick={() => {
-                                if (subjectInput.trim() && !teachingSubjects.includes(subjectInput.trim())) {
-                                  setTeachingSubjects([...teachingSubjects, subjectInput.trim()]);
-                                  setSubjectInput("");
-                                }
-                              }}
+                              onClick={addSubject}
                               data-testid="button-add-subject"
                             >
                               Add
@@ -404,7 +436,7 @@ export default function Profile() {
                                     variant="ghost"
                                     size="sm"
                                     className="h-4 w-4 p-0 hover:bg-transparent"
-                                    onClick={() => setTeachingSubjects(teachingSubjects.filter((_, i) => i !== index))}
+                                    onClick={() => removeSubject(index)}
                                     data-testid={`button-remove-subject-${index}`}
                                   >
                                     <X className="h-3 w-3" />
@@ -502,21 +534,13 @@ export default function Profile() {
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
-                                  if (interestInput.trim() && !interests.includes(interestInput.trim())) {
-                                    setInterests([...interests, interestInput.trim()]);
-                                    setInterestInput("");
-                                  }
+                                  addInterest();
                                 }
                               }}
                             />
                             <Button
                               type="button"
-                              onClick={() => {
-                                if (interestInput.trim() && !interests.includes(interestInput.trim())) {
-                                  setInterests([...interests, interestInput.trim()]);
-                                  setInterestInput("");
-                                }
-                              }}
+                              onClick={addInterest}
                               data-testid="button-add-interest"
                             >
                               Add
@@ -532,7 +556,7 @@ export default function Profile() {
                                     variant="ghost"
                                     size="sm"
                                     className="h-4 w-4 p-0 hover:bg-transparent"
-                                    onClick={() => setInterests(interests.filter((_, i) => i !== index))}
+                                    onClick={() => removeInterest(index)}
                                     data-testid={`button-remove-interest-${index}`}
                                   >
                                     <X className="h-3 w-3" />
