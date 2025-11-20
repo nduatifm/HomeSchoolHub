@@ -17,6 +17,13 @@ export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("assignments");
+  
+  // Dialog state
+  const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
+  const [uploadMaterialOpen, setUploadMaterialOpen] = useState(false);
+  const [createSessionOpen, setCreateSessionOpen] = useState(false);
+  const [createReportOpen, setCreateReportOpen] = useState(false);
+  const [sendMessageOpen, setSendMessageOpen] = useState(false);
 
   // Fetch data
   const { data: students = [] } = useQuery({ queryKey: ["/api/students/teacher"] });
@@ -42,6 +49,7 @@ export default function TeacherDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
       toast({ title: "Assignment created!", type: "success" });
       setAssignmentForm({ title: "", description: "", subject: "", dueDate: "", gradeLevel: "", points: 100 });
+      setCreateAssignmentOpen(false);
     },
   });
 
@@ -59,6 +67,7 @@ export default function TeacherDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
       toast({ title: "Material uploaded!", type: "success" });
       setMaterialForm({ title: "", description: "", fileUrl: "", subject: "", gradeLevel: "" });
+      setUploadMaterialOpen(false);
     },
   });
 
@@ -89,6 +98,7 @@ export default function TeacherDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions/teacher"] });
       toast({ title: "Session created!", type: "success" });
       setSessionForm({ subject: "", date: "", startTime: "", endTime: "", studentIds: [], notes: "", status: "scheduled" });
+      setCreateSessionOpen(false);
     },
   });
 
@@ -107,6 +117,7 @@ export default function TeacherDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       toast({ title: "Message sent!", type: "success" });
       setMessageForm({ receiverId: 0, content: "" });
+      setSendMessageOpen(false);
     },
   });
 
@@ -136,6 +147,7 @@ export default function TeacherDashboard() {
         strengths: "",
         improvements: ""
       });
+      setCreateReportOpen(false);
     },
   });
 
@@ -231,7 +243,7 @@ export default function TeacherDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Assignments</CardTitle>
-                <Dialog>
+                <Dialog open={createAssignmentOpen} onOpenChange={setCreateAssignmentOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-create-assignment">Create Assignment</Button>
                   </DialogTrigger>
@@ -318,7 +330,7 @@ export default function TeacherDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Study Materials</CardTitle>
-                <Dialog>
+                <Dialog open={uploadMaterialOpen} onOpenChange={setUploadMaterialOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-upload-material">Upload Material</Button>
                   </DialogTrigger>
@@ -428,7 +440,7 @@ export default function TeacherDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Sessions</CardTitle>
-                <Dialog>
+                <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-create-session">Create Session</Button>
                   </DialogTrigger>
@@ -550,7 +562,7 @@ export default function TeacherDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Progress Reports & Analytics</CardTitle>
-                <Dialog>
+                <Dialog open={createReportOpen} onOpenChange={setCreateReportOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-create-report">
                       <BarChart className="h-4 w-4 mr-2" />
@@ -708,7 +720,7 @@ export default function TeacherDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Messages</CardTitle>
-                <Dialog>
+                <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-new-message">
                       <Send className="h-4 w-4 mr-2" />
