@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import StudentSignup from "./pages/StudentSignup";
 import VerifyEmail from "./pages/VerifyEmail";
+import Profile from "./pages/Profile";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
@@ -77,6 +78,9 @@ function AppRoutes() {
       </Route>
       <Route path="/verify-email">
         <VerifyEmail />
+      </Route>
+      <Route path="/profile">
+        <ProtectedRoute component={Profile} />
       </Route>
       <Route path="/dashboard">
         <DashboardRouter />

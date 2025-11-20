@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
+import { z } from "zod";
 import { 
   insertUserSchema, 
   insertStudentSchema,
@@ -339,7 +340,15 @@ export function registerRoutes(app: Express) {
       }
 
       res.json({ 
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          name: user.name, 
+          role: user.role,
+          profilePicture: user.profilePicture,
+          isEmailVerified: user.isEmailVerified,
+          googleId: user.googleId
+        },
         profile 
       });
     } catch (error: any) {
@@ -465,6 +474,120 @@ export function registerRoutes(app: Express) {
         success: true,
         message: "Verification email sent! Please check your inbox." 
         });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== USER PROFILE ROUTES ==========
+  
+  // Update profile
+  app.patch("/api/user/profile", requireAuth, async (req, res) => {
+    try {
+      const updateProfileSchema = z.object({
+        name: z.string().min(1, "Name is required").max(100, "Name too long"),
+      });
+
+      const validation = updateProfileSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
+      }
+
+      const { name } = validation.data;
+      const user = await storage.updateUser(req.session.userId, { name });
+      
+      res.json({ 
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          name: user.name, 
+          role: user.role,
+          profilePicture: user.profilePicture,
+          isEmailVerified: user.isEmailVerified,
+          googleId: user.googleId
+        } 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update profile picture
+  app.patch("/api/user/profile-picture", requireAuth, async (req, res) => {
+    try {
+      const updatePictureSchema = z.object({
+        profilePicture: z.string().url("Must be a valid URL").startsWith("https://res.cloudinary.com/", "Profile picture must be uploaded through Cloudinary"),
+      });
+
+      const validation = updatePictureSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
+      }
+
+      const { profilePicture } = validation.data;
+      const user = await storage.updateUser(req.session.userId, { profilePicture });
+      
+      res.json({ 
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          name: user.name, 
+          role: user.role,
+          profilePicture: user.profilePicture,
+          isEmailVerified: user.isEmailVerified,
+          googleId: user.googleId
+        } 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Change password
+  app.post("/api/user/change-password", requireAuth, async (req, res) => {
+    try {
+      const changePasswordSchema = z.object({
+        currentPassword: z.string().min(1, "Current password is required"),
+        newPassword: z.string().min(8, "New password must be at least 8 characters").max(100, "New password too long"),
+      });
+
+      const validation = changePasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
+      }
+
+      const { currentPassword, newPassword } = validation.data;
+
+      const user = await storage.getUserById(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if user has a password (not Google OAuth)
+      if (!user.password) {
+        return res.status(400).json({ error: "Cannot change password for Google sign-in accounts" });
+      }
+
+      // Verify current password
+      const isValid = await verifyPassword(currentPassword, user.password);
+      if (!isValid) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+
+      // Hash and update new password
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUser(user.id, { password: hashedPassword });
+      
+      res.json({ 
+        success: true,
+        message: "Password changed successfully" 
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

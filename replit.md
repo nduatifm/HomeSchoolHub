@@ -52,6 +52,11 @@ A comprehensive web-based tutoring platform that connects teachers, parents, and
 - Downloadable reports
 - Earnings dashboard for teachers
 - Payment tracking and subscription management
+- **Profile Management**: Comprehensive profile settings for all users
+  - Personal information editing (name, view role and email)
+  - Profile picture upload with Cloudinary integration (up to 5MB)
+  - Password change functionality (not available for Google Sign-In users)
+  - Modern tabbed interface for easy navigation
 
 ## Technology Stack
 
@@ -216,6 +221,16 @@ npm run start
 ## Recent Changes (November 20, 2025)
 
 ### Latest Updates
+
+- **Profile Management System** (November 20, 2025):
+  - Created comprehensive Profile Settings page (`/profile`) with modern tabbed interface
+  - Added three tabs: Personal Info, Profile Picture, and Security (Password Change)
+  - Implemented profile picture upload using Cloudinary (max 5MB, validates Cloudinary URLs only)
+  - Added secure password change functionality (minimum 8 characters, validates current password)
+  - Google Sign-In users see appropriate message that password change is not available
+  - All API endpoints use Zod validation and proper error handling
+  - Profile data now returned by `/api/auth/me` including profilePicture, isEmailVerified, googleId
+  - Created Avatar and Label UI components for consistent design
 
 - **Email Verification URL Fix**: Fixed critical bug where verification emails used hardcoded localhost URL
   - Implemented dynamic base URL detection using `REPLIT_DOMAINS` environment variable
