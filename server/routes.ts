@@ -347,7 +347,17 @@ export function registerRoutes(app: Express) {
           role: user.role,
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
-          googleId: user.googleId
+          googleId: user.googleId,
+          bio: user.bio,
+          teachingSubjects: user.teachingSubjects,
+          yearsExperience: user.yearsExperience,
+          qualifications: user.qualifications,
+          specialization: user.specialization,
+          phone: user.phone,
+          preferredContact: user.preferredContact,
+          interests: user.interests,
+          favoriteSubject: user.favoriteSubject,
+          learningGoals: user.learningGoals,
         },
         profile 
       });
@@ -587,6 +597,61 @@ export function registerRoutes(app: Express) {
       res.json({ 
         success: true,
         message: "Password changed successfully" 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update bio and role-specific details
+  app.patch("/api/user/profile-details", requireAuth, async (req, res) => {
+    try {
+      const updateDetailsSchema = z.object({
+        bio: z.string().max(500, "Bio too long").optional(),
+        // Teacher fields
+        teachingSubjects: z.array(z.string()).optional(),
+        yearsExperience: z.number().int().min(0).max(100).optional(),
+        qualifications: z.string().max(200).optional(),
+        specialization: z.string().max(100).optional(),
+        // Parent fields
+        phone: z.string().max(20).optional(),
+        preferredContact: z.string().max(50).optional(),
+        // Student fields
+        interests: z.array(z.string()).optional(),
+        favoriteSubject: z.string().max(100).optional(),
+        learningGoals: z.string().max(500).optional(),
+      });
+
+      const validation = updateDetailsSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
+      }
+
+      const updateData = validation.data;
+      const user = await storage.updateUser(req.session.userId, updateData);
+      
+      res.json({ 
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          name: user.name, 
+          role: user.role,
+          profilePicture: user.profilePicture,
+          isEmailVerified: user.isEmailVerified,
+          googleId: user.googleId,
+          bio: user.bio,
+          teachingSubjects: user.teachingSubjects,
+          yearsExperience: user.yearsExperience,
+          qualifications: user.qualifications,
+          specialization: user.specialization,
+          phone: user.phone,
+          preferredContact: user.preferredContact,
+          interests: user.interests,
+          favoriteSubject: user.favoriteSubject,
+          learningGoals: user.learningGoals,
+        } 
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
