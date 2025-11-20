@@ -22,6 +22,33 @@ export const insertUserSchema = userSchema.omit({ id: true, isEmailVerified: tru
 export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
+// Auth validation schemas
+export const signupSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  name: z.string().min(1, "Name is required"),
+  role: z.enum(["teacher", "parent"], { errorMap: () => ({ message: "Role must be teacher or parent" }) }),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+export const studentSignupSchema = z.object({
+  token: z.string().uuid("Invalid invite token format"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export type SignupInput = z.infer<typeof signupSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+export type StudentSignupInput = z.infer<typeof studentSignupSchema>;
+
 // Student schema
 export const studentSchema = z.object({
   id: z.number(),

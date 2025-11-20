@@ -19,6 +19,10 @@ import {
   insertTutorRatingSchema,
   insertEarningsSchema,
   insertStudentInviteSchema,
+  signupSchema,
+  loginSchema,
+  resendVerificationSchema,
+  studentSignupSchema,
 } from "@shared/schema";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -54,11 +58,15 @@ export function registerRoutes(app: Express) {
   // Teacher/Parent signup
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, name, role } = req.body;
-      
-      if (!["teacher", "parent"].includes(role)) {
-        return res.status(400).json({ error: "Only teachers and parents can sign up" });
+      // Validate input with Zod
+      const validation = signupSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
       }
+
+      const { email, password, name, role } = validation.data;
 
       const existing = await storage.getUserByEmail(email);
       if (existing) {
@@ -108,7 +116,15 @@ export function registerRoutes(app: Express) {
   // Login
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email, password } = req.body;
+      // Validate input with Zod
+      const validation = loginSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
+      }
+
+      const { email, password } = validation.data;
       
       const user = await storage.getUserByEmail(email);
       if (!user) {
@@ -148,7 +164,15 @@ export function registerRoutes(app: Express) {
   // Student signup via invite
   app.post("/api/auth/signup/student", async (req, res) => {
     try {
-      const { token, password } = req.body;
+      // Validate input with Zod
+      const validation = studentSignupSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
+      }
+
+      const { token, password } = validation.data;
       
       const invite = await storage.getStudentInviteByToken(token);
       if (!invite || invite.status === "accepted") {
@@ -287,11 +311,15 @@ export function registerRoutes(app: Express) {
   // Resend verification email (unauthenticated endpoint)
   app.post("/api/auth/resend-verification", async (req, res) => {
     try {
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ error: "Email is required" });
+      // Validate input with Zod
+      const validation = resendVerificationSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: validation.error.errors[0].message 
+        });
       }
+
+      const { email } = validation.data;
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
