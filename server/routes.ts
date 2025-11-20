@@ -27,9 +27,13 @@ import {
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { sendVerificationEmail } from "./utils/emailService";
+import { OAuth2Client } from "google-auth-library";
 
 // Simple session management
 const sessions = new Map<string, number>();
+
+// Google OAuth client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Auth middleware
 function requireAuth(req: Request, res: Response, next: Function) {
@@ -233,6 +237,89 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Google Sign In/Sign Up
+  app.post("/api/auth/google", async (req, res) => {
+    try {
+      const { credential, role } = req.body;
+      
+      if (!credential) {
+        return res.status(400).json({ error: "Google credential is required" });
+      }
+
+      // Only allow teacher/parent roles for new signups
+      if (role && !["teacher", "parent"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role for Google sign up" });
+      }
+
+      // Verify Google token
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid Google token" });
+      }
+
+      const googleId = payload.sub;
+      const email = payload.email;
+      const name = payload.name || email;
+      const profilePicture = payload.picture;
+
+      // Check if user exists by Google ID
+      let user = await storage.getUserByGoogleId(googleId);
+
+      if (!user && email) {
+        // Check if user exists by email (account linking)
+        user = await storage.getUserByEmail(email);
+        
+        if (user) {
+          // Link Google account to existing email account
+          await storage.updateUser(user.id, {
+            googleId,
+            profilePicture,
+            isEmailVerified: true, // Google verified their email
+          });
+        }
+      }
+
+      // Create new user if doesn't exist
+      if (!user) {
+        if (!role) {
+          return res.status(400).json({ 
+            error: "Role is required for new Google sign ups",
+            requiresRole: true 
+          });
+        }
+
+        user = await storage.createUser({
+          email: email || `google_${googleId}@placeholder.com`,
+          password: null, // No password for Google users
+          name,
+          role,
+          isEmailVerified: true, // Google already verified email
+          emailVerifyToken: null,
+          emailVerifyExpires: null,
+          googleId,
+          profilePicture,
+        });
+      }
+
+      // Create session
+      const sessionId = crypto.randomUUID();
+      sessions.set(sessionId, user.id);
+
+      res.json({
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        sessionId,
+      });
+    } catch (error: any) {
+      console.error("Google auth error:", error);
+      res.status(500).json({ error: "Failed to authenticate with Google" });
+    }
+  });
+
   // Get current user
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     try {
@@ -381,8 +468,10 @@ export function registerRoutes(app: Express) {
       expiresDate.setDate(expiresDate.getDate() + 7); // 7 days expiry
 
       const invite = await storage.createStudentInvite({
-        ...data,
-        parentId: user.id,
+        email: data.email,
+        studentName: data.studentName,
+        gradeLevel: data.gradeLevel,
+        parent: { connect: { id: user.id } },
         token,
         status: "pending",
         createdDate: new Date().toISOString(),
@@ -714,12 +803,21 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Only teachers can create sessions" });
       }
 
-      const data = insertSessionSchema.parse({
-        ...req.body,
-        teacherId: user.id,
-      });
+      const data = insertSessionSchema.parse(req.body);
 
-      const session = await storage.createSession(data);
+      const session = await storage.createSession({
+        title: data.title,
+        description: data.description,
+        subject: data.subject,
+        sessionDate: data.sessionDate,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        meetingUrl: data.meetingUrl,
+        notes: data.notes,
+        status: data.status,
+        studentIds: data.studentIds,
+        teacher: { connect: { id: user.id } },
+      });
       res.json(session);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
