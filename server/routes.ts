@@ -102,7 +102,7 @@ export function registerRoutes(app: Express) {
       });
 
       // Send verification email (non-blocking)
-      sendVerificationEmail(email, emailVerifyToken, name).catch(err => 
+      sendVerificationEmail(email, name, emailVerifyToken).catch(err => 
         console.error("Failed to send verification email:", err)
       );
 
@@ -227,7 +227,7 @@ export function registerRoutes(app: Express) {
       await storage.updateStudentInvite(invite.id, { status: "accepted" });
 
       // Send verification email to student (non-blocking)
-      sendVerificationEmail(user.email, emailVerifyToken, user.name).catch(err => 
+      sendVerificationEmail(user.email, user.name, emailVerifyToken).catch(err => 
         console.error("Failed to send verification email to student:", err)
       );
 
@@ -459,7 +459,7 @@ export function registerRoutes(app: Express) {
       });
 
       // Send verification email
-      await sendVerificationEmail(user.email, emailVerifyToken, user.name);
+      await sendVerificationEmail(user.email, user.name, emailVerifyToken);
 
       res.json({ 
         success: true,
