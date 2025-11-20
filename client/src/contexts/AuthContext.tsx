@@ -6,6 +6,19 @@ interface User {
   email: string;
   name: string;
   role: "teacher" | "parent" | "student" | null;
+  profilePicture?: string | null;
+  isEmailVerified?: boolean;
+  googleId?: string | null;
+  bio?: string | null;
+  teachingSubjects?: string[];
+  yearsExperience?: number | null;
+  qualifications?: string | null;
+  specialization?: string | null;
+  phone?: string | null;
+  preferredContact?: string | null;
+  interests?: string[];
+  favoriteSubject?: string | null;
+  learningGoals?: string | null;
 }
 
 interface Student {
