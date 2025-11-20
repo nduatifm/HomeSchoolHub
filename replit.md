@@ -7,7 +7,9 @@ A comprehensive web-based tutoring platform that connects teachers, parents, and
 ## Key Features
 
 ### Authentication & User Management
-- **Teacher & Parent Signup**: Direct registration for teachers and parents
+- **Teacher & Parent Signup**: Direct registration for teachers and parents via email or Google Sign-In
+- **Email Verification**: Mandatory email verification before login (verification links use production URLs)
+- **Google Sign-In**: Optional OAuth authentication for teachers and parents
 - **Student Invite-Only**: Students can only join through parent-sent invitations
 - **Role-Based Access**: Three distinct user types with different permissions and dashboards
 
@@ -190,18 +192,47 @@ npm run start
 
 ## Environment Variables
 
+### Required
 - `DATABASE_URL`: PostgreSQL connection string (automatically provided by Replit)
+- `SMTP_HOST`: Email server hostname
+- `SMTP_PORT`: Email server port (587 or 465)
+- `SMTP_USER`: Email account username
+- `SMTP_PASS`: Email account password
+- `CLOUDINARY_CLOUD_NAME`: Cloudinary account name
+- `CLOUDINARY_API_KEY`: Cloudinary API key
+- `CLOUDINARY_API_SECRET`: Cloudinary API secret
+
+### Optional
+- `VITE_GOOGLE_CLIENT_ID`: Google OAuth Client ID (for Google Sign-In)
+- `GOOGLE_CLIENT_ID`: Google OAuth Client ID (backend verification)
+- `CLIENT_URL`: Override base URL for emails (auto-detected from REPLIT_DOMAINS)
+- `REPLIT_DOMAINS`: Auto-provided by Replit (used for production URLs)
 
 ## User Preferences
 
 - Communication style: Simple, everyday language
 - Avoid technical jargon when explaining features to users
 
-## Recent Changes (November 18, 2025)
+## Recent Changes (November 20, 2025)
 
-### Latest Update
+### Latest Updates
+
+- **Email Verification URL Fix**: Fixed critical bug where verification emails used hardcoded localhost URL
+  - Implemented dynamic base URL detection using `REPLIT_DOMAINS` environment variable
+  - Production emails now use correct production URL instead of `http://localhost:5000`
+  - Added fallback chain: CLIENT_URL → REPLIT_DOMAINS → localhost
+  - Affects both email verification and password reset emails
+
+- **Google Sign-In Support**: Full OAuth integration for teachers and parents
+  - Added Google Sign-In buttons to Login and Signup pages
+  - Implemented role selection dialog for Google Sign-Up (teacher/parent choice)
+  - Conditional rendering - buttons only show when `VITE_GOOGLE_CLIENT_ID` is configured
+  - Uses `@react-oauth/google` package with GoogleOAuthProvider wrapper
+  - Backend validates Google ID tokens via Google OAuth2Client
+  - Gracefully degrades when Google Client ID not configured
+
 - **Messaging System**: Added full messaging functionality to all three dashboards (Teacher, Parent, Student)
-  - Users can send messages to each other by specifying receiver ID
+  - Users can send messages to each other via user picker dropdown
   - Messages displayed in chat-like interface with sender/receiver differentiation
   - Unread badge for new messages
   

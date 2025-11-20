@@ -10,8 +10,25 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function getBaseUrl(): string {
+  // Check for explicit CLIENT_URL environment variable first
+  if (process.env.CLIENT_URL) {
+    return process.env.CLIENT_URL;
+  }
+  
+  // In production (Replit), use the Replit domain
+  if (process.env.REPLIT_DOMAINS) {
+    const domains = process.env.REPLIT_DOMAINS.split(',');
+    return `https://${domains[0]}`;
+  }
+  
+  // Fallback to localhost for development
+  return 'http://localhost:5000';
+}
+
 export async function sendVerificationEmail(email: string, name: string, token: string) {
-  const verificationUrl = `${process.env.CLIENT_URL || 'http://localhost:5000'}/verify-email?token=${token}`;
+  const baseUrl = getBaseUrl();
+  const verificationUrl = `${baseUrl}/verify-email?token=${token}`;
   
   const htmlContent = `
 <!DOCTYPE html>
@@ -61,7 +78,8 @@ export async function sendVerificationEmail(email: string, name: string, token: 
 }
 
 export async function sendPasswordResetEmail(email: string, name: string, token: string) {
-  const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5000'}/reset-password?token=${token}`;
+  const baseUrl = getBaseUrl();
+  const resetUrl = `${baseUrl}/reset-password?token=${token}`;
   
   try {
     await transporter.sendMail({
