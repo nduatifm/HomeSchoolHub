@@ -4,8 +4,7 @@ interface ColorfulStatCardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  color: "purple" | "green" | "coral" | "orange";
-  lightColor: "light-purple" | "light-green" | "light-coral" | "light-orange";
+  className: string;
   subtitle?: string;
 }
 
@@ -13,15 +12,14 @@ export default function ColorfulStatCard({
   title,
   value,
   icon: Icon,
-  color,
-  lightColor,
+  className,
   subtitle,
 }: ColorfulStatCardProps) {
-  const testIdBase = title.toLowerCase().replace(/\s+/g, '-');
-  
+  const testIdBase = title.toLowerCase().replace(/\s+/g, "-");
+
   return (
     <div
-      className={`bg-${color} rounded-3xl p-6 text-white shadow-lg hover:scale-105 transition-transform cursor-pointer`}
+      className={`${className} rounded-3xl p-6 text-white shadow-lg hover:scale-105 transition-transform cursor-pointer`}
       data-testid={`stat-card-${testIdBase}`}
     >
       <div className="flex items-start justify-between mb-4">
@@ -29,14 +27,17 @@ export default function ColorfulStatCard({
           <Icon className="w-6 h-6" />
         </div>
         <div className="text-right">
-          <div className="text-3xl font-bold" data-testid={`text-${testIdBase}`}>{value}</div>
+          <div
+            className="text-3xl font-bold"
+            data-testid={`text-${testIdBase}`}
+          >
+            {value}
+          </div>
         </div>
       </div>
       <div className="space-y-1">
         <h3 className="text-sm font-medium opacity-90">{title}</h3>
-        {subtitle && (
-          <p className="text-xs opacity-75">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-xs opacity-75">{subtitle}</p>}
       </div>
     </div>
   );
