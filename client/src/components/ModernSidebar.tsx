@@ -3,64 +3,35 @@ import { Home, LayoutGrid, Clock, Settings, User, LogOut, BookOpen, Users, FileT
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
-interface SidebarItem {
-  icon: React.ReactNode;
-  label: string;
-  path: string;
-}
-
 export default function ModernSidebar() {
-  const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const teacherItems: SidebarItem[] = [
-    { icon: <Home className="w-6 h-6" />, label: "Dashboard", path: "/teacher-dashboard" },
-    { icon: <LayoutGrid className="w-6 h-6" />, label: "Assignments", path: "/teacher-dashboard#assignments" },
-    { icon: <BookOpen className="w-6 h-6" />, label: "Materials", path: "/teacher-dashboard#materials" },
-    { icon: <Users className="w-6 h-6" />, label: "Students", path: "/teacher-dashboard#students" },
-  ];
-
-  const parentItems: SidebarItem[] = [
-    { icon: <Home className="w-6 h-6" />, label: "Dashboard", path: "/parent-dashboard" },
-    { icon: <Users className="w-6 h-6" />, label: "Children", path: "/parent-dashboard#children" },
-    { icon: <FileText className="w-6 h-6" />, label: "Progress", path: "/parent-dashboard#progress" },
-    { icon: <Clock className="w-6 h-6" />, label: "Attendance", path: "/parent-dashboard#attendance" },
-  ];
-
-  const studentItems: SidebarItem[] = [
-    { icon: <Home className="w-6 h-6" />, label: "Dashboard", path: "/student-dashboard" },
-    { icon: <FileText className="w-6 h-6" />, label: "Assignments", path: "/student-dashboard#assignments" },
-    { icon: <BookOpen className="w-6 h-6" />, label: "Materials", path: "/student-dashboard#materials" },
-    { icon: <Clock className="w-6 h-6" />, label: "Schedule", path: "/student-dashboard#schedule" },
-  ];
-
-  const getItems = () => {
-    if (user?.role === "teacher") return teacherItems;
-    if (user?.role === "parent") return parentItems;
-    if (user?.role === "student") return studentItems;
-    return [];
+  const getDashboardPath = () => {
+    if (user?.role === "teacher") return "/teacher-dashboard";
+    if (user?.role === "parent") return "/parent-dashboard";
+    if (user?.role === "student") return "/student-dashboard";
+    return "/";
   };
-
-  const items = getItems();
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-24 bg-sidebar flex flex-col items-center py-6 shadow-xl z-50" data-testid="sidebar">
       <div className="flex flex-col items-center gap-8 flex-1">
-        {items.map((item, index) => (
-          <button
-            key={index}
-            onClick={() => window.location.hash = item.path.split('#')[1] || ''}
-            className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all hover:scale-110 ${
-              index === 0
-                ? "bg-white text-sidebar-bg shadow-md"
-                : "text-white hover:bg-white/10"
-            }`}
-            title={item.label}
-            data-testid={`sidebar-${item.label.toLowerCase()}`}
+        <Link href={getDashboardPath()}>
+          <a
+            className="w-16 h-16 rounded-2xl flex items-center justify-center transition-all hover:scale-110 bg-white text-sidebar-bg shadow-md"
+            title="Dashboard"
+            data-testid="sidebar-dashboard"
           >
-            {item.icon}
-          </button>
-        ))}
+            <Home className="w-6 h-6" />
+          </a>
+        </Link>
+        
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center transition-all text-white opacity-50"
+          title="More sections available via tabs"
+        >
+          <LayoutGrid className="w-6 h-6" />
+        </div>
       </div>
 
       <div className="flex flex-col items-center gap-4 mt-auto">

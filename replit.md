@@ -10,7 +10,15 @@ A comprehensive web-based tutoring platform designed to connect teachers, parent
 ## System Architecture
 
 ### UI/UX Decisions
-The platform utilizes React 18 with TypeScript for the frontend, styled with Tailwind CSS and Shadcn/UI components for a modern and consistent design. Icons are provided by Lucide React. The profile management features a modern tabbed interface for easy navigation and role-specific fields. All interactive elements include `data-testid` attributes for robust testing.
+The platform utilizes React 18 with TypeScript for the frontend, styled with Tailwind CSS and Shadcn/UI components for a modern and consistent design. The platform features a **modern, colorful dashboard design** inspired by contemporary educational platforms:
+
+- **Modern Vertical Sidebar**: Dark navy sidebar (fixed left, 96px wide) with icon navigation for quick access to key sections
+- **Vibrant Color Palette**: Purple, green, coral, and orange accent colors for visual hierarchy and engagement
+- **Welcome Cards**: Personalized hero cards with gradient backgrounds and call-to-action buttons
+- **Colorful Stat Cards**: Vibrant metric cards with icons, gradients, and hover effects
+- **Rounded Design Language**: Generous border-radius (1rem default, up to 3rem on cards) for friendly, modern aesthetic
+
+Icons are provided by Lucide React. The profile management features a modern tabbed interface for easy navigation and role-specific fields. All interactive elements include `data-testid` attributes for robust testing.
 
 ### Technical Implementations
 - **Frontend**: React 18, TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn/UI, Tailwind CSS.

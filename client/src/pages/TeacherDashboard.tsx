@@ -17,6 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut, MessageSquare, Send, BarChart, Download, Edit, Trash2, Clock, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ModernSidebar from "@/components/ModernSidebar";
+import WelcomeCard from "@/components/WelcomeCard";
+import ColorfulStatCard from "@/components/ColorfulStatCard";
 
 const scheduleSchema = z.object({
   studentId: z.number().min(1, "Student required"),
@@ -389,67 +392,52 @@ export default function TeacherDashboard() {
   const totalEarnings = earnings.reduce((sum: number, e: any) => sum + e.amount, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Teacher Dashboard</h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-            <Button variant="outline" size="sm" onClick={logout} data-testid="button-logout">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background">
+      <ModernSidebar />
+      
+      <div className="ml-24 flex">
+        <main className="flex-1 p-8 max-w-6xl">
+          <WelcomeCard
+            name={user?.name || "Teacher"}
+            message="Ready to inspire and educate! Let's help your students reach their full potential."
+            buttonText="Today's Schedule"
+            onButtonClick={() => setActiveTab("schedule")}
+          />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Students</p>
-                  <p className="text-2xl font-bold" data-testid="text-students-count">{students.length}</p>
-                </div>
-                <Users className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Assignments</p>
-                  <p className="text-2xl font-bold" data-testid="text-assignments-count">{assignments.length}</p>
-                </div>
-                <FileText className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Sessions</p>
-                  <p className="text-2xl font-bold" data-testid="text-sessions-count">{sessions.length}</p>
-                </div>
-                <Calendar className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Earnings</p>
-                  <p className="text-2xl font-bold" data-testid="text-earnings">${totalEarnings}</p>
-                </div>
-                <DollarSign className="h-8 w-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+            <ColorfulStatCard
+              title="Students"
+              value={students.length}
+              icon={Users}
+              color="purple"
+              lightColor="light-purple"
+              subtitle="Active students"
+            />
+            <ColorfulStatCard
+              title="Assignments"
+              value={assignments.length}
+              icon={FileText}
+              color="green"
+              lightColor="light-green"
+              subtitle="Total created"
+            />
+            <ColorfulStatCard
+              title="Sessions"
+              value={sessions.length}
+              icon={Calendar}
+              color="coral"
+              lightColor="light-coral"
+              subtitle="Scheduled"
+            />
+            <ColorfulStatCard
+              title="Earnings"
+              value={`$${totalEarnings}`}
+              icon={DollarSign}
+              color="orange"
+              lightColor="light-orange"
+              subtitle="Total earned"
+            />
+          </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
@@ -1930,6 +1918,7 @@ export default function TeacherDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+      </div>
     </div>
   );
 }

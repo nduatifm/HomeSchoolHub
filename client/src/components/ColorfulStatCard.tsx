@@ -17,17 +17,19 @@ export default function ColorfulStatCard({
   lightColor,
   subtitle,
 }: ColorfulStatCardProps) {
+  const testIdBase = title.toLowerCase().replace(/\s+/g, '-');
+  
   return (
     <div
       className={`bg-${color} rounded-3xl p-6 text-white shadow-lg hover:scale-105 transition-transform cursor-pointer`}
-      data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      data-testid={`stat-card-${testIdBase}`}
     >
       <div className="flex items-start justify-between mb-4">
         <div className={`bg-white/20 p-3 rounded-2xl`}>
           <Icon className="w-6 h-6" />
         </div>
         <div className="text-right">
-          <div className="text-3xl font-bold">{value}</div>
+          <div className="text-3xl font-bold" data-testid={`text-${testIdBase}`}>{value}</div>
         </div>
       </div>
       <div className="space-y-1">

@@ -17,6 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Users, FileText, Calendar, UserPlus, LogOut, MessageSquare, Send, BarChart, Download, DollarSign, Star, ClipboardCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ModernSidebar from "@/components/ModernSidebar";
+import WelcomeCard from "@/components/WelcomeCard";
+import ColorfulStatCard from "@/components/ColorfulStatCard";
 
 const paymentSchema = z.object({
   teacherId: z.number().min(1, "Teacher required"),
@@ -204,67 +207,52 @@ export default function ParentDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Parent Dashboard</h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-            <Button variant="outline" size="sm" onClick={logout} data-testid="button-logout">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background">
+      <ModernSidebar />
+      
+      <div className="ml-24 flex">
+        <main className="flex-1 p-8 max-w-6xl">
+          <WelcomeCard
+            name={user?.name || "Parent"}
+            message="Stay connected with your child's learning journey. Monitor progress and support their growth."
+            buttonText="View Children"
+            onButtonClick={() => setActiveTab("children")}
+          />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Children</p>
-                  <p className="text-2xl font-bold" data-testid="text-children-count">{students.length}</p>
-                </div>
-                <Users className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Invites</p>
-                  <p className="text-2xl font-bold" data-testid="text-invites-count">{invites.length}</p>
-                </div>
-                <UserPlus className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Tutor Requests</p>
-                  <p className="text-2xl font-bold" data-testid="text-requests-count">{tutorRequests.length}</p>
-                </div>
-                <FileText className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Payments</p>
-                  <p className="text-2xl font-bold" data-testid="text-payments-count">{payments.length}</p>
-                </div>
-                <Calendar className="h-8 w-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+            <ColorfulStatCard
+              title="Children"
+              value={students.length}
+              icon={Users}
+              color="purple"
+              lightColor="light-purple"
+              subtitle="Registered"
+            />
+            <ColorfulStatCard
+              title="Invites"
+              value={invites.length}
+              icon={UserPlus}
+              color="green"
+              lightColor="light-green"
+              subtitle="Pending invites"
+            />
+            <ColorfulStatCard
+              title="Tutor Requests"
+              value={tutorRequests.length}
+              icon={FileText}
+              color="coral"
+              lightColor="light-coral"
+              subtitle="Active requests"
+            />
+            <ColorfulStatCard
+              title="Payments"
+              value={payments.length}
+              icon={DollarSign}
+              color="orange"
+              lightColor="light-orange"
+              subtitle="Total payments"
+            />
+          </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
@@ -1043,6 +1031,7 @@ export default function ParentDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+      </div>
     </div>
   );
 }

@@ -13,6 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Award, BookOpen, Calendar, LogOut, Trophy, MessageSquare, Send, ClipboardCheck, Video, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ModernSidebar from "@/components/ModernSidebar";
+import WelcomeCard from "@/components/WelcomeCard";
+import ColorfulStatCard from "@/components/ColorfulStatCard";
 
 export default function StudentDashboard() {
   const { user, student, logout } = useAuth();
@@ -123,67 +126,52 @@ export default function StudentDashboard() {
   const gradedAssignments = assignments.filter((a: any) => a.studentAssignment?.status === "graded");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Student Dashboard</h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-            <Button variant="outline" size="sm" onClick={logout} data-testid="button-logout">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background">
+      <ModernSidebar />
+      
+      <div className="ml-24 flex">
+        <main className="flex-1 p-8 max-w-6xl">
+          <WelcomeCard
+            name={user?.name || "Student"}
+            message="Let's start the day by learning something new. Don't forget to check your To-Do list."
+            buttonText="To-Do List"
+            onButtonClick={() => setActiveTab("assignments")}
+          />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Assignments</p>
-                  <p className="text-2xl font-bold" data-testid="text-assignments-count">{assignments.length}</p>
-                </div>
-                <FileText className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Points</p>
-                  <p className="text-2xl font-bold" data-testid="text-points">{student?.points || 0}</p>
-                </div>
-                <Trophy className="h-8 w-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Badges</p>
-                  <p className="text-2xl font-bold" data-testid="text-badges-count">{student?.badges?.length || 0}</p>
-                </div>
-                <Award className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Materials</p>
-                  <p className="text-2xl font-bold" data-testid="text-materials-count">{materials.length}</p>
-                </div>
-                <BookOpen className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+            <ColorfulStatCard
+              title="Assignments"
+              value={assignments.length}
+              icon={FileText}
+              color="purple"
+              lightColor="light-purple"
+              subtitle={`${pendingAssignments.length} pending`}
+            />
+            <ColorfulStatCard
+              title="Points"
+              value={student?.points || 0}
+              icon={Trophy}
+              color="green"
+              lightColor="light-green"
+              subtitle="Total earned"
+            />
+            <ColorfulStatCard
+              title="Badges"
+              value={student?.badges?.length || 0}
+              icon={Award}
+              color="coral"
+              lightColor="light-coral"
+              subtitle="Achievements"
+            />
+            <ColorfulStatCard
+              title="Materials"
+              value={materials.length}
+              icon={BookOpen}
+              color="orange"
+              lightColor="light-orange"
+              subtitle="Study resources"
+            />
+          </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
@@ -792,6 +780,7 @@ export default function StudentDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+      </div>
     </div>
   );
 }
