@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function googleSignIn(idToken: string) {
     const data = await apiRequest("/api/auth/google", {
       method: "POST",
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ credential: idToken }),
     });
     localStorage.setItem("sessionId", data.sessionId);
     setSessionId(data.sessionId);
