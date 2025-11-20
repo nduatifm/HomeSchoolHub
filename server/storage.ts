@@ -40,7 +40,7 @@ export interface IStorage {
   getAssignmentById(id: number): Promise<Assignment | null>;
   getAssignmentsByTeacher(teacherId: number): Promise<Assignment[]>;
   getAssignmentsByGradeLevel(gradeLevel: string): Promise<Assignment[]>;
-  updateAssignment(id: number, assignment: Prisma.AssignmentUpdateInput): Promise<Assignment>;
+  updateAssignment(id: number, assignment: any): Promise<Assignment>;
   deleteAssignment(id: number): Promise<void>;
   
   createStudentAssignment(studentAssignment: InsertStudentAssignment): Promise<StudentAssignment>;

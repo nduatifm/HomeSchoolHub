@@ -78,8 +78,10 @@ export const assignmentSchema = z.object({
 });
 
 export const insertAssignmentSchema = assignmentSchema.omit({ id: true });
+export const updateAssignmentSchema = assignmentSchema.omit({ id: true, teacherId: true }).partial();
 export type Assignment = z.infer<typeof assignmentSchema>;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+export type UpdateAssignment = z.infer<typeof updateAssignmentSchema>;
 
 // Student Assignment schema
 export const studentAssignmentSchema = z.object({

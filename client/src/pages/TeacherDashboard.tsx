@@ -20,6 +20,7 @@ export default function TeacherDashboard() {
   
   // Dialog state
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
+  const [editAssignmentOpen, setEditAssignmentOpen] = useState(false);
   const [uploadMaterialOpen, setUploadMaterialOpen] = useState(false);
   const [editMaterialOpen, setEditMaterialOpen] = useState(false);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
@@ -51,6 +52,35 @@ export default function TeacherDashboard() {
       toast({ title: "Assignment created!", type: "success" });
       setAssignmentForm({ title: "", description: "", subject: "", dueDate: "", gradeLevel: "", points: 100 });
       setCreateAssignmentOpen(false);
+    },
+  });
+
+  // Edit assignment
+  const [editAssignmentForm, setEditAssignmentForm] = useState({
+    id: 0, title: "", description: "", subject: "", dueDate: "", gradeLevel: "", points: 100, fileUrl: ""
+  });
+
+  const updateAssignmentMutation = useMutation({
+    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/assignments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
+      toast({ title: "Assignment updated!", type: "success" });
+      setEditAssignmentForm({ id: 0, title: "", description: "", subject: "", dueDate: "", gradeLevel: "", points: 100, fileUrl: "" });
+      setEditAssignmentOpen(false);
+    },
+  });
+
+  // Delete assignment
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/assignments/${id}`, {
+      method: "DELETE",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
+      toast({ title: "Assignment deleted!", type: "success" });
     },
   });
 
@@ -339,6 +369,7 @@ export default function TeacherDashboard() {
                       <TableHead>Subject</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Points</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -348,10 +379,108 @@ export default function TeacherDashboard() {
                         <TableCell>{a.subject}</TableCell>
                         <TableCell>{new Date(a.dueDate).toLocaleDateString()}</TableCell>
                         <TableCell>{a.points}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setEditAssignmentForm({
+                                  id: a.id,
+                                  title: a.title,
+                                  description: a.description || "",
+                                  subject: a.subject,
+                                  dueDate: a.dueDate,
+                                  gradeLevel: a.gradeLevel,
+                                  points: a.points,
+                                  fileUrl: a.fileUrl || ""
+                                });
+                                setEditAssignmentOpen(true);
+                              }}
+                              data-testid={`button-edit-assignment-${a.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this assignment?')) {
+                                  deleteAssignmentMutation.mutate(a.id);
+                                }
+                              }}
+                              data-testid={`button-delete-assignment-${a.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+
+                <Dialog open={editAssignmentOpen} onOpenChange={setEditAssignmentOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Assignment</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Input
+                        placeholder="Title"
+                        value={editAssignmentForm.title}
+                        onChange={(e) => setEditAssignmentForm({ ...editAssignmentForm, title: e.target.value })}
+                        data-testid="input-edit-assignment-title"
+                      />
+                      <Textarea
+                        placeholder="Description"
+                        value={editAssignmentForm.description}
+                        onChange={(e) => setEditAssignmentForm({ ...editAssignmentForm, description: e.target.value })}
+                        data-testid="input-edit-assignment-description"
+                      />
+                      <Input
+                        placeholder="Subject"
+                        value={editAssignmentForm.subject}
+                        onChange={(e) => setEditAssignmentForm({ ...editAssignmentForm, subject: e.target.value })}
+                        data-testid="input-edit-assignment-subject"
+                      />
+                      <Input
+                        type="date"
+                        placeholder="Due Date"
+                        value={editAssignmentForm.dueDate}
+                        onChange={(e) => setEditAssignmentForm({ ...editAssignmentForm, dueDate: e.target.value })}
+                        data-testid="input-edit-assignment-due-date"
+                      />
+                      <Input
+                        placeholder="Grade Level"
+                        value={editAssignmentForm.gradeLevel}
+                        onChange={(e) => setEditAssignmentForm({ ...editAssignmentForm, gradeLevel: e.target.value })}
+                        data-testid="input-edit-assignment-grade-level"
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Points"
+                        value={editAssignmentForm.points}
+                        onChange={(e) => setEditAssignmentForm({ ...editAssignmentForm, points: parseInt(e.target.value) || 0 })}
+                        data-testid="input-edit-assignment-points"
+                      />
+                      <Input
+                        placeholder="File URL (optional)"
+                        value={editAssignmentForm.fileUrl}
+                        onChange={(e) => setEditAssignmentForm({ ...editAssignmentForm, fileUrl: e.target.value })}
+                        data-testid="input-edit-assignment-file-url"
+                      />
+                      <Button
+                        onClick={() => updateAssignmentMutation.mutate(editAssignmentForm)}
+                        disabled={updateAssignmentMutation.isPending}
+                        className="w-full"
+                        data-testid="button-update-assignment"
+                      >
+                        {updateAssignmentMutation.isPending ? "Updating..." : "Update"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           </TabsContent>

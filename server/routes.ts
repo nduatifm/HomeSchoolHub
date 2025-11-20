@@ -4,6 +4,7 @@ import {
   insertUserSchema, 
   insertStudentSchema,
   insertAssignmentSchema,
+  updateAssignmentSchema,
   insertStudentAssignmentSchema,
   insertMaterialSchema,
   updateMaterialSchema,
@@ -699,9 +700,46 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/assignments/:id", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      const assignment = await storage.getAssignmentById(parseInt(req.params.id));
+      
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+
+      // Only teachers can view individual assignments, and only their own
+      if (user?.role !== "teacher" || assignment.teacherId !== user.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.patch("/api/assignments/:id", requireAuth, async (req, res) => {
     try {
-      const assignment = await storage.updateAssignment(parseInt(req.params.id), req.body);
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can update assignments" });
+      }
+
+      // Check if assignment exists and belongs to the requesting teacher
+      const existingAssignment = await storage.getAssignmentById(parseInt(req.params.id));
+      if (!existingAssignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      if (existingAssignment.teacherId !== user.id) {
+        return res.status(403).json({ error: "You can only update your own assignments" });
+      }
+
+      // Validate update data (excludes immutable fields like teacherId)
+      const validatedData = updateAssignmentSchema.parse(req.body);
+
+      const assignment = await storage.updateAssignment(parseInt(req.params.id), validatedData);
       res.json(assignment);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -710,6 +748,20 @@ export function registerRoutes(app: Express) {
 
   app.delete("/api/assignments/:id", requireAuth, async (req, res) => {
     try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can delete assignments" });
+      }
+
+      // Check if assignment exists and belongs to the requesting teacher
+      const existingAssignment = await storage.getAssignmentById(parseInt(req.params.id));
+      if (!existingAssignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      if (existingAssignment.teacherId !== user.id) {
+        return res.status(403).json({ error: "You can only delete your own assignments" });
+      }
+
       await storage.deleteAssignment(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
