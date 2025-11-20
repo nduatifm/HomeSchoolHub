@@ -8,31 +8,38 @@ datasource db {
 }
 
 model User {
-  id       Int     @id @default(autoincrement())
-  email    String  @unique
-  password String
-  name     String
-  role     String?
+  id                 Int       @id @default(autoincrement())
+  email              String    @unique
+  password           String?
+  name               String
+  role               String?
+  isEmailVerified    Boolean   @default(false)
+  emailVerifyToken   String?   @unique
+  emailVerifyExpires DateTime?
+  googleId           String?   @unique
+  profilePicture     String?
 
-  student        Student?
-  teacherAssignments Assignment[]
-  teacherMaterials Material[]
-  teacherSessions Session[]
-  teacherFeedback Feedback[]
-  teacherSchedules Schedule[] @relation("TeacherSchedules")
-  tutorRequests TutorRequest[] @relation("TeacherRequests")
-  parentStudents Student[] @relation("ParentStudents")
-  parentInvites StudentInvite[]
-  parentPayments Payment[]
-  parentTutorRequests TutorRequest[] @relation("ParentRequests")
-  parentControls ParentalControl[]
-  parentRatings TutorRating[]
-  teacherEarnings Earnings[]
-  sentMessages Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
-  teacherReports ProgressReport[]
+  student             Student?
+  teacherAssignments  Assignment[]
+  teacherMaterials    Material[]
+  teacherSessions     Session[]
+  teacherFeedback     Feedback[]
+  teacherSchedules    Schedule[]        @relation("TeacherSchedules")
+  tutorRequests       TutorRequest[]    @relation("TeacherRequests")
+  parentStudents      Student[]         @relation("ParentStudents")
+  parentInvites       StudentInvite[]
+  parentPayments      Payment[]
+  parentTutorRequests TutorRequest[]    @relation("ParentRequests")
+  parentControls      ParentalControl[]
+  parentRatings       TutorRating[]
+  teacherEarnings     Earnings[]
+  sentMessages        Message[]         @relation("SentMessages")
+  receivedMessages    Message[]         @relation("ReceivedMessages")
+  teacherReports      ProgressReport[]
 
   @@index([email])
+  @@index([googleId])
+  @@index([emailVerifyToken])
 }
 
 model Student {
@@ -44,31 +51,32 @@ model Student {
   badges     String[]
   points     Int      @default(0)
 
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent             User               @relation("ParentStudents", fields: [parentId], references: [id], onDelete: Cascade)
-  assignments        StudentAssignment[]
-  schedules          Schedule[]
-  feedback           Feedback[]
-  attendance         Attendance[]
-  clarifications     Clarification[]
-  parentalControls   ParentalControl[]
-  progressReports    ProgressReport[]
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           User                @relation("ParentStudents", fields: [parentId], references: [id], onDelete: Cascade)
+  assignments      StudentAssignment[]
+  schedules        Schedule[]
+  feedback         Feedback[]
+  attendance       Attendance[]
+  clarifications   Clarification[]
+  parentalControls ParentalControl[]
+  progressReports  ProgressReport[]
 
   @@index([userId])
   @@index([parentId])
 }
 
 model Assignment {
-  id          Int      @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   title       String
   description String
   subject     String
   dueDate     String
   teacherId   Int
   gradeLevel  String
-  points      Int      @default(100)
+  points      Int     @default(100)
+  fileUrl     String?
 
-  teacher            User               @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacher            User                @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   studentAssignments StudentAssignment[]
   clarifications     Clarification[]
 
@@ -126,15 +134,18 @@ model Schedule {
 }
 
 model Session {
-  id         Int    @id @default(autoincrement())
-  teacherId  Int
-  studentIds Int[]
-  subject    String
-  date       String
-  startTime  String
-  endTime    String
-  notes      String?
-  status     String  @default("scheduled")
+  id          Int     @id @default(autoincrement())
+  teacherId   Int
+  studentIds  Int[]
+  title       String?
+  description String?
+  subject     String
+  sessionDate String  @default("")
+  startTime   String
+  endTime     String
+  meetingUrl  String?
+  notes       String?
+  status      String  @default("scheduled")
 
   teacher    User         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   attendance Attendance[]
@@ -254,13 +265,13 @@ model Clarification {
 }
 
 model ParentalControl {
-  id               Int    @id @default(autoincrement())
-  studentId        Int    @unique
-  parentId         Int
-  screenTimeLimit  Int?
-  allowedDays      String[]
-  allowedTimes     Json
-  blockedFeatures  String[]
+  id              Int      @id @default(autoincrement())
+  studentId       Int      @unique
+  parentId        Int
+  screenTimeLimit Int?
+  allowedDays     String[]
+  allowedTimes    Json
+  blockedFeatures String[]
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
   parent  User    @relation(fields: [parentId], references: [id], onDelete: Cascade)
