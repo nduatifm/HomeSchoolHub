@@ -264,7 +264,7 @@ export function registerRoutes(app: Express) {
 
       const googleId = payload.sub;
       const email = payload.email;
-      const name = payload.name || email;
+      const name: string = payload.name || email || "Google User";
       const profilePicture = payload.picture;
 
       // Check if user exists by Google ID
