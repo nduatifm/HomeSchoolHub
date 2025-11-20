@@ -87,3 +87,43 @@
     color: hsl(var(--orange));
   }
 }
+
+@layer components {
+  /* Modern Dialog Styles */
+  [data-radix-dialog-content] {
+    @apply rounded-3xl border-2 shadow-2xl;
+  }
+
+  [data-radix-dialog-overlay] {
+    @apply backdrop-blur-sm;
+  }
+
+  /* Modern Input Styles */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  textarea,
+  select {
+    @apply rounded-xl border-2 transition-all;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    @apply border-primary/50 ring-4 ring-primary/10;
+  }
+
+  /* Modern Button Styles */
+  button[type="submit"],
+  button[data-testid*="button-"] {
+    @apply rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  /* Modern Select Trigger */
+  [data-radix-select-trigger] {
+    @apply rounded-xl border-2 transition-all;
+  }
+}

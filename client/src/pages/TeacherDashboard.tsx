@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
+import ModernCombobox from "@/components/ModernCombobox";
 
 const scheduleSchema = z.object({
   studentId: z.number().min(1, "Student required"),
@@ -1860,22 +1861,14 @@ export default function TeacherDashboard() {
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium">To</label>
-                        <Select
-                          value={messageForm.receiverId.toString()}
-                          onValueChange={(value) => setMessageForm({ ...messageForm, receiverId: parseInt(value) })}
-                        >
-                          <SelectTrigger data-testid="select-receiver">
-                            <SelectValue placeholder="Select a user" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {users.map((u: any) => (
-                              <SelectItem key={u.id} value={u.id.toString()} data-testid={`select-user-${u.id}`}>
-                                {u.name} ({u.role})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <label className="text-sm font-medium mb-2 block">To</label>
+                        <ModernCombobox
+                          users={users}
+                          selectedUserId={messageForm.receiverId}
+                          onSelect={(userId) => setMessageForm({ ...messageForm, receiverId: userId })}
+                          placeholder="Search users..."
+                          testId="select-receiver"
+                        />
                       </div>
                       <div>
                         <label className="text-sm font-medium">Message</label>
