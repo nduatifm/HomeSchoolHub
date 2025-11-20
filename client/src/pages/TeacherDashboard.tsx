@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,8 +14,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut, MessageSquare, Send, BarChart, Download, Edit, Trash2 } from "lucide-react";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut, MessageSquare, Send, BarChart, Download, Edit, Trash2, Clock, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const scheduleSchema = z.object({
+  studentId: z.number().min(1, "Student required"),
+  dayOfWeek: z.string().min(1, "Day required"),
+  startTime: z.string().min(1, "Start time required"),
+  endTime: z.string().min(1, "End time required"),
+  subject: z.string().min(1, "Subject required"),
+});
+
+const feedbackSchema = z.object({
+  studentId: z.number().min(1, "Student required"),
+  message: z.string().min(1, "Message required"),
+  type: z.string().min(1, "Type required"),
+});
+
+const attendanceSchema = z.object({
+  studentId: z.number().min(1, "Student required"),
+  date: z.string().min(1, "Date required"),
+  status: z.string().min(1, "Status required"),
+  notes: z.string(),
+});
 
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
@@ -28,6 +53,10 @@ export default function TeacherDashboard() {
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [createReportOpen, setCreateReportOpen] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
+  const [createScheduleOpen, setCreateScheduleOpen] = useState(false);
+  const [editScheduleOpen, setEditScheduleOpen] = useState(false);
+  const [giveFeedbackOpen, setGiveFeedbackOpen] = useState(false);
+  const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
 
   // Fetch data
   const { data: students = [] } = useQuery({ queryKey: ["/api/students/teacher"] });
@@ -39,6 +68,18 @@ export default function TeacherDashboard() {
   const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
   const { data: progressReports = [] } = useQuery({ queryKey: ["/api/progress-reports/teacher"] });
   const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
+  const schedulesQuery = useQuery({ queryKey: ["/api/schedules/teacher"] });
+  const feedbacksQuery = useQuery({ queryKey: ["/api/feedback/teacher"] });
+  
+  const [selectedStudentForAttendance, setSelectedStudentForAttendance] = useState<number | null>(null);
+  const attendanceQuery = useQuery({
+    queryKey: ["/api/attendance/student", selectedStudentForAttendance],
+    enabled: !!selectedStudentForAttendance,
+  });
+  
+  const schedules = schedulesQuery.data || [];
+  const feedbacks = feedbacksQuery.data || [];
+  const attendanceRecords = attendanceQuery.data || [];
 
   // Create assignment
   const [assignmentForm, setAssignmentForm] = useState({
@@ -259,6 +300,92 @@ export default function TeacherDashboard() {
     URL.revokeObjectURL(url);
   };
 
+  // Create schedule
+  const scheduleForm = useForm({
+    resolver: zodResolver(scheduleSchema),
+    defaultValues: { studentId: 0, dayOfWeek: "", startTime: "", endTime: "", subject: "" },
+  });
+
+  const createScheduleMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/schedules", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
+      toast({ title: "Schedule created!", type: "success" });
+      scheduleForm.reset();
+      setCreateScheduleOpen(false);
+    },
+  });
+
+  // Edit schedule
+  const [editScheduleForm, setEditScheduleForm] = useState({
+    id: 0, studentId: 0, dayOfWeek: "", startTime: "", endTime: "", subject: ""
+  });
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/schedules/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
+      toast({ title: "Schedule updated!", type: "success" });
+      setEditScheduleForm({ id: 0, studentId: 0, dayOfWeek: "", startTime: "", endTime: "", subject: "" });
+      setEditScheduleOpen(false);
+    },
+  });
+
+  // Delete schedule
+  const deleteScheduleMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/schedules/${id}`, {
+      method: "DELETE",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
+      toast({ title: "Schedule deleted!", type: "success" });
+    },
+  });
+
+  // Give feedback
+  const feedbackForm = useForm({
+    resolver: zodResolver(feedbackSchema),
+    defaultValues: { studentId: 0, message: "", type: "general" },
+  });
+
+  const giveFeedbackMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback/teacher"] });
+      toast({ title: "Feedback sent!", type: "success" });
+      feedbackForm.reset();
+      setGiveFeedbackOpen(false);
+    },
+  });
+
+  // Mark attendance
+  const attendanceForm = useForm({
+    resolver: zodResolver(attendanceSchema),
+    defaultValues: { studentId: 0, date: new Date().toISOString().split('T')[0], status: "present", notes: "" },
+  });
+
+  const markAttendanceMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/attendance", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/attendance/student", variables.studentId] });
+      toast({ title: "Attendance marked!", type: "success" });
+      attendanceForm.reset();
+      setMarkAttendanceOpen(false);
+    },
+  });
+
   const totalEarnings = earnings.reduce((sum: number, e: any) => sum + e.amount, 0);
 
   return (
@@ -330,6 +457,9 @@ export default function TeacherDashboard() {
             <TabsTrigger value="materials" data-testid="tab-materials">Materials</TabsTrigger>
             <TabsTrigger value="students" data-testid="tab-students">Students</TabsTrigger>
             <TabsTrigger value="sessions" data-testid="tab-sessions">Sessions</TabsTrigger>
+            <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="feedback" data-testid="tab-feedback">Feedback</TabsTrigger>
+            <TabsTrigger value="attendance" data-testid="tab-attendance">Attendance</TabsTrigger>
             <TabsTrigger value="requests" data-testid="tab-requests">Tutor Requests</TabsTrigger>
             <TabsTrigger value="reports" data-testid="tab-reports">Progress Reports</TabsTrigger>
             <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
@@ -935,6 +1065,575 @@ export default function TeacherDashboard() {
                     </div>
                   </DialogContent>
                 </Dialog>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="schedule">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Student Schedules</CardTitle>
+                <Dialog open={createScheduleOpen} onOpenChange={setCreateScheduleOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-create-schedule">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Create Schedule
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New Schedule</DialogTitle>
+                    </DialogHeader>
+                    <Form {...scheduleForm}>
+                      <form onSubmit={scheduleForm.handleSubmit((data) => createScheduleMutation.mutate(data))} className="space-y-4">
+                        <FormField
+                          control={scheduleForm.control}
+                          name="studentId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Student</FormLabel>
+                              <FormControl>
+                                <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value.toString()}>
+                                  <SelectTrigger data-testid="select-schedule-student">
+                                    <SelectValue placeholder="Select a student" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {students.map((s: any) => (
+                                      <SelectItem key={s.id} value={s.id.toString()}>
+                                        {s.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={scheduleForm.control}
+                          name="dayOfWeek"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Day of Week</FormLabel>
+                              <FormControl>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger data-testid="select-day-of-week">
+                                    <SelectValue placeholder="Select a day" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Monday">Monday</SelectItem>
+                                    <SelectItem value="Tuesday">Tuesday</SelectItem>
+                                    <SelectItem value="Wednesday">Wednesday</SelectItem>
+                                    <SelectItem value="Thursday">Thursday</SelectItem>
+                                    <SelectItem value="Friday">Friday</SelectItem>
+                                    <SelectItem value="Saturday">Saturday</SelectItem>
+                                    <SelectItem value="Sunday">Sunday</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={scheduleForm.control}
+                          name="startTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Start Time</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-schedule-start-time" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={scheduleForm.control}
+                          name="endTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>End Time</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-schedule-end-time" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={scheduleForm.control}
+                          name="subject"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Subject</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Subject" {...field} data-testid="input-schedule-subject" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={createScheduleMutation.isPending}
+                          className="w-full"
+                          data-testid="button-submit-schedule"
+                        >
+                          {createScheduleMutation.isPending ? "Creating..." : "Create Schedule"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {schedulesQuery.isLoading ? (
+                  <div className="text-center py-8">Loading schedules...</div>
+                ) : schedulesQuery.isError ? (
+                  <div className="text-center py-8 text-red-500">Error loading schedules</div>
+                ) : schedules.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">No schedules created yet</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Student</TableHead>
+                        <TableHead>Day</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schedules.map((s: any) => (
+                        <TableRow key={s.id} data-testid={`row-schedule-${s.id}`}>
+                          <TableCell data-testid={`text-schedule-student-${s.id}`}>
+                            {students.find((st: any) => st.id === s.studentId)?.name || `Student #${s.studentId}`}
+                          </TableCell>
+                          <TableCell>{s.dayOfWeek}</TableCell>
+                          <TableCell>{s.startTime} - {s.endTime}</TableCell>
+                          <TableCell>{s.subject}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setEditScheduleForm({
+                                    id: s.id,
+                                    studentId: s.studentId,
+                                    dayOfWeek: s.dayOfWeek,
+                                    startTime: s.startTime,
+                                    endTime: s.endTime,
+                                    subject: s.subject
+                                  });
+                                  setEditScheduleOpen(true);
+                                }}
+                                data-testid={`button-edit-schedule-${s.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm('Are you sure you want to delete this schedule?')) {
+                                    deleteScheduleMutation.mutate(s.id);
+                                  }
+                                }}
+                                data-testid={`button-delete-schedule-${s.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+
+                <Dialog open={editScheduleOpen} onOpenChange={setEditScheduleOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Schedule</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium">Student</label>
+                        <Select
+                          value={editScheduleForm.studentId.toString()}
+                          onValueChange={(value) => setEditScheduleForm({ ...editScheduleForm, studentId: parseInt(value) })}
+                        >
+                          <SelectTrigger data-testid="select-edit-schedule-student">
+                            <SelectValue placeholder="Select a student" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {students.map((s: any) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Day of Week</label>
+                        <Select
+                          value={editScheduleForm.dayOfWeek}
+                          onValueChange={(value) => setEditScheduleForm({ ...editScheduleForm, dayOfWeek: value })}
+                        >
+                          <SelectTrigger data-testid="select-edit-day-of-week">
+                            <SelectValue placeholder="Select a day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Monday">Monday</SelectItem>
+                            <SelectItem value="Tuesday">Tuesday</SelectItem>
+                            <SelectItem value="Wednesday">Wednesday</SelectItem>
+                            <SelectItem value="Thursday">Thursday</SelectItem>
+                            <SelectItem value="Friday">Friday</SelectItem>
+                            <SelectItem value="Saturday">Saturday</SelectItem>
+                            <SelectItem value="Sunday">Sunday</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Start Time</label>
+                        <Input
+                          type="time"
+                          value={editScheduleForm.startTime}
+                          onChange={(e) => setEditScheduleForm({ ...editScheduleForm, startTime: e.target.value })}
+                          data-testid="input-edit-schedule-start-time"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">End Time</label>
+                        <Input
+                          type="time"
+                          value={editScheduleForm.endTime}
+                          onChange={(e) => setEditScheduleForm({ ...editScheduleForm, endTime: e.target.value })}
+                          data-testid="input-edit-schedule-end-time"
+                        />
+                      </div>
+                      <Input
+                        placeholder="Subject"
+                        value={editScheduleForm.subject}
+                        onChange={(e) => setEditScheduleForm({ ...editScheduleForm, subject: e.target.value })}
+                        data-testid="input-edit-schedule-subject"
+                      />
+                      <Button
+                        onClick={() => updateScheduleMutation.mutate(editScheduleForm)}
+                        disabled={updateScheduleMutation.isPending}
+                        className="w-full"
+                        data-testid="button-update-schedule"
+                      >
+                        {updateScheduleMutation.isPending ? "Updating..." : "Update Schedule"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="feedback">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Student Feedback</CardTitle>
+                <Dialog open={giveFeedbackOpen} onOpenChange={setGiveFeedbackOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-give-feedback">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Give Feedback
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Give Student Feedback</DialogTitle>
+                    </DialogHeader>
+                    <Form {...feedbackForm}>
+                      <form onSubmit={feedbackForm.handleSubmit((data) => giveFeedbackMutation.mutate(data))} className="space-y-4">
+                        <FormField
+                          control={feedbackForm.control}
+                          name="studentId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Student</FormLabel>
+                              <FormControl>
+                                <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value.toString()}>
+                                  <SelectTrigger data-testid="select-feedback-student">
+                                    <SelectValue placeholder="Select a student" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {students.map((s: any) => (
+                                      <SelectItem key={s.id} value={s.id.toString()}>
+                                        {s.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={feedbackForm.control}
+                          name="type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Feedback Type</FormLabel>
+                              <FormControl>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger data-testid="select-feedback-type">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="positive">Positive</SelectItem>
+                                    <SelectItem value="constructive">Constructive</SelectItem>
+                                    <SelectItem value="general">General</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={feedbackForm.control}
+                          name="message"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Message</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Enter your feedback..."
+                                  rows={4}
+                                  {...field}
+                                  data-testid="input-feedback-message"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={giveFeedbackMutation.isPending}
+                          className="w-full"
+                          data-testid="button-submit-feedback"
+                        >
+                          {giveFeedbackMutation.isPending ? "Sending..." : "Send Feedback"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {feedbacksQuery.isLoading ? (
+                  <div className="text-center py-8">Loading feedback...</div>
+                ) : feedbacksQuery.isError ? (
+                  <div className="text-center py-8 text-red-500">Error loading feedback</div>
+                ) : feedbacks.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">No feedback given yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {feedbacks.map((f: any) => (
+                      <div key={f.id} className="p-4 border rounded-lg" data-testid={`card-feedback-${f.id}`}>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-medium" data-testid={`text-feedback-student-${f.id}`}>
+                                {students.find((st: any) => st.id === f.studentId)?.name || `Student #${f.studentId}`}
+                              </p>
+                              <Badge variant={f.type === "positive" ? "default" : f.type === "constructive" ? "secondary" : "outline"}>
+                                {f.type}
+                              </Badge>
+                            </div>
+                            <p className="text-sm" data-testid={`text-feedback-message-${f.id}`}>{f.message}</p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              {new Date(f.date).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="attendance">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Mark Student Attendance</CardTitle>
+                <Dialog open={markAttendanceOpen} onOpenChange={setMarkAttendanceOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-mark-attendance">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Mark Attendance
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Mark Attendance</DialogTitle>
+                    </DialogHeader>
+                    <Form {...attendanceForm}>
+                      <form onSubmit={attendanceForm.handleSubmit((data) => markAttendanceMutation.mutate(data))} className="space-y-4">
+                        <FormField
+                          control={attendanceForm.control}
+                          name="studentId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Student</FormLabel>
+                              <FormControl>
+                                <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value.toString()}>
+                                  <SelectTrigger data-testid="select-attendance-student">
+                                    <SelectValue placeholder="Select a student" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {students.map((s: any) => (
+                                      <SelectItem key={s.id} value={s.id.toString()}>
+                                        {s.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={attendanceForm.control}
+                          name="date"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} data-testid="input-attendance-date" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={attendanceForm.control}
+                          name="status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Status</FormLabel>
+                              <FormControl>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger data-testid="select-attendance-status">
+                                    <SelectValue placeholder="Select status" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="present">Present</SelectItem>
+                                    <SelectItem value="absent">Absent</SelectItem>
+                                    <SelectItem value="late">Late</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={attendanceForm.control}
+                          name="notes"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Notes (Optional)</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Additional notes..."
+                                  rows={3}
+                                  {...field}
+                                  data-testid="input-attendance-notes"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={markAttendanceMutation.isPending}
+                          className="w-full"
+                          data-testid="button-submit-attendance"
+                        >
+                          {markAttendanceMutation.isPending ? "Saving..." : "Mark Attendance"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Select Student to View Attendance</label>
+                    <select
+                      className="w-full mt-1 p-2 border rounded-md"
+                      value={selectedStudentForAttendance || 0}
+                      onChange={(e) => setSelectedStudentForAttendance(parseInt(e.target.value) || null)}
+                      data-testid="select-view-attendance-student"
+                    >
+                      <option value={0}>Select a student</option>
+                      {students.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedStudentForAttendance && (
+                    <div className="mt-6">
+                      <h3 className="text-lg font-semibold mb-4">
+                        Attendance Records for {students.find((s: any) => s.id === selectedStudentForAttendance)?.name}
+                      </h3>
+                      {attendanceQuery.isLoading ? (
+                        <div className="text-center py-8">Loading attendance...</div>
+                      ) : attendanceQuery.isError ? (
+                        <div className="text-center py-8 text-red-500">Error loading attendance</div>
+                      ) : attendanceRecords.length === 0 ? (
+                        <p className="text-center text-gray-500 py-8">No attendance records yet</p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Notes</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {attendanceRecords.map((a: any) => (
+                              <TableRow key={a.id} data-testid={`row-attendance-${a.id}`}>
+                                <TableCell data-testid={`text-attendance-date-${a.id}`}>
+                                  {new Date(a.date).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant={a.status === "present" ? "default" : a.status === "late" ? "secondary" : "destructive"}
+                                    data-testid={`badge-attendance-status-${a.id}`}
+                                  >
+                                    {a.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell data-testid={`text-attendance-notes-${a.id}`}>{a.notes || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

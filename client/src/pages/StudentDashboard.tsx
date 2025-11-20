@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Award, BookOpen, Calendar, LogOut, Trophy, MessageSquare, Send } from "lucide-react";
+import { FileText, Award, BookOpen, Calendar, LogOut, Trophy, MessageSquare, Send, ClipboardCheck, Video, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function StudentDashboard() {
@@ -37,11 +37,11 @@ export default function StudentDashboard() {
     queryKey: ["/api/feedback/student", student?.id],
     enabled: !!student,
   });
-  const { data: sessions = [] } = useQuery({
+  const sessionsQuery = useQuery({
     queryKey: ["/api/sessions/student", student?.id],
     enabled: !!student,
   });
-  const { data: schedule = [] } = useQuery({
+  const scheduleQuery = useQuery({
     queryKey: ["/api/schedules/student", student?.id],
     enabled: !!student,
   });
@@ -51,6 +51,14 @@ export default function StudentDashboard() {
   });
   const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
   const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
+  const attendanceQuery = useQuery({
+    queryKey: ["/api/attendance/student", student?.id],
+    enabled: !!student,
+  });
+
+  const sessions = sessionsQuery.data || [];
+  const schedule = scheduleQuery.data || [];
+  const attendance = attendanceQuery.data || [];
 
   // Submit assignment
   const [submissionForm, setSubmissionForm] = useState({
@@ -183,6 +191,9 @@ export default function StudentDashboard() {
             <TabsTrigger value="materials" data-testid="tab-materials">Study Materials</TabsTrigger>
             <TabsTrigger value="feedback" data-testid="tab-feedback">Feedback & Grades</TabsTrigger>
             <TabsTrigger value="schedule" data-testid="tab-schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="attendance" data-testid="tab-attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="sessions" data-testid="tab-sessions">Sessions</TabsTrigger>
+            <TabsTrigger value="rewards" data-testid="tab-rewards">Rewards</TabsTrigger>
             <TabsTrigger value="clarifications" data-testid="tab-clarifications">Ask Questions</TabsTrigger>
             <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
           </TabsList>
@@ -386,41 +397,234 @@ export default function StudentDashboard() {
                 <CardTitle>My Schedule</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {schedule.map((s: any) => (
-                      <TableRow key={s.id} data-testid={`row-schedule-${s.id}`}>
-                        <TableCell>{s.dayOfWeek}</TableCell>
-                        <TableCell>{s.subject}</TableCell>
-                        <TableCell>{s.startTime} - {s.endTime}</TableCell>
+                {scheduleQuery.isLoading ? (
+                  <div className="text-center py-8">Loading schedule...</div>
+                ) : scheduleQuery.isError ? (
+                  <div className="text-center py-8 text-red-500">Error loading schedule</div>
+                ) : schedule.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">No schedule items yet</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Day</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Time</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {schedule.map((s: any) => (
+                        <TableRow key={s.id} data-testid={`row-schedule-${s.id}`}>
+                          <TableCell>{s.dayOfWeek}</TableCell>
+                          <TableCell>{s.subject}</TableCell>
+                          <TableCell>{s.startTime} - {s.endTime}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
 
                 <div className="mt-6">
                   <h3 className="font-medium mb-4">Upcoming Sessions</h3>
+                  {sessionsQuery.isLoading ? (
+                    <div className="text-center py-8">Loading sessions...</div>
+                  ) : sessionsQuery.isError ? (
+                    <div className="text-center py-8 text-red-500">Error loading sessions</div>
+                  ) : sessions.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No sessions yet</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {sessions.map((s: any) => (
+                        <div key={s.id} className="p-4 border rounded-lg" data-testid={`card-session-${s.id}`}>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{s.subject}</p>
+                              <p className="text-sm text-gray-600">
+                                {new Date(s.date).toLocaleDateString()} at {s.startTime}
+                              </p>
+                            </div>
+                            <Badge>{s.status}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="attendance">
+            <Card>
+              <CardHeader>
+                <CardTitle>My Attendance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {attendanceQuery.isLoading ? (
+                  <div className="text-center py-8">Loading attendance...</div>
+                ) : attendanceQuery.isError ? (
+                  <div className="text-center py-8 text-red-500">Error loading attendance</div>
+                ) : attendance.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">No attendance records yet</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {attendance.map((a: any) => (
+                        <TableRow key={a.id} data-testid={`row-attendance-${a.id}`}>
+                          <TableCell data-testid={`text-attendance-date-${a.id}`}>
+                            {new Date(a.date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={a.status === "present" ? "default" : a.status === "late" ? "secondary" : "destructive"}
+                              data-testid={`badge-attendance-status-${a.id}`}
+                            >
+                              {a.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell data-testid={`text-attendance-notes-${a.id}`}>{a.notes || "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sessions">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tutoring Sessions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {sessionsQuery.isLoading ? (
+                  <div className="text-center py-8">Loading sessions...</div>
+                ) : sessionsQuery.isError ? (
+                  <div className="text-center py-8 text-red-500">Error loading sessions</div>
+                ) : sessions.length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">No sessions scheduled yet</p>
+                ) : (
                   <div className="space-y-4">
                     {sessions.map((s: any) => (
                       <div key={s.id} className="p-4 border rounded-lg" data-testid={`card-session-${s.id}`}>
                         <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium">{s.subject}</p>
-                            <p className="text-sm text-gray-600">
-                              {new Date(s.date).toLocaleDateString()} at {s.startTime}
-                            </p>
+                          <div className="flex-1">
+                            <h3 className="font-medium" data-testid={`text-session-title-${s.id}`}>
+                              {s.title || s.subject}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">{s.description}</p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm">
+                                <strong>Subject:</strong> {s.subject}
+                              </p>
+                              <p className="text-sm">
+                                <strong>Date:</strong> {new Date(s.sessionDate).toLocaleDateString()}
+                              </p>
+                              <p className="text-sm">
+                                <strong>Time:</strong> {s.startTime} - {s.endTime}
+                              </p>
+                              {s.meetingUrl && (
+                                <p className="text-sm">
+                                  <strong>Meeting Link:</strong>{" "}
+                                  <a 
+                                    href={s.meetingUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                    data-testid={`link-session-meeting-${s.id}`}
+                                  >
+                                    Join Session
+                                  </a>
+                                </p>
+                              )}
+                            </div>
+                            {s.notes && (
+                              <p className="text-sm text-gray-600 mt-2">
+                                <strong>Notes:</strong> {s.notes}
+                              </p>
+                            )}
                           </div>
-                          <Badge>{s.status}</Badge>
+                          <Badge 
+                            variant={s.status === "scheduled" ? "default" : s.status === "completed" ? "secondary" : "outline"}
+                            data-testid={`badge-session-status-${s.id}`}
+                          >
+                            {s.status}
+                          </Badge>
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="rewards">
+            <Card>
+              <CardHeader>
+                <CardTitle>My Rewards & Achievements</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">Total Points</p>
+                          <p className="text-4xl font-bold text-yellow-600" data-testid="text-total-points">
+                            {student?.points || 0}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <Award className="h-12 w-12 text-purple-500 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">Total Badges</p>
+                          <p className="text-4xl font-bold text-purple-600" data-testid="text-total-badges">
+                            {student?.badges?.length || 0}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">My Badges</h3>
+                    {!student?.badges || student.badges.length === 0 ? (
+                      <p className="text-center text-gray-500 py-8">No badges earned yet. Keep working hard!</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {student.badges.map((badge: string, index: number) => (
+                          <Badge 
+                            key={index} 
+                            variant="outline" 
+                            className="text-lg py-2 px-4"
+                            data-testid={`badge-reward-${index}`}
+                          >
+                            <Star className="h-4 w-4 mr-2 fill-yellow-400 text-yellow-400" />
+                            {badge}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold mb-2">Keep Going!</h3>
+                    <p className="text-sm text-gray-600">
+                      Complete assignments, attend sessions, and participate actively to earn more points and badges!
+                    </p>
                   </div>
                 </div>
               </CardContent>
