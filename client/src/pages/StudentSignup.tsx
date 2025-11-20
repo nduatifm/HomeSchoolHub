@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Logo } from "@/components/Logo";
 
 export default function StudentSignup() {
   const [token, setToken] = useState("");
@@ -58,7 +59,8 @@ export default function StudentSignup() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-teal-100 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
+        <CardHeader className="space-y-4">
+          <Logo className="mb-2" />
           <CardTitle className="text-2xl">Student Signup</CardTitle>
           <CardDescription>Join using your invite code from your parent</CardDescription>
         </CardHeader>

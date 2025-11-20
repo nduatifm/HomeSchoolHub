@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Home, LayoutGrid, Clock, Settings, User, LogOut, BookOpen, Users, FileText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Logo } from "@/components/Logo";
 
 interface SidebarItem {
   icon: React.ReactNode;
@@ -54,6 +55,8 @@ export default function ModernSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-24 bg-sidebar flex flex-col items-center py-6 shadow-xl z-50" data-testid="sidebar">
+      <Logo variant="sidebar" className="mb-4" />
+      
       <div className="flex flex-col items-center gap-8 flex-1">
         {items.map((item, index) => (
           <button

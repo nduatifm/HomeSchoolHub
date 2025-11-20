@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Logo } from "@/components/Logo";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -74,7 +75,8 @@ export default function Signup() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
+        <CardHeader className="space-y-4">
+          <Logo className="mb-2" />
           <CardTitle className="text-2xl">Create Account</CardTitle>
           <CardDescription>Sign up as a teacher or parent</CardDescription>
         </CardHeader>
