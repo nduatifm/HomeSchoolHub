@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 44 40% 96%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 232 60% 60%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
@@ -22,8 +22,17 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --ring: 232 60% 60%;
+    --radius: 1rem;
+    --sidebar-bg: 222 47% 11%;
+    --purple: 258 89% 66%;
+    --green: 123 38% 57%;
+    --coral: 352 95% 72%;
+    --orange: 25 95% 68%;
+    --light-purple: 258 100% 95%;
+    --light-green: 123 41% 92%;
+    --light-coral: 352 100% 94%;
+    --light-orange: 25 100% 93%;
   }
 }
 
@@ -34,5 +43,47 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .bg-purple {
+    background-color: hsl(var(--purple));
+  }
+  .bg-green {
+    background-color: hsl(var(--green));
+  }
+  .bg-coral {
+    background-color: hsl(var(--coral));
+  }
+  .bg-orange {
+    background-color: hsl(var(--orange));
+  }
+  .bg-light-purple {
+    background-color: hsl(var(--light-purple));
+  }
+  .bg-light-green {
+    background-color: hsl(var(--light-green));
+  }
+  .bg-light-coral {
+    background-color: hsl(var(--light-coral));
+  }
+  .bg-light-orange {
+    background-color: hsl(var(--light-orange));
+  }
+  .bg-sidebar {
+    background-color: hsl(var(--sidebar-bg));
+  }
+  .text-purple {
+    color: hsl(var(--purple));
+  }
+  .text-green {
+    color: hsl(var(--green));
+  }
+  .text-coral {
+    color: hsl(var(--coral));
+  }
+  .text-orange {
+    color: hsl(var(--orange));
   }
 }
