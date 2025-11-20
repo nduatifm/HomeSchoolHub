@@ -17,8 +17,13 @@ The platform utilizes React 18 with TypeScript for the frontend, styled with Tai
 - **Welcome Cards**: Personalized hero cards with gradient backgrounds and call-to-action buttons
 - **Colorful Stat Cards**: Vibrant metric cards with icons, gradients, and hover effects
 - **Rounded Design Language**: Generous border-radius (1rem default, up to 3rem on cards) for friendly, modern aesthetic
+- **Modern Dialogs & Dropdowns**: 
+  - All dialogs feature rounded corners (3xl), enhanced shadows, and backdrop blur effects
+  - Instagram-style ModernCombobox for user selection with searchable interface, avatar previews, and gradient themes
+  - Form inputs with rounded borders, focus rings, and smooth transitions
+  - Button animations with scale effects on hover and click
 
-Icons are provided by Lucide React. The profile management features a modern tabbed interface for easy navigation and role-specific fields. All interactive elements include `data-testid` attributes for robust testing.
+Icons are provided by Lucide React. The profile management features a modern tabbed interface for easy navigation and role-specific fields. All interactive elements include `data-testid` attributes for robust testing and full keyboard accessibility support.
 
 ### Technical Implementations
 - **Frontend**: React 18, TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn/UI, Tailwind CSS.
