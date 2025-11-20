@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut, MessageSquare, Send, BarChart, Download } from "lucide-react";
+import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut, MessageSquare, Send, BarChart, Download, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TeacherDashboard() {
@@ -21,6 +21,7 @@ export default function TeacherDashboard() {
   // Dialog state
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
   const [uploadMaterialOpen, setUploadMaterialOpen] = useState(false);
+  const [editMaterialOpen, setEditMaterialOpen] = useState(false);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [createReportOpen, setCreateReportOpen] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
@@ -68,6 +69,35 @@ export default function TeacherDashboard() {
       toast({ title: "Material uploaded!", type: "success" });
       setMaterialForm({ title: "", description: "", fileUrl: "", subject: "", gradeLevel: "" });
       setUploadMaterialOpen(false);
+    },
+  });
+
+  // Edit material
+  const [editMaterialForm, setEditMaterialForm] = useState({
+    id: 0, title: "", description: "", fileUrl: "", subject: "", gradeLevel: ""
+  });
+
+  const updateMaterialMutation = useMutation({
+    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/materials/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
+      toast({ title: "Material updated!", type: "success" });
+      setEditMaterialForm({ id: 0, title: "", description: "", fileUrl: "", subject: "", gradeLevel: "" });
+      setEditMaterialOpen(false);
+    },
+  });
+
+  // Delete material
+  const deleteMaterialMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/materials/${id}`, {
+      method: "DELETE",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
+      toast({ title: "Material deleted!", type: "success" });
     },
   });
 
@@ -389,6 +419,7 @@ export default function TeacherDashboard() {
                       <TableHead>Subject</TableHead>
                       <TableHead>Grade Level</TableHead>
                       <TableHead>Upload Date</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -398,10 +429,92 @@ export default function TeacherDashboard() {
                         <TableCell>{m.subject}</TableCell>
                         <TableCell>{m.gradeLevel}</TableCell>
                         <TableCell>{new Date(m.uploadDate).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setEditMaterialForm({
+                                  id: m.id,
+                                  title: m.title,
+                                  description: m.description || "",
+                                  fileUrl: m.fileUrl || "",
+                                  subject: m.subject,
+                                  gradeLevel: m.gradeLevel
+                                });
+                                setEditMaterialOpen(true);
+                              }}
+                              data-testid={`button-edit-material-${m.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this material?')) {
+                                  deleteMaterialMutation.mutate(m.id);
+                                }
+                              }}
+                              data-testid={`button-delete-material-${m.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+
+                <Dialog open={editMaterialOpen} onOpenChange={setEditMaterialOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Study Material</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Input
+                        placeholder="Title"
+                        value={editMaterialForm.title}
+                        onChange={(e) => setEditMaterialForm({ ...editMaterialForm, title: e.target.value })}
+                        data-testid="input-edit-material-title"
+                      />
+                      <Textarea
+                        placeholder="Description"
+                        value={editMaterialForm.description}
+                        onChange={(e) => setEditMaterialForm({ ...editMaterialForm, description: e.target.value })}
+                        data-testid="input-edit-material-description"
+                      />
+                      <Input
+                        placeholder="File URL"
+                        value={editMaterialForm.fileUrl}
+                        onChange={(e) => setEditMaterialForm({ ...editMaterialForm, fileUrl: e.target.value })}
+                        data-testid="input-edit-material-url"
+                      />
+                      <Input
+                        placeholder="Subject"
+                        value={editMaterialForm.subject}
+                        onChange={(e) => setEditMaterialForm({ ...editMaterialForm, subject: e.target.value })}
+                        data-testid="input-edit-material-subject"
+                      />
+                      <Input
+                        placeholder="Grade Level"
+                        value={editMaterialForm.gradeLevel}
+                        onChange={(e) => setEditMaterialForm({ ...editMaterialForm, gradeLevel: e.target.value })}
+                        data-testid="input-edit-material-grade-level"
+                      />
+                      <Button
+                        onClick={() => updateMaterialMutation.mutate(editMaterialForm)}
+                        disabled={updateMaterialMutation.isPending}
+                        className="w-full"
+                        data-testid="button-update-material"
+                      >
+                        {updateMaterialMutation.isPending ? "Updating..." : "Update"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           </TabsContent>

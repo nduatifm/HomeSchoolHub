@@ -110,8 +110,10 @@ export const materialSchema = z.object({
 });
 
 export const insertMaterialSchema = materialSchema.omit({ id: true });
+export const updateMaterialSchema = materialSchema.omit({ id: true, teacherId: true, uploadDate: true }).partial();
 export type Material = z.infer<typeof materialSchema>;
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
+export type UpdateMaterial = z.infer<typeof updateMaterialSchema>;
 
 // Schedule schema
 export const scheduleSchema = z.object({

@@ -6,6 +6,7 @@ import {
   insertAssignmentSchema,
   insertStudentAssignmentSchema,
   insertMaterialSchema,
+  updateMaterialSchema,
   insertScheduleSchema,
   insertSessionSchema,
   insertFeedbackSchema,
@@ -842,6 +843,26 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/materials/:id", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      const material = await storage.getMaterialById(parseInt(req.params.id));
+      
+      if (!material) {
+        return res.status(404).json({ error: "Material not found" });
+      }
+
+      // Only teachers can view individual materials, and only their own
+      if (user?.role !== "teacher" || material.teacherId !== user.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      res.json(material);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/materials/teacher", requireAuth, async (req, res) => {
     try {
       const materials = await storage.getMaterialsByTeacher(req.session.userId!);
@@ -865,8 +886,48 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/materials/:id", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can update materials" });
+      }
+
+      // Check if material exists and belongs to the requesting teacher
+      const existingMaterial = await storage.getMaterialById(parseInt(req.params.id));
+      if (!existingMaterial) {
+        return res.status(404).json({ error: "Material not found" });
+      }
+      if (existingMaterial.teacherId !== user.id) {
+        return res.status(403).json({ error: "You can only update your own materials" });
+      }
+
+      // Validate update data (excludes immutable fields like teacherId and uploadDate)
+      const validatedData = updateMaterialSchema.parse(req.body);
+
+      const material = await storage.updateMaterial(parseInt(req.params.id), validatedData);
+      res.json(material);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.delete("/api/materials/:id", requireAuth, async (req, res) => {
     try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can delete materials" });
+      }
+
+      // Check if material exists and belongs to the requesting teacher
+      const existingMaterial = await storage.getMaterialById(parseInt(req.params.id));
+      if (!existingMaterial) {
+        return res.status(404).json({ error: "Material not found" });
+      }
+      if (existingMaterial.teacherId !== user.id) {
+        return res.status(403).json({ error: "You can only delete your own materials" });
+      }
+
       await storage.deleteMaterial(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error: any) {

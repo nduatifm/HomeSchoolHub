@@ -54,6 +54,7 @@ export interface IStorage {
   getMaterialsByTeacher(teacherId: number): Promise<Material[]>;
   getMaterialsBySubject(subject: string): Promise<Material[]>;
   getMaterialsByGradeLevel(gradeLevel: string): Promise<Material[]>;
+  updateMaterial(id: number, material: Partial<InsertMaterial>): Promise<Material>;
   deleteMaterial(id: number): Promise<void>;
   
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
@@ -238,6 +239,13 @@ class PrismaStorage implements IStorage {
 
   async getMaterialsByGradeLevel(gradeLevel: string): Promise<Material[]> {
     return await prisma.material.findMany({ where: { gradeLevel } }) as Material[];
+  }
+
+  async updateMaterial(id: number, material: Partial<InsertMaterial>): Promise<Material> {
+    return await prisma.material.update({ 
+      where: { id },
+      data: material
+    }) as Material;
   }
 
   async deleteMaterial(id: number): Promise<void> {
