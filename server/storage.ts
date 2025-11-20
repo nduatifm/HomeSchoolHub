@@ -1,4 +1,5 @@
 import prisma from "./db";
+import { Prisma } from "@prisma/client";
 import type {
   User, InsertUser,
   Student, InsertStudent,
@@ -21,30 +22,32 @@ import type {
 } from "@shared/schema";
 
 export interface IStorage {
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: Prisma.UserCreateInput): Promise<User>;
   getUserById(id: number): Promise<User | null>;
   getUserByEmail(email: string): Promise<User | null>;
-  updateUser(id: number, user: Partial<User>): Promise<User>;
+  getUserByEmailVerifyToken(token: string): Promise<User | null>;
+  getUserByGoogleId(googleId: string): Promise<User | null>;
+  updateUser(id: number, user: Prisma.UserUpdateInput): Promise<User>;
   
   createStudent(student: InsertStudent): Promise<Student>;
   getStudentById(id: number): Promise<Student | null>;
   getStudentByUserId(userId: number): Promise<Student | null>;
   getStudentsByParent(parentId: number): Promise<Student[]>;
   getStudentsByTeacher(teacherId: number): Promise<Student[]>;
-  updateStudent(id: number, student: Partial<Student>): Promise<Student>;
+  updateStudent(id: number, student: Prisma.StudentUpdateInput): Promise<Student>;
   
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
   getAssignmentById(id: number): Promise<Assignment | null>;
   getAssignmentsByTeacher(teacherId: number): Promise<Assignment[]>;
   getAssignmentsByGradeLevel(gradeLevel: string): Promise<Assignment[]>;
-  updateAssignment(id: number, assignment: Partial<Assignment>): Promise<Assignment>;
+  updateAssignment(id: number, assignment: Prisma.AssignmentUpdateInput): Promise<Assignment>;
   deleteAssignment(id: number): Promise<void>;
   
   createStudentAssignment(studentAssignment: InsertStudentAssignment): Promise<StudentAssignment>;
   getStudentAssignmentById(id: number): Promise<StudentAssignment | null>;
   getStudentAssignmentsByStudent(studentId: number): Promise<StudentAssignment[]>;
   getStudentAssignmentsByAssignment(assignmentId: number): Promise<StudentAssignment[]>;
-  updateStudentAssignment(id: number, studentAssignment: Partial<StudentAssignment>): Promise<StudentAssignment>;
+  updateStudentAssignment(id: number, studentAssignment: Prisma.StudentAssignmentUpdateInput): Promise<StudentAssignment>;
   
   createMaterial(material: InsertMaterial): Promise<Material>;
   getMaterialById(id: number): Promise<Material | null>;
@@ -56,14 +59,14 @@ export interface IStorage {
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
   getSchedulesByTeacher(teacherId: number): Promise<Schedule[]>;
   getSchedulesByStudent(studentId: number): Promise<Schedule[]>;
-  updateSchedule(id: number, schedule: Partial<Schedule>): Promise<Schedule>;
+  updateSchedule(id: number, schedule: Prisma.ScheduleUpdateInput): Promise<Schedule>;
   deleteSchedule(id: number): Promise<void>;
   
-  createSession(session: InsertSession): Promise<Session>;
+  createSession(session: Prisma.SessionCreateInput): Promise<Session>;
   getSessionById(id: number): Promise<Session | null>;
   getSessionsByTeacher(teacherId: number): Promise<Session[]>;
   getSessionsByStudent(studentId: number): Promise<Session[]>;
-  updateSession(id: number, session: Partial<Session>): Promise<Session>;
+  updateSession(id: number, session: Prisma.SessionUpdateInput): Promise<Session>;
   
   createFeedback(feedback: InsertFeedback): Promise<Feedback>;
   getFeedbackByStudent(studentId: number): Promise<Feedback[]>;
@@ -72,18 +75,18 @@ export interface IStorage {
   createAttendance(attendance: InsertAttendance): Promise<Attendance>;
   getAttendanceByStudent(studentId: number): Promise<Attendance[]>;
   getAttendanceBySession(sessionId: number): Promise<Attendance[]>;
-  updateAttendance(id: number, attendance: Partial<Attendance>): Promise<Attendance>;
+  updateAttendance(id: number, attendance: Prisma.AttendanceUpdateInput): Promise<Attendance>;
   
   createPayment(payment: InsertPayment): Promise<Payment>;
   getPaymentsByParent(parentId: number): Promise<Payment[]>;
   getPaymentsByTeacher(teacherId: number): Promise<Payment[]>;
-  updatePayment(id: number, payment: Partial<Payment>): Promise<Payment>;
+  updatePayment(id: number, payment: Prisma.PaymentUpdateInput): Promise<Payment>;
   
   createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest>;
   getTutorRequestById(id: number): Promise<TutorRequest | null>;
   getTutorRequestsByParent(parentId: number): Promise<TutorRequest[]>;
   getTutorRequestsByTeacher(teacherId: number): Promise<TutorRequest[]>;
-  updateTutorRequest(id: number, request: Partial<TutorRequest>): Promise<TutorRequest>;
+  updateTutorRequest(id: number, request: Prisma.TutorRequestUpdateInput): Promise<TutorRequest>;
   
   createMessage(message: InsertMessage): Promise<Message>;
   getMessagesBetweenUsers(user1Id: number, user2Id: number): Promise<Message[]>;
@@ -97,11 +100,11 @@ export interface IStorage {
   createClarification(clarification: InsertClarification): Promise<Clarification>;
   getClarificationsByStudent(studentId: number): Promise<Clarification[]>;
   getClarificationsByAssignment(assignmentId: number): Promise<Clarification[]>;
-  updateClarification(id: number, clarification: Partial<Clarification>): Promise<Clarification>;
+  updateClarification(id: number, clarification: Prisma.ClarificationUpdateInput): Promise<Clarification>;
   
   createParentalControl(control: InsertParentalControl): Promise<ParentalControl>;
   getParentalControlByStudent(studentId: number): Promise<ParentalControl | null>;
-  updateParentalControl(id: number, control: Partial<ParentalControl>): Promise<ParentalControl>;
+  updateParentalControl(id: number, control: Prisma.ParentalControlUpdateInput): Promise<ParentalControl>;
   
   createTutorRating(rating: InsertTutorRating): Promise<TutorRating>;
   getRatingsByTeacher(teacherId: number): Promise<TutorRating[]>;
@@ -110,14 +113,14 @@ export interface IStorage {
   createEarnings(earnings: InsertEarnings): Promise<Earnings>;
   getEarningsByTeacher(teacherId: number): Promise<Earnings[]>;
   
-  createStudentInvite(invite: InsertStudentInvite): Promise<StudentInvite>;
+  createStudentInvite(invite: Prisma.StudentInviteCreateInput): Promise<StudentInvite>;
   getStudentInviteByToken(token: string): Promise<StudentInvite | null>;
   getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]>;
-  updateStudentInvite(id: number, invite: Partial<StudentInvite>): Promise<StudentInvite>;
+  updateStudentInvite(id: number, invite: Prisma.StudentInviteUpdateInput): Promise<StudentInvite>;
 }
 
 class PrismaStorage implements IStorage {
-  async createUser(user: InsertUser): Promise<User> {
+  async createUser(user: Prisma.UserCreateInput): Promise<User> {
     return await prisma.user.create({ data: user }) as User;
   }
 
@@ -129,7 +132,15 @@ class PrismaStorage implements IStorage {
     return await prisma.user.findUnique({ where: { email } }) as User | null;
   }
 
-  async updateUser(id: number, user: Partial<User>): Promise<User> {
+  async getUserByEmailVerifyToken(token: string): Promise<User | null> {
+    return await prisma.user.findUnique({ where: { emailVerifyToken: token } }) as User | null;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | null> {
+    return await prisma.user.findUnique({ where: { googleId } }) as User | null;
+  }
+
+  async updateUser(id: number, user: Prisma.UserUpdateInput): Promise<User> {
     return await prisma.user.update({ where: { id }, data: user }) as User;
   }
 
@@ -161,7 +172,7 @@ class PrismaStorage implements IStorage {
     return students;
   }
 
-  async updateStudent(id: number, student: Partial<Student>): Promise<Student> {
+  async updateStudent(id: number, student: Prisma.StudentUpdateInput): Promise<Student> {
     return await prisma.student.update({ where: { id }, data: student }) as Student;
   }
 
@@ -181,7 +192,7 @@ class PrismaStorage implements IStorage {
     return await prisma.assignment.findMany({ where: { gradeLevel } }) as Assignment[];
   }
 
-  async updateAssignment(id: number, assignment: Partial<Assignment>): Promise<Assignment> {
+  async updateAssignment(id: number, assignment: Prisma.AssignmentUpdateInput): Promise<Assignment> {
     return await prisma.assignment.update({ where: { id }, data: assignment }) as Assignment;
   }
 
@@ -205,7 +216,7 @@ class PrismaStorage implements IStorage {
     return await prisma.studentAssignment.findMany({ where: { assignmentId } }) as StudentAssignment[];
   }
 
-  async updateStudentAssignment(id: number, studentAssignment: Partial<StudentAssignment>): Promise<StudentAssignment> {
+  async updateStudentAssignment(id: number, studentAssignment: Prisma.StudentAssignmentUpdateInput): Promise<StudentAssignment> {
     return await prisma.studentAssignment.update({ where: { id }, data: studentAssignment }) as StudentAssignment;
   }
 
@@ -245,7 +256,7 @@ class PrismaStorage implements IStorage {
     return await prisma.schedule.findMany({ where: { studentId } }) as Schedule[];
   }
 
-  async updateSchedule(id: number, schedule: Partial<Schedule>): Promise<Schedule> {
+  async updateSchedule(id: number, schedule: Prisma.ScheduleUpdateInput): Promise<Schedule> {
     return await prisma.schedule.update({ where: { id }, data: schedule }) as Schedule;
   }
 
@@ -253,26 +264,26 @@ class PrismaStorage implements IStorage {
     await prisma.schedule.delete({ where: { id } });
   }
 
-  async createSession(session: InsertSession): Promise<Session> {
-    return await prisma.session.create({ data: session }) as Session;
+  async createSession(session: Prisma.SessionCreateInput): Promise<Session> {
+    return await prisma.session.create({ data: session }) as unknown as Session;
   }
 
   async getSessionById(id: number): Promise<Session | null> {
-    return await prisma.session.findUnique({ where: { id } }) as Session | null;
+    return await prisma.session.findUnique({ where: { id } }) as unknown as Session | null;
   }
 
   async getSessionsByTeacher(teacherId: number): Promise<Session[]> {
-    return await prisma.session.findMany({ where: { teacherId } }) as Session[];
+    return await prisma.session.findMany({ where: { teacherId } }) as unknown as Session[];
   }
 
   async getSessionsByStudent(studentId: number): Promise<Session[]> {
     return await prisma.session.findMany({
       where: { studentIds: { has: studentId } }
-    }) as Session[];
+    }) as unknown as Session[];
   }
 
-  async updateSession(id: number, session: Partial<Session>): Promise<Session> {
-    return await prisma.session.update({ where: { id }, data: session }) as Session;
+  async updateSession(id: number, session: Prisma.SessionUpdateInput): Promise<Session> {
+    return await prisma.session.update({ where: { id }, data: session }) as unknown as Session;
   }
 
   async createFeedback(feedback: InsertFeedback): Promise<Feedback> {
@@ -299,7 +310,7 @@ class PrismaStorage implements IStorage {
     return await prisma.attendance.findMany({ where: { sessionId } }) as Attendance[];
   }
 
-  async updateAttendance(id: number, attendance: Partial<Attendance>): Promise<Attendance> {
+  async updateAttendance(id: number, attendance: Prisma.AttendanceUpdateInput): Promise<Attendance> {
     return await prisma.attendance.update({ where: { id }, data: attendance }) as Attendance;
   }
 
@@ -315,7 +326,7 @@ class PrismaStorage implements IStorage {
     return await prisma.payment.findMany({ where: { teacherId } }) as Payment[];
   }
 
-  async updatePayment(id: number, payment: Partial<Payment>): Promise<Payment> {
+  async updatePayment(id: number, payment: Prisma.PaymentUpdateInput): Promise<Payment> {
     return await prisma.payment.update({ where: { id }, data: payment }) as Payment;
   }
 
@@ -335,7 +346,7 @@ class PrismaStorage implements IStorage {
     return await prisma.tutorRequest.findMany({ where: { teacherId } }) as TutorRequest[];
   }
 
-  async updateTutorRequest(id: number, request: Partial<TutorRequest>): Promise<TutorRequest> {
+  async updateTutorRequest(id: number, request: Prisma.TutorRequestUpdateInput): Promise<TutorRequest> {
     return await prisma.tutorRequest.update({ where: { id }, data: request }) as TutorRequest;
   }
 
@@ -394,7 +405,7 @@ class PrismaStorage implements IStorage {
     return await prisma.clarification.findMany({ where: { assignmentId } }) as Clarification[];
   }
 
-  async updateClarification(id: number, clarification: Partial<Clarification>): Promise<Clarification> {
+  async updateClarification(id: number, clarification: Prisma.ClarificationUpdateInput): Promise<Clarification> {
     return await prisma.clarification.update({ where: { id }, data: clarification }) as Clarification;
   }
 
@@ -406,7 +417,7 @@ class PrismaStorage implements IStorage {
     return await prisma.parentalControl.findUnique({ where: { studentId } }) as ParentalControl | null;
   }
 
-  async updateParentalControl(id: number, control: Partial<ParentalControl>): Promise<ParentalControl> {
+  async updateParentalControl(id: number, control: Prisma.ParentalControlUpdateInput): Promise<ParentalControl> {
     return await prisma.parentalControl.update({ where: { id }, data: control }) as ParentalControl;
   }
 
@@ -430,7 +441,7 @@ class PrismaStorage implements IStorage {
     return await prisma.earnings.findMany({ where: { teacherId } }) as Earnings[];
   }
 
-  async createStudentInvite(invite: InsertStudentInvite): Promise<StudentInvite> {
+  async createStudentInvite(invite: Prisma.StudentInviteCreateInput): Promise<StudentInvite> {
     return await prisma.studentInvite.create({ data: invite }) as StudentInvite;
   }
 
@@ -442,7 +453,7 @@ class PrismaStorage implements IStorage {
     return await prisma.studentInvite.findMany({ where: { parentId } }) as StudentInvite[];
   }
 
-  async updateStudentInvite(id: number, invite: Partial<StudentInvite>): Promise<StudentInvite> {
+  async updateStudentInvite(id: number, invite: Prisma.StudentInviteUpdateInput): Promise<StudentInvite> {
     return await prisma.studentInvite.update({ where: { id }, data: invite }) as StudentInvite;
   }
 }

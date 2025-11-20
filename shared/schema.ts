@@ -8,12 +8,17 @@ export type UserRole = typeof userRoles[number];
 export const userSchema = z.object({
   id: z.number(),
   email: z.string().email(),
-  password: z.string(),
+  password: z.string().nullable(),
   name: z.string(),
   role: z.enum(userRoles).nullable(),
+  isEmailVerified: z.boolean(),
+  emailVerifyToken: z.string().nullable(),
+  emailVerifyExpires: z.string().nullable(),
+  googleId: z.string().nullable(),
+  profilePicture: z.string().nullable(),
 });
 
-export const insertUserSchema = userSchema.omit({ id: true });
+export const insertUserSchema = userSchema.omit({ id: true, isEmailVerified: true, emailVerifyToken: true, emailVerifyExpires: true });
 export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
@@ -42,6 +47,7 @@ export const assignmentSchema = z.object({
   teacherId: z.number(),
   gradeLevel: z.string(),
   points: z.number(),
+  fileUrl: z.string().nullable(),
 });
 
 export const insertAssignmentSchema = assignmentSchema.omit({ id: true });
@@ -101,9 +107,12 @@ export const sessionSchema = z.object({
   teacherId: z.number(),
   studentIds: z.array(z.number()),
   subject: z.string(),
-  date: z.string(),
+  sessionDate: z.string(),
   startTime: z.string(),
   endTime: z.string(),
+  title: z.string().nullable(),
+  description: z.string().nullable(),
+  meetingUrl: z.string().nullable(),
   notes: z.string().nullable(),
   status: z.enum(["scheduled", "completed", "cancelled"]),
 });

@@ -22,6 +22,7 @@ import {
 } from "@shared/schema";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { sendVerificationEmail } from "./utils/emailService";
 
 // Simple session management
 const sessions = new Map<string, number>();
@@ -65,19 +66,39 @@ export function registerRoutes(app: Express) {
       }
 
       const hashedPassword = await hashPassword(password);
+      
+      // Generate email verification token
+      const emailVerifyToken = crypto.randomUUID();
+      const emailVerifyExpires = new Date();
+      emailVerifyExpires.setHours(emailVerifyExpires.getHours() + 24); // 24 hours expiry
+
       const user = await storage.createUser({
         email,
         password: hashedPassword,
         name,
         role,
+        isEmailVerified: false,
+        emailVerifyToken,
+        emailVerifyExpires: emailVerifyExpires.toISOString(),
+        googleId: null,
+        profilePicture: null,
       });
 
-      const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, user.id);
+      // Send verification email (non-blocking)
+      sendVerificationEmail(email, emailVerifyToken, name).catch(err => 
+        console.error("Failed to send verification email:", err)
+      );
 
+      // Do NOT create session until email is verified
       res.json({ 
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
-        sessionId 
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          name: user.name, 
+          role: user.role,
+          isEmailVerified: user.isEmailVerified 
+        },
+        message: "Signup successful! Please check your email to verify your account before logging in."
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -94,9 +115,22 @@ export function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Check if user password exists (for non-Google OAuth users)
+      if (!user.password) {
+        return res.status(401).json({ error: "Invalid credentials. Please use Google Sign In." });
+      }
+
       const isValid = await verifyPassword(password, user.password);
       if (!isValid) {
         return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      // Check if email is verified
+      if (!user.isEmailVerified) {
+        return res.status(403).json({ 
+          error: "Please verify your email before logging in",
+          needsVerification: true 
+        });
       }
 
       const sessionId = crypto.randomUUID();
@@ -126,13 +160,24 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Invite has expired" });
       }
 
-      // Create user account
+      // Create user account with email verification requirement
       const hashedPassword = await hashPassword(password);
+      
+      // Generate email verification token for student
+      const emailVerifyToken = crypto.randomUUID();
+      const emailVerifyExpires = new Date();
+      emailVerifyExpires.setHours(emailVerifyExpires.getHours() + 24);
+      
       const user = await storage.createUser({
         email: invite.email,
         password: hashedPassword,
         name: invite.studentName,
         role: "student",
+        isEmailVerified: false, // Students must verify email too
+        emailVerifyToken,
+        emailVerifyExpires: emailVerifyExpires.toISOString(),
+        googleId: null,
+        profilePicture: null,
       });
 
       // Create student profile
@@ -148,13 +193,16 @@ export function registerRoutes(app: Express) {
       // Mark invite as accepted
       await storage.updateStudentInvite(invite.id, { status: "accepted" });
 
-      const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, user.id);
+      // Send verification email to student (non-blocking)
+      sendVerificationEmail(user.email, emailVerifyToken, user.name).catch(err => 
+        console.error("Failed to send verification email to student:", err)
+      );
 
+      // Do NOT create session until email is verified
       res.json({ 
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: { id: user.id, email: user.email, name: user.name, role: user.role, isEmailVerified: user.isEmailVerified },
         student,
-        sessionId 
+        message: "Account created! Please check your email to verify your account before logging in."
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -190,6 +238,104 @@ export function registerRoutes(app: Express) {
       sessions.delete(sessionId);
     }
     res.json({ success: true });
+  });
+
+  // ========== EMAIL VERIFICATION ROUTES ==========
+  
+  // Verify email
+  app.get("/api/auth/verify-email/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const user = await storage.getUserByEmailVerifyToken(token);
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired verification token" });
+      }
+
+      // Check if already verified
+      if (user.isEmailVerified) {
+        return res.json({ 
+          success: true,
+          message: "Email already verified! You can now log in." 
+        });
+      }
+
+      // Check if token is expired
+      if (user.emailVerifyExpires && new Date(user.emailVerifyExpires) < new Date()) {
+        return res.status(400).json({ 
+          error: "Verification token has expired",
+          expired: true 
+        });
+      }
+
+      // Update user to verified
+      await storage.updateUser(user.id, {
+        isEmailVerified: true,
+        emailVerifyToken: null,
+        emailVerifyExpires: null,
+      });
+
+      res.json({ 
+        success: true,
+        message: "Email verified successfully! You can now log in." 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Resend verification email (unauthenticated endpoint)
+  app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal whether the email exists
+        return res.json({ 
+          success: true,
+          message: "If that email is registered, a verification link has been sent." 
+        });
+      }
+
+      if (user.isEmailVerified) {
+        return res.status(400).json({ error: "Email already verified" });
+      }
+
+      // Check if a token was sent recently (within last 5 minutes to prevent spam)
+      if (user.emailVerifyToken && user.emailVerifyExpires) {
+        const tokenAge = Date.now() - (new Date(user.emailVerifyExpires).getTime() - (24 * 60 * 60 * 1000));
+        if (tokenAge < 5 * 60 * 1000) { // 5 minutes
+          return res.status(429).json({ 
+            error: "A verification email was recently sent. Please check your inbox or try again in a few minutes." 
+          });
+        }
+      }
+
+      // Generate new verification token
+      const emailVerifyToken = crypto.randomUUID();
+      const emailVerifyExpires = new Date();
+      emailVerifyExpires.setHours(emailVerifyExpires.getHours() + 24);
+
+      await storage.updateUser(user.id, {
+        emailVerifyToken,
+        emailVerifyExpires: emailVerifyExpires.toISOString(),
+      });
+
+      // Send verification email
+      await sendVerificationEmail(user.email, emailVerifyToken, user.name);
+
+      res.json({ 
+        success: true,
+        message: "Verification email sent! Please check your inbox." 
+        });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // ========== STUDENT INVITE ROUTES ==========
