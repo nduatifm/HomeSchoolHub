@@ -24,6 +24,7 @@ export default function TeacherDashboard() {
   const [uploadMaterialOpen, setUploadMaterialOpen] = useState(false);
   const [editMaterialOpen, setEditMaterialOpen] = useState(false);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
+  const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [createReportOpen, setCreateReportOpen] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
 
@@ -146,7 +147,8 @@ export default function TeacherDashboard() {
 
   // Create session
   const [sessionForm, setSessionForm] = useState({
-    subject: "", date: "", startTime: "", endTime: "", studentIds: [] as number[], notes: "", status: "scheduled"
+    subject: "", sessionDate: "", startTime: "", endTime: "", studentIds: [] as number[], 
+    title: "", description: "", meetingUrl: "", notes: "", status: "scheduled"
   });
 
   const createSessionMutation = useMutation({
@@ -157,8 +159,40 @@ export default function TeacherDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions/teacher"] });
       toast({ title: "Session created!", type: "success" });
-      setSessionForm({ subject: "", date: "", startTime: "", endTime: "", studentIds: [], notes: "", status: "scheduled" });
+      setSessionForm({ subject: "", sessionDate: "", startTime: "", endTime: "", studentIds: [], 
+        title: "", description: "", meetingUrl: "", notes: "", status: "scheduled" });
       setCreateSessionOpen(false);
+    },
+  });
+
+  // Edit session
+  const [editSessionForm, setEditSessionForm] = useState({
+    id: 0, subject: "", sessionDate: "", startTime: "", endTime: "", studentIds: [] as number[], 
+    title: "", description: "", meetingUrl: "", notes: "", status: "scheduled"
+  });
+
+  const updateSessionMutation = useMutation({
+    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/sessions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions/teacher"] });
+      toast({ title: "Session updated!", type: "success" });
+      setEditSessionForm({ id: 0, subject: "", sessionDate: "", startTime: "", endTime: "", studentIds: [], 
+        title: "", description: "", meetingUrl: "", notes: "", status: "scheduled" });
+      setEditSessionOpen(false);
+    },
+  });
+
+  // Delete session
+  const deleteSessionMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/sessions/${id}`, {
+      method: "DELETE",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions/teacher"] });
+      toast({ title: "Session deleted!", type: "success" });
     },
   });
 
@@ -692,6 +726,18 @@ export default function TeacherDashboard() {
                     </DialogHeader>
                     <div className="space-y-4">
                       <Input
+                        placeholder="Title (optional)"
+                        value={sessionForm.title}
+                        onChange={(e) => setSessionForm({ ...sessionForm, title: e.target.value })}
+                        data-testid="input-session-title"
+                      />
+                      <Textarea
+                        placeholder="Description (optional)"
+                        value={sessionForm.description}
+                        onChange={(e) => setSessionForm({ ...sessionForm, description: e.target.value })}
+                        data-testid="input-session-description"
+                      />
+                      <Input
                         placeholder="Subject"
                         value={sessionForm.subject}
                         onChange={(e) => setSessionForm({ ...sessionForm, subject: e.target.value })}
@@ -699,8 +745,8 @@ export default function TeacherDashboard() {
                       />
                       <Input
                         type="date"
-                        value={sessionForm.date}
-                        onChange={(e) => setSessionForm({ ...sessionForm, date: e.target.value })}
+                        value={sessionForm.sessionDate}
+                        onChange={(e) => setSessionForm({ ...sessionForm, sessionDate: e.target.value })}
                         data-testid="input-session-date"
                       />
                       <Input
@@ -716,6 +762,18 @@ export default function TeacherDashboard() {
                         value={sessionForm.endTime}
                         onChange={(e) => setSessionForm({ ...sessionForm, endTime: e.target.value })}
                         data-testid="input-session-end-time"
+                      />
+                      <Input
+                        placeholder="Meeting URL (optional)"
+                        value={sessionForm.meetingUrl}
+                        onChange={(e) => setSessionForm({ ...sessionForm, meetingUrl: e.target.value })}
+                        data-testid="input-session-meeting-url"
+                      />
+                      <Textarea
+                        placeholder="Notes (optional)"
+                        value={sessionForm.notes}
+                        onChange={(e) => setSessionForm({ ...sessionForm, notes: e.target.value })}
+                        data-testid="input-session-notes"
                       />
                       <Button
                         onClick={() => createSessionMutation.mutate(sessionForm)}
@@ -736,20 +794,145 @@ export default function TeacherDashboard() {
                       <TableHead>Subject</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Time</TableHead>
+                      <TableHead>Meeting URL</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sessions.map((s: any) => (
                       <TableRow key={s.id} data-testid={`row-session-${s.id}`}>
                         <TableCell>{s.subject}</TableCell>
-                        <TableCell>{new Date(s.date).toLocaleDateString()}</TableCell>
+                        <TableCell>{s.sessionDate ? new Date(s.sessionDate).toLocaleDateString() : 'N/A'}</TableCell>
                         <TableCell>{s.startTime} - {s.endTime}</TableCell>
+                        <TableCell>
+                          {s.meetingUrl ? (
+                            <a 
+                              href={s.meetingUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                              data-testid={`link-meeting-url-${s.id}`}
+                            >
+                              Join Meeting
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">No URL</span>
+                          )}
+                        </TableCell>
                         <TableCell><Badge>{s.status}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setEditSessionForm({
+                                  id: s.id,
+                                  subject: s.subject,
+                                  sessionDate: s.sessionDate || "",
+                                  startTime: s.startTime,
+                                  endTime: s.endTime,
+                                  studentIds: s.studentIds || [],
+                                  title: s.title || "",
+                                  description: s.description || "",
+                                  meetingUrl: s.meetingUrl || "",
+                                  notes: s.notes || "",
+                                  status: s.status
+                                });
+                                setEditSessionOpen(true);
+                              }}
+                              data-testid={`button-edit-session-${s.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this session?')) {
+                                  deleteSessionMutation.mutate(s.id);
+                                }
+                              }}
+                              data-testid={`button-delete-session-${s.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+
+                <Dialog open={editSessionOpen} onOpenChange={setEditSessionOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Session</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Input
+                        placeholder="Title (optional)"
+                        value={editSessionForm.title}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, title: e.target.value })}
+                        data-testid="input-edit-session-title"
+                      />
+                      <Textarea
+                        placeholder="Description (optional)"
+                        value={editSessionForm.description}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, description: e.target.value })}
+                        data-testid="input-edit-session-description"
+                      />
+                      <Input
+                        placeholder="Subject"
+                        value={editSessionForm.subject}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, subject: e.target.value })}
+                        data-testid="input-edit-session-subject"
+                      />
+                      <Input
+                        type="date"
+                        placeholder="Session Date"
+                        value={editSessionForm.sessionDate}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, sessionDate: e.target.value })}
+                        data-testid="input-edit-session-date"
+                      />
+                      <Input
+                        type="time"
+                        placeholder="Start Time"
+                        value={editSessionForm.startTime}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, startTime: e.target.value })}
+                        data-testid="input-edit-session-start-time"
+                      />
+                      <Input
+                        type="time"
+                        placeholder="End Time"
+                        value={editSessionForm.endTime}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, endTime: e.target.value })}
+                        data-testid="input-edit-session-end-time"
+                      />
+                      <Input
+                        placeholder="Meeting URL (optional)"
+                        value={editSessionForm.meetingUrl}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, meetingUrl: e.target.value })}
+                        data-testid="input-edit-session-meeting-url"
+                      />
+                      <Textarea
+                        placeholder="Notes (optional)"
+                        value={editSessionForm.notes}
+                        onChange={(e) => setEditSessionForm({ ...editSessionForm, notes: e.target.value })}
+                        data-testid="input-edit-session-notes"
+                      />
+                      <Button
+                        onClick={() => updateSessionMutation.mutate(editSessionForm)}
+                        disabled={updateSessionMutation.isPending}
+                        className="w-full"
+                        data-testid="button-update-session"
+                      >
+                        {updateSessionMutation.isPending ? "Updating..." : "Update"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           </TabsContent>

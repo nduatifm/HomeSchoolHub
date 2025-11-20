@@ -67,7 +67,8 @@ export interface IStorage {
   getSessionById(id: number): Promise<Session | null>;
   getSessionsByTeacher(teacherId: number): Promise<Session[]>;
   getSessionsByStudent(studentId: number): Promise<Session[]>;
-  updateSession(id: number, session: Prisma.SessionUpdateInput): Promise<Session>;
+  updateSession(id: number, session: any): Promise<Session>;
+  deleteSession(id: number): Promise<void>;
   
   createFeedback(feedback: InsertFeedback): Promise<Feedback>;
   getFeedbackByStudent(studentId: number): Promise<Feedback[]>;
@@ -290,8 +291,12 @@ class PrismaStorage implements IStorage {
     }) as unknown as Session[];
   }
 
-  async updateSession(id: number, session: Prisma.SessionUpdateInput): Promise<Session> {
+  async updateSession(id: number, session: any): Promise<Session> {
     return await prisma.session.update({ where: { id }, data: session }) as unknown as Session;
+  }
+
+  async deleteSession(id: number): Promise<void> {
+    await prisma.session.delete({ where: { id } });
   }
 
   async createFeedback(feedback: InsertFeedback): Promise<Feedback> {

@@ -149,8 +149,10 @@ export const sessionSchema = z.object({
 });
 
 export const insertSessionSchema = sessionSchema.omit({ id: true });
+export const updateSessionSchema = sessionSchema.omit({ id: true, teacherId: true }).partial();
 export type Session = z.infer<typeof sessionSchema>;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
+export type UpdateSession = z.infer<typeof updateSessionSchema>;
 
 // Feedback schema
 export const feedbackSchema = z.object({

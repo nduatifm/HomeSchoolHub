@@ -10,6 +10,7 @@ import {
   updateMaterialSchema,
   insertScheduleSchema,
   insertSessionSchema,
+  updateSessionSchema,
   insertFeedbackSchema,
   insertAttendanceSchema,
   insertPaymentSchema,
@@ -1083,10 +1084,70 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const session = await storage.getSessionById(parseInt(req.params.id));
+      
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      const user = await storage.getUserById(req.session.userId!);
+      // Only teachers can view individual sessions, and only their own
+      if (user?.role !== "teacher" || session.teacherId !== user.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.patch("/api/sessions/:id", requireAuth, async (req, res) => {
     try {
-      const session = await storage.updateSession(parseInt(req.params.id), req.body);
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can update sessions" });
+      }
+
+      // Check if session exists and belongs to the requesting teacher
+      const existingSession = await storage.getSessionById(parseInt(req.params.id));
+      if (!existingSession) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      if (existingSession.teacherId !== user.id) {
+        return res.status(403).json({ error: "You can only update your own sessions" });
+      }
+
+      // Validate update data (excludes immutable fields like teacherId)
+      const validatedData = updateSessionSchema.parse(req.body);
+
+      const session = await storage.updateSession(parseInt(req.params.id), validatedData);
       res.json(session);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/sessions/:id", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can delete sessions" });
+      }
+
+      // Check if session exists and belongs to the requesting teacher
+      const existingSession = await storage.getSessionById(parseInt(req.params.id));
+      if (!existingSession) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      if (existingSession.teacherId !== user.id) {
+        return res.status(403).json({ error: "You can only delete your own sessions" });
+      }
+
+      await storage.deleteSession(parseInt(req.params.id));
+      res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
