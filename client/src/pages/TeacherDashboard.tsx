@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -102,16 +102,33 @@ export default function TeacherDashboard() {
   const [assignmentForm, setAssignmentForm] = useState({
     title: "", description: "", subject: "", dueDate: "", gradeLevel: "", points: 100
   });
+  const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
 
   const createAssignmentMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/assignments", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    mutationFn: async (data: any) => {
+      if (assignmentFile) {
+        const formData = new FormData();
+        formData.append('file', assignmentFile);
+        formData.append('title', data.title);
+        formData.append('description', data.description);
+        formData.append('subject', data.subject);
+        formData.append('dueDate', data.dueDate);
+        formData.append('gradeLevel', data.gradeLevel);
+        formData.append('points', data.points.toString());
+
+        return apiUpload('/api/assignments/with-file', formData);
+      } else {
+        return apiRequest("/api/assignments", {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
       toast({ title: "Assignment created!", type: "success" });
       setAssignmentForm({ title: "", description: "", subject: "", dueDate: "", gradeLevel: "", points: 100 });
+      setAssignmentFile(null);
       setCreateAssignmentOpen(false);
     },
   });
@@ -147,18 +164,30 @@ export default function TeacherDashboard() {
 
   // Upload material
   const [materialForm, setMaterialForm] = useState({
-    title: "", description: "", fileUrl: "", subject: "", gradeLevel: ""
+    title: "", description: "", subject: "", gradeLevel: ""
   });
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
 
   const uploadMaterialMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/materials", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    mutationFn: async (data: any) => {
+      if (materialFile) {
+        const formData = new FormData();
+        formData.append('file', materialFile);
+        formData.append('title', data.title);
+        formData.append('description', data.description || '');
+        formData.append('subject', data.subject);
+        formData.append('gradeLevel', data.gradeLevel);
+
+        return apiUpload('/api/materials/with-file', formData);
+      } else {
+        throw new Error('Please select a file to upload');
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
       toast({ title: "Material uploaded!", type: "success" });
-      setMaterialForm({ title: "", description: "", fileUrl: "", subject: "", gradeLevel: "" });
+      setMaterialForm({ title: "", description: "", subject: "", gradeLevel: "" });
+      setMaterialFile(null);
       setUploadMaterialOpen(false);
     },
   });
@@ -471,7 +500,13 @@ export default function TeacherDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Assignments</CardTitle>
-                <Dialog open={createAssignmentOpen} onOpenChange={setCreateAssignmentOpen}>
+                <Dialog 
+                  open={createAssignmentOpen} 
+                  onOpenChange={(open) => {
+                    setCreateAssignmentOpen(open);
+                    if (!open) setAssignmentFile(null);
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button data-testid="button-create-assignment">Create Assignment</Button>
                   </DialogTrigger>
@@ -517,6 +552,47 @@ export default function TeacherDashboard() {
                         onChange={(e) => setAssignmentForm({ ...assignmentForm, points: parseInt(e.target.value) || 0 })}
                         data-testid="input-assignment-points"
                       />
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">File Upload (optional)</label>
+                        <Input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.gif"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                              if (!allowedTypes.includes(file.type)) {
+                                toast({ title: "Invalid file type", description: "Only PDF and image files are allowed", type: "error" });
+                                e.target.value = '';
+                                return;
+                              }
+                              if (file.size > 10 * 1024 * 1024) {
+                                toast({ title: "File too large", description: "Maximum file size is 10MB", type: "error" });
+                                e.target.value = '';
+                                return;
+                              }
+                              setAssignmentFile(file);
+                            }
+                          }}
+                          data-testid="input-assignment-file"
+                        />
+                        {assignmentFile && (
+                          <div className="flex items-center justify-between p-2 bg-muted rounded">
+                            <p className="text-sm">
+                              {assignmentFile.name} ({(assignmentFile.size / 1024).toFixed(2)} KB)
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setAssignmentFile(null)}
+                              data-testid="button-clear-assignment-file"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       <Button
                         onClick={() => createAssignmentMutation.mutate(assignmentForm)}
                         disabled={createAssignmentMutation.isPending}
@@ -537,6 +613,7 @@ export default function TeacherDashboard() {
                       <TableHead>Subject</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Points</TableHead>
+                      <TableHead>File</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -547,6 +624,22 @@ export default function TeacherDashboard() {
                         <TableCell>{a.subject}</TableCell>
                         <TableCell>{new Date(a.dueDate).toLocaleDateString()}</TableCell>
                         <TableCell>{a.points}</TableCell>
+                        <TableCell>
+                          {a.fileUrl ? (
+                            <a 
+                              href={a.fileUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline flex items-center gap-1"
+                              data-testid={`link-assignment-file-${a.id}`}
+                            >
+                              <FileText className="h-4 w-4" />
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">No file</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button 
@@ -657,7 +750,13 @@ export default function TeacherDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Study Materials</CardTitle>
-                <Dialog open={uploadMaterialOpen} onOpenChange={setUploadMaterialOpen}>
+                <Dialog 
+                  open={uploadMaterialOpen} 
+                  onOpenChange={(open) => {
+                    setUploadMaterialOpen(open);
+                    if (!open) setMaterialFile(null);
+                  }}
+                >
                   <DialogTrigger asChild>
                     <Button data-testid="button-upload-material">Upload Material</Button>
                   </DialogTrigger>
@@ -673,17 +772,52 @@ export default function TeacherDashboard() {
                         data-testid="input-material-title"
                       />
                       <Textarea
-                        placeholder="Description"
+                        placeholder="Description (optional)"
                         value={materialForm.description}
                         onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
                         data-testid="input-material-description"
                       />
-                      <Input
-                        placeholder="File URL"
-                        value={materialForm.fileUrl}
-                        onChange={(e) => setMaterialForm({ ...materialForm, fileUrl: e.target.value })}
-                        data-testid="input-material-url"
-                      />
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">File Upload *</label>
+                        <Input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.gif"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                              if (!allowedTypes.includes(file.type)) {
+                                toast({ title: "Invalid file type", description: "Only PDF and image files are allowed", type: "error" });
+                                e.target.value = '';
+                                return;
+                              }
+                              if (file.size > 10 * 1024 * 1024) {
+                                toast({ title: "File too large", description: "Maximum file size is 10MB", type: "error" });
+                                e.target.value = '';
+                                return;
+                              }
+                              setMaterialFile(file);
+                            }
+                          }}
+                          data-testid="input-material-file"
+                        />
+                        {materialFile && (
+                          <div className="flex items-center justify-between p-2 bg-muted rounded">
+                            <p className="text-sm">
+                              {materialFile.name} ({(materialFile.size / 1024).toFixed(2)} KB)
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setMaterialFile(null)}
+                              data-testid="button-clear-material-file"
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       <Input
                         placeholder="Subject"
                         value={materialForm.subject}
@@ -698,7 +832,7 @@ export default function TeacherDashboard() {
                       />
                       <Button
                         onClick={() => uploadMaterialMutation.mutate(materialForm)}
-                        disabled={uploadMaterialMutation.isPending}
+                        disabled={uploadMaterialMutation.isPending || !materialFile}
                         className="w-full"
                         data-testid="button-submit-material"
                       >
@@ -716,6 +850,7 @@ export default function TeacherDashboard() {
                       <TableHead>Subject</TableHead>
                       <TableHead>Grade Level</TableHead>
                       <TableHead>Upload Date</TableHead>
+                      <TableHead>File</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -726,6 +861,18 @@ export default function TeacherDashboard() {
                         <TableCell>{m.subject}</TableCell>
                         <TableCell>{m.gradeLevel}</TableCell>
                         <TableCell>{new Date(m.uploadDate).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <a 
+                            href={m.fileUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline flex items-center gap-1"
+                            data-testid={`link-material-file-${m.id}`}
+                          >
+                            <FileText className="h-4 w-4" />
+                            View
+                          </a>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button 
