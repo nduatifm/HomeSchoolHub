@@ -38,7 +38,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, role: string) => Promise<any>;
   signupStudent: (token: string, password: string) => Promise<void>;
-  googleSignIn: (idToken: string) => Promise<void>;
+  googleSignIn: (idToken: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
 }
@@ -108,10 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStudent(data.student);
   }
 
-  async function googleSignIn(idToken: string) {
+  async function googleSignIn(idToken: string, role?: string) {
     const data = await apiRequest("/api/auth/google", {
       method: "POST",
-      body: JSON.stringify({ credential: idToken }),
+      body: JSON.stringify({ credential: idToken, role }),
     });
     localStorage.setItem("sessionId", data.sessionId);
     setSessionId(data.sessionId);

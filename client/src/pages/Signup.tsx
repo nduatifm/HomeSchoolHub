@@ -61,7 +61,7 @@ export default function Signup() {
     
     setIsLoading(true);
     try {
-      await googleSignIn(googleCredential);
+      await googleSignIn(googleCredential, googleRole);
       toast({ title: "Account created!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
@@ -171,7 +171,7 @@ export default function Signup() {
       </Card>
 
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
-        <DialogContent>
+        <DialogContent className="rounded-3xl">
           <DialogHeader>
             <DialogTitle>Complete Your Signup</DialogTitle>
             <DialogDescription>

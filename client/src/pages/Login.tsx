@@ -5,6 +5,8 @@ import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
 
@@ -16,6 +18,11 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  
+  // Google Sign In state for role selection
+  const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [googleCredential, setGoogleCredential] = useState<string | null>(null);
+  const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,13 +43,25 @@ export default function Login() {
     }
   }
 
-  async function handleGoogleSuccess(credentialResponse: any) {
+  function handleGoogleSuccess(credentialResponse: any) {
+    // Store credential and show role selection dialog
+    setGoogleCredential(credentialResponse.credential);
+    setShowRoleDialog(true);
+  }
+
+  async function handleGoogleLoginComplete() {
+    if (!googleCredential) return;
+    
+    setIsLoading(true);
     try {
-      await googleSignIn(credentialResponse.credential);
+      await googleSignIn(googleCredential, googleRole);
       toast({ title: "Welcome back!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
       toast({ title: "Google Sign In failed", description: error.message, type: "error" });
+    } finally {
+      setIsLoading(false);
+      setShowRoleDialog(false);
     }
   }
 
@@ -126,6 +145,39 @@ export default function Login() {
           </Button>
         </CardFooter>
       </Card>
+
+      <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Select Your Role</DialogTitle>
+            <DialogDescription>
+              Please select your role to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="google-role" className="text-sm font-medium">I am a...</label>
+              <Select value={googleRole} onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}>
+                <SelectTrigger data-testid="select-google-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="parent">Parent</SelectItem>
+                  <SelectItem value="teacher">Teacher</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button 
+              onClick={handleGoogleLoginComplete} 
+              className="w-full"
+              disabled={isLoading}
+              data-testid="button-complete-google-login"
+            >
+              {isLoading ? "Signing in..." : "Continue"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
