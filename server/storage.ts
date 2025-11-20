@@ -119,6 +119,8 @@ export interface IStorage {
   getStudentInviteByToken(token: string): Promise<StudentInvite | null>;
   getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]>;
   updateStudentInvite(id: number, invite: Prisma.StudentInviteUpdateInput): Promise<StudentInvite>;
+  
+  getAllUsers(): Promise<User[]>;
 }
 
 class PrismaStorage implements IStorage {
@@ -468,6 +470,22 @@ class PrismaStorage implements IStorage {
 
   async updateStudentInvite(id: number, invite: Prisma.StudentInviteUpdateInput): Promise<StudentInvite> {
     return await prisma.studentInvite.update({ where: { id }, data: invite }) as StudentInvite;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        emailVerified: true,
+        googleId: true,
+        createdAt: true,
+        updatedAt: true,
+        // Exclude password and emailVerifyToken for security
+      }
+    }) as User[];
   }
 }
 

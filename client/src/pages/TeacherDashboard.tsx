@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookOpen, Users, Calendar, DollarSign, FileText, LogOut, MessageSquare, Send, BarChart, Download, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +38,7 @@ export default function TeacherDashboard() {
   const { data: earnings = [] } = useQuery({ queryKey: ["/api/earnings/teacher"] });
   const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
   const { data: progressReports = [] } = useQuery({ queryKey: ["/api/progress-reports/teacher"] });
+  const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
 
   // Create assignment
   const [assignmentForm, setAssignmentForm] = useState({
@@ -1158,14 +1160,22 @@ export default function TeacherDashboard() {
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium">To (User ID)</label>
-                        <Input
-                          type="number"
-                          placeholder="Receiver ID"
-                          value={messageForm.receiverId || ""}
-                          onChange={(e) => setMessageForm({ ...messageForm, receiverId: parseInt(e.target.value) || 0 })}
-                          data-testid="input-receiver-id"
-                        />
+                        <label className="text-sm font-medium">To</label>
+                        <Select
+                          value={messageForm.receiverId.toString()}
+                          onValueChange={(value) => setMessageForm({ ...messageForm, receiverId: parseInt(value) })}
+                        >
+                          <SelectTrigger data-testid="select-receiver">
+                            <SelectValue placeholder="Select a user" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {users.map((u: any) => (
+                              <SelectItem key={u.id} value={u.id.toString()} data-testid={`select-user-${u.id}`}>
+                                {u.name} ({u.role})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <label className="text-sm font-medium">Message</label>

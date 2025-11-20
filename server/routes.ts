@@ -356,6 +356,18 @@ export function registerRoutes(app: Express) {
     res.json({ success: true });
   });
 
+  // Get all users (for messaging)
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Exclude current user from the list
+      const filteredUsers = users.filter(u => u.id !== req.session.userId);
+      res.json(filteredUsers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ========== EMAIL VERIFICATION ROUTES ==========
   
   // Verify email
