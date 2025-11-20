@@ -82,7 +82,7 @@ export default function ParentDashboard() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace("#", "");
-    return hash || "overview";
+    return hash || "children";
   });
 
   // Listen to hash changes from sidebar navigation

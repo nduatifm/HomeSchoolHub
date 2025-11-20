@@ -55,7 +55,7 @@ export default function StudentDashboard() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace("#", "");
-    return hash || "overview";
+    return hash || "assignments";
   });
 
   // Listen to hash changes from sidebar navigation
