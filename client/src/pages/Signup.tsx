@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
+import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Signup() {
@@ -13,9 +15,15 @@ export default function Signup() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<"teacher" | "parent">("parent");
   const [isLoading, setIsLoading] = useState(false);
-  const { signup } = useAuth();
+  const { signup, googleSignIn } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  
+  // Google Sign In state
+  const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [googleCredential, setGoogleCredential] = useState<string | null>(null);
+  const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +37,28 @@ export default function Signup() {
       toast({ title: "Signup failed", description: error.message, type: "error" });
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  function handleGoogleSuccess(credentialResponse: any) {
+    // Store credential and show role selection dialog
+    setGoogleCredential(credentialResponse.credential);
+    setShowRoleDialog(true);
+  }
+
+  async function handleGoogleSignupComplete() {
+    if (!googleCredential) return;
+    
+    setIsLoading(true);
+    try {
+      await googleSignIn(googleCredential);
+      toast({ title: "Account created!", type: "success" });
+      setLocation("/dashboard");
+    } catch (error: any) {
+      toast({ title: "Google Sign Up failed", description: error.message, type: "error" });
+    } finally {
+      setIsLoading(false);
+      setShowRoleDialog(false);
     }
   }
 
@@ -94,6 +124,28 @@ export default function Signup() {
               {isLoading ? "Creating account..." : "Sign Up"}
             </Button>
           </form>
+          
+          {googleClientId && (
+            <>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="flex justify-center" data-testid="google-signup-container">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => {
+                    toast({ title: "Google Sign Up failed", description: "Please try again", type: "error" });
+                  }}
+                />
+              </div>
+            </>
+          )}
         </CardContent>
         <CardFooter>
           <Button
@@ -106,6 +158,39 @@ export default function Signup() {
           </Button>
         </CardFooter>
       </Card>
+
+      <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Complete Your Signup</DialogTitle>
+            <DialogDescription>
+              Please select your role to finish creating your account
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="google-role" className="text-sm font-medium">I am a...</label>
+              <Select value={googleRole} onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}>
+                <SelectTrigger data-testid="select-google-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="parent">Parent</SelectItem>
+                  <SelectItem value="teacher">Teacher</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button 
+              onClick={handleGoogleSignupComplete} 
+              className="w-full"
+              disabled={isLoading}
+              data-testid="button-complete-google-signup"
+            >
+              {isLoading ? "Creating account..." : "Complete Signup"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

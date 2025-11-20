@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
+import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -10,9 +11,10 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, googleSignIn } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,6 +28,16 @@ export default function Login() {
       toast({ title: "Login failed", description: error.message, type: "error" });
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleGoogleSuccess(credentialResponse: any) {
+    try {
+      await googleSignIn(credentialResponse.credential);
+      toast({ title: "Welcome back!", type: "success" });
+      setLocation("/dashboard");
+    } catch (error: any) {
+      toast({ title: "Google Sign In failed", description: error.message, type: "error" });
     }
   }
 
@@ -66,6 +78,28 @@ export default function Login() {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
+          
+          {googleClientId && (
+            <>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="flex justify-center" data-testid="google-login-container">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => {
+                    toast({ title: "Google Sign In failed", description: "Please try again", type: "error" });
+                  }}
+                />
+              </div>
+            </>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <Button
