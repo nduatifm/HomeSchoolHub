@@ -30,9 +30,18 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      await signup(email, password, name, role);
-      toast({ title: "Account created!", type: "success" });
-      setLocation("/dashboard");
+      const response = await signup(email, password, name, role);
+      toast({ 
+        title: "Account created!", 
+        description: response.message || "Please check your email to verify your account before logging in.",
+        type: "success" 
+      });
+      // Clear form
+      setEmail("");
+      setPassword("");
+      setName("");
+      // Redirect to login page after 2 seconds
+      setTimeout(() => setLocation("/login"), 2000);
     } catch (error: any) {
       toast({ title: "Signup failed", description: error.message, type: "error" });
     } finally {

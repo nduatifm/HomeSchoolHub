@@ -25,9 +25,13 @@ export default function Login() {
       toast({ title: "Welcome back!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Login failed", description: error.message, type: "error" });
-    } finally {
       setIsLoading(false);
+      toast({ 
+        title: "Login failed", 
+        description: error.message || "Please check your credentials and try again", 
+        type: "error",
+        duration: 5000
+      });
     }
   }
 

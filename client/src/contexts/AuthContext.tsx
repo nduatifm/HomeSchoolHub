@@ -23,7 +23,7 @@ interface AuthContextType {
   student: Student | null;
   sessionId: string | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name: string, role: string) => Promise<void>;
+  signup: (email: string, password: string, name: string, role: string) => Promise<any>;
   signupStudent: (token: string, password: string) => Promise<void>;
   googleSignIn: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -75,13 +75,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signup(email: string, password: string, name: string, role: string) {
+    // Signup does NOT create a session - user must verify email first
     const data = await apiRequest("/api/auth/signup", {
       method: "POST",
       body: JSON.stringify({ email, password, name, role }),
     });
-    localStorage.setItem("sessionId", data.sessionId);
-    setSessionId(data.sessionId);
-    setUser(data.user);
+    // Return the response message to show to the user
+    return data;
   }
 
   async function signupStudent(token: string, password: string) {
