@@ -33,10 +33,18 @@ Icons are provided by Lucide React. The profile management features a modern tab
     - Teachers & Parents: Direct signup via email/password or Google Sign-In. Email verification is mandatory.
     - Students: Invite-only system where parents generate unique tokens.
     - Role-Based Access: Distinct dashboards and permissions for Teacher, Parent, and Student roles.
+- **File Upload System**:
+    - **Cloudinary Integration**: All file uploads (assignments, materials, profile pictures) use Cloudinary storage
+    - **Supported Formats**: Images (JPEG, JPG, PNG, GIF, WEBP) and PDFs with MIME type validation
+    - **Assignment Files**: Optional file attachment during assignment creation (max 10MB)
+    - **Material Files**: Required file upload for study materials (max 10MB)
+    - **apiUpload Helper**: Dedicated FormData upload helper in `client/src/lib/queryClient.ts` that maintains consistent auth headers (Bearer token + session cookies) and error handling across all file upload operations
+    - **UX Features**: File preview with name/size display, remove/clear buttons, automatic state reset on dialog close
+    - **API Endpoints**: `/api/assignments/with-file` and `/api/materials/with-file` for multipart uploads
 - **Core Features**:
-    - **Teacher Dashboard**: Assignment creation/grading, material uploads, schedule management, feedback system, attendance tracking, earnings view, tutoring session management.
+    - **Teacher Dashboard**: Assignment creation/grading with file uploads, material uploads with file management, schedule management, feedback system, attendance tracking, earnings view, tutoring session management.
     - **Parent Dashboard**: Child progress tracking, assignment monitoring, student invitations, payment management, tutor requests, attendance viewing, tutor rating.
-    - **Student Dashboard**: Assignment submission, material access, grade/feedback viewing, rewards/badges, clarification requests, schedule viewing, attendance viewing, session joining.
+    - **Student Dashboard**: Assignment submission, material access with file viewing, grade/feedback viewing, rewards/badges, clarification requests, schedule viewing, attendance viewing, session joining.
     - **Additional**: Real-time messaging, progress reports, analytics, downloadable reports, comprehensive profile management with Cloudinary integration for profile pictures.
 
 ### System Design Choices

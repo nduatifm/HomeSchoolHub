@@ -120,7 +120,7 @@ export default function TeacherDashboard() {
       } else {
         return apiRequest("/api/assignments", {
           method: "POST",
-          body: JSON.stringify(data),
+          body: JSON.stringify({ ...data, fileUrl: null }),
         });
       }
     },
