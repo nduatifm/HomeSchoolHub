@@ -18,6 +18,22 @@ model User {
   emailVerifyExpires DateTime?
   googleId           String?   @unique
   profilePicture     String?
+  bio                String?
+  
+  // Teacher-specific fields
+  teachingSubjects   String[]
+  yearsExperience    Int?
+  qualifications     String?
+  specialization     String?
+  
+  // Parent-specific fields
+  phone              String?
+  preferredContact   String?
+  
+  // Student-specific fields (via Student model relation)
+  interests          String[]
+  favoriteSubject    String?
+  learningGoals      String?
 
   student             Student?
   teacherAssignments  Assignment[]
