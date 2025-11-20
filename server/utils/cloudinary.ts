@@ -8,12 +8,27 @@ cloudinary.config({
 });
 
 export async function uploadToCloudinary(file: Express.Multer.File, folder: string = 'uploads') {
+  // Validate Cloudinary configuration
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    return {
+      success: false,
+      error: 'Cloudinary credentials not configured',
+    };
+  }
+
   try {
     const result = await cloudinary.uploader.upload(file.path, {
       folder,
       resource_type: 'auto',
       public_id: `${Date.now()}_${file.originalname}`,
     });
+
+    if (!result.secure_url || !result.public_id) {
+      return {
+        success: false,
+        error: 'Upload completed but missing URL or public ID',
+      };
+    }
 
     return {
       success: true,
@@ -30,7 +45,15 @@ export async function uploadToCloudinary(file: Express.Multer.File, folder: stri
 }
 
 export async function uploadBufferToCloudinary(buffer: Buffer, filename: string, folder: string = 'uploads') {
-  return new Promise((resolve, reject) => {
+  // Validate Cloudinary configuration
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    return {
+      success: false,
+      error: 'Cloudinary credentials not configured',
+    };
+  }
+
+  return new Promise<{ success: boolean; url?: string; publicId?: string; error?: string }>((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
@@ -39,12 +62,20 @@ export async function uploadBufferToCloudinary(buffer: Buffer, filename: string,
       },
       (error, result) => {
         if (error) {
-          reject(error);
+          resolve({
+            success: false,
+            error: error.message,
+          });
+        } else if (!result?.secure_url || !result?.public_id) {
+          resolve({
+            success: false,
+            error: 'Upload completed but missing URL or public ID',
+          });
         } else {
           resolve({
             success: true,
-            url: result?.secure_url,
-            publicId: result?.public_id,
+            url: result.secure_url,
+            publicId: result.public_id,
           });
         }
       }

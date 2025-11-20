@@ -28,6 +28,8 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { sendVerificationEmail } from "./utils/emailService";
 import { OAuth2Client } from "google-auth-library";
+import { memoryUpload } from "./utils/multer";
+import { uploadBufferToCloudinary } from "./utils/cloudinary";
 
 // Simple session management
 const sessions = new Map<string, number>();
@@ -453,6 +455,37 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ========== FILE UPLOAD ROUTES ==========
+  
+  app.post("/api/upload", requireAuth, memoryUpload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      const folder = req.body.folder || 'uploads';
+      const result: any = await uploadBufferToCloudinary(
+        req.file.buffer,
+        req.file.originalname,
+        folder
+      );
+
+      if (!result.success || !result.url || !result.publicId) {
+        return res.status(500).json({ 
+          error: result.error || 'File upload failed - missing URL or public ID' 
+        });
+      }
+
+      res.json({ 
+        success: true,
+        url: result.url,
+        publicId: result.publicId
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ========== STUDENT INVITE ROUTES ==========
   
   app.post("/api/invites/student", requireAuth, async (req, res) => {
@@ -554,6 +587,63 @@ export function registerRoutes(app: Express) {
 
       const data = insertAssignmentSchema.parse({
         ...req.body,
+        teacherId: user.id,
+      });
+
+      const assignment = await storage.createAssignment(data);
+
+      // Auto-assign to students with matching grade level
+      const students = await storage.getStudentsByTeacher(user.id);
+      const matchingStudents = students.filter(s => s.gradeLevel === assignment.gradeLevel);
+      
+      for (const student of matchingStudents) {
+        await storage.createStudentAssignment({
+          assignmentId: assignment.id,
+          studentId: student.id,
+          submission: null,
+          grade: null,
+          feedback: null,
+          status: "pending",
+          submittedAt: null,
+        });
+      }
+
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/assignments/with-file", requireAuth, memoryUpload.single('file'), async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can create assignments" });
+      }
+
+      let fileUrl = null;
+      if (req.file) {
+        const uploadResult: any = await uploadBufferToCloudinary(
+          req.file.buffer,
+          req.file.originalname,
+          'assignments'
+        );
+        if (!uploadResult.success || !uploadResult.url || !uploadResult.publicId) {
+          return res.status(500).json({ 
+            error: uploadResult.error || 'File upload failed - missing URL or public ID' 
+          });
+        }
+        fileUrl = uploadResult.url;
+      }
+
+      const data = insertAssignmentSchema.parse({
+        title: req.body.title,
+        description: req.body.description,
+        subject: req.body.subject,
+        gradeLevel: parseInt(req.body.gradeLevel),
+        dueDate: req.body.dueDate,
+        points: parseInt(req.body.points),
+        fileUrl,
         teacherId: user.id,
       });
 
@@ -703,6 +793,44 @@ export function registerRoutes(app: Express) {
 
       const data = insertMaterialSchema.parse({
         ...req.body,
+        teacherId: user.id,
+        uploadDate: new Date().toISOString(),
+      });
+
+      const material = await storage.createMaterial(data);
+      res.json(material);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/materials/with-file", requireAuth, memoryUpload.single('file'), async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can upload materials" });
+      }
+
+      let fileUrl = null;
+      if (req.file) {
+        const uploadResult: any = await uploadBufferToCloudinary(
+          req.file.buffer,
+          req.file.originalname,
+          'materials'
+        );
+        if (!uploadResult.success || !uploadResult.url || !uploadResult.publicId) {
+          return res.status(500).json({ 
+            error: uploadResult.error || 'File upload failed - missing URL or public ID' 
+          });
+        }
+        fileUrl = uploadResult.url;
+      }
+
+      const data = insertMaterialSchema.parse({
+        title: req.body.title,
+        subject: req.body.subject,
+        gradeLevel: parseInt(req.body.gradeLevel),
+        fileUrl,
         teacherId: user.id,
         uploadDate: new Date().toISOString(),
       });
