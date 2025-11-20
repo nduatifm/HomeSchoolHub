@@ -5,11 +5,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Upload, User, Settings, Camera } from "lucide-react";
+import { Loader2, Upload, User, Settings, Camera, FileText, X } from "lucide-react";
 
 export default function Profile() {
   const { user, setUser } = useAuth();
@@ -20,6 +21,20 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Bio and role-specific fields
+  const [bio, setBio] = useState(user?.bio || "");
+  const [teachingSubjects, setTeachingSubjects] = useState<string[]>(user?.teachingSubjects || []);
+  const [subjectInput, setSubjectInput] = useState("");
+  const [yearsExperience, setYearsExperience] = useState(user?.yearsExperience?.toString() || "");
+  const [qualifications, setQualifications] = useState(user?.qualifications || "");
+  const [specialization, setSpecialization] = useState(user?.specialization || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [preferredContact, setPreferredContact] = useState(user?.preferredContact || "");
+  const [interests, setInterests] = useState<string[]>(user?.interests || []);
+  const [interestInput, setInterestInput] = useState("");
+  const [favoriteSubject, setFavoriteSubject] = useState(user?.favoriteSubject || "");
+  const [learningGoals, setLearningGoals] = useState(user?.learningGoals || "");
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { name: string }) => {
@@ -72,9 +87,57 @@ export default function Profile() {
     },
   });
 
+  const updateDetailsMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("/api/user/profile-details", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (data) => {
+      setUser(data.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Details updated",
+        description: "Your profile details have been updated successfully.",
+        type: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update details",
+        type: "error",
+      });
+    },
+  });
+
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateProfileMutation.mutate({ name });
+  };
+
+  const handleDetailsSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const detailsData: any = { bio };
+    
+    // Add role-specific fields
+    if (user?.role === "teacher") {
+      detailsData.teachingSubjects = teachingSubjects;
+      if (yearsExperience) detailsData.yearsExperience = parseInt(yearsExperience);
+      if (qualifications) detailsData.qualifications = qualifications;
+      if (specialization) detailsData.specialization = specialization;
+    } else if (user?.role === "parent") {
+      if (phone) detailsData.phone = phone;
+      if (preferredContact) detailsData.preferredContact = preferredContact;
+    } else if (user?.role === "student") {
+      detailsData.interests = interests;
+      if (favoriteSubject) detailsData.favoriteSubject = favoriteSubject;
+      if (learningGoals) detailsData.learningGoals = learningGoals;
+    }
+    
+    updateDetailsMutation.mutate(detailsData);
   };
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -190,10 +253,14 @@ export default function Profile() {
         </div>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile" data-testid="tab-profile">
               <User className="h-4 w-4 mr-2" />
               Profile
+            </TabsTrigger>
+            <TabsTrigger value="details" data-testid="tab-details">
+              <FileText className="h-4 w-4 mr-2" />
+              Bio & Details
             </TabsTrigger>
             <TabsTrigger value="picture" data-testid="tab-picture">
               <Camera className="h-4 w-4 mr-2" />
@@ -258,6 +325,261 @@ export default function Profile() {
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     Save Changes
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="details">
+            <Card>
+              <CardHeader>
+                <CardTitle>Bio & Additional Details</CardTitle>
+                <CardDescription>
+                  {user?.role === "teacher" ? "Share your teaching experience and expertise" :
+                   user?.role === "parent" ? "Add contact information and preferences" :
+                   "Tell us about your interests and goals"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleDetailsSubmit} className="space-y-6">
+                  {/* Bio - Common for all roles */}
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea
+                      id="bio"
+                      data-testid="input-bio"
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      placeholder="Tell us about yourself..."
+                      className="min-h-[100px]"
+                      maxLength={500}
+                    />
+                    <p className="text-xs text-gray-500">{bio.length}/500 characters</p>
+                  </div>
+
+                  {/* Teacher-specific fields */}
+                  {user?.role === "teacher" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="teaching-subjects">Teaching Subjects</Label>
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              id="teaching-subjects"
+                              data-testid="input-subject"
+                              value={subjectInput}
+                              onChange={(e) => setSubjectInput(e.target.value)}
+                              placeholder="Add a subject (e.g., Mathematics)"
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (subjectInput.trim() && !teachingSubjects.includes(subjectInput.trim())) {
+                                    setTeachingSubjects([...teachingSubjects, subjectInput.trim()]);
+                                    setSubjectInput("");
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                if (subjectInput.trim() && !teachingSubjects.includes(subjectInput.trim())) {
+                                  setTeachingSubjects([...teachingSubjects, subjectInput.trim()]);
+                                  setSubjectInput("");
+                                }
+                              }}
+                              data-testid="button-add-subject"
+                            >
+                              Add
+                            </Button>
+                          </div>
+                          {teachingSubjects.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {teachingSubjects.map((subject, index) => (
+                                <div key={index} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full" data-testid={`tag-subject-${index}`}>
+                                  <span className="text-sm">{subject}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-4 w-4 p-0 hover:bg-transparent"
+                                    onClick={() => setTeachingSubjects(teachingSubjects.filter((_, i) => i !== index))}
+                                    data-testid={`button-remove-subject-${index}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="years-experience">Years of Experience</Label>
+                        <Input
+                          id="years-experience"
+                          data-testid="input-years-experience"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={yearsExperience}
+                          onChange={(e) => setYearsExperience(e.target.value)}
+                          placeholder="e.g., 5"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="qualifications">Qualifications</Label>
+                        <Input
+                          id="qualifications"
+                          data-testid="input-qualifications"
+                          value={qualifications}
+                          onChange={(e) => setQualifications(e.target.value)}
+                          placeholder="e.g., Bachelor's in Education"
+                          maxLength={200}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="specialization">Specialization</Label>
+                        <Input
+                          id="specialization"
+                          data-testid="input-specialization"
+                          value={specialization}
+                          onChange={(e) => setSpecialization(e.target.value)}
+                          placeholder="e.g., STEM Education"
+                          maxLength={100}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Parent-specific fields */}
+                  {user?.role === "parent" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          data-testid="input-phone"
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="e.g., +1 234 567 8900"
+                          maxLength={20}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="preferred-contact">Preferred Contact Method</Label>
+                        <Input
+                          id="preferred-contact"
+                          data-testid="input-preferred-contact"
+                          value={preferredContact}
+                          onChange={(e) => setPreferredContact(e.target.value)}
+                          placeholder="e.g., Email, Phone, App Messaging"
+                          maxLength={50}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Student-specific fields */}
+                  {user?.role === "student" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="interests">Interests & Hobbies</Label>
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              id="interests"
+                              data-testid="input-interest"
+                              value={interestInput}
+                              onChange={(e) => setInterestInput(e.target.value)}
+                              placeholder="Add an interest (e.g., Reading)"
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (interestInput.trim() && !interests.includes(interestInput.trim())) {
+                                    setInterests([...interests, interestInput.trim()]);
+                                    setInterestInput("");
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                if (interestInput.trim() && !interests.includes(interestInput.trim())) {
+                                  setInterests([...interests, interestInput.trim()]);
+                                  setInterestInput("");
+                                }
+                              }}
+                              data-testid="button-add-interest"
+                            >
+                              Add
+                            </Button>
+                          </div>
+                          {interests.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {interests.map((interest, index) => (
+                                <div key={index} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full" data-testid={`tag-interest-${index}`}>
+                                  <span className="text-sm">{interest}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-4 w-4 p-0 hover:bg-transparent"
+                                    onClick={() => setInterests(interests.filter((_, i) => i !== index))}
+                                    data-testid={`button-remove-interest-${index}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="favorite-subject">Favorite Subject</Label>
+                        <Input
+                          id="favorite-subject"
+                          data-testid="input-favorite-subject"
+                          value={favoriteSubject}
+                          onChange={(e) => setFavoriteSubject(e.target.value)}
+                          placeholder="e.g., Science"
+                          maxLength={100}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="learning-goals">Learning Goals</Label>
+                        <Textarea
+                          id="learning-goals"
+                          data-testid="input-learning-goals"
+                          value={learningGoals}
+                          onChange={(e) => setLearningGoals(e.target.value)}
+                          placeholder="What do you want to achieve?"
+                          className="min-h-[100px]"
+                          maxLength={500}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <Button
+                    type="submit"
+                    data-testid="button-save-details"
+                    disabled={updateDetailsMutation.isPending}
+                  >
+                    {updateDetailsMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save Details
                   </Button>
                 </form>
               </CardContent>
