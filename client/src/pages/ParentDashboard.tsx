@@ -17,6 +17,11 @@ export default function ParentDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("children");
+  
+  // Dialog state
+  const [inviteStudentOpen, setInviteStudentOpen] = useState(false);
+  const [requestTutorOpen, setRequestTutorOpen] = useState(false);
+  const [sendMessageOpen, setSendMessageOpen] = useState(false);
 
   // Fetch data
   const { data: students = [] } = useQuery({ queryKey: ["/api/students/parent"] });
@@ -49,6 +54,7 @@ export default function ParentDashboard() {
         type: "success" 
       });
       setInviteForm({ email: "", studentName: "", gradeLevel: "" });
+      setInviteStudentOpen(false);
     },
   });
 
@@ -66,6 +72,7 @@ export default function ParentDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/tutor-requests/parent"] });
       toast({ title: "Tutor request sent!", type: "success" });
       setTutorRequestForm({ teacherId: 1, message: "", studentId: null });
+      setRequestTutorOpen(false);
     },
   });
 
@@ -103,6 +110,7 @@ export default function ParentDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       toast({ title: "Message sent!", type: "success" });
       setMessageForm({ receiverId: 0, content: "" });
+      setSendMessageOpen(false);
     },
   });
 
@@ -339,7 +347,7 @@ export default function ParentDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Tutor Requests</CardTitle>
-                <Dialog>
+                <Dialog open={requestTutorOpen} onOpenChange={setRequestTutorOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-request-tutor">Request Tutor</Button>
                   </DialogTrigger>
@@ -526,7 +534,7 @@ export default function ParentDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Messages</CardTitle>
-                <Dialog>
+                <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-new-message">
                       <Send className="h-4 w-4 mr-2" />

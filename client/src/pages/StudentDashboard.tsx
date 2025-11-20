@@ -17,6 +17,11 @@ export default function StudentDashboard() {
   const { user, student, logout } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("assignments");
+  
+  // Dialog state
+  const [submitDialogAssignmentId, setSubmitDialogAssignmentId] = useState<number | null>(null);
+  const [requestClarificationOpen, setRequestClarificationOpen] = useState(false);
+  const [sendMessageOpen, setSendMessageOpen] = useState(false);
 
   // Fetch data
   const { data: assignments = [] } = useQuery({
@@ -61,6 +66,7 @@ export default function StudentDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/assignments/student", student?.id] });
       toast({ title: "Assignment submitted!", type: "success" });
       setSubmissionForm({ studentAssignmentId: 0, submission: "" });
+      setSubmitDialogAssignmentId(null);
     },
   });
 
@@ -79,6 +85,7 @@ export default function StudentDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/clarifications/student", student?.id] });
       toast({ title: "Clarification requested!", type: "success" });
       setClarificationForm({ assignmentId: 0, question: "" });
+      setRequestClarificationOpen(false);
     },
   });
 
@@ -97,6 +104,7 @@ export default function StudentDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       toast({ title: "Message sent!", type: "success" });
       setMessageForm({ receiverId: 0, content: "" });
+      setSendMessageOpen(false);
     },
   });
 
@@ -197,11 +205,17 @@ export default function StudentDashboard() {
                               <Badge variant="secondary">{a.points} points</Badge>
                             </div>
                           </div>
-                          <Dialog>
+                          <Dialog open={submitDialogAssignmentId === a.id} onOpenChange={(open) => {
+                            if (open) {
+                              setSubmitDialogAssignmentId(a.id);
+                              setSubmissionForm({ studentAssignmentId: a.studentAssignment.id, submission: "" });
+                            } else {
+                              setSubmitDialogAssignmentId(null);
+                            }
+                          }}>
                             <DialogTrigger asChild>
                               <Button
                                 size="sm"
-                                onClick={() => setSubmissionForm({ studentAssignmentId: a.studentAssignment.id, submission: "" })}
                                 data-testid={`button-submit-${a.id}`}
                               >
                                 Submit
@@ -415,7 +429,7 @@ export default function StudentDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Ask Questions</CardTitle>
-                <Dialog>
+                <Dialog open={requestClarificationOpen} onOpenChange={setRequestClarificationOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-ask-question">Ask Question</Button>
                   </DialogTrigger>
@@ -488,7 +502,7 @@ export default function StudentDashboard() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Messages</CardTitle>
-                <Dialog>
+                <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-new-message">
                       <Send className="h-4 w-4 mr-2" />
