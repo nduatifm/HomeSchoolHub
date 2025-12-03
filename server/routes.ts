@@ -224,6 +224,15 @@ export function registerRoutes(app: Express) {
         points: 0,
       });
 
+      // Check if tutor request mode is OFF - if so, auto-assign to a teacher
+      const tutorRequestModeSetting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+      const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
+      
+      if (!isTutorRequestMode) {
+        // Auto-assign student to the first available teacher
+        await storage.assignStudentToFirstAvailableTeacher(student.id);
+      }
+
       // Mark invite as accepted
       await storage.updateStudentInvite(invite.id, { status: "accepted" });
 
@@ -754,7 +763,23 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/students/teacher", requireAuth, async (req, res) => {
     try {
-      const students = await storage.getStudentsByTeacher(req.session.userId!);
+      // Check if tutor request mode is enabled
+      const tutorRequestModeSetting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+      const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
+
+      let students;
+      if (isTutorRequestMode) {
+        // When tutor request mode is ON, use the old flow (students from approved requests)
+        students = await storage.getStudentsByTeacher(req.session.userId!);
+      } else {
+        // When tutor request mode is OFF, get students directly assigned to this teacher
+        students = await storage.getStudentsByTeacherDirect(req.session.userId!);
+        
+        // If no direct assignments exist yet, show all students (for backward compatibility)
+        if (students.length === 0) {
+          students = await storage.getAllStudentsForTeachers();
+        }
+      }
       res.json(students);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1802,4 +1827,60 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ========== SYSTEM SETTINGS ROUTES ==========
+  
+  // Public endpoint to check tutor request mode (no auth required for UI decisions)
+  app.get("/api/system-settings/tutor-request-mode", async (req, res) => {
+    try {
+      const setting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+      // Default to false if not set (direct assignment mode)
+      res.json({ enabled: setting?.value === "true" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.get("/api/system-settings", requireAuth, async (req, res) => {
+    try {
+      const settings = await storage.getAllSystemSettings();
+      res.json(settings);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/system-settings/:key", requireAuth, async (req, res) => {
+    try {
+      const setting = await storage.getSystemSetting(req.params.key);
+      res.json(setting);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/system-settings", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res.status(403).json({ error: "Only teachers can modify system settings" });
+      }
+
+      const { key, value, description } = req.body;
+      if (!key || !value) {
+        return res.status(400).json({ error: "Key and value are required" });
+      }
+
+      const setting = await storage.setSystemSetting(key, value, description);
+      res.json(setting);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Helper function to check if tutor request mode is enabled
+  async function isTutorRequestModeEnabled(): Promise<boolean> {
+    const setting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+    return setting?.value === "true";
+  }
 }

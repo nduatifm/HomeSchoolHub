@@ -494,10 +494,9 @@ class PrismaStorage implements IStorage {
         email: true,
         name: true,
         role: true,
-        emailVerified: true,
+        isEmailVerified: true,
         googleId: true,
-        createdAt: true,
-        updatedAt: true,
+        profilePicture: true,
         // Exclude password and emailVerifyToken for security
       }
     }) as User[];
@@ -536,7 +535,7 @@ class PrismaStorage implements IStorage {
       where: { teacherId, status: "active" },
       include: { student: true }
     });
-    return assignments.map(a => a.student) as Student[];
+    return assignments.map((a: any) => a.student) as Student[];
   }
 
   async getAllStudentsForTeachers(): Promise<Student[]> {
