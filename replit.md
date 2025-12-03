@@ -43,9 +43,19 @@ Icons are provided by Lucide React. The profile management features a modern tab
     - **API Endpoints**: `/api/assignments/with-file` and `/api/materials/with-file` for multipart uploads
 - **Core Features**:
     - **Teacher Dashboard**: Assignment creation/grading with file uploads, material uploads with file management, schedule management, feedback system, attendance tracking, earnings view, tutoring session management.
-    - **Parent Dashboard**: Child progress tracking, assignment monitoring, student invitations, payment management, tutor requests, attendance viewing, tutor rating.
+    - **Parent Dashboard**: Child progress tracking, assignment monitoring, student invitations, payment management, tutor requests (when enabled), attendance viewing, tutor rating.
     - **Student Dashboard**: Assignment submission, material access with file viewing, grade/feedback viewing, rewards/badges, clarification requests, schedule viewing, attendance viewing, session joining.
     - **Additional**: Real-time messaging, progress reports, analytics, downloadable reports, comprehensive profile management with Cloudinary integration for profile pictures.
+- **Tutor Request Mode Toggle**:
+    - **Flexible Teacher Assignment System**: The platform supports two modes for connecting students with teachers:
+    - **Mode OFF (Default - Direct Assignment)**: Students are automatically assigned to available teachers when they join. Best for small teams with 1-3 teachers.
+    - **Mode ON (Request Flow)**: Parents must request a tutor for their children, and teachers can approve/reject requests. Better for larger teams with multiple teachers.
+    - **System Settings API**: Controlled via `TUTOR_REQUEST_MODE` setting in the `SystemSettings` table
+    - **Auto-Assignment**: When mode is OFF, new students are automatically assigned to the first available teacher
+    - **UI Conditional Rendering**: Tutor request tabs/sections only appear in dashboards when the mode is ON
+    - **API Endpoints**: 
+        - `GET /api/system-settings/tutor-request-mode` - Check current mode (public)
+        - `POST /api/system-settings` - Update settings (teacher only)
 
 ### System Design Choices
 - **Database**: PostgreSQL hosted on Neon, managed with Prisma ORM for type-safe queries and migrations.
