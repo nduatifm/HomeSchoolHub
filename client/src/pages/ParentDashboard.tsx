@@ -303,7 +303,7 @@ export default function ParentDashboard() {
             onButtonClick={() => setActiveTab("children")}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
             <ColorfulStatCard
               title="Children"
               value={students.length}
@@ -318,24 +318,10 @@ export default function ParentDashboard() {
               className="bg-green-500"
               subtitle="Pending invites"
             />
-            <ColorfulStatCard
-              title="Tutor Requests"
-              value={tutorRequests.length}
-              icon={FileText}
-              className="bg-pink-500"
-              subtitle="Active requests"
-            />
-            <ColorfulStatCard
-              title="Payments"
-              value={payments.length}
-              icon={DollarSign}
-              className="bg-orange-500"
-              subtitle="Total payments"
-            />
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
+            {/* <TabsList className="mb-4">
               <TabsTrigger value="children" data-testid="tab-children">
                 My Children
               </TabsTrigger>
@@ -366,7 +352,7 @@ export default function ParentDashboard() {
               <TabsTrigger value="messages" data-testid="tab-messages">
                 Messages
               </TabsTrigger>
-            </TabsList>
+            </TabsList> */}
 
             <TabsContent value="children">
               <Card>
@@ -554,7 +540,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="payments">
+            {/* <TabsContent value="payments">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Payments</CardTitle>
@@ -746,9 +732,9 @@ export default function ParentDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="rate-tutor">
+            {/* <TabsContent value="rate-tutor">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Rate Tutor</CardTitle>
@@ -924,9 +910,9 @@ export default function ParentDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="attendance">
+            {/* <TabsContent value="attendance">
               <Card>
                 <CardHeader>
                   <CardTitle>Children's Attendance</CardTitle>
@@ -1027,9 +1013,9 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="tutors">
+            {/* <TabsContent value="tutors">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Tutor Requests</CardTitle>
@@ -1104,9 +1090,9 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="reports">
+            {/* <TabsContent value="reports">
               <Card>
                 <CardHeader>
                   <CardTitle>Student Progress Reports</CardTitle>
@@ -1202,9 +1188,9 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="controls">
+            {/* <TabsContent value="controls">
               <Card>
                 <CardHeader>
                   <CardTitle>Parental Controls</CardTitle>
@@ -1300,9 +1286,9 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="messages">
+            {/* <TabsContent value="messages">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Messages</CardTitle>
@@ -1413,7 +1399,7 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
           </Tabs>
         </main>
       </div>

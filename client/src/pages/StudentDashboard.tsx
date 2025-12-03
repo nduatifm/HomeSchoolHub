@@ -43,6 +43,9 @@ import {
   ClipboardCheck,
   Video,
   Star,
+  LibraryBig,
+  Presentation,
+  MessageSquareQuote,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -203,35 +206,35 @@ export default function StudentDashboard() {
             <ColorfulStatCard
               title="Assignments"
               value={assignments.length}
-              icon={FileText}
+              icon={BookOpen}
               className="bg-purple-500"
               subtitle={`${pendingAssignments.length} pending`}
             />
             <ColorfulStatCard
-              title="Points"
-              value={student?.points || 0}
-              icon={Trophy}
-              className="bg-green-500"
-              subtitle="Total earned"
-            />
-            <ColorfulStatCard
-              title="Badges"
-              value={student?.badges?.length || 0}
-              icon={Award}
-              className="bg-pink-500"
-              subtitle="Achievements"
-            />
-            <ColorfulStatCard
               title="Materials"
               value={materials.length}
-              icon={BookOpen}
+              icon={LibraryBig}
               className="bg-orange-500"
               subtitle="Study resources"
+            />
+            <ColorfulStatCard
+              title="Sessions"
+              value={sessions.length || 0}
+              icon={Presentation}
+              className="bg-green-500"
+              subtitle="Total Classes"
+            />
+            <ColorfulStatCard
+              title="Feedback"
+              value={feedback.length}
+              icon={MessageSquareQuote}
+              className="bg-pink-500"
+              subtitle="Your Progress"
             />
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
+            {/* <TabsList className="mb-4">
               <TabsTrigger value="assignments" data-testid="tab-assignments">
                 Assignments
               </TabsTrigger>
@@ -262,7 +265,7 @@ export default function StudentDashboard() {
               <TabsTrigger value="messages" data-testid="tab-messages">
                 Messages
               </TabsTrigger>
-            </TabsList>
+            </TabsList> */}
 
             <TabsContent value="assignments">
               <div className="space-y-4">
@@ -540,7 +543,7 @@ export default function StudentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="schedule">
+            {/* <TabsContent value="schedule">
               <Card>
                 <CardHeader>
                   <CardTitle>My Schedule</CardTitle>
@@ -621,9 +624,9 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="attendance">
+            {/* <TabsContent value="attendance">
               <Card>
                 <CardHeader>
                   <CardTitle>My Attendance</CardTitle>
@@ -687,7 +690,7 @@ export default function StudentDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
             <TabsContent value="sessions">
               <Card>
@@ -778,7 +781,7 @@ export default function StudentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="rewards">
+            {/* <TabsContent value="rewards">
               <Card>
                 <CardHeader>
                   <CardTitle>My Rewards & Achievements</CardTitle>
@@ -857,9 +860,9 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="clarifications">
+            {/* <TabsContent value="clarifications">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Ask Questions</CardTitle>
@@ -977,9 +980,9 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="messages">
+            {/* <TabsContent value="messages">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Messages</CardTitle>
@@ -1090,7 +1093,7 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
           </Tabs>
         </main>
       </div>

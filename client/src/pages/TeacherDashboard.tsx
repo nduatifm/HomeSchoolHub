@@ -56,6 +56,7 @@ import {
   Trash2,
   Clock,
   Star,
+  LibraryBig,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -646,28 +647,28 @@ export default function TeacherDashboard() {
             <ColorfulStatCard
               title="Assignments"
               value={assignments.length}
-              icon={FileText}
+              icon={BookOpen}
               className="bg-green-500"
               subtitle="Total created"
             />
             <ColorfulStatCard
               title="Sessions"
               value={sessions.length}
-              icon={Calendar}
+              icon={Presentation}
               className="bg-pink-500"
               subtitle="Scheduled"
             />
             <ColorfulStatCard
-              title="Earnings"
-              value={`$${totalEarnings}`}
-              icon={DollarSign}
+              title="Materials"
+              value={materials.length}
+              icon={LibraryBig}
               className="bg-orange-500"
-              subtitle="Total earned"
+              subtitle="Study resources"
             />
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
+            {/* <TabsList className="mb-4">
               <TabsTrigger value="assignments" data-testid="tab-assignments">
                 Assignments
               </TabsTrigger>
@@ -698,7 +699,7 @@ export default function TeacherDashboard() {
               <TabsTrigger value="messages" data-testid="tab-messages">
                 Messages
               </TabsTrigger>
-            </TabsList>
+            </TabsList> */}
 
             <TabsContent value="assignments">
               <Card>
@@ -1740,7 +1741,7 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="schedule">
+            {/* <TabsContent value="schedule">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Student Schedules</CardTitle>
@@ -2110,7 +2111,7 @@ export default function TeacherDashboard() {
                   </Dialog>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
             <TabsContent value="feedback">
               <Card>
@@ -2294,7 +2295,7 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="attendance">
+            {/* <TabsContent value="attendance">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Mark Student Attendance</CardTitle>
@@ -2526,9 +2527,9 @@ export default function TeacherDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="requests">
+            {/* <TabsContent value="requests">
               <Card>
                 <CardHeader>
                   <CardTitle>Tutor Requests</CardTitle>
@@ -2596,9 +2597,9 @@ export default function TeacherDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="reports">
+            {/* <TabsContent value="reports">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Progress Reports & Analytics</CardTitle>
@@ -2840,9 +2841,9 @@ export default function TeacherDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
-            <TabsContent value="messages">
+            {/* <TabsContent value="messages">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Messages</CardTitle>
@@ -2953,7 +2954,7 @@ export default function TeacherDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
           </Tabs>
         </main>
       </div>

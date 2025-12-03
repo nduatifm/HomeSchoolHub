@@ -1,23 +1,14 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import {
-  Home,
-  LayoutGrid,
-  Clock,
   Settings,
   User,
-  LogOut,
   BookOpen,
-  Users,
   FileText,
-  CreditCard,
-  Star,
-  Calendar,
-  MessageSquare,
-  Shield,
-  HelpCircle,
-  Award,
-  // UserPlus, // For tutor request - commented for future use
+  UserPlus,
+  Presentation,
+  MessageSquareQuote,
+  LibraryBig,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -44,104 +35,74 @@ export default function ModernSidebar() {
   }, []);
 
   // Teacher sidebar items
-  // Available tabs: schedule, attendance, tutor request (commented), progress report, messages
   const teacherItems: SidebarItem[] = [
     {
-      icon: <Calendar className="w-6 h-6" />,
-      label: "Schedule",
-      hash: "schedule",
+      icon: <BookOpen className="w-6 h-6" />,
+      label: "Assignments",
+      hash: "assignments",
     },
     {
-      icon: <Clock className="w-6 h-6" />,
-      label: "Attendance",
-      hash: "attendance",
-    },
-    // Tutor Request - commented for future use (multiple teachers feature)
-    // {
-    //   icon: <UserPlus className="w-6 h-6" />,
-    //   label: "Tutor Request",
-    //   hash: "tutor-request",
-    // },
-    {
-      icon: <FileText className="w-6 h-6" />,
-      label: "Progress Report",
-      hash: "progress-report",
+      icon: <LibraryBig className="w-6 h-6" />,
+      label: "Study Materials",
+      hash: "materials",
     },
     {
-      icon: <MessageSquare className="w-6 h-6" />,
-      label: "Messages",
-      hash: "messages",
+      icon: <User className="w-6 h-6" />,
+      label: "Students",
+      hash: "students",
+    },
+    {
+      icon: <Presentation className="w-6 h-6" />,
+      label: "Sessions",
+      hash: "sessions",
+    },
+    {
+      icon: <MessageSquareQuote className="w-6 h-6" />,
+      label: "Feedback",
+      hash: "feedback",
     },
   ];
 
   // Parent sidebar items
-  // Available tabs: payments, rate tutor, attendance, tutor request (commented), progress report, parental control, messages
   const parentItems: SidebarItem[] = [
     {
-      icon: <CreditCard className="w-6 h-6" />,
-      label: "Payments",
-      hash: "payments",
+      icon: <User className="w-6 h-6" />,
+      label: "My Children",
+      hash: "children",
     },
     {
-      icon: <Star className="w-6 h-6" />,
-      label: "Rate Tutor",
-      hash: "rate-tutor",
+      icon: <UserPlus className="w-6 h-6" />,
+      label: "Invite Student",
+      hash: "invites",
     },
-    {
-      icon: <Clock className="w-6 h-6" />,
-      label: "Attendance",
-      hash: "attendance",
-    },
-    // Tutor Request - commented for future use (multiple teachers feature)
-    // {
-    //   icon: <UserPlus className="w-6 h-6" />,
-    //   label: "Tutor Request",
-    //   hash: "tutor-request",
-    // },
     {
       icon: <FileText className="w-6 h-6" />,
-      label: "Progress Report",
-      hash: "progress-report",
-    },
-    {
-      icon: <Shield className="w-6 h-6" />,
-      label: "Parental Control",
-      hash: "parental-control",
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />,
-      label: "Messages",
-      hash: "messages",
+      label: "Track Progress",
+      hash: "progress",
     },
   ];
 
   // Student sidebar items
-  // Available tabs: schedule, attendance, rewards, ask questions, messages
   const studentItems: SidebarItem[] = [
     {
-      icon: <Calendar className="w-6 h-6" />,
-      label: "Schedule",
-      hash: "schedule",
+      icon: <BookOpen className="w-6 h-6" />,
+      label: "Assignments",
+      hash: "assignments",
     },
     {
-      icon: <Clock className="w-6 h-6" />,
-      label: "Attendance",
-      hash: "attendance",
+      icon: <LibraryBig className="w-6 h-6" />,
+      label: "Study Materials",
+      hash: "materials",
     },
     {
-      icon: <Award className="w-6 h-6" />,
-      label: "Rewards",
-      hash: "rewards",
+      icon: <Presentation className="w-6 h-6" />,
+      label: "Sessions",
+      hash: "sessions",
     },
     {
-      icon: <HelpCircle className="w-6 h-6" />,
-      label: "Ask Questions",
-      hash: "ask-questions",
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />,
-      label: "Messages",
-      hash: "messages",
+      icon: <MessageSquareQuote className="w-6 h-6" />,
+      label: "Feedback",
+      hash: "feedback",
     },
   ];
 
