@@ -328,3 +328,28 @@ export const insertStudentInviteSchema = studentInviteSchema.omit({
 });
 export type StudentInvite = z.infer<typeof studentInviteSchema>;
 export type InsertStudentInvite = z.infer<typeof insertStudentInviteSchema>;
+
+// System Settings schema
+export const systemSettingsSchema = z.object({
+  id: z.number(),
+  key: z.string(),
+  value: z.string(),
+  description: z.string().nullable(),
+});
+
+export const insertSystemSettingsSchema = systemSettingsSchema.omit({ id: true });
+export type SystemSettings = z.infer<typeof systemSettingsSchema>;
+export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
+
+// Teacher Assignment schema (for direct teacher-student assignments without request flow)
+export const teacherStudentAssignmentSchema = z.object({
+  id: z.number(),
+  teacherId: z.number(),
+  studentId: z.number(),
+  assignedDate: z.string(),
+  status: z.enum(["active", "inactive"]),
+});
+
+export const insertTeacherStudentAssignmentSchema = teacherStudentAssignmentSchema.omit({ id: true });
+export type TeacherStudentAssignment = z.infer<typeof teacherStudentAssignmentSchema>;
+export type InsertTeacherStudentAssignment = z.infer<typeof insertTeacherStudentAssignmentSchema>;

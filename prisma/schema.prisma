@@ -35,23 +35,24 @@ model User {
   favoriteSubject    String?
   learningGoals      String?
 
-  student             Student?
-  teacherAssignments  Assignment[]
-  teacherMaterials    Material[]
-  teacherSessions     Session[]
-  teacherFeedback     Feedback[]
-  teacherSchedules    Schedule[]        @relation("TeacherSchedules")
-  tutorRequests       TutorRequest[]    @relation("TeacherRequests")
-  parentStudents      Student[]         @relation("ParentStudents")
-  parentInvites       StudentInvite[]
-  parentPayments      Payment[]
-  parentTutorRequests TutorRequest[]    @relation("ParentRequests")
-  parentControls      ParentalControl[]
-  parentRatings       TutorRating[]
-  teacherEarnings     Earnings[]
-  sentMessages        Message[]         @relation("SentMessages")
-  receivedMessages    Message[]         @relation("ReceivedMessages")
-  teacherReports      ProgressReport[]
+  student                    Student?
+  teacherAssignments         Assignment[]
+  teacherMaterials           Material[]
+  teacherSessions            Session[]
+  teacherFeedback            Feedback[]
+  teacherSchedules           Schedule[]                  @relation("TeacherSchedules")
+  tutorRequests              TutorRequest[]              @relation("TeacherRequests")
+  parentStudents             Student[]                   @relation("ParentStudents")
+  parentInvites              StudentInvite[]
+  parentPayments             Payment[]
+  parentTutorRequests        TutorRequest[]              @relation("ParentRequests")
+  parentControls             ParentalControl[]
+  parentRatings              TutorRating[]
+  teacherEarnings            Earnings[]
+  sentMessages               Message[]                   @relation("SentMessages")
+  receivedMessages           Message[]                   @relation("ReceivedMessages")
+  teacherReports             ProgressReport[]
+  teacherStudentAssignments  TeacherStudentAssignment[]
 
   @@index([email])
   @@index([googleId])
@@ -67,15 +68,16 @@ model Student {
   badges     String[]
   points     Int      @default(0)
 
-  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent           User                @relation("ParentStudents", fields: [parentId], references: [id], onDelete: Cascade)
-  assignments      StudentAssignment[]
-  schedules        Schedule[]
-  feedback         Feedback[]
-  attendance       Attendance[]
-  clarifications   Clarification[]
-  parentalControls ParentalControl[]
-  progressReports  ProgressReport[]
+  user                       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent                     User                       @relation("ParentStudents", fields: [parentId], references: [id], onDelete: Cascade)
+  assignments                StudentAssignment[]
+  schedules                  Schedule[]
+  feedback                   Feedback[]
+  attendance                 Attendance[]
+  clarifications             Clarification[]
+  parentalControls           ParentalControl[]
+  progressReports            ProgressReport[]
+  teacherStudentAssignments  TeacherStudentAssignment[]
 
   @@index([userId])
   @@index([parentId])
@@ -337,4 +339,28 @@ model StudentInvite {
 
   @@index([parentId])
   @@index([token])
+}
+
+model SystemSettings {
+  id          Int     @id @default(autoincrement())
+  key         String  @unique
+  value       String
+  description String?
+
+  @@index([key])
+}
+
+model TeacherStudentAssignment {
+  id           Int    @id @default(autoincrement())
+  teacherId    Int
+  studentId    Int
+  assignedDate String
+  status       String @default("active")
+
+  teacher User    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, studentId])
+  @@index([teacherId])
+  @@index([studentId])
 }
