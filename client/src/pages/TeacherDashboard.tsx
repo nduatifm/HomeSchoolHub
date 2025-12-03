@@ -117,6 +117,12 @@ export default function TeacherDashboard() {
   const [giveFeedbackOpen, setGiveFeedbackOpen] = useState(false);
   const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
 
+  // Check if tutor request mode is enabled (for showing/hiding tutor request UI)
+  const { data: tutorRequestModeData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/system-settings/tutor-request-mode"],
+  });
+  const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
+
   // Fetch data
   const { data: students = [] } = useQuery({
     queryKey: ["/api/students/teacher"],
@@ -132,6 +138,7 @@ export default function TeacherDashboard() {
   });
   const { data: tutorRequests = [] } = useQuery({
     queryKey: ["/api/tutor-requests/teacher"],
+    enabled: isTutorRequestModeEnabled, // Only fetch when tutor request mode is ON
   });
   const { data: earnings = [] } = useQuery({
     queryKey: ["/api/earnings/teacher"],

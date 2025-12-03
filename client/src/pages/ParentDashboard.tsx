@@ -102,6 +102,12 @@ export default function ParentDashboard() {
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [rateTutorOpen, setRateTutorOpen] = useState(false);
 
+  // Check if tutor request mode is enabled (for showing/hiding tutor request UI)
+  const { data: tutorRequestModeData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/system-settings/tutor-request-mode"],
+  });
+  const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
+
   // Fetch data
   const { data: students = [] } = useQuery({
     queryKey: ["/api/students/parent"],
@@ -111,6 +117,7 @@ export default function ParentDashboard() {
   });
   const { data: tutorRequests = [] } = useQuery({
     queryKey: ["/api/tutor-requests/parent"],
+    enabled: isTutorRequestModeEnabled, // Only fetch when tutor request mode is ON
   });
   const paymentsQuery = useQuery({ queryKey: ["/api/payments/parent"] });
   const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
