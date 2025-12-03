@@ -43,106 +43,121 @@ export default function ModernSidebar() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
-  // Teacher sidebar items
-  // Available tabs: schedule, attendance, tutor request (commented), progress report, messages
+  // Teacher sidebar items - commented for future use
+  // Available tabs: schedule, attendance, tutor request, progress report, messages
   const teacherItems: SidebarItem[] = [
-    {
-      icon: <Calendar className="w-6 h-6" />,
-      label: "Schedule",
-      hash: "schedule",
-    },
-    {
-      icon: <Clock className="w-6 h-6" />,
-      label: "Attendance",
-      hash: "attendance",
-    },
+    // Schedule - commented for future use
+    // {
+    //   icon: <Calendar className="w-6 h-6" />,
+    //   label: "Schedule",
+    //   hash: "schedule",
+    // },
+    // Attendance - commented for future use
+    // {
+    //   icon: <Clock className="w-6 h-6" />,
+    //   label: "Attendance",
+    //   hash: "attendance",
+    // },
     // Tutor Request - commented for future use (multiple teachers feature)
     // {
     //   icon: <UserPlus className="w-6 h-6" />,
     //   label: "Tutor Request",
     //   hash: "tutor-request",
     // },
-    {
-      icon: <FileText className="w-6 h-6" />,
-      label: "Progress Report",
-      hash: "progress-report",
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />,
-      label: "Messages",
-      hash: "messages",
-    },
+    // Progress Report - commented for future use
+    // {
+    //   icon: <FileText className="w-6 h-6" />,
+    //   label: "Progress Report",
+    //   hash: "progress-report",
+    // },
+    // Messages - commented for future use
+    // {
+    //   icon: <MessageSquare className="w-6 h-6" />,
+    //   label: "Messages",
+    //   hash: "messages",
+    // },
   ];
 
-  // Parent sidebar items
-  // Available tabs: payments, rate tutor, attendance, tutor request (commented), progress report, parental control, messages
+  // Parent sidebar items - commented for future use
+  // Available tabs: payments, rate tutor, attendance, tutor request, progress report, parental control, messages
   const parentItems: SidebarItem[] = [
-    {
-      icon: <CreditCard className="w-6 h-6" />,
-      label: "Payments",
-      hash: "payments",
-    },
-    {
-      icon: <Star className="w-6 h-6" />,
-      label: "Rate Tutor",
-      hash: "rate-tutor",
-    },
-    {
-      icon: <Clock className="w-6 h-6" />,
-      label: "Attendance",
-      hash: "attendance",
-    },
+    // Payments - commented for future use
+    // {
+    //   icon: <CreditCard className="w-6 h-6" />,
+    //   label: "Payments",
+    //   hash: "payments",
+    // },
+    // Rate Tutor - commented for future use
+    // {
+    //   icon: <Star className="w-6 h-6" />,
+    //   label: "Rate Tutor",
+    //   hash: "rate-tutor",
+    // },
+    // Attendance - commented for future use
+    // {
+    //   icon: <Clock className="w-6 h-6" />,
+    //   label: "Attendance",
+    //   hash: "attendance",
+    // },
     // Tutor Request - commented for future use (multiple teachers feature)
     // {
     //   icon: <UserPlus className="w-6 h-6" />,
     //   label: "Tutor Request",
     //   hash: "tutor-request",
     // },
-    {
-      icon: <FileText className="w-6 h-6" />,
-      label: "Progress Report",
-      hash: "progress-report",
-    },
-    {
-      icon: <Shield className="w-6 h-6" />,
-      label: "Parental Control",
-      hash: "parental-control",
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />,
-      label: "Messages",
-      hash: "messages",
-    },
+    // Progress Report - commented for future use
+    // {
+    //   icon: <FileText className="w-6 h-6" />,
+    //   label: "Progress Report",
+    //   hash: "progress-report",
+    // },
+    // Parental Control - commented for future use
+    // {
+    //   icon: <Shield className="w-6 h-6" />,
+    //   label: "Parental Control",
+    //   hash: "parental-control",
+    // },
+    // Messages - commented for future use
+    // {
+    //   icon: <MessageSquare className="w-6 h-6" />,
+    //   label: "Messages",
+    //   hash: "messages",
+    // },
   ];
 
-  // Student sidebar items
+  // Student sidebar items - commented for future use
   // Available tabs: schedule, attendance, rewards, ask questions, messages
   const studentItems: SidebarItem[] = [
-    {
-      icon: <Calendar className="w-6 h-6" />,
-      label: "Schedule",
-      hash: "schedule",
-    },
-    {
-      icon: <Clock className="w-6 h-6" />,
-      label: "Attendance",
-      hash: "attendance",
-    },
-    {
-      icon: <Award className="w-6 h-6" />,
-      label: "Rewards",
-      hash: "rewards",
-    },
-    {
-      icon: <HelpCircle className="w-6 h-6" />,
-      label: "Ask Questions",
-      hash: "ask-questions",
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />,
-      label: "Messages",
-      hash: "messages",
-    },
+    // Schedule - commented for future use
+    // {
+    //   icon: <Calendar className="w-6 h-6" />,
+    //   label: "Schedule",
+    //   hash: "schedule",
+    // },
+    // Attendance - commented for future use
+    // {
+    //   icon: <Clock className="w-6 h-6" />,
+    //   label: "Attendance",
+    //   hash: "attendance",
+    // },
+    // Rewards - commented for future use
+    // {
+    //   icon: <Award className="w-6 h-6" />,
+    //   label: "Rewards",
+    //   hash: "rewards",
+    // },
+    // Ask Questions - commented for future use
+    // {
+    //   icon: <HelpCircle className="w-6 h-6" />,
+    //   label: "Ask Questions",
+    //   hash: "ask-questions",
+    // },
+    // Messages - commented for future use
+    // {
+    //   icon: <MessageSquare className="w-6 h-6" />,
+    //   label: "Messages",
+    //   hash: "messages",
+    // },
   ];
 
   const getItems = () => {
