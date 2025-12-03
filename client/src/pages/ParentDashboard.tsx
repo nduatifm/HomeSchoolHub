@@ -1022,82 +1022,88 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent> */}
 
-            {/* <TabsContent value="tutors">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Tutor Requests</CardTitle>
-                  <Dialog
-                    open={requestTutorOpen}
-                    onOpenChange={setRequestTutorOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button data-testid="button-request-tutor">
-                        Request Tutor
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Request Tutor</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <Textarea
-                          placeholder="Message to tutor..."
-                          value={tutorRequestForm.message}
-                          onChange={(e) =>
-                            setTutorRequestForm({
-                              ...tutorRequestForm,
-                              message: e.target.value,
-                            })
-                          }
-                          data-testid="input-tutor-request-message"
-                        />
-                        <Button
-                          onClick={() =>
-                            requestTutorMutation.mutate(tutorRequestForm)
-                          }
-                          disabled={requestTutorMutation.isPending}
-                          className="w-full"
-                          data-testid="button-submit-tutor-request"
-                        >
-                          {requestTutorMutation.isPending
-                            ? "Sending..."
-                            : "Send Request"}
+            {isTutorRequestModeEnabled && (
+              <TabsContent value="tutors">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Tutor Requests</CardTitle>
+                    <Dialog
+                      open={requestTutorOpen}
+                      onOpenChange={setRequestTutorOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button data-testid="button-request-tutor">
+                          Request Tutor
                         </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {tutorRequests.map((r: any) => (
-                      <div
-                        key={r.id}
-                        className="p-4 border rounded-lg"
-                        data-testid={`card-tutor-request-${r.id}`}
-                      >
-                        <p
-                          className="font-medium"
-                          data-testid={`text-tutor-request-message-${r.id}`}
-                        >
-                          {r.message}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Requested:{" "}
-                          {new Date(r.requestDate).toLocaleDateString()}
-                        </p>
-                        <Badge
-                          variant={
-                            r.status === "approved" ? "default" : "outline"
-                          }
-                        >
-                          {r.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent> */}
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Request Tutor</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Textarea
+                            placeholder="Message to tutor..."
+                            value={tutorRequestForm.message}
+                            onChange={(e) =>
+                              setTutorRequestForm({
+                                ...tutorRequestForm,
+                                message: e.target.value,
+                              })
+                            }
+                            data-testid="input-tutor-request-message"
+                          />
+                          <Button
+                            onClick={() =>
+                              requestTutorMutation.mutate(tutorRequestForm)
+                            }
+                            disabled={requestTutorMutation.isPending}
+                            className="w-full"
+                            data-testid="button-submit-tutor-request"
+                          >
+                            {requestTutorMutation.isPending
+                              ? "Sending..."
+                              : "Send Request"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {tutorRequests.length === 0 ? (
+                        <p className="text-sm text-gray-600">No tutor requests yet. Click "Request Tutor" to get started.</p>
+                      ) : (
+                        tutorRequests.map((r: any) => (
+                          <div
+                            key={r.id}
+                            className="p-4 border rounded-lg"
+                            data-testid={`card-tutor-request-${r.id}`}
+                          >
+                            <p
+                              className="font-medium"
+                              data-testid={`text-tutor-request-message-${r.id}`}
+                            >
+                              {r.message}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Requested:{" "}
+                              {new Date(r.requestDate).toLocaleDateString()}
+                            </p>
+                            <Badge
+                              variant={
+                                r.status === "approved" ? "default" : "outline"
+                              }
+                            >
+                              {r.status}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
 
             {/* <TabsContent value="reports">
               <Card>

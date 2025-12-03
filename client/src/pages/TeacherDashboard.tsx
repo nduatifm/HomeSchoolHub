@@ -2536,75 +2536,81 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent> */}
 
-            {/* <TabsContent value="requests">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tutor Requests</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {tutorRequests.map((r: any) => (
-                      <div
-                        key={r.id}
-                        className="p-4 border rounded-lg"
-                        data-testid={`card-request-${r.id}`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p
-                              className="font-medium"
-                              data-testid={`text-request-message-${r.id}`}
-                            >
-                              {r.message}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Requested:{" "}
-                              {new Date(r.requestDate).toLocaleDateString()}
-                            </p>
-                            <Badge
-                              variant={
-                                r.status === "approved" ? "default" : "outline"
-                              }
-                            >
-                              {r.status}
-                            </Badge>
-                          </div>
-                          {r.status === "pending" && (
-                            <div className="space-x-2">
-                              <Button
-                                size="sm"
-                                onClick={() =>
-                                  approveTutorRequestMutation.mutate({
-                                    id: r.id,
-                                    status: "approved",
-                                  })
-                                }
-                                data-testid={`button-approve-${r.id}`}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  approveTutorRequestMutation.mutate({
-                                    id: r.id,
-                                    status: "rejected",
-                                  })
-                                }
-                                data-testid={`button-reject-${r.id}`}
-                              >
-                                Reject
-                              </Button>
+            {isTutorRequestModeEnabled && (
+              <TabsContent value="requests">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Tutor Requests</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {tutorRequests.length === 0 ? (
+                        <p className="text-sm text-gray-600">No tutor requests pending.</p>
+                      ) : (
+                        tutorRequests.map((r: any) => (
+                          <div
+                            key={r.id}
+                            className="p-4 border rounded-lg"
+                            data-testid={`card-request-${r.id}`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p
+                                  className="font-medium"
+                                  data-testid={`text-request-message-${r.id}`}
+                                >
+                                  {r.message}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  Requested:{" "}
+                                  {new Date(r.requestDate).toLocaleDateString()}
+                                </p>
+                                <Badge
+                                  variant={
+                                    r.status === "approved" ? "default" : "outline"
+                                  }
+                                >
+                                  {r.status}
+                                </Badge>
+                              </div>
+                              {r.status === "pending" && (
+                                <div className="space-x-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      approveTutorRequestMutation.mutate({
+                                        id: r.id,
+                                        status: "approved",
+                                      })
+                                    }
+                                    data-testid={`button-approve-${r.id}`}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      approveTutorRequestMutation.mutate({
+                                        id: r.id,
+                                        status: "rejected",
+                                      })
+                                    }
+                                    data-testid={`button-reject-${r.id}`}
+                                  >
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent> */}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
 
             {/* <TabsContent value="reports">
               <Card>
