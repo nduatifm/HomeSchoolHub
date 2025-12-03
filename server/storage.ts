@@ -19,6 +19,8 @@ import type {
   TutorRating, InsertTutorRating,
   Earnings, InsertEarnings,
   StudentInvite, InsertStudentInvite,
+  SystemSettings, InsertSystemSettings,
+  TeacherStudentAssignment, InsertTeacherStudentAssignment,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -121,6 +123,19 @@ export interface IStorage {
   updateStudentInvite(id: number, invite: Prisma.StudentInviteUpdateInput): Promise<StudentInvite>;
   
   getAllUsers(): Promise<User[]>;
+  
+  // System Settings
+  getSystemSetting(key: string): Promise<SystemSettings | null>;
+  setSystemSetting(key: string, value: string, description?: string): Promise<SystemSettings>;
+  getAllSystemSettings(): Promise<SystemSettings[]>;
+  
+  // Teacher-Student Assignments (direct assignment without request flow)
+  createTeacherStudentAssignment(assignment: InsertTeacherStudentAssignment): Promise<TeacherStudentAssignment>;
+  getTeacherStudentAssignment(teacherId: number, studentId: number): Promise<TeacherStudentAssignment | null>;
+  getStudentsByTeacherDirect(teacherId: number): Promise<Student[]>;
+  getAllStudentsForTeachers(): Promise<Student[]>;
+  assignStudentToFirstAvailableTeacher(studentId: number): Promise<TeacherStudentAssignment | null>;
+  removeTeacherStudentAssignment(teacherId: number, studentId: number): Promise<void>;
 }
 
 class PrismaStorage implements IStorage {
@@ -486,6 +501,89 @@ class PrismaStorage implements IStorage {
         // Exclude password and emailVerifyToken for security
       }
     }) as User[];
+  }
+
+  // System Settings methods
+  async getSystemSetting(key: string): Promise<SystemSettings | null> {
+    return await prisma.systemSettings.findUnique({ where: { key } }) as SystemSettings | null;
+  }
+
+  async setSystemSetting(key: string, value: string, description?: string): Promise<SystemSettings> {
+    return await prisma.systemSettings.upsert({
+      where: { key },
+      update: { value, description },
+      create: { key, value, description },
+    }) as SystemSettings;
+  }
+
+  async getAllSystemSettings(): Promise<SystemSettings[]> {
+    return await prisma.systemSettings.findMany() as SystemSettings[];
+  }
+
+  // Teacher-Student Assignment methods
+  async createTeacherStudentAssignment(assignment: InsertTeacherStudentAssignment): Promise<TeacherStudentAssignment> {
+    return await prisma.teacherStudentAssignment.create({ data: assignment }) as TeacherStudentAssignment;
+  }
+
+  async getTeacherStudentAssignment(teacherId: number, studentId: number): Promise<TeacherStudentAssignment | null> {
+    return await prisma.teacherStudentAssignment.findUnique({
+      where: { teacherId_studentId: { teacherId, studentId } }
+    }) as TeacherStudentAssignment | null;
+  }
+
+  async getStudentsByTeacherDirect(teacherId: number): Promise<Student[]> {
+    const assignments = await prisma.teacherStudentAssignment.findMany({
+      where: { teacherId, status: "active" },
+      include: { student: true }
+    });
+    return assignments.map(a => a.student) as Student[];
+  }
+
+  async getAllStudentsForTeachers(): Promise<Student[]> {
+    return await prisma.student.findMany() as Student[];
+  }
+
+  async assignStudentToFirstAvailableTeacher(studentId: number): Promise<TeacherStudentAssignment | null> {
+    // Find the first available teacher (teacher with least students)
+    const teachers = await prisma.user.findMany({
+      where: { role: "teacher" },
+      include: {
+        teacherStudentAssignments: {
+          where: { status: "active" }
+        }
+      }
+    });
+
+    if (teachers.length === 0) return null;
+
+    // Sort by number of students (ascending) to balance load
+    teachers.sort((a, b) => a.teacherStudentAssignments.length - b.teacherStudentAssignments.length);
+    const selectedTeacher = teachers[0];
+
+    // Check if assignment already exists
+    const existing = await prisma.teacherStudentAssignment.findUnique({
+      where: { teacherId_studentId: { teacherId: selectedTeacher.id, studentId } }
+    });
+
+    if (existing) {
+      return existing as TeacherStudentAssignment;
+    }
+
+    // Create new assignment
+    return await prisma.teacherStudentAssignment.create({
+      data: {
+        teacherId: selectedTeacher.id,
+        studentId,
+        assignedDate: new Date().toISOString(),
+        status: "active"
+      }
+    }) as TeacherStudentAssignment;
+  }
+
+  async removeTeacherStudentAssignment(teacherId: number, studentId: number): Promise<void> {
+    await prisma.teacherStudentAssignment.delete({
+      where: { teacherId_studentId: { teacherId, studentId } }
+    });
   }
 }
 
