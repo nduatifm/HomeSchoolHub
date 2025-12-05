@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, apiUploadWithProgress } from "@/lib/queryClient";
+import {
+  queryClient,
+  apiRequest,
+  apiUploadWithProgress,
+} from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -176,7 +180,9 @@ export default function TeacherDashboard() {
   });
   const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
   const [assignmentFileUrl, setAssignmentFileUrl] = useState("");
-  const [assignmentInputType, setAssignmentInputType] = useState<"file" | "url">("file");
+  const [assignmentInputType, setAssignmentInputType] = useState<
+    "file" | "url"
+  >("file");
   const [assignmentUploadProgress, setAssignmentUploadProgress] = useState(0);
   const [isAssignmentUploading, setIsAssignmentUploading] = useState(false);
 
@@ -185,7 +191,7 @@ export default function TeacherDashboard() {
       if (assignmentInputType === "file" && assignmentFile) {
         setIsAssignmentUploading(true);
         setAssignmentUploadProgress(0);
-        
+
         const formData = new FormData();
         formData.append("file", assignmentFile);
         formData.append("title", data.title);
@@ -197,7 +203,7 @@ export default function TeacherDashboard() {
         return apiUploadWithProgress(
           "/api/assignments/with-file",
           formData,
-          (progress) => setAssignmentUploadProgress(progress)
+          (progress) => setAssignmentUploadProgress(progress),
         );
       } else if (assignmentInputType === "url" && assignmentFileUrl) {
         return apiRequest("/api/assignments", {
@@ -287,7 +293,9 @@ export default function TeacherDashboard() {
   });
   const [materialFile, setMaterialFile] = useState<File | null>(null);
   const [materialLink, setMaterialLink] = useState("");
-  const [materialInputType, setMaterialInputType] = useState<"file" | "link">("file");
+  const [materialInputType, setMaterialInputType] = useState<"file" | "link">(
+    "file",
+  );
   const [materialUploadProgress, setMaterialUploadProgress] = useState(0);
   const [isMaterialUploading, setIsMaterialUploading] = useState(false);
 
@@ -296,7 +304,7 @@ export default function TeacherDashboard() {
       if (materialInputType === "file" && materialFile) {
         setIsMaterialUploading(true);
         setMaterialUploadProgress(0);
-        
+
         const formData = new FormData();
         formData.append("file", materialFile);
         formData.append("title", data.title);
@@ -307,13 +315,13 @@ export default function TeacherDashboard() {
         return apiUploadWithProgress(
           "/api/materials/with-file",
           formData,
-          (progress) => setMaterialUploadProgress(progress)
+          (progress) => setMaterialUploadProgress(progress),
         );
       } else if (materialInputType === "link" && materialLink) {
         return apiRequest("/api/materials", {
           method: "POST",
-          body: JSON.stringify({ 
-            ...data, 
+          body: JSON.stringify({
+            ...data,
             fileUrl: materialLink,
             uploadDate: new Date().toISOString(),
           }),
@@ -833,7 +841,7 @@ export default function TeacherDashboard() {
                           }
                           data-testid="input-assignment-grade-level"
                         />
-                        
+
                         <div className="space-y-3">
                           <label className="text-sm font-medium">
                             Assignment File (optional)
@@ -841,7 +849,11 @@ export default function TeacherDashboard() {
                           <div className="flex gap-2">
                             <Button
                               type="button"
-                              variant={assignmentInputType === "file" ? "default" : "outline"}
+                              variant={
+                                assignmentInputType === "file"
+                                  ? "default"
+                                  : "outline"
+                              }
                               size="sm"
                               onClick={() => {
                                 setAssignmentInputType("file");
@@ -855,7 +867,11 @@ export default function TeacherDashboard() {
                             </Button>
                             <Button
                               type="button"
-                              variant={assignmentInputType === "url" ? "default" : "outline"}
+                              variant={
+                                assignmentInputType === "url"
+                                  ? "default"
+                                  : "outline"
+                              }
                               size="sm"
                               onClick={() => {
                                 setAssignmentInputType("url");
@@ -868,7 +884,7 @@ export default function TeacherDashboard() {
                               File URL
                             </Button>
                           </div>
-                          
+
                           {assignmentInputType === "file" ? (
                             <>
                               <Input
@@ -890,7 +906,8 @@ export default function TeacherDashboard() {
                                     if (!allowedTypes.includes(file.type)) {
                                       toast({
                                         title: "Invalid file type",
-                                        description: "Only PDF, images, and document files are allowed",
+                                        description:
+                                          "Only PDF, images, and document files are allowed",
                                       });
                                       e.target.value = "";
                                       return;
@@ -898,7 +915,8 @@ export default function TeacherDashboard() {
                                     if (file.size > 10 * 1024 * 1024) {
                                       toast({
                                         title: "File too large",
-                                        description: "Maximum file size is 10MB",
+                                        description:
+                                          "Maximum file size is 10MB",
                                       });
                                       e.target.value = "";
                                       return;
@@ -911,7 +929,13 @@ export default function TeacherDashboard() {
                               {assignmentFile && (
                                 <div className="flex items-center justify-between p-2 bg-muted rounded">
                                   <p className="text-sm truncate max-w-[200px]">
-                                    {assignmentFile.name} ({(assignmentFile.size / 1024 / 1024).toFixed(2)} MB)
+                                    {assignmentFile.name} (
+                                    {(
+                                      assignmentFile.size /
+                                      1024 /
+                                      1024
+                                    ).toFixed(2)}{" "}
+                                    MB)
                                   </p>
                                   <Button
                                     type="button"
@@ -929,35 +953,43 @@ export default function TeacherDashboard() {
                             <Input
                               placeholder="Enter file URL (e.g., https://example.com/file.pdf)"
                               value={assignmentFileUrl}
-                              onChange={(e) => setAssignmentFileUrl(e.target.value)}
+                              onChange={(e) =>
+                                setAssignmentFileUrl(e.target.value)
+                              }
                               data-testid="input-assignment-url"
                             />
                           )}
-                          
+
                           {isAssignmentUploading && (
                             <div className="space-y-2">
                               <div className="flex items-center justify-between text-sm">
                                 <span>Uploading...</span>
                                 <span>{assignmentUploadProgress}%</span>
                               </div>
-                              <Progress value={assignmentUploadProgress} className="h-2" />
+                              <Progress
+                                value={assignmentUploadProgress}
+                                className="h-2"
+                              />
                             </div>
                           )}
                         </div>
-                        
+
                         <Button
                           onClick={() =>
                             createAssignmentMutation.mutate(assignmentForm)
                           }
-                          disabled={createAssignmentMutation.isPending || isAssignmentUploading}
+                          disabled={
+                            createAssignmentMutation.isPending ||
+                            isAssignmentUploading
+                          }
                           className="w-full"
                           data-testid="button-submit-assignment"
                         >
                           {isAssignmentUploading
                             ? "Uploading..."
                             : createAssignmentMutation.isPending
-                            ? "Creating..."
-                            : "Create"}
+                              ? "Creating..."
+                              : "Create"}
                         </Button>
                       </div>
                     </DialogContent>
@@ -1011,7 +1043,7 @@ export default function TeacherDashboard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button
+                              {/* <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
@@ -1029,7 +1061,7 @@ export default function TeacherDashboard() {
                                 data-testid={`button-edit-assignment-${a.id}`}
                               >
                                 <Edit className="h-4 w-4" />
-                              </Button>
+                              </Button> */}
                               <Button
                                 variant="destructive"
                                 size="sm"
@@ -1213,7 +1245,7 @@ export default function TeacherDashboard() {
                           }
                           data-testid="input-material-grade-level"
                         />
-                        
+
                         <div className="space-y-3">
                           <label className="text-sm font-medium">
                             Material Resource *
@@ -1221,7 +1253,11 @@ export default function TeacherDashboard() {
                           <div className="flex gap-2">
                             <Button
                               type="button"
-                              variant={materialInputType === "file" ? "default" : "outline"}
+                              variant={
+                                materialInputType === "file"
+                                  ? "default"
+                                  : "outline"
+                              }
                               size="sm"
                               onClick={() => {
                                 setMaterialInputType("file");
@@ -1235,7 +1271,11 @@ export default function TeacherDashboard() {
                             </Button>
                             <Button
                               type="button"
-                              variant={materialInputType === "link" ? "default" : "outline"}
+                              variant={
+                                materialInputType === "link"
+                                  ? "default"
+                                  : "outline"
+                              }
                               size="sm"
                               onClick={() => {
                                 setMaterialInputType("link");
@@ -1248,7 +1288,7 @@ export default function TeacherDashboard() {
                               Material Link
                             </Button>
                           </div>
-                          
+
                           {materialInputType === "file" ? (
                             <>
                               <Input
@@ -1270,7 +1310,8 @@ export default function TeacherDashboard() {
                                     if (!allowedTypes.includes(file.type)) {
                                       toast({
                                         title: "Invalid file type",
-                                        description: "Only PDF, images, and document files are allowed",
+                                        description:
+                                          "Only PDF, images, and document files are allowed",
                                       });
                                       e.target.value = "";
                                       return;
@@ -1278,7 +1319,8 @@ export default function TeacherDashboard() {
                                     if (file.size > 10 * 1024 * 1024) {
                                       toast({
                                         title: "File too large",
-                                        description: "Maximum file size is 10MB",
+                                        description:
+                                          "Maximum file size is 10MB",
                                       });
                                       e.target.value = "";
                                       return;
@@ -1291,7 +1333,11 @@ export default function TeacherDashboard() {
                               {materialFile && (
                                 <div className="flex items-center justify-between p-2 bg-muted rounded">
                                   <p className="text-sm truncate max-w-[200px]">
-                                    {materialFile.name} ({(materialFile.size / 1024 / 1024).toFixed(2)} MB)
+                                    {materialFile.name} (
+                                    {(materialFile.size / 1024 / 1024).toFixed(
+                                      2,
+                                    )}{" "}
+                                    MB)
                                   </p>
                                   <Button
                                     type="button"
@@ -1313,25 +1359,28 @@ export default function TeacherDashboard() {
                               data-testid="input-material-link"
                             />
                           )}
-                          
+
                           {isMaterialUploading && (
                             <div className="space-y-2">
                               <div className="flex items-center justify-between text-sm">
                                 <span>Uploading...</span>
                                 <span>{materialUploadProgress}%</span>
                               </div>
-                              <Progress value={materialUploadProgress} className="h-2" />
+                              <Progress
+                                value={materialUploadProgress}
+                                className="h-2"
+                              />
                             </div>
                           )}
                         </div>
-                        
+
                         <Button
                           onClick={() =>
                             uploadMaterialMutation.mutate(materialForm)
                           }
                           disabled={
-                            uploadMaterialMutation.isPending || 
-                            isMaterialUploading || 
+                            uploadMaterialMutation.isPending ||
+                            isMaterialUploading ||
                             (materialInputType === "file" && !materialFile) ||
                             (materialInputType === "link" && !materialLink)
                           }
@@ -1341,8 +1390,8 @@ export default function TeacherDashboard() {
                           {isMaterialUploading
                             ? "Uploading..."
                             : uploadMaterialMutation.isPending
-                            ? "Creating..."
-                            : "Upload"}
+                              ? "Creating..."
+                              : "Upload"}
                         </Button>
                       </div>
                     </DialogContent>
@@ -1390,7 +1439,7 @@ export default function TeacherDashboard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button
+                              {/* <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
@@ -1407,7 +1456,7 @@ export default function TeacherDashboard() {
                                 data-testid={`button-edit-material-${m.id}`}
                               >
                                 <Edit className="h-4 w-4" />
-                              </Button>
+                              </Button> */}
                               <Button
                                 variant="destructive"
                                 size="sm"
