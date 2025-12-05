@@ -435,7 +435,9 @@ export default function TeacherDashboard() {
     notes: "",
     status: "scheduled",
   });
-  const [sessionFormErrors, setSessionFormErrors] = useState<Record<string, string>>({});
+  const [sessionFormErrors, setSessionFormErrors] = useState<
+    Record<string, string>
+  >({});
 
   const createSessionMutation = useMutation({
     mutationFn: (data: any) =>
@@ -477,9 +479,13 @@ export default function TeacherDashboard() {
     notes: "",
     status: "scheduled",
   });
-  const [editSessionFormErrors, setEditSessionFormErrors] = useState<Record<string, string>>({});
+  const [editSessionFormErrors, setEditSessionFormErrors] = useState<
+    Record<string, string>
+  >({});
 
-  const validateSessionForm = (form: typeof sessionForm): Record<string, string> => {
+  const validateSessionForm = (
+    form: typeof sessionForm,
+  ): Record<string, string> => {
     const result = sessionFormSchema.safeParse(form);
     if (result.success) return {};
     const errors: Record<string, string> = {};
@@ -1669,10 +1675,14 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-session-title"
-                            className={sessionFormErrors.title ? "border-red-500" : ""}
+                            className={
+                              sessionFormErrors.title ? "border-red-500" : ""
+                            }
                           />
                           {sessionFormErrors.title && (
-                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.title}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {sessionFormErrors.title}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1686,10 +1696,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-session-description"
-                            className={sessionFormErrors.description ? "border-red-500" : ""}
+                            className={
+                              sessionFormErrors.description
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {sessionFormErrors.description && (
-                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.description}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {sessionFormErrors.description}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1703,10 +1719,14 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-session-subject"
-                            className={sessionFormErrors.subject ? "border-red-500" : ""}
+                            className={
+                              sessionFormErrors.subject ? "border-red-500" : ""
+                            }
                           />
                           {sessionFormErrors.subject && (
-                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.subject}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {sessionFormErrors.subject}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1720,10 +1740,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-session-date"
-                            className={sessionFormErrors.sessionDate ? "border-red-500" : ""}
+                            className={
+                              sessionFormErrors.sessionDate
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {sessionFormErrors.sessionDate && (
-                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.sessionDate}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {sessionFormErrors.sessionDate}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1738,10 +1764,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-session-start-time"
-                            className={sessionFormErrors.startTime ? "border-red-500" : ""}
+                            className={
+                              sessionFormErrors.startTime
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {sessionFormErrors.startTime && (
-                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.startTime}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {sessionFormErrors.startTime}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1756,10 +1788,14 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-session-end-time"
-                            className={sessionFormErrors.endTime ? "border-red-500" : ""}
+                            className={
+                              sessionFormErrors.endTime ? "border-red-500" : ""
+                            }
                           />
                           {sessionFormErrors.endTime && (
-                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.endTime}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {sessionFormErrors.endTime}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1773,10 +1809,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-session-meeting-url"
-                            className={sessionFormErrors.meetingUrl ? "border-red-500" : ""}
+                            className={
+                              sessionFormErrors.meetingUrl
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {sessionFormErrors.meetingUrl && (
-                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.meetingUrl}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {sessionFormErrors.meetingUrl}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1919,10 +1961,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-edit-session-title"
-                            className={editSessionFormErrors.title ? "border-red-500" : ""}
+                            className={
+                              editSessionFormErrors.title
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {editSessionFormErrors.title && (
-                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.title}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {editSessionFormErrors.title}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1936,10 +1984,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-edit-session-description"
-                            className={editSessionFormErrors.description ? "border-red-500" : ""}
+                            className={
+                              editSessionFormErrors.description
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {editSessionFormErrors.description && (
-                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.description}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {editSessionFormErrors.description}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1953,10 +2007,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-edit-session-subject"
-                            className={editSessionFormErrors.subject ? "border-red-500" : ""}
+                            className={
+                              editSessionFormErrors.subject
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {editSessionFormErrors.subject && (
-                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.subject}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {editSessionFormErrors.subject}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1971,10 +2031,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-edit-session-date"
-                            className={editSessionFormErrors.sessionDate ? "border-red-500" : ""}
+                            className={
+                              editSessionFormErrors.sessionDate
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {editSessionFormErrors.sessionDate && (
-                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.sessionDate}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {editSessionFormErrors.sessionDate}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -1989,10 +2055,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-edit-session-start-time"
-                            className={editSessionFormErrors.startTime ? "border-red-500" : ""}
+                            className={
+                              editSessionFormErrors.startTime
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {editSessionFormErrors.startTime && (
-                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.startTime}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {editSessionFormErrors.startTime}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -2007,10 +2079,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-edit-session-end-time"
-                            className={editSessionFormErrors.endTime ? "border-red-500" : ""}
+                            className={
+                              editSessionFormErrors.endTime
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {editSessionFormErrors.endTime && (
-                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.endTime}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {editSessionFormErrors.endTime}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -2024,10 +2102,16 @@ export default function TeacherDashboard() {
                               })
                             }
                             data-testid="input-edit-session-meeting-url"
-                            className={editSessionFormErrors.meetingUrl ? "border-red-500" : ""}
+                            className={
+                              editSessionFormErrors.meetingUrl
+                                ? "border-red-500"
+                                : ""
+                            }
                           />
                           {editSessionFormErrors.meetingUrl && (
-                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.meetingUrl}</p>
+                            <p className="text-sm text-red-500 mt-1">
+                              {editSessionFormErrors.meetingUrl}
+                            </p>
                           )}
                         </div>
                         <div>
@@ -2432,7 +2516,7 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent> */}
 
-            <TabsContent value="feedback">
+            {/* <TabsContent value="feedback">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Student Feedback</CardTitle>
@@ -2612,7 +2696,7 @@ export default function TeacherDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
             {/* <TabsContent value="attendance">
               <Card>

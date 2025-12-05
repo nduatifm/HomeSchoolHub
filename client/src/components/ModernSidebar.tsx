@@ -74,11 +74,6 @@ export default function ModernSidebar() {
       label: "Sessions",
       hash: "sessions",
     },
-    {
-      icon: <MessageSquareQuote className="w-6 h-6" />,
-      label: "Feedback",
-      hash: "feedback",
-    },
   ];
 
   // Parent sidebar items
@@ -111,11 +106,6 @@ export default function ModernSidebar() {
       icon: <Presentation className="w-6 h-6" />,
       label: "Sessions",
       hash: "sessions",
-    },
-    {
-      icon: <MessageSquareQuote className="w-6 h-6" />,
-      label: "Feedback",
-      hash: "feedback",
     },
   ];
 

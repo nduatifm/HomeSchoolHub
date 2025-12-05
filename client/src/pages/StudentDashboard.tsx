@@ -202,7 +202,7 @@ export default function StudentDashboard() {
             onButtonClick={() => setActiveTab("assignments")}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
             <ColorfulStatCard
               title="Assignments"
               value={assignments.length}
@@ -224,13 +224,13 @@ export default function StudentDashboard() {
               className="bg-green-500"
               subtitle="Total Classes"
             />
-            <ColorfulStatCard
+            {/* <ColorfulStatCard
               title="Feedback"
               value={feedback.length}
               icon={MessageSquareQuote}
               className="bg-pink-500"
               subtitle="Your Progress"
-            />
+            /> */}
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -503,7 +503,7 @@ export default function StudentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="feedback">
+            {/* <TabsContent value="feedback">
               <Card>
                 <CardHeader>
                   <CardTitle>Feedback</CardTitle>
@@ -541,7 +541,7 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
             {/* <TabsContent value="schedule">
               <Card>
