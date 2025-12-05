@@ -54,6 +54,7 @@ import {
   DollarSign,
   Star,
   ClipboardCheck,
+  Unlink2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -364,43 +365,38 @@ export default function ParentDashboard() {
             <TabsContent value="children">
               <Card>
                 <CardHeader>
-                  <CardTitle>My Children</CardTitle>
+                  <CardTitle>My Students</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {students.map((s: any) => (
-                      <Card key={s.id} data-testid={`card-student-${s.id}`}>
-                        <CardHeader>
-                          <CardTitle
-                            className="text-lg"
-                            data-testid={`text-student-name-${s.id}`}
-                          >
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Grade Level</TableHead>
+                        {/* <TableHead>Select</TableHead> */}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {students.map((s: any) => (
+                        <TableRow
+                          key={s.id}
+                          data-testid={`row-student-${s.id}`}
+                        >
+                          <TableCell data-testid={`text-student-name-${s.id}`}>
                             {s.name}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            <p className="text-sm">
-                              <strong>Grade:</strong> {s.gradeLevel}
-                            </p>
-                            <p className="text-sm">
-                              <strong>Points:</strong> {s.points}
-                            </p>
-                            <p className="text-sm">
-                              <strong>Badges:</strong> {s.badges.length}
-                            </p>
-                            <Button
-                              size="sm"
-                              onClick={() => setSelectedStudent(s)}
-                              data-testid={`button-view-dashboard-${s.id}`}
-                            >
-                              View Dashboard
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                          </TableCell>
+                          <TableCell>{s.email}</TableCell>
+                          <TableCell>{s.gradeLevel}</TableCell>
+                          {/* <TableCell>
+                            <button onClick={() => setSelectedStudent(s)}>
+                              <Unlink2 />
+                            </button>
+                          </TableCell> */}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -492,7 +488,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="progress">
+            {/* <TabsContent value="progress">
               <Card>
                 <CardHeader>
                   <CardTitle>Track Student Progress</CardTitle>
@@ -545,7 +541,7 @@ export default function ParentDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> */}
 
             {/* <TabsContent value="payments">
               <Card>
@@ -1071,7 +1067,10 @@ export default function ParentDashboard() {
                   <CardContent>
                     <div className="space-y-4">
                       {tutorRequests.length === 0 ? (
-                        <p className="text-sm text-gray-600">No tutor requests yet. Click "Request Tutor" to get started.</p>
+                        <p className="text-sm text-gray-600">
+                          No tutor requests yet. Click "Request Tutor" to get
+                          started.
+                        </p>
                       ) : (
                         tutorRequests.map((r: any) => (
                           <div

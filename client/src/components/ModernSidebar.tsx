@@ -93,11 +93,6 @@ export default function ModernSidebar() {
       label: "Invite Student",
       hash: "invites",
     },
-    {
-      icon: <FileText className="w-6 h-6" />,
-      label: "Track Progress",
-      hash: "progress",
-    },
   ];
 
   // Student sidebar items
