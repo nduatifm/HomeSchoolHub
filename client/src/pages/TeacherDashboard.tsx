@@ -1388,9 +1388,8 @@ export default function TeacherDashboard() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
                         <TableHead>Grade Level</TableHead>
-                        <TableHead>Points</TableHead>
-                        <TableHead>Badges</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1402,9 +1401,8 @@ export default function TeacherDashboard() {
                           <TableCell data-testid={`text-student-name-${s.id}`}>
                             {s.name}
                           </TableCell>
+                          <TableCell>{s.email}</TableCell>
                           <TableCell>{s.gradeLevel}</TableCell>
-                          <TableCell>{s.points}</TableCell>
-                          <TableCell>{s.badges.length}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
