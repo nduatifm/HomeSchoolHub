@@ -506,7 +506,7 @@ export default function StudentDashboard() {
             <TabsContent value="feedback">
               <Card>
                 <CardHeader>
-                  <CardTitle>Feedback & Grades</CardTitle>
+                  <CardTitle>Feedback</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
