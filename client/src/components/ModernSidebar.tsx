@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   Settings,
   User,
@@ -22,6 +22,7 @@ interface SidebarItem {
 
 export default function ModernSidebar() {
   const { user, logout } = useAuth();
+  const [location, setLocation] = useLocation();
   const [currentHash, setCurrentHash] = useState(
     window.location.hash.replace("#", "") || "schedule",
   );
@@ -33,6 +34,17 @@ export default function ModernSidebar() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  const handleNavigation = (hash: string) => {
+    if (location !== "/dashboard") {
+      setLocation(`/dashboard#${hash}`);
+      setTimeout(() => {
+        window.location.hash = hash;
+      }, 50);
+    } else {
+      window.location.hash = hash;
+    }
+  };
 
   // Teacher sidebar items
   const teacherItems: SidebarItem[] = [
@@ -126,9 +138,9 @@ export default function ModernSidebar() {
         {items.map((item, index) => (
           <button
             key={index}
-            onClick={() => (window.location.hash = item.hash)}
+            onClick={() => handleNavigation(item.hash)}
             className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all hover:scale-110 ${
-              currentHash === item.hash
+              currentHash === item.hash && location === "/dashboard"
                 ? "bg-white text-sidebar-bg shadow-md"
                 : "text-white hover:bg-white/10"
             }`}
@@ -143,7 +155,11 @@ export default function ModernSidebar() {
       <div className="flex flex-col items-center gap-4 mt-auto">
         <Link href="/profile">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-white hover:bg-white/10 transition-all hover:scale-110 cursor-pointer"
+            className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all hover:scale-110 cursor-pointer ${
+              location === "/profile"
+                ? "bg-white text-sidebar-bg shadow-md"
+                : "text-white hover:bg-white/10"
+            }`}
             data-testid="sidebar-profile"
           >
             <Settings className="w-6 h-6" />
