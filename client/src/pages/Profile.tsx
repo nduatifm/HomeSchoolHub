@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Upload, User, Settings, Camera, FileText, X } from "lucide-react";
+import ModernSidebar from "@/components/ModernSidebar";
 
 export default function Profile() {
   const { user, setUser } = useAuth();
@@ -282,17 +283,20 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Profile Settings
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage your account settings and preferences
-          </p>
-        </div>
+      <ModernSidebar />
+      
+      <div className="ml-24 p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Profile Settings
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Manage your account settings and preferences
+            </p>
+          </div>
 
-        <Tabs defaultValue="profile" className="w-full">
+          <Tabs defaultValue="profile" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile" data-testid="tab-profile">
               <User className="h-4 w-4 mr-2" />
@@ -728,6 +732,7 @@ export default function Profile() {
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </div>
   );
