@@ -119,7 +119,10 @@ export function apiUploadWithProgress(
 }
 
 async function defaultQueryFn({ queryKey }: { queryKey: any[] }) {
-  const url = queryKey[0];
+  // Build URL from queryKey segments - join path segments with /
+  const url = queryKey
+    .filter((segment) => segment !== undefined && segment !== null)
+    .join('/');
   return apiRequest(url);
 }
 
