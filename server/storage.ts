@@ -34,8 +34,8 @@ export interface IStorage {
   createStudent(student: InsertStudent): Promise<Student>;
   getStudentById(id: number): Promise<Student | null>;
   getStudentByUserId(userId: number): Promise<Student | null>;
-  getStudentsByParent(parentId: number): Promise<Student[]>;
-  getStudentsByTeacher(teacherId: number): Promise<Student[]>;
+  getStudentsByParent(parentId: number): Promise<(Student & { email?: string })[]>;
+  getStudentsByTeacher(teacherId: number): Promise<(Student & { email?: string })[]>;
   updateStudent(id: number, student: Prisma.StudentUpdateInput): Promise<Student>;
   
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
@@ -132,8 +132,8 @@ export interface IStorage {
   // Teacher-Student Assignments (direct assignment without request flow)
   createTeacherStudentAssignment(assignment: InsertTeacherStudentAssignment): Promise<TeacherStudentAssignment>;
   getTeacherStudentAssignment(teacherId: number, studentId: number): Promise<TeacherStudentAssignment | null>;
-  getStudentsByTeacherDirect(teacherId: number): Promise<Student[]>;
-  getAllStudentsForTeachers(): Promise<Student[]>;
+  getStudentsByTeacherDirect(teacherId: number): Promise<(Student & { email?: string })[]>;
+  getAllStudentsForTeachers(): Promise<(Student & { email?: string })[]>;
   assignStudentToFirstAvailableTeacher(studentId: number): Promise<TeacherStudentAssignment | null>;
   removeTeacherStudentAssignment(teacherId: number, studentId: number): Promise<void>;
 }
@@ -175,18 +175,32 @@ class PrismaStorage implements IStorage {
     return await prisma.student.findUnique({ where: { userId } }) as Student | null;
   }
 
-  async getStudentsByParent(parentId: number): Promise<Student[]> {
-    return await prisma.student.findMany({ where: { parentId } }) as Student[];
+  async getStudentsByParent(parentId: number): Promise<(Student & { email?: string })[]> {
+    const students = await prisma.student.findMany({ 
+      where: { parentId },
+      include: { user: true }
+    });
+    return students.map((s: any) => ({
+      ...s,
+      email: s.user?.email,
+      user: undefined
+    })) as (Student & { email?: string })[];
   }
 
-  async getStudentsByTeacher(teacherId: number): Promise<Student[]> {
+  async getStudentsByTeacher(teacherId: number): Promise<(Student & { email?: string })[]> {
     const requests = await prisma.tutorRequest.findMany({
       where: { teacherId, status: "approved" },
-      include: { parent: { include: { parentStudents: true } } }
+      include: { parent: { include: { parentStudents: { include: { user: true } } } } }
     });
-    const students: Student[] = [];
+    const students: (Student & { email?: string })[] = [];
     requests.forEach(r => {
-      r.parent.parentStudents.forEach((s: any) => students.push(s as Student));
+      r.parent.parentStudents.forEach((s: any) => {
+        students.push({
+          ...s,
+          email: s.user?.email,
+          user: undefined
+        } as Student & { email?: string });
+      });
     });
     return students;
   }
@@ -530,16 +544,27 @@ class PrismaStorage implements IStorage {
     }) as TeacherStudentAssignment | null;
   }
 
-  async getStudentsByTeacherDirect(teacherId: number): Promise<Student[]> {
+  async getStudentsByTeacherDirect(teacherId: number): Promise<(Student & { email?: string })[]> {
     const assignments = await prisma.teacherStudentAssignment.findMany({
       where: { teacherId, status: "active" },
-      include: { student: true }
+      include: { student: { include: { user: true } } }
     });
-    return assignments.map((a: any) => a.student) as Student[];
+    return assignments.map((a: any) => ({
+      ...a.student,
+      email: a.student.user?.email,
+      user: undefined
+    })) as (Student & { email?: string })[];
   }
 
-  async getAllStudentsForTeachers(): Promise<Student[]> {
-    return await prisma.student.findMany() as Student[];
+  async getAllStudentsForTeachers(): Promise<(Student & { email?: string })[]> {
+    const students = await prisma.student.findMany({
+      include: { user: true }
+    });
+    return students.map((s: any) => ({
+      ...s,
+      email: s.user?.email,
+      user: undefined
+    })) as (Student & { email?: string })[];
   }
 
   async assignStudentToFirstAvailableTeacher(studentId: number): Promise<TeacherStudentAssignment | null> {
