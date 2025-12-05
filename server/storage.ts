@@ -139,6 +139,7 @@ export interface IStorage {
   getAllStudentsForTeachers(): Promise<(Student & { email?: string })[]>;
   assignStudentToFirstAvailableTeacher(studentId: number): Promise<TeacherStudentAssignment | null>;
   removeTeacherStudentAssignment(teacherId: number, studentId: number): Promise<void>;
+  getAssignedTeachersForStudent(studentId: number): Promise<TeacherStudentAssignment[]>;
 }
 
 class PrismaStorage implements IStorage {
@@ -623,6 +624,12 @@ class PrismaStorage implements IStorage {
     await prisma.teacherStudentAssignment.delete({
       where: { teacherId_studentId: { teacherId, studentId } }
     });
+  }
+
+  async getAssignedTeachersForStudent(studentId: number): Promise<TeacherStudentAssignment[]> {
+    return await prisma.teacherStudentAssignment.findMany({
+      where: { studentId, status: "active" }
+    }) as TeacherStudentAssignment[];
   }
 }
 

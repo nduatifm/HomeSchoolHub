@@ -920,17 +920,26 @@ export function registerRoutes(app: Express) {
         );
         res.json(assignments);
       } else {
-        // When tutor request mode is OFF, show ALL assignments
+        // When tutor request mode is OFF, show assignments from assigned teachers
         const student = await storage.getStudentById(studentId);
         const allAssignments = await storage.getAllAssignments();
+        
+        // Get teachers assigned to this student
+        const assignedTeachers = await storage.getAssignedTeachersForStudent(studentId);
+        const assignedTeacherIds = new Set(assignedTeachers.map(t => t.teacherId));
         
         // Get any existing student assignments to show submission status
         const studentAssignments = await storage.getStudentAssignmentsByStudent(studentId);
         const studentAssignmentMap = new Map(studentAssignments.map(sa => [sa.assignmentId, sa]));
         
-        // Return all assignments, optionally filtered by grade level, with studentAssignment if exists
+        // Return assignments from assigned teachers OR matching grade level
         const assignments = allAssignments
-          .filter(a => !student?.gradeLevel || a.gradeLevel === student.gradeLevel)
+          .filter(a => {
+            // Include if from an assigned teacher
+            if (assignedTeacherIds.has(a.teacherId)) return true;
+            // Or if matching grade level (for general assignments)
+            return !student?.gradeLevel || a.gradeLevel === student.gradeLevel;
+          })
           .map(assignment => ({
             ...assignment,
             studentAssignment: studentAssignmentMap.get(assignment.id) || null
