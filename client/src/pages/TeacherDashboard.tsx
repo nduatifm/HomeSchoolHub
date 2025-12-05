@@ -93,6 +93,19 @@ const attendanceSchema = z.object({
   notes: z.string(),
 });
 
+const sessionFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().min(1, "Description is required"),
+  subject: z.string().min(1, "Subject is required"),
+  sessionDate: z.string().min(1, "Session date is required"),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().min(1, "End time is required"),
+  meetingUrl: z.string().min(1, "Meeting URL is required"),
+  notes: z.string().optional(),
+  studentIds: z.array(z.number()),
+  status: z.string(),
+});
+
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -422,6 +435,7 @@ export default function TeacherDashboard() {
     notes: "",
     status: "scheduled",
   });
+  const [sessionFormErrors, setSessionFormErrors] = useState<Record<string, string>>({});
 
   const createSessionMutation = useMutation({
     mutationFn: (data: any) =>
@@ -444,6 +458,7 @@ export default function TeacherDashboard() {
         notes: "",
         status: "scheduled",
       });
+      setSessionFormErrors({});
       setCreateSessionOpen(false);
     },
   });
@@ -462,6 +477,34 @@ export default function TeacherDashboard() {
     notes: "",
     status: "scheduled",
   });
+  const [editSessionFormErrors, setEditSessionFormErrors] = useState<Record<string, string>>({});
+
+  const validateSessionForm = (form: typeof sessionForm): Record<string, string> => {
+    const result = sessionFormSchema.safeParse(form);
+    if (result.success) return {};
+    const errors: Record<string, string> = {};
+    result.error.errors.forEach((err) => {
+      if (err.path[0]) {
+        errors[err.path[0] as string] = err.message;
+      }
+    });
+    return errors;
+  };
+
+  const handleCreateSession = () => {
+    const errors = validateSessionForm(sessionForm);
+    setSessionFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    createSessionMutation.mutate(sessionForm);
+  };
+
+  const handleUpdateSession = () => {
+    const { id, ...formWithoutId } = editSessionForm;
+    const errors = validateSessionForm(formWithoutId);
+    setEditSessionFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    updateSessionMutation.mutate(editSessionForm);
+  };
 
   const updateSessionMutation = useMutation({
     mutationFn: ({ id, ...data }: any) =>
@@ -485,6 +528,7 @@ export default function TeacherDashboard() {
         notes: "",
         status: "scheduled",
       });
+      setEditSessionFormErrors({});
       setEditSessionOpen(false);
     },
   });
@@ -1614,100 +1658,142 @@ export default function TeacherDashboard() {
                         <DialogTitle>Create Session</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <Input
-                          placeholder="Title (optional)"
-                          value={sessionForm.title}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              title: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-title"
-                        />
-                        <Textarea
-                          placeholder="Description (optional)"
-                          value={sessionForm.description}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              description: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-description"
-                        />
-                        <Input
-                          placeholder="Subject"
-                          value={sessionForm.subject}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              subject: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-subject"
-                        />
-                        <Input
-                          type="date"
-                          value={sessionForm.sessionDate}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              sessionDate: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-date"
-                        />
-                        <Input
-                          type="time"
-                          placeholder="Start Time"
-                          value={sessionForm.startTime}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              startTime: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-start-time"
-                        />
-                        <Input
-                          type="time"
-                          placeholder="End Time"
-                          value={sessionForm.endTime}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              endTime: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-end-time"
-                        />
-                        <Input
-                          placeholder="Meeting URL (optional)"
-                          value={sessionForm.meetingUrl}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              meetingUrl: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-meeting-url"
-                        />
-                        <Textarea
-                          placeholder="Notes (optional)"
-                          value={sessionForm.notes}
-                          onChange={(e) =>
-                            setSessionForm({
-                              ...sessionForm,
-                              notes: e.target.value,
-                            })
-                          }
-                          data-testid="input-session-notes"
-                        />
+                        <div>
+                          <Input
+                            placeholder="Title *"
+                            value={sessionForm.title}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                title: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-title"
+                            className={sessionFormErrors.title ? "border-red-500" : ""}
+                          />
+                          {sessionFormErrors.title && (
+                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.title}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Textarea
+                            placeholder="Description *"
+                            value={sessionForm.description}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                description: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-description"
+                            className={sessionFormErrors.description ? "border-red-500" : ""}
+                          />
+                          {sessionFormErrors.description && (
+                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.description}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            placeholder="Subject *"
+                            value={sessionForm.subject}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                subject: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-subject"
+                            className={sessionFormErrors.subject ? "border-red-500" : ""}
+                          />
+                          {sessionFormErrors.subject && (
+                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.subject}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            type="date"
+                            value={sessionForm.sessionDate}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                sessionDate: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-date"
+                            className={sessionFormErrors.sessionDate ? "border-red-500" : ""}
+                          />
+                          {sessionFormErrors.sessionDate && (
+                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.sessionDate}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            type="time"
+                            placeholder="Start Time *"
+                            value={sessionForm.startTime}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                startTime: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-start-time"
+                            className={sessionFormErrors.startTime ? "border-red-500" : ""}
+                          />
+                          {sessionFormErrors.startTime && (
+                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.startTime}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            type="time"
+                            placeholder="End Time *"
+                            value={sessionForm.endTime}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                endTime: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-end-time"
+                            className={sessionFormErrors.endTime ? "border-red-500" : ""}
+                          />
+                          {sessionFormErrors.endTime && (
+                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.endTime}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            placeholder="Meeting URL *"
+                            value={sessionForm.meetingUrl}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                meetingUrl: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-meeting-url"
+                            className={sessionFormErrors.meetingUrl ? "border-red-500" : ""}
+                          />
+                          {sessionFormErrors.meetingUrl && (
+                            <p className="text-sm text-red-500 mt-1">{sessionFormErrors.meetingUrl}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Textarea
+                            placeholder="Notes (optional)"
+                            value={sessionForm.notes}
+                            onChange={(e) =>
+                              setSessionForm({
+                                ...sessionForm,
+                                notes: e.target.value,
+                              })
+                            }
+                            data-testid="input-session-notes"
+                          />
+                        </div>
                         <Button
-                          onClick={() =>
-                            createSessionMutation.mutate(sessionForm)
-                          }
+                          onClick={handleCreateSession}
                           disabled={createSessionMutation.isPending}
                           className="w-full"
                           data-testid="button-submit-session"
@@ -1822,101 +1908,143 @@ export default function TeacherDashboard() {
                         <DialogTitle>Edit Session</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <Input
-                          placeholder="Title (optional)"
-                          value={editSessionForm.title}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              title: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-title"
-                        />
-                        <Textarea
-                          placeholder="Description (optional)"
-                          value={editSessionForm.description}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              description: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-description"
-                        />
-                        <Input
-                          placeholder="Subject"
-                          value={editSessionForm.subject}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              subject: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-subject"
-                        />
-                        <Input
-                          type="date"
-                          placeholder="Session Date"
-                          value={editSessionForm.sessionDate}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              sessionDate: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-date"
-                        />
-                        <Input
-                          type="time"
-                          placeholder="Start Time"
-                          value={editSessionForm.startTime}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              startTime: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-start-time"
-                        />
-                        <Input
-                          type="time"
-                          placeholder="End Time"
-                          value={editSessionForm.endTime}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              endTime: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-end-time"
-                        />
-                        <Input
-                          placeholder="Meeting URL (optional)"
-                          value={editSessionForm.meetingUrl}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              meetingUrl: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-meeting-url"
-                        />
-                        <Textarea
-                          placeholder="Notes (optional)"
-                          value={editSessionForm.notes}
-                          onChange={(e) =>
-                            setEditSessionForm({
-                              ...editSessionForm,
-                              notes: e.target.value,
-                            })
-                          }
-                          data-testid="input-edit-session-notes"
-                        />
+                        <div>
+                          <Input
+                            placeholder="Title *"
+                            value={editSessionForm.title}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                title: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-title"
+                            className={editSessionFormErrors.title ? "border-red-500" : ""}
+                          />
+                          {editSessionFormErrors.title && (
+                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.title}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Textarea
+                            placeholder="Description *"
+                            value={editSessionForm.description}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                description: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-description"
+                            className={editSessionFormErrors.description ? "border-red-500" : ""}
+                          />
+                          {editSessionFormErrors.description && (
+                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.description}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            placeholder="Subject *"
+                            value={editSessionForm.subject}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                subject: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-subject"
+                            className={editSessionFormErrors.subject ? "border-red-500" : ""}
+                          />
+                          {editSessionFormErrors.subject && (
+                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.subject}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            type="date"
+                            placeholder="Session Date *"
+                            value={editSessionForm.sessionDate}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                sessionDate: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-date"
+                            className={editSessionFormErrors.sessionDate ? "border-red-500" : ""}
+                          />
+                          {editSessionFormErrors.sessionDate && (
+                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.sessionDate}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            type="time"
+                            placeholder="Start Time *"
+                            value={editSessionForm.startTime}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                startTime: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-start-time"
+                            className={editSessionFormErrors.startTime ? "border-red-500" : ""}
+                          />
+                          {editSessionFormErrors.startTime && (
+                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.startTime}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            type="time"
+                            placeholder="End Time *"
+                            value={editSessionForm.endTime}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                endTime: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-end-time"
+                            className={editSessionFormErrors.endTime ? "border-red-500" : ""}
+                          />
+                          {editSessionFormErrors.endTime && (
+                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.endTime}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Input
+                            placeholder="Meeting URL *"
+                            value={editSessionForm.meetingUrl}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                meetingUrl: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-meeting-url"
+                            className={editSessionFormErrors.meetingUrl ? "border-red-500" : ""}
+                          />
+                          {editSessionFormErrors.meetingUrl && (
+                            <p className="text-sm text-red-500 mt-1">{editSessionFormErrors.meetingUrl}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Textarea
+                            placeholder="Notes (optional)"
+                            value={editSessionForm.notes}
+                            onChange={(e) =>
+                              setEditSessionForm({
+                                ...editSessionForm,
+                                notes: e.target.value,
+                              })
+                            }
+                            data-testid="input-edit-session-notes"
+                          />
+                        </div>
                         <Button
-                          onClick={() =>
-                            updateSessionMutation.mutate(editSessionForm)
-                          }
+                          onClick={handleUpdateSession}
                           disabled={updateSessionMutation.isPending}
                           className="w-full"
                           data-testid="button-update-session"
