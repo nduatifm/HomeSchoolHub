@@ -24,12 +24,18 @@ export default function ModernSidebar() {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [currentHash, setCurrentHash] = useState(
-    window.location.hash.replace("#", "") || "schedule",
+    window.location.hash.replace("#", "") || user?.role === "parent"
+      ? "children"
+      : "assignments",
   );
 
   useEffect(() => {
     const handleHashChange = () => {
-      setCurrentHash(window.location.hash.replace("#", "") || "schedule");
+      setCurrentHash(
+        window.location.hash.replace("#", "") || user?.role === "parent"
+          ? "children"
+          : "assignments",
+      );
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
