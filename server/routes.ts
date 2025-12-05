@@ -1272,7 +1272,8 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Only teachers can create sessions" });
       }
 
-      const data = insertSessionSchema.parse(req.body);
+      const createSessionSchema = insertSessionSchema.omit({ teacherId: true });
+      const data = createSessionSchema.parse(req.body);
 
       const session = await storage.createSession({
         title: data.title,
