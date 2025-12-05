@@ -73,12 +73,12 @@ export const assignmentSchema = z.object({
   dueDate: z.string(),
   teacherId: z.number(),
   gradeLevel: z.string(),
-  points: z.number(),
+  points: z.number().optional().default(0),
   fileUrl: z.string().nullable(),
 });
 
 export const insertAssignmentSchema = assignmentSchema.omit({ id: true });
-export const updateAssignmentSchema = assignmentSchema.omit({ id: true, teacherId: true }).partial();
+export const updateAssignmentSchema = assignmentSchema.omit({ id: true, teacherId: true, points: true }).partial();
 export type Assignment = z.infer<typeof assignmentSchema>;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 export type UpdateAssignment = z.infer<typeof updateAssignmentSchema>;

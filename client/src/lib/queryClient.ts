@@ -65,6 +65,59 @@ export async function apiUpload(url: string, formData: FormData, options: Reques
   return response.json();
 }
 
+export function apiUploadWithProgress(
+  url: string,
+  formData: FormData,
+  onProgress: (progress: number) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const token = localStorage.getItem("sessionId");
+
+    xhr.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        onProgress(percentComplete);
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          resolve(response);
+        } catch {
+          resolve({ success: true });
+        }
+      } else {
+        try {
+          const error = JSON.parse(xhr.responseText);
+          reject(new Error(error.error || "Upload failed"));
+        } catch {
+          reject(new Error("Upload failed"));
+        }
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      reject(new Error("Network error during upload"));
+    });
+
+    xhr.addEventListener("abort", () => {
+      reject(new Error("Upload aborted"));
+    });
+
+    xhr.open("POST", url);
+    
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+    
+    xhr.withCredentials = true;
+    xhr.send(formData);
+  });
+}
+
 async function defaultQueryFn({ queryKey }: { queryKey: any[] }) {
   const url = queryKey[0];
   return apiRequest(url);

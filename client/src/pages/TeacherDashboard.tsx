@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUploadWithProgress } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -58,7 +58,10 @@ import {
   Star,
   LibraryBig,
   Presentation,
+  Upload,
+  Link,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
@@ -170,13 +173,19 @@ export default function TeacherDashboard() {
     subject: "",
     dueDate: "",
     gradeLevel: "",
-    points: 100,
   });
   const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
+  const [assignmentFileUrl, setAssignmentFileUrl] = useState("");
+  const [assignmentInputType, setAssignmentInputType] = useState<"file" | "url">("file");
+  const [assignmentUploadProgress, setAssignmentUploadProgress] = useState(0);
+  const [isAssignmentUploading, setIsAssignmentUploading] = useState(false);
 
   const createAssignmentMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (assignmentFile) {
+      if (assignmentInputType === "file" && assignmentFile) {
+        setIsAssignmentUploading(true);
+        setAssignmentUploadProgress(0);
+        
         const formData = new FormData();
         formData.append("file", assignmentFile);
         formData.append("title", data.title);
@@ -184,9 +193,17 @@ export default function TeacherDashboard() {
         formData.append("subject", data.subject);
         formData.append("dueDate", data.dueDate);
         formData.append("gradeLevel", data.gradeLevel);
-        formData.append("points", data.points.toString());
 
-        return apiUpload("/api/assignments/with-file", formData);
+        return apiUploadWithProgress(
+          "/api/assignments/with-file",
+          formData,
+          (progress) => setAssignmentUploadProgress(progress)
+        );
+      } else if (assignmentInputType === "url" && assignmentFileUrl) {
+        return apiRequest("/api/assignments", {
+          method: "POST",
+          body: JSON.stringify({ ...data, fileUrl: assignmentFileUrl }),
+        });
       } else {
         return apiRequest("/api/assignments", {
           method: "POST",
@@ -196,17 +213,23 @@ export default function TeacherDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
-      toast({ title: "Assignment created!", type: "success" });
+      toast({ title: "Assignment created!", description: "success" });
       setAssignmentForm({
         title: "",
         description: "",
         subject: "",
         dueDate: "",
         gradeLevel: "",
-        points: 100,
       });
       setAssignmentFile(null);
+      setAssignmentFileUrl("");
+      setAssignmentUploadProgress(0);
+      setIsAssignmentUploading(false);
       setCreateAssignmentOpen(false);
+    },
+    onError: () => {
+      setAssignmentUploadProgress(0);
+      setIsAssignmentUploading(false);
     },
   });
 
@@ -218,7 +241,6 @@ export default function TeacherDashboard() {
     subject: "",
     dueDate: "",
     gradeLevel: "",
-    points: 100,
     fileUrl: "",
   });
 
@@ -230,7 +252,7 @@ export default function TeacherDashboard() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
-      toast({ title: "Assignment updated!", type: "success" });
+      toast({ title: "Assignment updated!", description: "success" });
       setEditAssignmentForm({
         id: 0,
         title: "",
@@ -238,7 +260,6 @@ export default function TeacherDashboard() {
         subject: "",
         dueDate: "",
         gradeLevel: "",
-        points: 100,
         fileUrl: "",
       });
       setEditAssignmentOpen(false);
@@ -265,10 +286,17 @@ export default function TeacherDashboard() {
     gradeLevel: "",
   });
   const [materialFile, setMaterialFile] = useState<File | null>(null);
+  const [materialLink, setMaterialLink] = useState("");
+  const [materialInputType, setMaterialInputType] = useState<"file" | "link">("file");
+  const [materialUploadProgress, setMaterialUploadProgress] = useState(0);
+  const [isMaterialUploading, setIsMaterialUploading] = useState(false);
 
   const uploadMaterialMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (materialFile) {
+      if (materialInputType === "file" && materialFile) {
+        setIsMaterialUploading(true);
+        setMaterialUploadProgress(0);
+        
         const formData = new FormData();
         formData.append("file", materialFile);
         formData.append("title", data.title);
@@ -276,14 +304,27 @@ export default function TeacherDashboard() {
         formData.append("subject", data.subject);
         formData.append("gradeLevel", data.gradeLevel);
 
-        return apiUpload("/api/materials/with-file", formData);
+        return apiUploadWithProgress(
+          "/api/materials/with-file",
+          formData,
+          (progress) => setMaterialUploadProgress(progress)
+        );
+      } else if (materialInputType === "link" && materialLink) {
+        return apiRequest("/api/materials", {
+          method: "POST",
+          body: JSON.stringify({ 
+            ...data, 
+            fileUrl: materialLink,
+            uploadDate: new Date().toISOString(),
+          }),
+        });
       } else {
-        throw new Error("Please select a file to upload");
+        throw new Error("Please provide a file or link");
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
-      toast({ title: "Material uploaded!", type: "success" });
+      toast({ title: "Material uploaded!", description: "success" });
       setMaterialForm({
         title: "",
         description: "",
@@ -291,7 +332,14 @@ export default function TeacherDashboard() {
         gradeLevel: "",
       });
       setMaterialFile(null);
+      setMaterialLink("");
+      setMaterialUploadProgress(0);
+      setIsMaterialUploading(false);
       setUploadMaterialOpen(false);
+    },
+    onError: () => {
+      setMaterialUploadProgress(0);
+      setIsMaterialUploading(false);
     },
   });
 
@@ -785,86 +833,129 @@ export default function TeacherDashboard() {
                           }
                           data-testid="input-assignment-grade-level"
                         />
-                        <Input
-                          type="number"
-                          placeholder="Points"
-                          value={assignmentForm.points}
-                          onChange={(e) =>
-                            setAssignmentForm({
-                              ...assignmentForm,
-                              points: parseInt(e.target.value) || 0,
-                            })
-                          }
-                          data-testid="input-assignment-points"
-                        />
-                        <div className="space-y-2">
+                        
+                        <div className="space-y-3">
                           <label className="text-sm font-medium">
-                            File Upload (optional)
+                            Assignment File (optional)
                           </label>
-                          <Input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png,.gif"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const allowedTypes = [
-                                  "application/pdf",
-                                  "image/jpeg",
-                                  "image/jpg",
-                                  "image/png",
-                                  "image/gif",
-                                ];
-                                if (!allowedTypes.includes(file.type)) {
-                                  toast({
-                                    title: "Invalid file type",
-                                    description:
-                                      "Only PDF and image files are allowed",
-                                    type: "error",
-                                  });
-                                  e.target.value = "";
-                                  return;
-                                }
-                                if (file.size > 10 * 1024 * 1024) {
-                                  toast({
-                                    title: "File too large",
-                                    description: "Maximum file size is 10MB",
-                                    type: "error",
-                                  });
-                                  e.target.value = "";
-                                  return;
-                                }
-                                setAssignmentFile(file);
-                              }
-                            }}
-                            data-testid="input-assignment-file"
-                          />
-                          {assignmentFile && (
-                            <div className="flex items-center justify-between p-2 bg-muted rounded">
-                              <p className="text-sm">
-                                {assignmentFile.name} (
-                                {(assignmentFile.size / 1024).toFixed(2)} KB)
-                              </p>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setAssignmentFile(null)}
-                                data-testid="button-clear-assignment-file"
-                              >
-                                Remove
-                              </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={assignmentInputType === "file" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setAssignmentInputType("file");
+                                setAssignmentFileUrl("");
+                              }}
+                              className="flex items-center gap-1"
+                              data-testid="button-assignment-file-option"
+                            >
+                              <Upload className="h-4 w-4" />
+                              Upload File
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={assignmentInputType === "url" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setAssignmentInputType("url");
+                                setAssignmentFile(null);
+                              }}
+                              className="flex items-center gap-1"
+                              data-testid="button-assignment-url-option"
+                            >
+                              <Link className="h-4 w-4" />
+                              File URL
+                            </Button>
+                          </div>
+                          
+                          {assignmentInputType === "file" ? (
+                            <>
+                              <Input
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.txt"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const allowedTypes = [
+                                      "application/pdf",
+                                      "image/jpeg",
+                                      "image/jpg",
+                                      "image/png",
+                                      "image/gif",
+                                      "application/msword",
+                                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                      "text/plain",
+                                    ];
+                                    if (!allowedTypes.includes(file.type)) {
+                                      toast({
+                                        title: "Invalid file type",
+                                        description: "Only PDF, images, and document files are allowed",
+                                      });
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      toast({
+                                        title: "File too large",
+                                        description: "Maximum file size is 10MB",
+                                      });
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                    setAssignmentFile(file);
+                                  }
+                                }}
+                                data-testid="input-assignment-file"
+                              />
+                              {assignmentFile && (
+                                <div className="flex items-center justify-between p-2 bg-muted rounded">
+                                  <p className="text-sm truncate max-w-[200px]">
+                                    {assignmentFile.name} ({(assignmentFile.size / 1024 / 1024).toFixed(2)} MB)
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setAssignmentFile(null)}
+                                    data-testid="button-clear-assignment-file"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <Input
+                              placeholder="Enter file URL (e.g., https://example.com/file.pdf)"
+                              value={assignmentFileUrl}
+                              onChange={(e) => setAssignmentFileUrl(e.target.value)}
+                              data-testid="input-assignment-url"
+                            />
+                          )}
+                          
+                          {isAssignmentUploading && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span>Uploading...</span>
+                                <span>{assignmentUploadProgress}%</span>
+                              </div>
+                              <Progress value={assignmentUploadProgress} className="h-2" />
                             </div>
                           )}
                         </div>
+                        
                         <Button
                           onClick={() =>
                             createAssignmentMutation.mutate(assignmentForm)
                           }
-                          disabled={createAssignmentMutation.isPending}
+                          disabled={createAssignmentMutation.isPending || isAssignmentUploading}
                           className="w-full"
                           data-testid="button-submit-assignment"
                         >
-                          {createAssignmentMutation.isPending
+                          {isAssignmentUploading
+                            ? "Uploading..."
+                            : createAssignmentMutation.isPending
                             ? "Creating..."
                             : "Create"}
                         </Button>
@@ -879,7 +970,7 @@ export default function TeacherDashboard() {
                         <TableHead>Title</TableHead>
                         <TableHead>Subject</TableHead>
                         <TableHead>Due Date</TableHead>
-                        <TableHead>Points</TableHead>
+                        <TableHead>Grade Level</TableHead>
                         <TableHead>File</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -899,7 +990,7 @@ export default function TeacherDashboard() {
                           <TableCell>
                             {new Date(a.dueDate).toLocaleDateString()}
                           </TableCell>
-                          <TableCell>{a.points}</TableCell>
+                          <TableCell>{a.gradeLevel}</TableCell>
                           <TableCell>
                             {a.fileUrl ? (
                               <a
@@ -931,7 +1022,6 @@ export default function TeacherDashboard() {
                                     subject: a.subject,
                                     dueDate: a.dueDate,
                                     gradeLevel: a.gradeLevel,
-                                    points: a.points,
                                     fileUrl: a.fileUrl || "",
                                   });
                                   setEditAssignmentOpen(true);
@@ -1029,18 +1119,6 @@ export default function TeacherDashboard() {
                           data-testid="input-edit-assignment-grade-level"
                         />
                         <Input
-                          type="number"
-                          placeholder="Points"
-                          value={editAssignmentForm.points}
-                          onChange={(e) =>
-                            setEditAssignmentForm({
-                              ...editAssignmentForm,
-                              points: parseInt(e.target.value) || 0,
-                            })
-                          }
-                          data-testid="input-edit-assignment-points"
-                        />
-                        <Input
                           placeholder="File URL (optional)"
                           value={editAssignmentForm.fileUrl}
                           onChange={(e) =>
@@ -1113,65 +1191,6 @@ export default function TeacherDashboard() {
                           }
                           data-testid="input-material-description"
                         />
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">
-                            File Upload *
-                          </label>
-                          <Input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png,.gif"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const allowedTypes = [
-                                  "application/pdf",
-                                  "image/jpeg",
-                                  "image/jpg",
-                                  "image/png",
-                                  "image/gif",
-                                ];
-                                if (!allowedTypes.includes(file.type)) {
-                                  toast({
-                                    title: "Invalid file type",
-                                    description:
-                                      "Only PDF and image files are allowed",
-                                    type: "error",
-                                  });
-                                  e.target.value = "";
-                                  return;
-                                }
-                                if (file.size > 10 * 1024 * 1024) {
-                                  toast({
-                                    title: "File too large",
-                                    description: "Maximum file size is 10MB",
-                                    type: "error",
-                                  });
-                                  e.target.value = "";
-                                  return;
-                                }
-                                setMaterialFile(file);
-                              }
-                            }}
-                            data-testid="input-material-file"
-                          />
-                          {materialFile && (
-                            <div className="flex items-center justify-between p-2 bg-muted rounded">
-                              <p className="text-sm">
-                                {materialFile.name} (
-                                {(materialFile.size / 1024).toFixed(2)} KB)
-                              </p>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setMaterialFile(null)}
-                                data-testid="button-clear-material-file"
-                              >
-                                Remove
-                              </Button>
-                            </div>
-                          )}
-                        </div>
                         <Input
                           placeholder="Subject"
                           value={materialForm.subject}
@@ -1194,18 +1213,135 @@ export default function TeacherDashboard() {
                           }
                           data-testid="input-material-grade-level"
                         />
+                        
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium">
+                            Material Resource *
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={materialInputType === "file" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setMaterialInputType("file");
+                                setMaterialLink("");
+                              }}
+                              className="flex items-center gap-1"
+                              data-testid="button-material-file-option"
+                            >
+                              <Upload className="h-4 w-4" />
+                              Upload File
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={materialInputType === "link" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setMaterialInputType("link");
+                                setMaterialFile(null);
+                              }}
+                              className="flex items-center gap-1"
+                              data-testid="button-material-link-option"
+                            >
+                              <Link className="h-4 w-4" />
+                              Material Link
+                            </Button>
+                          </div>
+                          
+                          {materialInputType === "file" ? (
+                            <>
+                              <Input
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.txt"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const allowedTypes = [
+                                      "application/pdf",
+                                      "image/jpeg",
+                                      "image/jpg",
+                                      "image/png",
+                                      "image/gif",
+                                      "application/msword",
+                                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                      "text/plain",
+                                    ];
+                                    if (!allowedTypes.includes(file.type)) {
+                                      toast({
+                                        title: "Invalid file type",
+                                        description: "Only PDF, images, and document files are allowed",
+                                      });
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      toast({
+                                        title: "File too large",
+                                        description: "Maximum file size is 10MB",
+                                      });
+                                      e.target.value = "";
+                                      return;
+                                    }
+                                    setMaterialFile(file);
+                                  }
+                                }}
+                                data-testid="input-material-file"
+                              />
+                              {materialFile && (
+                                <div className="flex items-center justify-between p-2 bg-muted rounded">
+                                  <p className="text-sm truncate max-w-[200px]">
+                                    {materialFile.name} ({(materialFile.size / 1024 / 1024).toFixed(2)} MB)
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setMaterialFile(null)}
+                                    data-testid="button-clear-material-file"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <Input
+                              placeholder="Enter material link (e.g., https://example.com/resource)"
+                              value={materialLink}
+                              onChange={(e) => setMaterialLink(e.target.value)}
+                              data-testid="input-material-link"
+                            />
+                          )}
+                          
+                          {isMaterialUploading && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span>Uploading...</span>
+                                <span>{materialUploadProgress}%</span>
+                              </div>
+                              <Progress value={materialUploadProgress} className="h-2" />
+                            </div>
+                          )}
+                        </div>
+                        
                         <Button
                           onClick={() =>
                             uploadMaterialMutation.mutate(materialForm)
                           }
                           disabled={
-                            uploadMaterialMutation.isPending || !materialFile
+                            uploadMaterialMutation.isPending || 
+                            isMaterialUploading || 
+                            (materialInputType === "file" && !materialFile) ||
+                            (materialInputType === "link" && !materialLink)
                           }
                           className="w-full"
                           data-testid="button-submit-material"
                         >
-                          {uploadMaterialMutation.isPending
+                          {isMaterialUploading
                             ? "Uploading..."
+                            : uploadMaterialMutation.isPending
+                            ? "Creating..."
                             : "Upload"}
                         </Button>
                       </div>
