@@ -117,22 +117,37 @@ export default function StudentDashboard() {
 
   // Submit assignment
   const [submissionForm, setSubmissionForm] = useState({
+    assignmentId: 0,
     studentAssignmentId: 0,
     submission: "",
+    hasStudentAssignment: false,
   });
 
   const submitAssignmentMutation = useMutation({
-    mutationFn: ({ id, submission }: { id: number; submission: string }) =>
-      apiRequest(`/api/student-assignments/${id}/submit`, {
-        method: "PATCH",
-        body: JSON.stringify({ submission }),
-      }),
+    mutationFn: ({ assignmentId, studentAssignmentId, submission, hasStudentAssignment }: { 
+      assignmentId: number; 
+      studentAssignmentId: number; 
+      submission: string;
+      hasStudentAssignment: boolean;
+    }) => {
+      if (hasStudentAssignment) {
+        return apiRequest(`/api/student-assignments/${studentAssignmentId}/submit`, {
+          method: "PATCH",
+          body: JSON.stringify({ submission }),
+        });
+      } else {
+        return apiRequest(`/api/assignments/${assignmentId}/submit`, {
+          method: "POST",
+          body: JSON.stringify({ studentId: student?.id, submission }),
+        });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/assignments/student", student?.id],
       });
       toast({ title: "Assignment submitted!", type: "success" });
-      setSubmissionForm({ studentAssignmentId: 0, submission: "" });
+      setSubmissionForm({ assignmentId: 0, studentAssignmentId: 0, submission: "", hasStudentAssignment: false });
       setSubmitDialogAssignmentId(null);
     },
   });
@@ -180,7 +195,7 @@ export default function StudentDashboard() {
   });
 
   const pendingAssignments = assignments.filter(
-    (a: any) => a.studentAssignment?.status === "pending",
+    (a: any) => a.studentAssignment?.status === "pending" || !a.studentAssignment,
   );
   const submittedAssignments = assignments.filter(
     (a: any) => a.studentAssignment?.status === "submitted",
@@ -311,8 +326,10 @@ export default function StudentDashboard() {
                                 if (open) {
                                   setSubmitDialogAssignmentId(a.id);
                                   setSubmissionForm({
-                                    studentAssignmentId: a.studentAssignment.id,
+                                    assignmentId: a.id,
+                                    studentAssignmentId: a.studentAssignment?.id || 0,
                                     submission: "",
+                                    hasStudentAssignment: !!a.studentAssignment,
                                   });
                                 } else {
                                   setSubmitDialogAssignmentId(null);
@@ -350,8 +367,10 @@ export default function StudentDashboard() {
                                     <Button
                                       onClick={() =>
                                         submitAssignmentMutation.mutate({
-                                          id: submissionForm.studentAssignmentId,
+                                          assignmentId: submissionForm.assignmentId,
+                                          studentAssignmentId: submissionForm.studentAssignmentId,
                                           submission: submissionForm.submission,
+                                          hasStudentAssignment: submissionForm.hasStudentAssignment,
                                         })
                                       }
                                       disabled={

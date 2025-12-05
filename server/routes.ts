@@ -1037,6 +1037,42 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Submit assignment by assignment ID (creates StudentAssignment if needed)
+  app.post("/api/assignments/:assignmentId/submit", requireAuth, async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.assignmentId);
+      const { studentId, submission } = req.body;
+
+      // Check if StudentAssignment already exists
+      const existingAssignments = await storage.getStudentAssignmentsByStudent(studentId);
+      let studentAssignment = existingAssignments.find(sa => sa.assignmentId === assignmentId);
+
+      if (!studentAssignment) {
+        // Create StudentAssignment record
+        studentAssignment = await storage.createStudentAssignment({
+          assignmentId,
+          studentId,
+          submission,
+          grade: null,
+          feedback: null,
+          status: "submitted",
+          submittedAt: new Date().toISOString(),
+        });
+      } else {
+        // Update existing StudentAssignment
+        studentAssignment = await storage.updateStudentAssignment(studentAssignment.id, {
+          submission,
+          status: "submitted",
+          submittedAt: new Date().toISOString(),
+        });
+      }
+
+      res.json(studentAssignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.patch("/api/student-assignments/:id/grade", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
