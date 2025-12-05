@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,14 @@ export default function VerifyEmail() {
   const [, setLocation] = useLocation();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const verificationAttempted = useRef(false);
 
   useEffect(() => {
+    if (verificationAttempted.current) return;
+    verificationAttempted.current = true;
+
     const verifyEmail = async () => {
       try {
-        // Extract token from URL query params
         const params = new URLSearchParams(window.location.search);
         const token = params.get("token");
 
@@ -21,7 +24,6 @@ export default function VerifyEmail() {
           return;
         }
 
-        // Call the backend API with token as path parameter
         const response = await fetch(`/api/auth/verify-email/${token}`);
         const data = await response.json();
 
@@ -29,7 +31,6 @@ export default function VerifyEmail() {
           setStatus("success");
           setMessage(data.message || "Email verified successfully!");
           
-          // Redirect to login after 3 seconds
           setTimeout(() => {
             setLocation("/login");
           }, 3000);
@@ -44,7 +45,7 @@ export default function VerifyEmail() {
     };
 
     verifyEmail();
-  }, [setLocation]);
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">

@@ -1,5 +1,17 @@
 import { QueryClient } from "@tanstack/react-query";
 
+export class ApiError extends Error {
+  requiresRole?: boolean;
+  status?: number;
+  
+  constructor(message: string, options?: { requiresRole?: boolean; status?: number }) {
+    super(message);
+    this.name = 'ApiError';
+    this.requiresRole = options?.requiresRole;
+    this.status = options?.status;
+  }
+}
+
 export async function apiRequest(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem("sessionId");
   const headers: HeadersInit = {
@@ -17,8 +29,11 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || "Request failed");
+    const errorData = await response.json().catch(() => ({ error: "Request failed" }));
+    throw new ApiError(errorData.error || "Request failed", {
+      requiresRole: errorData.requiresRole,
+      status: response.status,
+    });
   }
 
   return response.json();

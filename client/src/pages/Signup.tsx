@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
+import { ApiError } from "@/lib/queryClient";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -50,10 +51,26 @@ export default function Signup() {
     }
   }
 
-  function handleGoogleSuccess(credentialResponse: any) {
-    // Store credential and show role selection dialog
-    setGoogleCredential(credentialResponse.credential);
-    setShowRoleDialog(true);
+  async function handleGoogleSuccess(credentialResponse: any) {
+    const credential = credentialResponse.credential;
+    setGoogleCredential(credential);
+    setIsLoading(true);
+    
+    try {
+      // First, try to sign in without a role - if user exists with role, this will succeed
+      await googleSignIn(credential);
+      toast({ title: "Welcome back!", type: "success" });
+      setLocation("/dashboard");
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      if (apiError.requiresRole) {
+        setShowRoleDialog(true);
+      } else {
+        toast({ title: "Google Sign Up failed", description: apiError.message, type: "error" });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function handleGoogleSignupComplete() {
