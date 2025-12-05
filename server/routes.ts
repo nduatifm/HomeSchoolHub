@@ -515,7 +515,7 @@ export function registerRoutes(app: Express) {
       }
 
       const { name } = validation.data;
-      const user = await storage.updateUser(req.session.userId, { name });
+      const user = await storage.updateUser(req.session.userId!, { name });
       
       res.json({ 
         user: { 
@@ -548,7 +548,7 @@ export function registerRoutes(app: Express) {
       }
 
       const { profilePicture } = validation.data;
-      const user = await storage.updateUser(req.session.userId, { profilePicture });
+      const user = await storage.updateUser(req.session.userId!, { profilePicture });
       
       res.json({ 
         user: { 
@@ -583,7 +583,7 @@ export function registerRoutes(app: Express) {
 
       const { currentPassword, newPassword } = validation.data;
 
-      const user = await storage.getUserById(req.session.userId);
+      const user = await storage.getUserById(req.session.userId!);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -639,7 +639,7 @@ export function registerRoutes(app: Express) {
       }
 
       const updateData = validation.data;
-      const user = await storage.updateUser(req.session.userId, updateData);
+      const user = await storage.updateUser(req.session.userId!, updateData);
       
       res.json({ 
         user: { 

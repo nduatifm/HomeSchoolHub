@@ -16,6 +16,19 @@ export const userSchema = z.object({
   emailVerifyExpires: z.string().nullable(),
   googleId: z.string().nullable(),
   profilePicture: z.string().nullable(),
+  bio: z.string().nullable(),
+  // Teacher-specific fields
+  teachingSubjects: z.array(z.string()),
+  yearsExperience: z.number().nullable(),
+  qualifications: z.string().nullable(),
+  specialization: z.string().nullable(),
+  // Parent-specific fields
+  phone: z.string().nullable(),
+  preferredContact: z.string().nullable(),
+  // Student-specific fields
+  interests: z.array(z.string()),
+  favoriteSubject: z.string().nullable(),
+  learningGoals: z.string().nullable(),
 });
 
 export const insertUserSchema = userSchema.omit({ id: true, isEmailVerified: true, emailVerifyToken: true, emailVerifyExpires: true });
