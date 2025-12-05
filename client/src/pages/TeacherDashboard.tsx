@@ -57,6 +57,7 @@ import {
   Clock,
   Star,
   LibraryBig,
+  Presentation,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -2545,7 +2546,9 @@ export default function TeacherDashboard() {
                   <CardContent>
                     <div className="space-y-4">
                       {tutorRequests.length === 0 ? (
-                        <p className="text-sm text-gray-600">No tutor requests pending.</p>
+                        <p className="text-sm text-gray-600">
+                          No tutor requests pending.
+                        </p>
                       ) : (
                         tutorRequests.map((r: any) => (
                           <div
@@ -2567,7 +2570,9 @@ export default function TeacherDashboard() {
                                 </p>
                                 <Badge
                                   variant={
-                                    r.status === "approved" ? "default" : "outline"
+                                    r.status === "approved"
+                                      ? "default"
+                                      : "outline"
                                   }
                                 >
                                   {r.status}
