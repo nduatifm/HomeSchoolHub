@@ -815,6 +815,7 @@ export function registerRoutes(app: Express) {
 
       const data = insertAssignmentSchema.parse({
         ...req.body,
+        points: 0,
         teacherId: user.id,
       });
 
@@ -868,9 +869,9 @@ export function registerRoutes(app: Express) {
         title: req.body.title,
         description: req.body.description,
         subject: req.body.subject,
-        gradeLevel: parseInt(req.body.gradeLevel),
+        gradeLevel: req.body.gradeLevel,
         dueDate: req.body.dueDate,
-        points: parseInt(req.body.points),
+        points: 0,
         fileUrl,
         teacherId: user.id,
       });
@@ -1107,8 +1108,9 @@ export function registerRoutes(app: Express) {
 
       const data = insertMaterialSchema.parse({
         title: req.body.title,
+        description: req.body.description || null,
         subject: req.body.subject,
-        gradeLevel: parseInt(req.body.gradeLevel),
+        gradeLevel: req.body.gradeLevel,
         fileUrl,
         teacherId: user.id,
         uploadDate: new Date().toISOString(),
