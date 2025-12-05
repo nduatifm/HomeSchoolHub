@@ -911,17 +911,39 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/assignments/student/:studentId", requireAuth, async (req, res) => {
     try {
-      const studentAssignments = await storage.getStudentAssignmentsByStudent(parseInt(req.params.studentId));
+      const studentId = parseInt(req.params.studentId);
+      const isTutorRequestMode = await isTutorRequestModeEnabled();
       
-      // Get full assignment details
-      const assignments = await Promise.all(
-        studentAssignments.map(async (sa) => {
-          const assignment = await storage.getAssignmentById(sa.assignmentId);
-          return { ...assignment, studentAssignment: sa };
-        })
-      );
-
-      res.json(assignments);
+      if (isTutorRequestMode) {
+        // When tutor request mode is ON, only show assigned assignments
+        const studentAssignments = await storage.getStudentAssignmentsByStudent(studentId);
+        
+        const assignments = await Promise.all(
+          studentAssignments.map(async (sa) => {
+            const assignment = await storage.getAssignmentById(sa.assignmentId);
+            return { ...assignment, studentAssignment: sa };
+          })
+        );
+        res.json(assignments);
+      } else {
+        // When tutor request mode is OFF, show ALL assignments
+        const student = await storage.getStudentById(studentId);
+        const allAssignments = await storage.getAllAssignments();
+        
+        // Get any existing student assignments to show submission status
+        const studentAssignments = await storage.getStudentAssignmentsByStudent(studentId);
+        const studentAssignmentMap = new Map(studentAssignments.map(sa => [sa.assignmentId, sa]));
+        
+        // Return all assignments, optionally filtered by grade level, with studentAssignment if exists
+        const assignments = allAssignments
+          .filter(a => !student?.gradeLevel || a.gradeLevel === student.gradeLevel)
+          .map(assignment => ({
+            ...assignment,
+            studentAssignment: studentAssignmentMap.get(assignment.id) || null
+          }));
+        
+        res.json(assignments);
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1134,13 +1156,23 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/materials/student/:studentId", requireAuth, async (req, res) => {
     try {
-      const student = await storage.getStudentById(parseInt(req.params.studentId));
+      const studentId = parseInt(req.params.studentId);
+      const student = await storage.getStudentById(studentId);
       if (!student) {
         return res.status(404).json({ error: "Student not found" });
       }
 
-      const materials = await storage.getMaterialsByGradeLevel(student.gradeLevel);
-      res.json(materials);
+      const isTutorRequestMode = await isTutorRequestModeEnabled();
+      
+      if (isTutorRequestMode) {
+        // When tutor request mode is ON, filter by grade level
+        const materials = await storage.getMaterialsByGradeLevel(student.gradeLevel);
+        res.json(materials);
+      } else {
+        // When tutor request mode is OFF, show ALL materials
+        const materials = await storage.getAllMaterials();
+        res.json(materials);
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1305,8 +1337,18 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/sessions/student/:studentId", requireAuth, async (req, res) => {
     try {
-      const sessions = await storage.getSessionsByStudent(parseInt(req.params.studentId));
-      res.json(sessions);
+      const studentId = parseInt(req.params.studentId);
+      const isTutorRequestMode = await isTutorRequestModeEnabled();
+      
+      if (isTutorRequestMode) {
+        // When tutor request mode is ON, only show sessions the student is part of
+        const sessions = await storage.getSessionsByStudent(studentId);
+        res.json(sessions);
+      } else {
+        // When tutor request mode is OFF, show ALL sessions
+        const sessions = await storage.getAllSessions();
+        res.json(sessions);
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

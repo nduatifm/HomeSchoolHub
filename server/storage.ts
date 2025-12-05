@@ -42,6 +42,7 @@ export interface IStorage {
   getAssignmentById(id: number): Promise<Assignment | null>;
   getAssignmentsByTeacher(teacherId: number): Promise<Assignment[]>;
   getAssignmentsByGradeLevel(gradeLevel: string): Promise<Assignment[]>;
+  getAllAssignments(): Promise<Assignment[]>;
   updateAssignment(id: number, assignment: any): Promise<Assignment>;
   deleteAssignment(id: number): Promise<void>;
   
@@ -56,6 +57,7 @@ export interface IStorage {
   getMaterialsByTeacher(teacherId: number): Promise<Material[]>;
   getMaterialsBySubject(subject: string): Promise<Material[]>;
   getMaterialsByGradeLevel(gradeLevel: string): Promise<Material[]>;
+  getAllMaterials(): Promise<Material[]>;
   updateMaterial(id: number, material: Partial<InsertMaterial>): Promise<Material>;
   deleteMaterial(id: number): Promise<void>;
   
@@ -69,6 +71,7 @@ export interface IStorage {
   getSessionById(id: number): Promise<Session | null>;
   getSessionsByTeacher(teacherId: number): Promise<Session[]>;
   getSessionsByStudent(studentId: number): Promise<Session[]>;
+  getAllSessions(): Promise<Session[]>;
   updateSession(id: number, session: any): Promise<Session>;
   deleteSession(id: number): Promise<void>;
   
@@ -225,6 +228,10 @@ class PrismaStorage implements IStorage {
     return await prisma.assignment.findMany({ where: { gradeLevel } }) as Assignment[];
   }
 
+  async getAllAssignments(): Promise<Assignment[]> {
+    return await prisma.assignment.findMany() as Assignment[];
+  }
+
   async updateAssignment(id: number, assignment: Prisma.AssignmentUpdateInput): Promise<Assignment> {
     return await prisma.assignment.update({ where: { id }, data: assignment }) as Assignment;
   }
@@ -271,6 +278,10 @@ class PrismaStorage implements IStorage {
 
   async getMaterialsByGradeLevel(gradeLevel: string): Promise<Material[]> {
     return await prisma.material.findMany({ where: { gradeLevel } }) as Material[];
+  }
+
+  async getAllMaterials(): Promise<Material[]> {
+    return await prisma.material.findMany() as Material[];
   }
 
   async updateMaterial(id: number, material: Partial<InsertMaterial>): Promise<Material> {
@@ -320,6 +331,10 @@ class PrismaStorage implements IStorage {
     return await prisma.session.findMany({
       where: { studentIds: { has: studentId } }
     }) as unknown as Session[];
+  }
+
+  async getAllSessions(): Promise<Session[]> {
+    return await prisma.session.findMany() as unknown as Session[];
   }
 
   async updateSession(id: number, session: any): Promise<Session> {
