@@ -764,21 +764,15 @@ export function registerRoutes(app: Express) {
   app.get("/api/students/teacher", requireAuth, async (req, res) => {
     try {
       // Check if tutor request mode is enabled
-      const tutorRequestModeSetting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
-      const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
+      const isTutorRequestMode = await isTutorRequestModeEnabled();
 
       let students;
       if (isTutorRequestMode) {
         // When tutor request mode is ON, use the old flow (students from approved requests)
         students = await storage.getStudentsByTeacher(req.session.userId!);
       } else {
-        // When tutor request mode is OFF, get students directly assigned to this teacher
-        students = await storage.getStudentsByTeacherDirect(req.session.userId!);
-        
-        // If no direct assignments exist yet, show all students (for backward compatibility)
-        if (students.length === 0) {
-          students = await storage.getAllStudentsForTeachers();
-        }
+        // When tutor request mode is OFF, show ALL students
+        students = await storage.getAllStudentsForTeachers();
       }
       res.json(students);
     } catch (error: any) {
