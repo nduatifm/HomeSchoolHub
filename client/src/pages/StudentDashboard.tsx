@@ -124,17 +124,25 @@ export default function StudentDashboard() {
   });
 
   const submitAssignmentMutation = useMutation({
-    mutationFn: ({ assignmentId, studentAssignmentId, submission, hasStudentAssignment }: { 
-      assignmentId: number; 
-      studentAssignmentId: number; 
+    mutationFn: ({
+      assignmentId,
+      studentAssignmentId,
+      submission,
+      hasStudentAssignment,
+    }: {
+      assignmentId: number;
+      studentAssignmentId: number;
       submission: string;
       hasStudentAssignment: boolean;
     }) => {
       if (hasStudentAssignment) {
-        return apiRequest(`/api/student-assignments/${studentAssignmentId}/submit`, {
-          method: "PATCH",
-          body: JSON.stringify({ submission }),
-        });
+        return apiRequest(
+          `/api/student-assignments/${studentAssignmentId}/submit`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ submission }),
+          },
+        );
       } else {
         return apiRequest(`/api/assignments/${assignmentId}/submit`, {
           method: "POST",
@@ -147,7 +155,12 @@ export default function StudentDashboard() {
         queryKey: ["/api/assignments/student", student?.id],
       });
       toast({ title: "Assignment submitted!", type: "success" });
-      setSubmissionForm({ assignmentId: 0, studentAssignmentId: 0, submission: "", hasStudentAssignment: false });
+      setSubmissionForm({
+        assignmentId: 0,
+        studentAssignmentId: 0,
+        submission: "",
+        hasStudentAssignment: false,
+      });
       setSubmitDialogAssignmentId(null);
     },
   });
@@ -195,7 +208,8 @@ export default function StudentDashboard() {
   });
 
   const pendingAssignments = assignments.filter(
-    (a: any) => a.studentAssignment?.status === "pending" || !a.studentAssignment,
+    (a: any) =>
+      a.studentAssignment?.status === "pending" || !a.studentAssignment,
   );
   const submittedAssignments = assignments.filter(
     (a: any) => a.studentAssignment?.status === "submitted",
@@ -283,7 +297,58 @@ export default function StudentDashboard() {
             </TabsList> */}
 
             <TabsContent value="assignments">
-              <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Assignments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Grade</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Assignment Link</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingAssignments.map((s: any) => (
+                        <TableRow
+                          key={s.id}
+                          data-testid={`row-materials-${s.id}`}
+                        >
+                          <TableCell
+                            data-testid={`text-materials-name-${s.id}`}
+                          >
+                            {s.title}
+                          </TableCell>
+                          <TableCell>{s.description}</TableCell>
+                          <TableCell>{s.subject}</TableCell>
+                          <TableCell>{s.gradeLevel}</TableCell>
+                          <TableCell>
+                            {new Date(s.dueDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <a
+                              href={s.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                              data-testid={`link-materials-meeting-${s.id}`}
+                            >
+                              Access Assignment
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* <div className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>
@@ -327,7 +392,8 @@ export default function StudentDashboard() {
                                   setSubmitDialogAssignmentId(a.id);
                                   setSubmissionForm({
                                     assignmentId: a.id,
-                                    studentAssignmentId: a.studentAssignment?.id || 0,
+                                    studentAssignmentId:
+                                      a.studentAssignment?.id || 0,
                                     submission: "",
                                     hasStudentAssignment: !!a.studentAssignment,
                                   });
@@ -367,10 +433,13 @@ export default function StudentDashboard() {
                                     <Button
                                       onClick={() =>
                                         submitAssignmentMutation.mutate({
-                                          assignmentId: submissionForm.assignmentId,
-                                          studentAssignmentId: submissionForm.studentAssignmentId,
+                                          assignmentId:
+                                            submissionForm.assignmentId,
+                                          studentAssignmentId:
+                                            submissionForm.studentAssignmentId,
                                           submission: submissionForm.submission,
-                                          hasStudentAssignment: submissionForm.hasStudentAssignment,
+                                          hasStudentAssignment:
+                                            submissionForm.hasStudentAssignment,
                                         })
                                       }
                                       disabled={
@@ -478,7 +547,7 @@ export default function StudentDashboard() {
                     </Table>
                   </CardContent>
                 </Card>
-              </div>
+              </div> */}
             </TabsContent>
 
             <TabsContent value="materials">
@@ -487,37 +556,45 @@ export default function StudentDashboard() {
                   <CardTitle>Study Materials</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {materials.map((m: any) => (
-                      <Card key={m.id} data-testid={`card-material-${m.id}`}>
-                        <CardHeader>
-                          <CardTitle
-                            className="text-lg"
-                            data-testid={`text-material-title-${m.id}`}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Grade</TableHead>
+                        <TableHead>Material Link</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {materials.map((s: any) => (
+                        <TableRow
+                          key={s.id}
+                          data-testid={`row-materials-${s.id}`}
+                        >
+                          <TableCell
+                            data-testid={`text-materials-name-${s.id}`}
                           >
-                            {m.title}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-gray-600 mb-4">
-                            {m.description}
-                          </p>
-                          <div className="space-x-2 mb-4">
-                            <Badge>{m.subject}</Badge>
-                            <Badge variant="outline">{m.gradeLevel}</Badge>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            data-testid={`button-access-${m.id}`}
-                          >
-                            <BookOpen className="h-4 w-4 mr-2" />
-                            Access Material
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                            {s.title}
+                          </TableCell>
+                          <TableCell>{s.description}</TableCell>
+                          <TableCell>{s.subject}</TableCell>
+                          <TableCell>{s.gradeLevel}</TableCell>
+                          <TableCell>
+                            <a
+                              href={s.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                              data-testid={`link-materials-meeting-${s.id}`}
+                            >
+                              Access Material
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -717,85 +794,51 @@ export default function StudentDashboard() {
                   <CardTitle>Tutoring Sessions</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {sessionsQuery.isLoading ? (
-                    <div className="text-center py-8">Loading sessions...</div>
-                  ) : sessionsQuery.isError ? (
-                    <div className="text-center py-8 text-red-500">
-                      Error loading sessions
-                    </div>
-                  ) : sessions.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
-                      No sessions scheduled yet
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Meeting Link</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {sessions.map((s: any) => (
-                        <div
+                        <TableRow
                           key={s.id}
-                          className="p-4 border rounded-lg"
-                          data-testid={`card-session-${s.id}`}
+                          data-testid={`row-session-${s.id}`}
                         >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h3
-                                className="font-medium"
-                                data-testid={`text-session-title-${s.id}`}
-                              >
-                                {s.title || s.subject}
-                              </h3>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {s.description}
-                              </p>
-                              <div className="mt-2 space-y-1">
-                                <p className="text-sm">
-                                  <strong>Subject:</strong> {s.subject}
-                                </p>
-                                <p className="text-sm">
-                                  <strong>Date:</strong>{" "}
-                                  {new Date(s.sessionDate).toLocaleDateString()}
-                                </p>
-                                <p className="text-sm">
-                                  <strong>Time:</strong> {s.startTime} -{" "}
-                                  {s.endTime}
-                                </p>
-                                {s.meetingUrl && (
-                                  <p className="text-sm">
-                                    <strong>Meeting Link:</strong>{" "}
-                                    <a
-                                      href={s.meetingUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:underline"
-                                      data-testid={`link-session-meeting-${s.id}`}
-                                    >
-                                      Join Session
-                                    </a>
-                                  </p>
-                                )}
-                              </div>
-                              {s.notes && (
-                                <p className="text-sm text-gray-600 mt-2">
-                                  <strong>Notes:</strong> {s.notes}
-                                </p>
-                              )}
-                            </div>
-                            <Badge
-                              variant={
-                                s.status === "scheduled"
-                                  ? "default"
-                                  : s.status === "completed"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                              data-testid={`badge-session-status-${s.id}`}
+                          <TableCell data-testid={`text-session-name-${s.id}`}>
+                            {s.title}
+                          </TableCell>
+                          <TableCell>{s.description}</TableCell>
+                          <TableCell>{s.subject}</TableCell>
+                          <TableCell>
+                            {new Date(s.sessionDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            {s.startTime} - {s.endTime}
+                          </TableCell>
+                          <TableCell>
+                            <a
+                              href={s.meetingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                              data-testid={`link-session-meeting-${s.id}`}
                             >
-                              {s.status}
-                            </Badge>
-                          </div>
-                        </div>
+                              Join Session
+                            </a>
+                          </TableCell>
+                          <TableCell>{s.notes || "-"}</TableCell>
+                        </TableRow>
                       ))}
-                    </div>
-                  )}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </TabsContent>

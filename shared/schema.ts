@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // User roles
 export const userRoles = ["teacher", "parent", "student"] as const;
-export type UserRole = typeof userRoles[number];
+export type UserRole = (typeof userRoles)[number];
 
 // User schema
 export const userSchema = z.object({
@@ -31,7 +31,12 @@ export const userSchema = z.object({
   learningGoals: z.string().nullable(),
 });
 
-export const insertUserSchema = userSchema.omit({ id: true, isEmailVerified: true, emailVerifyToken: true, emailVerifyExpires: true });
+export const insertUserSchema = userSchema.omit({
+  id: true,
+  isEmailVerified: true,
+  emailVerifyToken: true,
+  emailVerifyExpires: true,
+});
 export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
@@ -40,7 +45,9 @@ export const signupSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   name: z.string().min(1, "Name is required"),
-  role: z.enum(["teacher", "parent"], { errorMap: () => ({ message: "Role must be teacher or parent" }) }),
+  role: z.enum(["teacher", "parent"], {
+    errorMap: () => ({ message: "Role must be teacher or parent" }),
+  }),
 });
 
 export const loginSchema = z.object({
@@ -91,7 +98,9 @@ export const assignmentSchema = z.object({
 });
 
 export const insertAssignmentSchema = assignmentSchema.omit({ id: true });
-export const updateAssignmentSchema = assignmentSchema.omit({ id: true, teacherId: true, points: true }).partial();
+export const updateAssignmentSchema = assignmentSchema
+  .omit({ id: true, teacherId: true, points: true })
+  .partial();
 export type Assignment = z.infer<typeof assignmentSchema>;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 export type UpdateAssignment = z.infer<typeof updateAssignmentSchema>;
@@ -108,9 +117,13 @@ export const studentAssignmentSchema = z.object({
   submittedAt: z.string().nullable(),
 });
 
-export const insertStudentAssignmentSchema = studentAssignmentSchema.omit({ id: true });
+export const insertStudentAssignmentSchema = studentAssignmentSchema.omit({
+  id: true,
+});
 export type StudentAssignment = z.infer<typeof studentAssignmentSchema>;
-export type InsertStudentAssignment = z.infer<typeof insertStudentAssignmentSchema>;
+export type InsertStudentAssignment = z.infer<
+  typeof insertStudentAssignmentSchema
+>;
 
 // Study Material schema
 export const materialSchema = z.object({
@@ -125,7 +138,9 @@ export const materialSchema = z.object({
 });
 
 export const insertMaterialSchema = materialSchema.omit({ id: true });
-export const updateMaterialSchema = materialSchema.omit({ id: true, teacherId: true, uploadDate: true }).partial();
+export const updateMaterialSchema = materialSchema
+  .omit({ id: true, teacherId: true, uploadDate: true })
+  .partial();
 export type Material = z.infer<typeof materialSchema>;
 export type InsertMaterial = z.infer<typeof insertMaterialSchema>;
 export type UpdateMaterial = z.infer<typeof updateMaterialSchema>;
@@ -162,7 +177,9 @@ export const sessionSchema = z.object({
 });
 
 export const insertSessionSchema = sessionSchema.omit({ id: true });
-export const updateSessionSchema = sessionSchema.omit({ id: true, teacherId: true }).partial();
+export const updateSessionSchema = sessionSchema
+  .omit({ id: true, teacherId: true })
+  .partial();
 export type Session = z.infer<typeof sessionSchema>;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type UpdateSession = z.infer<typeof updateSessionSchema>;
@@ -252,7 +269,9 @@ export const progressReportSchema = z.object({
   grades: z.record(z.string(), z.number()),
 });
 
-export const insertProgressReportSchema = progressReportSchema.omit({ id: true });
+export const insertProgressReportSchema = progressReportSchema.omit({
+  id: true,
+});
 export type ProgressReport = z.infer<typeof progressReportSchema>;
 export type InsertProgressReport = z.infer<typeof insertProgressReportSchema>;
 
@@ -286,7 +305,9 @@ export const parentalControlSchema = z.object({
   blockedFeatures: z.array(z.string()),
 });
 
-export const insertParentalControlSchema = parentalControlSchema.omit({ id: true });
+export const insertParentalControlSchema = parentalControlSchema.omit({
+  id: true,
+});
 export type ParentalControl = z.infer<typeof parentalControlSchema>;
 export type InsertParentalControl = z.infer<typeof insertParentalControlSchema>;
 
@@ -331,13 +352,13 @@ export const studentInviteSchema = z.object({
   expiresDate: z.string(),
 });
 
-export const insertStudentInviteSchema = studentInviteSchema.omit({ 
-  id: true, 
-  parentId: true, 
-  token: true, 
-  status: true, 
-  createdDate: true, 
-  expiresDate: true 
+export const insertStudentInviteSchema = studentInviteSchema.omit({
+  id: true,
+  parentId: true,
+  token: true,
+  status: true,
+  createdDate: true,
+  expiresDate: true,
 });
 export type StudentInvite = z.infer<typeof studentInviteSchema>;
 export type InsertStudentInvite = z.infer<typeof insertStudentInviteSchema>;
@@ -350,7 +371,9 @@ export const systemSettingsSchema = z.object({
   description: z.string().nullable(),
 });
 
-export const insertSystemSettingsSchema = systemSettingsSchema.omit({ id: true });
+export const insertSystemSettingsSchema = systemSettingsSchema.omit({
+  id: true,
+});
 export type SystemSettings = z.infer<typeof systemSettingsSchema>;
 export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
 
@@ -363,6 +386,11 @@ export const teacherStudentAssignmentSchema = z.object({
   status: z.enum(["active", "inactive"]),
 });
 
-export const insertTeacherStudentAssignmentSchema = teacherStudentAssignmentSchema.omit({ id: true });
-export type TeacherStudentAssignment = z.infer<typeof teacherStudentAssignmentSchema>;
-export type InsertTeacherStudentAssignment = z.infer<typeof insertTeacherStudentAssignmentSchema>;
+export const insertTeacherStudentAssignmentSchema =
+  teacherStudentAssignmentSchema.omit({ id: true });
+export type TeacherStudentAssignment = z.infer<
+  typeof teacherStudentAssignmentSchema
+>;
+export type InsertTeacherStudentAssignment = z.infer<
+  typeof insertTeacherStudentAssignmentSchema
+>;

@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { z } from "zod";
-import { 
-  insertUserSchema, 
+import {
+  insertUserSchema,
   insertStudentSchema,
   insertAssignmentSchema,
   updateAssignmentSchema,
@@ -57,22 +57,24 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 // Verify password with bcrypt
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
+async function verifyPassword(
+  password: string,
+  hash: string,
+): Promise<boolean> {
   return await bcrypt.compare(password, hash);
 }
 
 export function registerRoutes(app: Express) {
-  
   // ========== AUTH ROUTES ==========
-  
+
   // Teacher/Parent signup
   app.post("/api/auth/signup", async (req, res) => {
     try {
       // Validate input with Zod
       const validation = signupSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
@@ -84,7 +86,7 @@ export function registerRoutes(app: Express) {
       }
 
       const hashedPassword = await hashPassword(password);
-      
+
       // Generate email verification token
       const emailVerifyToken = crypto.randomUUID();
       const emailVerifyExpires = new Date();
@@ -103,20 +105,21 @@ export function registerRoutes(app: Express) {
       });
 
       // Send verification email (non-blocking)
-      sendVerificationEmail(email, name, emailVerifyToken).catch(err => 
-        console.error("Failed to send verification email:", err)
+      sendVerificationEmail(email, name, emailVerifyToken).catch((err) =>
+        console.error("Failed to send verification email:", err),
       );
 
       // Do NOT create session until email is verified
-      res.json({ 
-        user: { 
-          id: user.id, 
-          email: user.email, 
-          name: user.name, 
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
           role: user.role,
-          isEmailVerified: user.isEmailVerified 
+          isEmailVerified: user.isEmailVerified,
         },
-        message: "Signup successful! Please check your email to verify your account before logging in."
+        message:
+          "Signup successful! Please check your email to verify your account before logging in.",
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -129,13 +132,13 @@ export function registerRoutes(app: Express) {
       // Validate input with Zod
       const validation = loginSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
       const { email, password } = validation.data;
-      
+
       const user = await storage.getUserByEmail(email);
       if (!user) {
         return res.status(401).json({ error: "Invalid credentials" });
@@ -143,7 +146,9 @@ export function registerRoutes(app: Express) {
 
       // Check if user password exists (for non-Google OAuth users)
       if (!user.password) {
-        return res.status(401).json({ error: "Invalid credentials. Please use Google Sign In." });
+        return res
+          .status(401)
+          .json({ error: "Invalid credentials. Please use Google Sign In." });
       }
 
       const isValid = await verifyPassword(password, user.password);
@@ -153,18 +158,23 @@ export function registerRoutes(app: Express) {
 
       // Check if email is verified
       if (!user.isEmailVerified) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: "Please verify your email before logging in",
-          needsVerification: true 
+          needsVerification: true,
         });
       }
 
       const sessionId = crypto.randomUUID();
       sessions.set(sessionId, user.id);
 
-      res.json({ 
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
-        sessionId 
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+        sessionId,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -177,13 +187,13 @@ export function registerRoutes(app: Express) {
       // Validate input with Zod
       const validation = studentSignupSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
       const { token, password } = validation.data;
-      
+
       const invite = await storage.getStudentInviteByToken(token);
       if (!invite || invite.status === "accepted") {
         return res.status(400).json({ error: "Invalid or expired invite" });
@@ -196,12 +206,12 @@ export function registerRoutes(app: Express) {
 
       // Create user account with email verification requirement
       const hashedPassword = await hashPassword(password);
-      
+
       // Generate email verification token for student
       const emailVerifyToken = crypto.randomUUID();
       const emailVerifyExpires = new Date();
       emailVerifyExpires.setHours(emailVerifyExpires.getHours() + 24);
-      
+
       const user = await storage.createUser({
         email: invite.email,
         password: hashedPassword,
@@ -225,9 +235,10 @@ export function registerRoutes(app: Express) {
       });
 
       // Check if tutor request mode is OFF - if so, auto-assign to a teacher
-      const tutorRequestModeSetting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+      const tutorRequestModeSetting =
+        await storage.getSystemSetting("TUTOR_REQUEST_MODE");
       const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
-      
+
       if (!isTutorRequestMode) {
         // Auto-assign student to the first available teacher
         await storage.assignStudentToFirstAvailableTeacher(student.id);
@@ -237,15 +248,23 @@ export function registerRoutes(app: Express) {
       await storage.updateStudentInvite(invite.id, { status: "accepted" });
 
       // Send verification email to student (non-blocking)
-      sendVerificationEmail(user.email, user.name, emailVerifyToken).catch(err => 
-        console.error("Failed to send verification email to student:", err)
+      sendVerificationEmail(user.email, user.name, emailVerifyToken).catch(
+        (err) =>
+          console.error("Failed to send verification email to student:", err),
       );
 
       // Do NOT create session until email is verified
-      res.json({ 
-        user: { id: user.id, email: user.email, name: user.name, role: user.role, isEmailVerified: user.isEmailVerified },
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          isEmailVerified: user.isEmailVerified,
+        },
         student,
-        message: "Account created! Please check your email to verify your account before logging in."
+        message:
+          "Account created! Please check your email to verify your account before logging in.",
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -256,14 +275,16 @@ export function registerRoutes(app: Express) {
   app.post("/api/auth/google", async (req, res) => {
     try {
       const { credential, role } = req.body;
-      
+
       if (!credential) {
         return res.status(400).json({ error: "Google credential is required" });
       }
 
       // Only allow teacher/parent roles for new signups
       if (role && !["teacher", "parent"].includes(role)) {
-        return res.status(400).json({ error: "Invalid role for Google sign up" });
+        return res
+          .status(400)
+          .json({ error: "Invalid role for Google sign up" });
       }
 
       // Verify Google token
@@ -288,7 +309,7 @@ export function registerRoutes(app: Express) {
       if (!user && email) {
         // Check if user exists by email (account linking)
         user = await storage.getUserByEmail(email);
-        
+
         if (user) {
           // Link Google account to existing email account
           await storage.updateUser(user.id, {
@@ -302,9 +323,9 @@ export function registerRoutes(app: Express) {
       // Create new user if doesn't exist
       if (!user) {
         if (!role) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: "Role is required for new Google sign ups",
-            requiresRole: true 
+            requiresRole: true,
           });
         }
 
@@ -326,7 +347,12 @@ export function registerRoutes(app: Express) {
       sessions.set(sessionId, user.id);
 
       res.json({
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
         sessionId,
       });
     } catch (error: any) {
@@ -348,11 +374,11 @@ export function registerRoutes(app: Express) {
         profile = await storage.getStudentByUserId(user.id);
       }
 
-      res.json({ 
-        user: { 
-          id: user.id, 
-          email: user.email, 
-          name: user.name, 
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
           role: user.role,
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
@@ -368,7 +394,7 @@ export function registerRoutes(app: Express) {
           favoriteSubject: user.favoriteSubject,
           learningGoals: user.learningGoals,
         },
-        profile 
+        profile,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -389,7 +415,7 @@ export function registerRoutes(app: Express) {
     try {
       const users = await storage.getAllUsers();
       // Exclude current user from the list
-      const filteredUsers = users.filter(u => u.id !== req.session.userId);
+      const filteredUsers = users.filter((u) => u.id !== req.session.userId);
       res.json(filteredUsers);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -397,30 +423,35 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== EMAIL VERIFICATION ROUTES ==========
-  
+
   // Verify email
   app.get("/api/auth/verify-email/:token", async (req, res) => {
     try {
       const { token } = req.params;
-      
+
       const user = await storage.getUserByEmailVerifyToken(token);
       if (!user) {
-        return res.status(400).json({ error: "Invalid or expired verification token" });
+        return res
+          .status(400)
+          .json({ error: "Invalid or expired verification token" });
       }
 
       // Check if already verified
       if (user.isEmailVerified) {
-        return res.json({ 
+        return res.json({
           success: true,
-          message: "Email already verified! You can now log in." 
+          message: "Email already verified! You can now log in.",
         });
       }
 
       // Check if token is expired
-      if (user.emailVerifyExpires && new Date(user.emailVerifyExpires) < new Date()) {
-        return res.status(400).json({ 
+      if (
+        user.emailVerifyExpires &&
+        new Date(user.emailVerifyExpires) < new Date()
+      ) {
+        return res.status(400).json({
           error: "Verification token has expired",
-          expired: true 
+          expired: true,
         });
       }
 
@@ -431,9 +462,9 @@ export function registerRoutes(app: Express) {
         emailVerifyExpires: null,
       });
 
-      res.json({ 
+      res.json({
         success: true,
-        message: "Email verified successfully! You can now log in." 
+        message: "Email verified successfully! You can now log in.",
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -446,8 +477,8 @@ export function registerRoutes(app: Express) {
       // Validate input with Zod
       const validation = resendVerificationSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
@@ -456,9 +487,10 @@ export function registerRoutes(app: Express) {
       const user = await storage.getUserByEmail(email);
       if (!user) {
         // Don't reveal whether the email exists
-        return res.json({ 
+        return res.json({
           success: true,
-          message: "If that email is registered, a verification link has been sent." 
+          message:
+            "If that email is registered, a verification link has been sent.",
         });
       }
 
@@ -468,10 +500,14 @@ export function registerRoutes(app: Express) {
 
       // Check if a token was sent recently (within last 5 minutes to prevent spam)
       if (user.emailVerifyToken && user.emailVerifyExpires) {
-        const tokenAge = Date.now() - (new Date(user.emailVerifyExpires).getTime() - (24 * 60 * 60 * 1000));
-        if (tokenAge < 5 * 60 * 1000) { // 5 minutes
-          return res.status(429).json({ 
-            error: "A verification email was recently sent. Please check your inbox or try again in a few minutes." 
+        const tokenAge =
+          Date.now() -
+          (new Date(user.emailVerifyExpires).getTime() - 24 * 60 * 60 * 1000);
+        if (tokenAge < 5 * 60 * 1000) {
+          // 5 minutes
+          return res.status(429).json({
+            error:
+              "A verification email was recently sent. Please check your inbox or try again in a few minutes.",
           });
         }
       }
@@ -489,17 +525,17 @@ export function registerRoutes(app: Express) {
       // Send verification email
       await sendVerificationEmail(user.email, user.name, emailVerifyToken);
 
-      res.json({ 
+      res.json({
         success: true,
-        message: "Verification email sent! Please check your inbox." 
-        });
+        message: "Verification email sent! Please check your inbox.",
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
   // ========== USER PROFILE ROUTES ==========
-  
+
   // Update profile
   app.patch("/api/user/profile", requireAuth, async (req, res) => {
     try {
@@ -509,24 +545,24 @@ export function registerRoutes(app: Express) {
 
       const validation = updateProfileSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
       const { name } = validation.data;
       const user = await storage.updateUser(req.session.userId!, { name });
-      
-      res.json({ 
-        user: { 
-          id: user.id, 
-          email: user.email, 
-          name: user.name, 
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
           role: user.role,
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
-          googleId: user.googleId
-        } 
+          googleId: user.googleId,
+        },
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -537,29 +573,37 @@ export function registerRoutes(app: Express) {
   app.patch("/api/user/profile-picture", requireAuth, async (req, res) => {
     try {
       const updatePictureSchema = z.object({
-        profilePicture: z.string().url("Must be a valid URL").startsWith("https://res.cloudinary.com/", "Profile picture must be uploaded through Cloudinary"),
+        profilePicture: z
+          .string()
+          .url("Must be a valid URL")
+          .startsWith(
+            "https://res.cloudinary.com/",
+            "Profile picture must be uploaded through Cloudinary",
+          ),
       });
 
       const validation = updatePictureSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
       const { profilePicture } = validation.data;
-      const user = await storage.updateUser(req.session.userId!, { profilePicture });
-      
-      res.json({ 
-        user: { 
-          id: user.id, 
-          email: user.email, 
-          name: user.name, 
+      const user = await storage.updateUser(req.session.userId!, {
+        profilePicture,
+      });
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
           role: user.role,
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
-          googleId: user.googleId
-        } 
+          googleId: user.googleId,
+        },
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -571,13 +615,16 @@ export function registerRoutes(app: Express) {
     try {
       const changePasswordSchema = z.object({
         currentPassword: z.string().min(1, "Current password is required"),
-        newPassword: z.string().min(8, "New password must be at least 8 characters").max(100, "New password too long"),
+        newPassword: z
+          .string()
+          .min(8, "New password must be at least 8 characters")
+          .max(100, "New password too long"),
       });
 
       const validation = changePasswordSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
@@ -590,7 +637,9 @@ export function registerRoutes(app: Express) {
 
       // Check if user has a password (not Google OAuth)
       if (!user.password) {
-        return res.status(400).json({ error: "Cannot change password for Google sign-in accounts" });
+        return res.status(400).json({
+          error: "Cannot change password for Google sign-in accounts",
+        });
       }
 
       // Verify current password
@@ -602,10 +651,10 @@ export function registerRoutes(app: Express) {
       // Hash and update new password
       const hashedPassword = await hashPassword(newPassword);
       await storage.updateUser(user.id, { password: hashedPassword });
-      
-      res.json({ 
+
+      res.json({
         success: true,
-        message: "Password changed successfully" 
+        message: "Password changed successfully",
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -633,19 +682,19 @@ export function registerRoutes(app: Express) {
 
       const validation = updateDetailsSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: validation.error.errors[0].message 
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
         });
       }
 
       const updateData = validation.data;
       const user = await storage.updateUser(req.session.userId!, updateData);
-      
-      res.json({ 
-        user: { 
-          id: user.id, 
-          email: user.email, 
-          name: user.name, 
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
           role: user.role,
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
@@ -660,7 +709,7 @@ export function registerRoutes(app: Express) {
           interests: user.interests,
           favoriteSubject: user.favoriteSubject,
           learningGoals: user.learningGoals,
-        } 
+        },
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -668,43 +717,51 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== FILE UPLOAD ROUTES ==========
-  
-  app.post("/api/upload", requireAuth, memoryUpload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file provided" });
-      }
 
-      const folder = req.body.folder || 'uploads';
-      const result: any = await uploadBufferToCloudinary(
-        req.file.buffer,
-        req.file.originalname,
-        folder
-      );
+  app.post(
+    "/api/upload",
+    requireAuth,
+    memoryUpload.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "No file provided" });
+        }
 
-      if (!result.success || !result.url || !result.publicId) {
-        return res.status(500).json({ 
-          error: result.error || 'File upload failed - missing URL or public ID' 
+        const folder = req.body.folder || "uploads";
+        const result: any = await uploadBufferToCloudinary(
+          req.file.buffer,
+          req.file.originalname,
+          folder,
+        );
+
+        if (!result.success || !result.url || !result.publicId) {
+          return res.status(500).json({
+            error:
+              result.error || "File upload failed - missing URL or public ID",
+          });
+        }
+
+        res.json({
+          success: true,
+          url: result.url,
+          publicId: result.publicId,
         });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      res.json({ 
-        success: true,
-        url: result.url,
-        publicId: result.publicId
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // ========== STUDENT INVITE ROUTES ==========
-  
+
   app.post("/api/invites/student", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "parent") {
-        return res.status(403).json({ error: "Only parents can invite students" });
+        return res
+          .status(403)
+          .json({ error: "Only parents can invite students" });
       }
 
       const data = insertStudentInviteSchema.parse(req.body);
@@ -731,7 +788,9 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/invites/student/parent", requireAuth, async (req, res) => {
     try {
-      const invites = await storage.getStudentInvitesByParent(req.session.userId!);
+      const invites = await storage.getStudentInvitesByParent(
+        req.session.userId!,
+      );
       res.json(invites);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -751,7 +810,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== STUDENT ROUTES ==========
-  
+
   app.get("/api/students/parent", requireAuth, async (req, res) => {
     try {
       const students = await storage.getStudentsByParent(req.session.userId!);
@@ -791,7 +850,10 @@ export function registerRoutes(app: Express) {
 
   app.patch("/api/students/:id", requireAuth, async (req, res) => {
     try {
-      const student = await storage.updateStudent(parseInt(req.params.id), req.body);
+      const student = await storage.updateStudent(
+        parseInt(req.params.id),
+        req.body,
+      );
       res.json(student);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -799,12 +861,14 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== ASSIGNMENT ROUTES ==========
-  
+
   app.post("/api/assignments", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can create assignments" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can create assignments" });
       }
 
       const data = insertAssignmentSchema.parse({
@@ -817,8 +881,10 @@ export function registerRoutes(app: Express) {
 
       // Auto-assign to students with matching grade level
       const students = await storage.getStudentsByTeacher(user.id);
-      const matchingStudents = students.filter(s => s.gradeLevel === assignment.gradeLevel);
-      
+      const matchingStudents = students.filter(
+        (s) => s.gradeLevel === assignment.gradeLevel,
+      );
+
       for (const student of matchingStudents) {
         await storage.createStudentAssignment({
           assignmentId: assignment.id,
@@ -837,126 +903,161 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/assignments/with-file", requireAuth, memoryUpload.single('file'), async (req, res) => {
-    try {
-      const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can create assignments" });
-      }
+  app.post(
+    "/api/assignments/with-file",
+    requireAuth,
+    memoryUpload.single("file"),
+    async (req, res) => {
+      try {
+        const user = await storage.getUserById(req.session.userId!);
+        if (user?.role !== "teacher") {
+          return res
+            .status(403)
+            .json({ error: "Only teachers can create assignments" });
+        }
 
-      let fileUrl = null;
-      if (req.file) {
-        const uploadResult: any = await uploadBufferToCloudinary(
-          req.file.buffer,
-          req.file.originalname,
-          'assignments'
+        let fileUrl = null;
+        if (req.file) {
+          const uploadResult: any = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+            "assignments",
+          );
+          if (
+            !uploadResult.success ||
+            !uploadResult.url ||
+            !uploadResult.publicId
+          ) {
+            return res.status(500).json({
+              error:
+                uploadResult.error ||
+                "File upload failed - missing URL or public ID",
+            });
+          }
+          fileUrl = uploadResult.url;
+        }
+
+        const data = insertAssignmentSchema.parse({
+          title: req.body.title,
+          description: req.body.description,
+          subject: req.body.subject,
+          gradeLevel: req.body.gradeLevel,
+          dueDate: req.body.dueDate,
+          points: 0,
+          fileUrl,
+          teacherId: user.id,
+        });
+
+        const assignment = await storage.createAssignment(data);
+
+        // Auto-assign to students with matching grade level
+        const students = await storage.getStudentsByTeacher(user.id);
+        const matchingStudents = students.filter(
+          (s) => s.gradeLevel === assignment.gradeLevel,
         );
-        if (!uploadResult.success || !uploadResult.url || !uploadResult.publicId) {
-          return res.status(500).json({ 
-            error: uploadResult.error || 'File upload failed - missing URL or public ID' 
+
+        for (const student of matchingStudents) {
+          await storage.createStudentAssignment({
+            assignmentId: assignment.id,
+            studentId: student.id,
+            submission: null,
+            grade: null,
+            feedback: null,
+            status: "pending",
+            submittedAt: null,
           });
         }
-        fileUrl = uploadResult.url;
+
+        res.json(assignment);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      const data = insertAssignmentSchema.parse({
-        title: req.body.title,
-        description: req.body.description,
-        subject: req.body.subject,
-        gradeLevel: req.body.gradeLevel,
-        dueDate: req.body.dueDate,
-        points: 0,
-        fileUrl,
-        teacherId: user.id,
-      });
-
-      const assignment = await storage.createAssignment(data);
-
-      // Auto-assign to students with matching grade level
-      const students = await storage.getStudentsByTeacher(user.id);
-      const matchingStudents = students.filter(s => s.gradeLevel === assignment.gradeLevel);
-      
-      for (const student of matchingStudents) {
-        await storage.createStudentAssignment({
-          assignmentId: assignment.id,
-          studentId: student.id,
-          submission: null,
-          grade: null,
-          feedback: null,
-          status: "pending",
-          submittedAt: null,
-        });
-      }
-
-      res.json(assignment);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   app.get("/api/assignments/teacher", requireAuth, async (req, res) => {
     try {
-      const assignments = await storage.getAssignmentsByTeacher(req.session.userId!);
+      const assignments = await storage.getAssignmentsByTeacher(
+        req.session.userId!,
+      );
       res.json(assignments);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/assignments/student/:studentId", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      const isTutorRequestMode = await isTutorRequestModeEnabled();
-      
-      if (isTutorRequestMode) {
-        // When tutor request mode is ON, only show assigned assignments
-        const studentAssignments = await storage.getStudentAssignmentsByStudent(studentId);
-        
-        const assignments = await Promise.all(
-          studentAssignments.map(async (sa) => {
-            const assignment = await storage.getAssignmentById(sa.assignmentId);
-            return { ...assignment, studentAssignment: sa };
-          })
-        );
-        res.json(assignments);
-      } else {
-        // When tutor request mode is OFF, show assignments from assigned teachers
-        const student = await storage.getStudentById(studentId);
-        const allAssignments = await storage.getAllAssignments();
-        
-        // Get teachers assigned to this student
-        const assignedTeachers = await storage.getAssignedTeachersForStudent(studentId);
-        const assignedTeacherIds = new Set(assignedTeachers.map(t => t.teacherId));
-        
-        // Get any existing student assignments to show submission status
-        const studentAssignments = await storage.getStudentAssignmentsByStudent(studentId);
-        const studentAssignmentMap = new Map(studentAssignments.map(sa => [sa.assignmentId, sa]));
-        
-        // Return assignments from assigned teachers OR matching grade level
-        const assignments = allAssignments
-          .filter(a => {
-            // Include if from an assigned teacher
-            if (assignedTeacherIds.has(a.teacherId)) return true;
-            // Or if matching grade level (for general assignments)
-            return !student?.gradeLevel || a.gradeLevel === student.gradeLevel;
-          })
-          .map(assignment => ({
-            ...assignment,
-            studentAssignment: studentAssignmentMap.get(assignment.id) || null
-          }));
-        
-        res.json(assignments);
+  app.get(
+    "/api/assignments/student/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        const isTutorRequestMode = await isTutorRequestModeEnabled();
+
+        if (isTutorRequestMode) {
+          // When tutor request mode is ON, only show assigned assignments
+          const studentAssignments =
+            await storage.getStudentAssignmentsByStudent(studentId);
+
+          const assignments = await Promise.all(
+            studentAssignments.map(async (sa) => {
+              const assignment = await storage.getAssignmentById(
+                sa.assignmentId,
+              );
+              return { ...assignment, studentAssignment: sa };
+            }),
+          );
+          res.json(assignments);
+        } else {
+          // When tutor request mode is OFF, show assignments from assigned teachers
+          const student = await storage.getStudentById(studentId);
+          const allAssignments = await storage.getAllAssignments();
+
+          // Get teachers assigned to this student
+          const assignedTeachers =
+            await storage.getAssignedTeachersForStudent(studentId);
+          const assignedTeacherIds = new Set(
+            assignedTeachers.map((t) => t.teacherId),
+          );
+
+          // Get any existing student assignments to show submission status
+          const studentAssignments =
+            await storage.getStudentAssignmentsByStudent(studentId);
+          const studentAssignmentMap = new Map(
+            studentAssignments.map((sa) => [sa.assignmentId, sa]),
+          );
+
+          // Return assignments from assigned teachers OR matching grade level
+          const assignments = allAssignments
+            .filter((a) => {
+              // Include if from an assigned teacher
+              if (assignedTeacherIds.has(a.teacherId)) return true;
+              // Or if matching grade level (for general assignments)
+              return (
+                !student?.gradeLevel || a.gradeLevel === student.gradeLevel
+              );
+            })
+            .map((assignment) => ({
+              ...assignment,
+              studentAssignment:
+                studentAssignmentMap.get(assignment.id) || null,
+            }));
+
+          res.json(assignments);
+        }
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   app.get("/api/assignments/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      const assignment = await storage.getAssignmentById(parseInt(req.params.id));
-      
+      const assignment = await storage.getAssignmentById(
+        parseInt(req.params.id),
+      );
+
       if (!assignment) {
         return res.status(404).json({ error: "Assignment not found" });
       }
@@ -976,22 +1077,31 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can update assignments" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can update assignments" });
       }
 
       // Check if assignment exists and belongs to the requesting teacher
-      const existingAssignment = await storage.getAssignmentById(parseInt(req.params.id));
+      const existingAssignment = await storage.getAssignmentById(
+        parseInt(req.params.id),
+      );
       if (!existingAssignment) {
         return res.status(404).json({ error: "Assignment not found" });
       }
       if (existingAssignment.teacherId !== user.id) {
-        return res.status(403).json({ error: "You can only update your own assignments" });
+        return res
+          .status(403)
+          .json({ error: "You can only update your own assignments" });
       }
 
       // Validate update data (excludes immutable fields like teacherId)
       const validatedData = updateAssignmentSchema.parse(req.body);
 
-      const assignment = await storage.updateAssignment(parseInt(req.params.id), validatedData);
+      const assignment = await storage.updateAssignment(
+        parseInt(req.params.id),
+        validatedData,
+      );
       res.json(assignment);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1002,16 +1112,22 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can delete assignments" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can delete assignments" });
       }
 
       // Check if assignment exists and belongs to the requesting teacher
-      const existingAssignment = await storage.getAssignmentById(parseInt(req.params.id));
+      const existingAssignment = await storage.getAssignmentById(
+        parseInt(req.params.id),
+      );
       if (!existingAssignment) {
         return res.status(404).json({ error: "Assignment not found" });
       }
       if (existingAssignment.teacherId !== user.id) {
-        return res.status(403).json({ error: "You can only delete your own assignments" });
+        return res
+          .status(403)
+          .json({ error: "You can only delete your own assignments" });
       }
 
       await storage.deleteAssignment(parseInt(req.params.id));
@@ -1022,114 +1138,155 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== STUDENT ASSIGNMENT ROUTES ==========
-  
-  app.patch("/api/student-assignments/:id/submit", requireAuth, async (req, res) => {
-    try {
-      const { submission } = req.body;
-      const sa = await storage.updateStudentAssignment(parseInt(req.params.id), {
-        submission,
-        status: "submitted",
-        submittedAt: new Date().toISOString(),
-      });
-      res.json(sa);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+
+  app.patch(
+    "/api/student-assignments/:id/submit",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const { submission } = req.body;
+        const sa = await storage.updateStudentAssignment(
+          parseInt(req.params.id),
+          {
+            submission,
+            status: "submitted",
+            submittedAt: new Date().toISOString(),
+          },
+        );
+        res.json(sa);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // Submit assignment by assignment ID (creates StudentAssignment if needed)
-  app.post("/api/assignments/:assignmentId/submit", requireAuth, async (req, res) => {
-    try {
-      const assignmentId = parseInt(req.params.assignmentId);
-      const { studentId, submission } = req.body;
+  app.post(
+    "/api/assignments/:assignmentId/submit",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const assignmentId = parseInt(req.params.assignmentId);
+        const { studentId, submission } = req.body;
 
-      // Check if StudentAssignment already exists
-      const existingAssignments = await storage.getStudentAssignmentsByStudent(studentId);
-      let studentAssignment = existingAssignments.find(sa => sa.assignmentId === assignmentId);
+        // Check if StudentAssignment already exists
+        const existingAssignments =
+          await storage.getStudentAssignmentsByStudent(studentId);
+        let studentAssignment = existingAssignments.find(
+          (sa) => sa.assignmentId === assignmentId,
+        );
 
-      if (!studentAssignment) {
-        // Create StudentAssignment record
-        studentAssignment = await storage.createStudentAssignment({
-          assignmentId,
-          studentId,
-          submission,
-          grade: null,
-          feedback: null,
-          status: "submitted",
-          submittedAt: new Date().toISOString(),
-        });
-      } else {
-        // Update existing StudentAssignment
-        studentAssignment = await storage.updateStudentAssignment(studentAssignment.id, {
-          submission,
-          status: "submitted",
-          submittedAt: new Date().toISOString(),
-        });
-      }
-
-      res.json(studentAssignment);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.patch("/api/student-assignments/:id/grade", requireAuth, async (req, res) => {
-    try {
-      const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can grade assignments" });
-      }
-
-      const { grade, feedback } = req.body;
-      const sa = await storage.updateStudentAssignment(parseInt(req.params.id), {
-        grade,
-        feedback,
-        status: "graded",
-      });
-
-      // Award points to student
-      const studentAssignment = await storage.getStudentAssignmentById(parseInt(req.params.id));
-      if (studentAssignment) {
-        const assignment = await storage.getAssignmentById(studentAssignment.assignmentId);
-        const student = await storage.getStudentById(studentAssignment.studentId);
-        if (assignment && student && grade >= 70) {
-          await storage.updateStudent(student.id, {
-            points: student.points + assignment.points,
+        if (!studentAssignment) {
+          // Create StudentAssignment record
+          studentAssignment = await storage.createStudentAssignment({
+            assignmentId,
+            studentId,
+            submission,
+            grade: null,
+            feedback: null,
+            status: "submitted",
+            submittedAt: new Date().toISOString(),
           });
+        } else {
+          // Update existing StudentAssignment
+          studentAssignment = await storage.updateStudentAssignment(
+            studentAssignment.id,
+            {
+              submission,
+              status: "submitted",
+              submittedAt: new Date().toISOString(),
+            },
+          );
         }
+
+        res.json(studentAssignment);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
+    },
+  );
 
-      res.json(sa);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.patch(
+    "/api/student-assignments/:id/grade",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const user = await storage.getUserById(req.session.userId!);
+        if (user?.role !== "teacher") {
+          return res
+            .status(403)
+            .json({ error: "Only teachers can grade assignments" });
+        }
 
-  app.get("/api/student-assignments/assignment/:assignmentId", requireAuth, async (req, res) => {
-    try {
-      const studentAssignments = await storage.getStudentAssignmentsByAssignment(parseInt(req.params.assignmentId));
-      
-      // Get student details for each
-      const withStudents = await Promise.all(
-        studentAssignments.map(async (sa) => {
-          const student = await storage.getStudentById(sa.studentId);
-          return { ...sa, student };
-        })
-      );
+        const { grade, feedback } = req.body;
+        const sa = await storage.updateStudentAssignment(
+          parseInt(req.params.id),
+          {
+            grade,
+            feedback,
+            status: "graded",
+          },
+        );
 
-      res.json(withStudents);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+        // Award points to student
+        const studentAssignment = await storage.getStudentAssignmentById(
+          parseInt(req.params.id),
+        );
+        if (studentAssignment) {
+          const assignment = await storage.getAssignmentById(
+            studentAssignment.assignmentId,
+          );
+          const student = await storage.getStudentById(
+            studentAssignment.studentId,
+          );
+          if (assignment && student && grade >= 70) {
+            await storage.updateStudent(student.id, {
+              points: student.points + assignment.points,
+            });
+          }
+        }
+
+        res.json(sa);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
+
+  app.get(
+    "/api/student-assignments/assignment/:assignmentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentAssignments =
+          await storage.getStudentAssignmentsByAssignment(
+            parseInt(req.params.assignmentId),
+          );
+
+        // Get student details for each
+        const withStudents = await Promise.all(
+          studentAssignments.map(async (sa) => {
+            const student = await storage.getStudentById(sa.studentId);
+            return { ...sa, student };
+          }),
+        );
+
+        res.json(withStudents);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // ========== MATERIAL ROUTES ==========
-  
+
   app.post("/api/materials", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can upload materials" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can upload materials" });
       }
 
       const data = insertMaterialSchema.parse({
@@ -1145,83 +1302,104 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/materials/with-file", requireAuth, memoryUpload.single('file'), async (req, res) => {
-    try {
-      const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can upload materials" });
-      }
-
-      let fileUrl = null;
-      if (req.file) {
-        const uploadResult: any = await uploadBufferToCloudinary(
-          req.file.buffer,
-          req.file.originalname,
-          'materials'
-        );
-        if (!uploadResult.success || !uploadResult.url || !uploadResult.publicId) {
-          return res.status(500).json({ 
-            error: uploadResult.error || 'File upload failed - missing URL or public ID' 
-          });
+  app.post(
+    "/api/materials/with-file",
+    requireAuth,
+    memoryUpload.single("file"),
+    async (req, res) => {
+      try {
+        const user = await storage.getUserById(req.session.userId!);
+        if (user?.role !== "teacher") {
+          return res
+            .status(403)
+            .json({ error: "Only teachers can upload materials" });
         }
-        fileUrl = uploadResult.url;
+
+        let fileUrl = null;
+        if (req.file) {
+          const uploadResult: any = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+            "materials",
+          );
+          if (
+            !uploadResult.success ||
+            !uploadResult.url ||
+            !uploadResult.publicId
+          ) {
+            return res.status(500).json({
+              error:
+                uploadResult.error ||
+                "File upload failed - missing URL or public ID",
+            });
+          }
+          fileUrl = uploadResult.url;
+        }
+
+        const data = insertMaterialSchema.parse({
+          title: req.body.title,
+          description: req.body.description || null,
+          subject: req.body.subject,
+          gradeLevel: req.body.gradeLevel,
+          fileUrl,
+          teacherId: user.id,
+          uploadDate: new Date().toISOString(),
+        });
+
+        const material = await storage.createMaterial(data);
+        res.json(material);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      const data = insertMaterialSchema.parse({
-        title: req.body.title,
-        description: req.body.description || null,
-        subject: req.body.subject,
-        gradeLevel: req.body.gradeLevel,
-        fileUrl,
-        teacherId: user.id,
-        uploadDate: new Date().toISOString(),
-      });
-
-      const material = await storage.createMaterial(data);
-      res.json(material);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   app.get("/api/materials/teacher", requireAuth, async (req, res) => {
     try {
-      const materials = await storage.getMaterialsByTeacher(req.session.userId!);
+      const materials = await storage.getMaterialsByTeacher(
+        req.session.userId!,
+      );
       res.json(materials);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/materials/student/:studentId", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      const student = await storage.getStudentById(studentId);
-      if (!student) {
-        return res.status(404).json({ error: "Student not found" });
-      }
+  app.get(
+    "/api/materials/student/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        const student = await storage.getStudentById(studentId);
+        if (!student) {
+          return res.status(404).json({ error: "Student not found" });
+        }
 
-      const isTutorRequestMode = await isTutorRequestModeEnabled();
-      
-      if (isTutorRequestMode) {
-        // When tutor request mode is ON, filter by grade level
-        const materials = await storage.getMaterialsByGradeLevel(student.gradeLevel);
-        res.json(materials);
-      } else {
-        // When tutor request mode is OFF, show ALL materials
-        const materials = await storage.getAllMaterials();
-        res.json(materials);
+        const isTutorRequestMode = await isTutorRequestModeEnabled();
+
+        if (isTutorRequestMode) {
+          // When tutor request mode is ON, filter by grade level
+          const materials = await storage.getMaterialsByGradeLevel(
+            student.gradeLevel,
+          );
+          res.json(materials);
+        } else {
+          // When tutor request mode is OFF, show ALL materials
+          const materials = await storage.getAllMaterials();
+          res.json(materials);
+        }
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   app.get("/api/materials/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       const material = await storage.getMaterialById(parseInt(req.params.id));
-      
+
       if (!material) {
         return res.status(404).json({ error: "Material not found" });
       }
@@ -1241,22 +1419,31 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can update materials" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can update materials" });
       }
 
       // Check if material exists and belongs to the requesting teacher
-      const existingMaterial = await storage.getMaterialById(parseInt(req.params.id));
+      const existingMaterial = await storage.getMaterialById(
+        parseInt(req.params.id),
+      );
       if (!existingMaterial) {
         return res.status(404).json({ error: "Material not found" });
       }
       if (existingMaterial.teacherId !== user.id) {
-        return res.status(403).json({ error: "You can only update your own materials" });
+        return res
+          .status(403)
+          .json({ error: "You can only update your own materials" });
       }
 
       // Validate update data (excludes immutable fields like teacherId and uploadDate)
       const validatedData = updateMaterialSchema.parse(req.body);
 
-      const material = await storage.updateMaterial(parseInt(req.params.id), validatedData);
+      const material = await storage.updateMaterial(
+        parseInt(req.params.id),
+        validatedData,
+      );
       res.json(material);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1267,16 +1454,22 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can delete materials" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can delete materials" });
       }
 
       // Check if material exists and belongs to the requesting teacher
-      const existingMaterial = await storage.getMaterialById(parseInt(req.params.id));
+      const existingMaterial = await storage.getMaterialById(
+        parseInt(req.params.id),
+      );
       if (!existingMaterial) {
         return res.status(404).json({ error: "Material not found" });
       }
       if (existingMaterial.teacherId !== user.id) {
-        return res.status(403).json({ error: "You can only delete your own materials" });
+        return res
+          .status(403)
+          .json({ error: "You can only delete your own materials" });
       }
 
       await storage.deleteMaterial(parseInt(req.params.id));
@@ -1287,7 +1480,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== SCHEDULE ROUTES ==========
-  
+
   app.post("/api/schedules", requireAuth, async (req, res) => {
     try {
       const data = insertScheduleSchema.parse(req.body);
@@ -1300,25 +1493,36 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/schedules/teacher", requireAuth, async (req, res) => {
     try {
-      const schedules = await storage.getSchedulesByTeacher(req.session.userId!);
+      const schedules = await storage.getSchedulesByTeacher(
+        req.session.userId!,
+      );
       res.json(schedules);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/schedules/student/:studentId", requireAuth, async (req, res) => {
-    try {
-      const schedules = await storage.getSchedulesByStudent(parseInt(req.params.studentId));
-      res.json(schedules);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/schedules/student/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const schedules = await storage.getSchedulesByStudent(
+          parseInt(req.params.studentId),
+        );
+        res.json(schedules);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.patch("/api/schedules/:id", requireAuth, async (req, res) => {
     try {
-      const schedule = await storage.updateSchedule(parseInt(req.params.id), req.body);
+      const schedule = await storage.updateSchedule(
+        parseInt(req.params.id),
+        req.body,
+      );
       res.json(schedule);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1335,12 +1539,14 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== SESSION ROUTES ==========
-  
+
   app.post("/api/sessions", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can create sessions" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can create sessions" });
       }
 
       const createSessionSchema = insertSessionSchema.omit({ teacherId: true });
@@ -1378,7 +1584,7 @@ export function registerRoutes(app: Express) {
     try {
       const studentId = parseInt(req.params.studentId);
       const isTutorRequestMode = await isTutorRequestModeEnabled();
-      
+
       if (isTutorRequestMode) {
         // When tutor request mode is ON, only show sessions the student is part of
         const sessions = await storage.getSessionsByStudent(studentId);
@@ -1396,7 +1602,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/sessions/:id", requireAuth, async (req, res) => {
     try {
       const session = await storage.getSessionById(parseInt(req.params.id));
-      
+
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
@@ -1417,22 +1623,31 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can update sessions" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can update sessions" });
       }
 
       // Check if session exists and belongs to the requesting teacher
-      const existingSession = await storage.getSessionById(parseInt(req.params.id));
+      const existingSession = await storage.getSessionById(
+        parseInt(req.params.id),
+      );
       if (!existingSession) {
         return res.status(404).json({ error: "Session not found" });
       }
       if (existingSession.teacherId !== user.id) {
-        return res.status(403).json({ error: "You can only update your own sessions" });
+        return res
+          .status(403)
+          .json({ error: "You can only update your own sessions" });
       }
 
       // Validate update data (excludes immutable fields like teacherId)
       const validatedData = updateSessionSchema.parse(req.body);
 
-      const session = await storage.updateSession(parseInt(req.params.id), validatedData);
+      const session = await storage.updateSession(
+        parseInt(req.params.id),
+        validatedData,
+      );
       res.json(session);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1443,16 +1658,22 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can delete sessions" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can delete sessions" });
       }
 
       // Check if session exists and belongs to the requesting teacher
-      const existingSession = await storage.getSessionById(parseInt(req.params.id));
+      const existingSession = await storage.getSessionById(
+        parseInt(req.params.id),
+      );
       if (!existingSession) {
         return res.status(404).json({ error: "Session not found" });
       }
       if (existingSession.teacherId !== user.id) {
-        return res.status(403).json({ error: "You can only delete your own sessions" });
+        return res
+          .status(403)
+          .json({ error: "You can only delete your own sessions" });
       }
 
       await storage.deleteSession(parseInt(req.params.id));
@@ -1463,12 +1684,14 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== FEEDBACK ROUTES ==========
-  
+
   app.post("/api/feedback", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can give feedback" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can give feedback" });
       }
 
       const data = insertFeedbackSchema.parse({
@@ -1486,7 +1709,9 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/feedback/student/:studentId", requireAuth, async (req, res) => {
     try {
-      const feedback = await storage.getFeedbackByStudent(parseInt(req.params.studentId));
+      const feedback = await storage.getFeedbackByStudent(
+        parseInt(req.params.studentId),
+      );
       res.json(feedback);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1503,7 +1728,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== ATTENDANCE ROUTES ==========
-  
+
   app.post("/api/attendance", requireAuth, async (req, res) => {
     try {
       const data = insertAttendanceSchema.parse(req.body);
@@ -1514,18 +1739,27 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/attendance/student/:studentId", requireAuth, async (req, res) => {
-    try {
-      const attendance = await storage.getAttendanceByStudent(parseInt(req.params.studentId));
-      res.json(attendance);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/attendance/student/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const attendance = await storage.getAttendanceByStudent(
+          parseInt(req.params.studentId),
+        );
+        res.json(attendance);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.patch("/api/attendance/:id", requireAuth, async (req, res) => {
     try {
-      const attendance = await storage.updateAttendance(parseInt(req.params.id), req.body);
+      const attendance = await storage.updateAttendance(
+        parseInt(req.params.id),
+        req.body,
+      );
       res.json(attendance);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1533,12 +1767,14 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== PAYMENT ROUTES ==========
-  
+
   app.post("/api/payments", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "parent") {
-        return res.status(403).json({ error: "Only parents can make payments" });
+        return res
+          .status(403)
+          .json({ error: "Only parents can make payments" });
       }
 
       const data = insertPaymentSchema.parse({
@@ -1586,7 +1822,10 @@ export function registerRoutes(app: Express) {
 
   app.patch("/api/payments/:id", requireAuth, async (req, res) => {
     try {
-      const payment = await storage.updatePayment(parseInt(req.params.id), req.body);
+      const payment = await storage.updatePayment(
+        parseInt(req.params.id),
+        req.body,
+      );
       res.json(payment);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1594,12 +1833,14 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== TUTOR REQUEST ROUTES ==========
-  
+
   app.post("/api/tutor-requests", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "parent") {
-        return res.status(403).json({ error: "Only parents can request tutors" });
+        return res
+          .status(403)
+          .json({ error: "Only parents can request tutors" });
       }
 
       const data = insertTutorRequestSchema.parse({
@@ -1619,7 +1860,9 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/tutor-requests/parent", requireAuth, async (req, res) => {
     try {
-      const requests = await storage.getTutorRequestsByParent(req.session.userId!);
+      const requests = await storage.getTutorRequestsByParent(
+        req.session.userId!,
+      );
       res.json(requests);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1628,7 +1871,9 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/tutor-requests/teacher", requireAuth, async (req, res) => {
     try {
-      const requests = await storage.getTutorRequestsByTeacher(req.session.userId!);
+      const requests = await storage.getTutorRequestsByTeacher(
+        req.session.userId!,
+      );
       res.json(requests);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1639,14 +1884,19 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can respond to requests" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can respond to requests" });
       }
 
       const { status } = req.body;
-      const request = await storage.updateTutorRequest(parseInt(req.params.id), {
-        status,
-        responseDate: new Date().toISOString(),
-      });
+      const request = await storage.updateTutorRequest(
+        parseInt(req.params.id),
+        {
+          status,
+          responseDate: new Date().toISOString(),
+        },
+      );
 
       res.json(request);
     } catch (error: any) {
@@ -1655,7 +1905,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== MESSAGE ROUTES ==========
-  
+
   app.post("/api/messages", requireAuth, async (req, res) => {
     try {
       const data = insertMessageSchema.parse({
@@ -1676,7 +1926,7 @@ export function registerRoutes(app: Express) {
     try {
       const messages = await storage.getMessagesBetweenUsers(
         req.session.userId!,
-        parseInt(req.params.userId)
+        parseInt(req.params.userId),
       );
       res.json(messages);
     } catch (error: any) {
@@ -1687,11 +1937,12 @@ export function registerRoutes(app: Express) {
   app.get("/api/messages", requireAuth, async (req, res) => {
     try {
       const messages = await storage.getMessagesByUser(req.session.userId!);
-      
+
       // Group by conversation
       const conversations = new Map();
       for (const msg of messages) {
-        const otherId = msg.senderId === req.session.userId! ? msg.receiverId : msg.senderId;
+        const otherId =
+          msg.senderId === req.session.userId! ? msg.receiverId : msg.senderId;
         if (!conversations.has(otherId)) {
           const otherUser = await storage.getUserById(otherId);
           conversations.set(otherId, {
@@ -1722,12 +1973,14 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== PROGRESS REPORT ROUTES ==========
-  
+
   app.post("/api/progress-reports", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can create reports" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can create reports" });
       }
 
       const data = insertProgressReportSchema.parse({
@@ -1743,18 +1996,26 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/progress-reports/student/:studentId", requireAuth, async (req, res) => {
-    try {
-      const reports = await storage.getProgressReportsByStudent(parseInt(req.params.studentId));
-      res.json(reports);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/progress-reports/student/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const reports = await storage.getProgressReportsByStudent(
+          parseInt(req.params.studentId),
+        );
+        res.json(reports);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.get("/api/progress-reports/teacher", requireAuth, async (req, res) => {
     try {
-      const reports = await storage.getProgressReportsByTeacher(req.session.userId!);
+      const reports = await storage.getProgressReportsByTeacher(
+        req.session.userId!,
+      );
       res.json(reports);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1762,13 +2023,15 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== CLARIFICATION ROUTES ==========
-  
+
   app.post("/api/clarifications", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       const student = await storage.getStudentByUserId(user!.id);
       if (!student) {
-        return res.status(403).json({ error: "Only students can request clarifications" });
+        return res
+          .status(403)
+          .json({ error: "Only students can request clarifications" });
       }
 
       const data = insertClarificationSchema.parse({
@@ -1787,32 +2050,47 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/clarifications/student/:studentId", requireAuth, async (req, res) => {
-    try {
-      const clarifications = await storage.getClarificationsByStudent(parseInt(req.params.studentId));
-      res.json(clarifications);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/clarifications/student/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const clarifications = await storage.getClarificationsByStudent(
+          parseInt(req.params.studentId),
+        );
+        res.json(clarifications);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
-  app.get("/api/clarifications/assignment/:assignmentId", requireAuth, async (req, res) => {
-    try {
-      const clarifications = await storage.getClarificationsByAssignment(parseInt(req.params.assignmentId));
-      res.json(clarifications);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/clarifications/assignment/:assignmentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const clarifications = await storage.getClarificationsByAssignment(
+          parseInt(req.params.assignmentId),
+        );
+        res.json(clarifications);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.patch("/api/clarifications/:id", requireAuth, async (req, res) => {
     try {
       const { answer } = req.body;
-      const clarification = await storage.updateClarification(parseInt(req.params.id), {
-        answer,
-        answeredDate: new Date().toISOString(),
-        status: "answered",
-      });
+      const clarification = await storage.updateClarification(
+        parseInt(req.params.id),
+        {
+          answer,
+          answeredDate: new Date().toISOString(),
+          status: "answered",
+        },
+      );
       res.json(clarification);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1820,7 +2098,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== PARENTAL CONTROL ROUTES ==========
-  
+
   app.post("/api/parental-controls", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
@@ -1840,18 +2118,27 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/parental-controls/student/:studentId", requireAuth, async (req, res) => {
-    try {
-      const control = await storage.getParentalControlByStudent(parseInt(req.params.studentId));
-      res.json(control);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/parental-controls/student/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const control = await storage.getParentalControlByStudent(
+          parseInt(req.params.studentId),
+        );
+        res.json(control);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.patch("/api/parental-controls/:id", requireAuth, async (req, res) => {
     try {
-      const control = await storage.updateParentalControl(parseInt(req.params.id), req.body);
+      const control = await storage.updateParentalControl(
+        parseInt(req.params.id),
+        req.body,
+      );
       res.json(control);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1859,7 +2146,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== TUTOR RATING ROUTES ==========
-  
+
   app.post("/api/tutor-ratings", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
@@ -1880,17 +2167,23 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/tutor-ratings/teacher/:teacherId", requireAuth, async (req, res) => {
-    try {
-      const ratings = await storage.getRatingsByTeacher(parseInt(req.params.teacherId));
-      res.json(ratings);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/tutor-ratings/teacher/:teacherId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const ratings = await storage.getRatingsByTeacher(
+          parseInt(req.params.teacherId),
+        );
+        res.json(ratings);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // ========== EARNINGS ROUTES ==========
-  
+
   app.get("/api/earnings/teacher", requireAuth, async (req, res) => {
     try {
       const earnings = await storage.getEarningsByTeacher(req.session.userId!);
@@ -1901,7 +2194,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== TEACHERS LIST ==========
-  
+
   app.get("/api/teachers", requireAuth, async (req, res) => {
     try {
       // This would normally query all teachers, for now return empty
@@ -1913,7 +2206,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ========== SYSTEM SETTINGS ROUTES ==========
-  
+
   // Public endpoint to check tutor request mode (no auth required for UI decisions)
   app.get("/api/system-settings/tutor-request-mode", async (req, res) => {
     try {
@@ -1924,7 +2217,7 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
-  
+
   app.get("/api/system-settings", requireAuth, async (req, res) => {
     try {
       const settings = await storage.getAllSystemSettings();
@@ -1947,7 +2240,9 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "teacher") {
-        return res.status(403).json({ error: "Only teachers can modify system settings" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can modify system settings" });
       }
 
       const { key, value, description } = req.body;

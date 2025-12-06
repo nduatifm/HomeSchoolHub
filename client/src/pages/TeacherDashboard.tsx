@@ -1616,7 +1616,7 @@ export default function TeacherDashboard() {
             <TabsContent value="students">
               <Card>
                 <CardHeader>
-                  <CardTitle>My Students</CardTitle>
+                  <CardTitle>Students</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -2932,7 +2932,7 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent> */}
 
-            {isTutorRequestModeEnabled && (
+            {/* {isTutorRequestModeEnabled && (
               <TabsContent value="requests">
                 <Card>
                   <CardHeader>
@@ -3010,7 +3010,7 @@ export default function TeacherDashboard() {
                   </CardContent>
                 </Card>
               </TabsContent>
-            )}
+            )} */}
 
             {/* <TabsContent value="reports">
               <Card>

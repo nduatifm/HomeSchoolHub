@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Settings,
@@ -29,6 +29,9 @@ export default function ModernSidebar() {
       : "assignments",
   );
 
+  const [openMenu, setOpenMenu] = useState(false);
+  const menuRef = useRef(null);
+
   useEffect(() => {
     const handleHashChange = () => {
       setCurrentHash(
@@ -39,6 +42,16 @@ export default function ModernSidebar() {
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: any) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpenMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleNavigation = (hash: string) => {
@@ -157,18 +170,43 @@ export default function ModernSidebar() {
           </div>
         </Link>
 
-        <button
-          onClick={logout}
-          className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-white/20 hover:ring-white/40 transition-all"
-          data-testid="sidebar-avatar"
-        >
-          <Avatar className="w-full h-full">
-            <AvatarImage src={user?.profilePicture || ""} />
-            <AvatarFallback className="bg-primary text-white">
-              {user?.name?.charAt(0).toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-        </button>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setOpenMenu(!openMenu)}
+            className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-white/20 hover:ring-white/40 transition-all"
+          >
+            <Avatar className="w-full h-full">
+              <AvatarImage src={user?.profilePicture || ""} />
+              <AvatarFallback className="bg-primary text-white">
+                {user?.name?.charAt(0).toUpperCase() || "U"}
+              </AvatarFallback>
+            </Avatar>
+          </button>
+
+          {openMenu && (
+            <div className="absolute left-16 bottom-0 w-60 bg-white shadow-2xl rounded-2xl border p-4 z-[100]">
+              <div className="flex items-center gap-3 mb-4">
+                <Avatar className="w-12 h-12">
+                  <AvatarImage src={user?.profilePicture || ""} />
+                  <AvatarFallback className="bg-primary text-white text-lg">
+                    {user?.name?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-semibold text-gray-900">{user?.name}</p>
+                  <p className="text-sm text-gray-600">{user?.email}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={logout}
+                className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl transition-all"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );
