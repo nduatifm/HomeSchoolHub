@@ -30,7 +30,7 @@ import {
 } from "@shared/schema";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { sendVerificationEmail } from "./utils/emailService";
+import { sendVerificationEmail, sendStudentInviteEmail } from "./utils/emailService";
 import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
 import { uploadBufferToCloudinary } from "./utils/cloudinary";
@@ -204,22 +204,17 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Invite has expired" });
       }
 
-      // Create user account with email verification requirement
+      // Create user account - mark as verified since invite code IS the verification
       const hashedPassword = await hashPassword(password);
-
-      // Generate email verification token for student
-      const emailVerifyToken = crypto.randomUUID();
-      const emailVerifyExpires = new Date();
-      emailVerifyExpires.setHours(emailVerifyExpires.getHours() + 24);
 
       const user = await storage.createUser({
         email: invite.email,
         password: hashedPassword,
         name: invite.studentName,
         role: "student",
-        isEmailVerified: false, // Students must verify email too
-        emailVerifyToken,
-        emailVerifyExpires: emailVerifyExpires.toISOString(),
+        isEmailVerified: true, // Verified via invite code
+        emailVerifyToken: null,
+        emailVerifyExpires: null,
         googleId: null,
         profilePicture: null,
       });
@@ -247,13 +242,10 @@ export function registerRoutes(app: Express) {
       // Mark invite as accepted
       await storage.updateStudentInvite(invite.id, { status: "accepted" });
 
-      // Send verification email to student (non-blocking)
-      sendVerificationEmail(user.email, user.name, emailVerifyToken).catch(
-        (err) =>
-          console.error("Failed to send verification email to student:", err),
-      );
+      // Create session immediately - student verified via invite code
+      const sessionId = crypto.randomUUID();
+      sessions.set(sessionId, user.id);
 
-      // Do NOT create session until email is verified
       res.json({
         user: {
           id: user.id,
@@ -263,8 +255,8 @@ export function registerRoutes(app: Express) {
           isEmailVerified: user.isEmailVerified,
         },
         student,
-        message:
-          "Account created! Please check your email to verify your account before logging in.",
+        sessionId,
+        message: "Welcome! Your account has been created successfully.",
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -779,6 +771,16 @@ export function registerRoutes(app: Express) {
         createdDate: new Date().toISOString(),
         expiresDate: expiresDate.toISOString(),
       });
+
+      // Send invite email with URL and invite code (non-blocking)
+      sendStudentInviteEmail(
+        data.email,
+        data.studentName,
+        token,
+        user.name
+      ).catch((err) =>
+        console.error("Failed to send student invite email:", err)
+      );
 
       res.json(invite);
     } catch (error: any) {
