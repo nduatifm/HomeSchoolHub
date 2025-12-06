@@ -116,6 +116,11 @@ export default function ModernSidebar() {
       hash: "materials",
     },
     {
+      icon: <User className="w-6 h-6" />,
+      label: "Teachers",
+      hash: "teachers",
+    },
+    {
       icon: <Presentation className="w-6 h-6" />,
       label: "Sessions",
       hash: "sessions",

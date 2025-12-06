@@ -30,7 +30,10 @@ import {
 } from "@shared/schema";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { sendVerificationEmail, sendStudentInviteEmail } from "./utils/emailService";
+import {
+  sendVerificationEmail,
+  sendStudentInviteEmail,
+} from "./utils/emailService";
 import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
 import { uploadBufferToCloudinary } from "./utils/cloudinary";
@@ -777,9 +780,9 @@ export function registerRoutes(app: Express) {
         data.email,
         data.studentName,
         token,
-        user.name
+        user.name,
       ).catch((err) =>
-        console.error("Failed to send student invite email:", err)
+        console.error("Failed to send student invite email:", err),
       );
 
       res.json(invite);
@@ -1396,6 +1399,22 @@ export function registerRoutes(app: Express) {
       }
     },
   );
+
+  app.get("/api/teachers/student/:studentId", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const student = await storage.getStudentById(studentId);
+      if (!student) {
+        return res.status(404).json({ error: "Student not found" });
+      }
+
+      // When tutor request mode is OFF, show ALL materials
+      const teachers = await storage.getAllTeachers();
+      res.json(teachers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.get("/api/materials/:id", requireAuth, async (req, res) => {
     try {

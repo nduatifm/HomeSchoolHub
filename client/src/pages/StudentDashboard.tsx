@@ -88,6 +88,10 @@ export default function StudentDashboard() {
     queryKey: ["/api/materials/student", student?.id],
     enabled: !!student,
   });
+  const { data: teachers = [] } = useQuery({
+    queryKey: ["/api/teachers/student", student?.id],
+    enabled: !!student,
+  });
   const { data: feedback = [] } = useQuery({
     queryKey: ["/api/feedback/student", student?.id],
     enabled: !!student,
@@ -548,6 +552,37 @@ export default function StudentDashboard() {
                   </CardContent>
                 </Card>
               </div> */}
+            </TabsContent>
+
+            <TabsContent value="teachers">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Teachers</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {teachers?.map((s: any) => (
+                        <TableRow
+                          key={s.id}
+                          data-testid={`row-teachers-${s.id}`}
+                        >
+                          <TableCell data-testid={`text-teachers-name-${s.id}`}>
+                            {s.name}
+                          </TableCell>
+                          <TableCell>{s.email}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="materials">
