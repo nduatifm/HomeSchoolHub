@@ -1009,7 +1009,12 @@ export function registerRoutes(app: Express) {
               const assignment = await storage.getAssignmentById(
                 sa.assignmentId,
               );
-              return { ...assignment, studentAssignment: sa };
+              const teacher = await storage.getUserById(assignment?.teacherId || 0);
+              return { 
+                ...assignment, 
+                studentAssignment: sa,
+                teacherName: teacher?.name || null
+              };
             }),
           );
           res.json(assignments);
@@ -1033,22 +1038,28 @@ export function registerRoutes(app: Express) {
           );
 
           // Return assignments from assigned teachers OR matching grade level
-          const assignments = allAssignments
-            .filter((a) => {
-              // Include if from an assigned teacher
-              if (assignedTeacherIds.has(a.teacherId)) return true;
-              // Or if matching grade level (for general assignments)
-              return (
-                !student?.gradeLevel || a.gradeLevel === student.gradeLevel
-              );
-            })
-            .map((assignment) => ({
-              ...assignment,
-              studentAssignment:
-                studentAssignmentMap.get(assignment.id) || null,
-            }));
+          const assignmentsWithTeachers = await Promise.all(
+            allAssignments
+              .filter((a) => {
+                // Include if from an assigned teacher
+                if (assignedTeacherIds.has(a.teacherId)) return true;
+                // Or if matching grade level (for general assignments)
+                return (
+                  !student?.gradeLevel || a.gradeLevel === student.gradeLevel
+                );
+              })
+              .map(async (assignment) => {
+                const teacher = await storage.getUserById(assignment.teacherId);
+                return {
+                  ...assignment,
+                  studentAssignment:
+                    studentAssignmentMap.get(assignment.id) || null,
+                  teacherName: teacher?.name || null
+                };
+              })
+          );
 
-          res.json(assignments);
+          res.json(assignmentsWithTeachers);
         }
       } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -1383,17 +1394,29 @@ export function registerRoutes(app: Express) {
 
         const isTutorRequestMode = await isTutorRequestModeEnabled();
 
+        let materials;
         if (isTutorRequestMode) {
           // When tutor request mode is ON, filter by grade level
-          const materials = await storage.getMaterialsByGradeLevel(
+          materials = await storage.getMaterialsByGradeLevel(
             student.gradeLevel,
           );
-          res.json(materials);
         } else {
           // When tutor request mode is OFF, show ALL materials
-          const materials = await storage.getAllMaterials();
-          res.json(materials);
+          materials = await storage.getAllMaterials();
         }
+
+        // Add teacher name to each material
+        const materialsWithTeacher = await Promise.all(
+          materials.map(async (material) => {
+            const teacher = await storage.getUserById(material.teacherId);
+            return {
+              ...material,
+              teacherName: teacher?.name || null
+            };
+          })
+        );
+
+        res.json(materialsWithTeacher);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -1606,15 +1629,27 @@ export function registerRoutes(app: Express) {
       const studentId = parseInt(req.params.studentId);
       const isTutorRequestMode = await isTutorRequestModeEnabled();
 
+      let sessions;
       if (isTutorRequestMode) {
         // When tutor request mode is ON, only show sessions the student is part of
-        const sessions = await storage.getSessionsByStudent(studentId);
-        res.json(sessions);
+        sessions = await storage.getSessionsByStudent(studentId);
       } else {
         // When tutor request mode is OFF, show ALL sessions
-        const sessions = await storage.getAllSessions();
-        res.json(sessions);
+        sessions = await storage.getAllSessions();
       }
+
+      // Add teacher name to each session
+      const sessionsWithTeacher = await Promise.all(
+        sessions.map(async (session) => {
+          const teacher = await storage.getUserById(session.teacherId);
+          return {
+            ...session,
+            teacherName: teacher?.name || null
+          };
+        })
+      );
+
+      res.json(sessionsWithTeacher);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
