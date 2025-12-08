@@ -24,9 +24,11 @@ export default function ModernSidebar() {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [currentHash, setCurrentHash] = useState(
-    window.location.hash.replace("#", "") || user?.role === "parent"
-      ? "children"
-      : "assignments",
+    window.location.hash
+      ? window.location.hash.replace("#", "")
+      : user?.role === "parent"
+        ? "children"
+        : "assignments",
   );
 
   const [openMenu, setOpenMenu] = useState(false);
@@ -35,9 +37,11 @@ export default function ModernSidebar() {
   useEffect(() => {
     const handleHashChange = () => {
       setCurrentHash(
-        window.location.hash.replace("#", "") || user?.role === "parent"
-          ? "children"
-          : "assignments",
+        window.location.hash
+          ? window.location.hash.replace("#", "")
+          : user?.role === "parent"
+            ? "children"
+            : "assignments",
       );
     };
     window.addEventListener("hashchange", handleHashChange);
@@ -56,10 +60,10 @@ export default function ModernSidebar() {
 
   const handleNavigation = (hash: string) => {
     if (location !== "/dashboard") {
-      setLocation(`/dashboard#${hash}`);
+      setLocation("/dashboard");
       setTimeout(() => {
         window.location.hash = hash;
-      }, 50);
+      }, 0);
     } else {
       window.location.hash = hash;
     }

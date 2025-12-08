@@ -232,7 +232,10 @@ export default function StudentDashboard() {
             name={user?.name || "Student"}
             message="Let's start the day by learning something new. Don't forget to check your To-Do list."
             buttonText="To-Do List"
-            onButtonClick={() => setActiveTab("assignments")}
+            onButtonClick={() => {
+              setActiveTab("assignments");
+              window.location.hash = "assignments";
+            }}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">

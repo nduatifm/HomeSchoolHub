@@ -747,7 +747,10 @@ export default function TeacherDashboard() {
             name={user?.name || "Teacher"}
             message="Ready to inspire and educate! Let's help your students reach their full potential."
             buttonText="Today's Schedule"
-            onButtonClick={() => setActiveTab("schedule")}
+            onButtonClick={() => {
+              setActiveTab("schedule");
+              window.location.hash = "schedule";
+            }}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-8">

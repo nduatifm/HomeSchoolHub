@@ -308,7 +308,10 @@ export default function ParentDashboard() {
             name={user?.name || "Parent"}
             message="Stay connected with your child's learning journey. Monitor progress and support their growth."
             buttonText="View Children"
-            onButtonClick={() => setActiveTab("children")}
+            onButtonClick={() => {
+              setActiveTab("children");
+              window.location.hash = "children";
+            }}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
