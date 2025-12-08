@@ -313,6 +313,7 @@ export default function StudentDashboard() {
                         <TableHead>Description</TableHead>
                         <TableHead>Subject</TableHead>
                         <TableHead>Grade</TableHead>
+                        <TableHead>Assigned By</TableHead>
                         <TableHead>Due Date</TableHead>
                         <TableHead>Assignment Link</TableHead>
                       </TableRow>
@@ -331,6 +332,7 @@ export default function StudentDashboard() {
                           <TableCell>{s.description}</TableCell>
                           <TableCell>{s.subject}</TableCell>
                           <TableCell>{s.gradeLevel}</TableCell>
+                          <TableCell>{s.teacherName}</TableCell>
                           <TableCell>
                             {new Date(s.dueDate).toLocaleDateString()}
                           </TableCell>
@@ -598,6 +600,7 @@ export default function StudentDashboard() {
                         <TableHead>Description</TableHead>
                         <TableHead>Subject</TableHead>
                         <TableHead>Grade</TableHead>
+                        <TableHead>Created By</TableHead>
                         <TableHead>Material Link</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -615,6 +618,7 @@ export default function StudentDashboard() {
                           <TableCell>{s.description}</TableCell>
                           <TableCell>{s.subject}</TableCell>
                           <TableCell>{s.gradeLevel}</TableCell>
+                          <TableCell>{s.teacherName}</TableCell>
                           <TableCell>
                             <a
                               href={s.fileUrl}
@@ -837,6 +841,7 @@ export default function StudentDashboard() {
                         <TableHead>Subject</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Time</TableHead>
+                        <TableHead>Scheduled By</TableHead>
                         <TableHead>Meeting Link</TableHead>
                         <TableHead>Notes</TableHead>
                       </TableRow>
@@ -858,6 +863,7 @@ export default function StudentDashboard() {
                           <TableCell>
                             {s.startTime} - {s.endTime}
                           </TableCell>
+                          <TableCell>{s.teacherName}</TableCell>
                           <TableCell>
                             <a
                               href={s.meetingUrl}
