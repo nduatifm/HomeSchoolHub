@@ -107,6 +107,8 @@ model StudentAssignment {
   assignmentId Int
   studentId    Int
   submission   String?
+  fileUrl      String?
+  notes        String?
   grade        Int?
   feedback     String?
   status       String  @default("pending")

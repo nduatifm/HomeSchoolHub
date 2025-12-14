@@ -895,6 +895,8 @@ export function registerRoutes(app: Express) {
           assignmentId: assignment.id,
           studentId: student.id,
           submission: null,
+          fileUrl: null,
+          notes: null,
           grade: null,
           feedback: null,
           status: "pending",
@@ -966,6 +968,8 @@ export function registerRoutes(app: Express) {
             assignmentId: assignment.id,
             studentId: student.id,
             submission: null,
+            fileUrl: null,
+            notes: null,
             grade: null,
             feedback: null,
             status: "pending",
@@ -1158,13 +1162,28 @@ export function registerRoutes(app: Express) {
   app.patch(
     "/api/student-assignments/:id/submit",
     requireAuth,
-    async (req, res) => {
+    memoryUpload.single("file"),
+    async (req: any, res) => {
       try {
-        const { submission } = req.body;
+        const { submission, notes } = req.body;
+        let fileUrl = null;
+
+        if (req.file) {
+          const result = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+          );
+          if (result.success && result.url) {
+            fileUrl = result.url;
+          }
+        }
+
         const sa = await storage.updateStudentAssignment(
           parseInt(req.params.id),
           {
             submission,
+            fileUrl,
+            notes: notes || null,
             status: "submitted",
             submittedAt: new Date().toISOString(),
           },
@@ -1180,14 +1199,26 @@ export function registerRoutes(app: Express) {
   app.post(
     "/api/assignments/:assignmentId/submit",
     requireAuth,
-    async (req, res) => {
+    memoryUpload.single("file"),
+    async (req: any, res) => {
       try {
         const assignmentId = parseInt(req.params.assignmentId);
-        const { studentId, submission } = req.body;
+        const { studentId, submission, notes } = req.body;
+        let fileUrl = null;
+
+        if (req.file) {
+          const result = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+          );
+          if (result.success && result.url) {
+            fileUrl = result.url;
+          }
+        }
 
         // Check if StudentAssignment already exists
         const existingAssignments =
-          await storage.getStudentAssignmentsByStudent(studentId);
+          await storage.getStudentAssignmentsByStudent(parseInt(studentId));
         let studentAssignment = existingAssignments.find(
           (sa) => sa.assignmentId === assignmentId,
         );
@@ -1196,8 +1227,10 @@ export function registerRoutes(app: Express) {
           // Create StudentAssignment record
           studentAssignment = await storage.createStudentAssignment({
             assignmentId,
-            studentId,
+            studentId: parseInt(studentId),
             submission,
+            fileUrl,
+            notes: notes || null,
             grade: null,
             feedback: null,
             status: "submitted",
@@ -1209,6 +1242,8 @@ export function registerRoutes(app: Express) {
             studentAssignment.id,
             {
               submission,
+              fileUrl,
+              notes: notes || null,
               status: "submitted",
               submittedAt: new Date().toISOString(),
             },

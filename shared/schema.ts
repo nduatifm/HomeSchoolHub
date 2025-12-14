@@ -111,6 +111,8 @@ export const studentAssignmentSchema = z.object({
   assignmentId: z.number(),
   studentId: z.number(),
   submission: z.string().nullable(),
+  fileUrl: z.string().nullable(),
+  notes: z.string().nullable(),
   grade: z.number().nullable(),
   feedback: z.string().nullable(),
   status: z.enum(["pending", "submitted", "graded"]),

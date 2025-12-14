@@ -2,9 +2,24 @@
 CREATE TABLE "User" (
     "id" SERIAL NOT NULL,
     "email" TEXT NOT NULL,
-    "password" TEXT NOT NULL,
+    "password" TEXT,
     "name" TEXT NOT NULL,
     "role" TEXT,
+    "isEmailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "emailVerifyToken" TEXT,
+    "emailVerifyExpires" TIMESTAMP(3),
+    "googleId" TEXT,
+    "profilePicture" TEXT,
+    "bio" TEXT,
+    "teachingSubjects" TEXT[],
+    "yearsExperience" INTEGER,
+    "qualifications" TEXT,
+    "specialization" TEXT,
+    "phone" TEXT,
+    "preferredContact" TEXT,
+    "interests" TEXT[],
+    "favoriteSubject" TEXT,
+    "learningGoals" TEXT,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -32,6 +47,7 @@ CREATE TABLE "Assignment" (
     "teacherId" INTEGER NOT NULL,
     "gradeLevel" TEXT NOT NULL,
     "points" INTEGER NOT NULL DEFAULT 100,
+    "fileUrl" TEXT,
 
     CONSTRAINT "Assignment_pkey" PRIMARY KEY ("id")
 );
@@ -42,6 +58,8 @@ CREATE TABLE "StudentAssignment" (
     "assignmentId" INTEGER NOT NULL,
     "studentId" INTEGER NOT NULL,
     "submission" TEXT,
+    "fileUrl" TEXT,
+    "notes" TEXT,
     "grade" INTEGER,
     "feedback" TEXT,
     "status" TEXT NOT NULL DEFAULT 'pending',
@@ -82,10 +100,13 @@ CREATE TABLE "Session" (
     "id" SERIAL NOT NULL,
     "teacherId" INTEGER NOT NULL,
     "studentIds" INTEGER[],
+    "title" TEXT,
+    "description" TEXT,
     "subject" TEXT NOT NULL,
-    "date" TEXT NOT NULL,
+    "sessionDate" TEXT NOT NULL DEFAULT '',
     "startTime" TEXT NOT NULL,
     "endTime" TEXT NOT NULL,
+    "meetingUrl" TEXT,
     "notes" TEXT,
     "status" TEXT NOT NULL DEFAULT 'scheduled',
 
@@ -235,11 +256,44 @@ CREATE TABLE "StudentInvite" (
     CONSTRAINT "StudentInvite_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "SystemSettings" (
+    "id" SERIAL NOT NULL,
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "description" TEXT,
+
+    CONSTRAINT "SystemSettings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TeacherStudentAssignment" (
+    "id" SERIAL NOT NULL,
+    "teacherId" INTEGER NOT NULL,
+    "studentId" INTEGER NOT NULL,
+    "assignedDate" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'active',
+
+    CONSTRAINT "TeacherStudentAssignment_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "User_emailVerifyToken_key" ON "User"("emailVerifyToken");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_googleId_key" ON "User"("googleId");
+
+-- CreateIndex
 CREATE INDEX "User_email_idx" ON "User"("email");
+
+-- CreateIndex
+CREATE INDEX "User_googleId_idx" ON "User"("googleId");
+
+-- CreateIndex
+CREATE INDEX "User_emailVerifyToken_idx" ON "User"("emailVerifyToken");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Student_userId_key" ON "Student"("userId");
@@ -343,6 +397,21 @@ CREATE INDEX "StudentInvite_parentId_idx" ON "StudentInvite"("parentId");
 -- CreateIndex
 CREATE INDEX "StudentInvite_token_idx" ON "StudentInvite"("token");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "SystemSettings_key_key" ON "SystemSettings"("key");
+
+-- CreateIndex
+CREATE INDEX "SystemSettings_key_idx" ON "SystemSettings"("key");
+
+-- CreateIndex
+CREATE INDEX "TeacherStudentAssignment_teacherId_idx" ON "TeacherStudentAssignment"("teacherId");
+
+-- CreateIndex
+CREATE INDEX "TeacherStudentAssignment_studentId_idx" ON "TeacherStudentAssignment"("studentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TeacherStudentAssignment_teacherId_studentId_key" ON "TeacherStudentAssignment"("teacherId", "studentId");
+
 -- AddForeignKey
 ALTER TABLE "Student" ADD CONSTRAINT "Student_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -423,3 +492,10 @@ ALTER TABLE "Earnings" ADD CONSTRAINT "Earnings_teacherId_fkey" FOREIGN KEY ("te
 
 -- AddForeignKey
 ALTER TABLE "StudentInvite" ADD CONSTRAINT "StudentInvite_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TeacherStudentAssignment" ADD CONSTRAINT "TeacherStudentAssignment_teacherId_fkey" FOREIGN KEY ("teacherId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TeacherStudentAssignment" ADD CONSTRAINT "TeacherStudentAssignment_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

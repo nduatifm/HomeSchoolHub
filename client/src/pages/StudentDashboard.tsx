@@ -46,6 +46,8 @@ import {
   LibraryBig,
   Presentation,
   MessageSquareQuote,
+  Upload,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -124,34 +126,61 @@ export default function StudentDashboard() {
     assignmentId: 0,
     studentAssignmentId: 0,
     submission: "",
+    notes: "",
     hasStudentAssignment: false,
   });
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submitAssignmentMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       assignmentId,
       studentAssignmentId,
       submission,
+      notes,
       hasStudentAssignment,
+      file,
     }: {
       assignmentId: number;
       studentAssignmentId: number;
       submission: string;
+      notes: string;
       hasStudentAssignment: boolean;
+      file: File | null;
     }) => {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append("submission", submission);
+      if (notes) formData.append("notes", notes);
+      if (file) formData.append("file", file);
+
       if (hasStudentAssignment) {
-        return apiRequest(
+        const response = await fetch(
           `/api/student-assignments/${studentAssignmentId}/submit`,
           {
             method: "PATCH",
-            body: JSON.stringify({ submission }),
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("sessionId")}`,
+            },
+            body: formData,
           },
         );
+        if (!response.ok) throw new Error("Failed to submit");
+        return response.json();
       } else {
-        return apiRequest(`/api/assignments/${assignmentId}/submit`, {
-          method: "POST",
-          body: JSON.stringify({ studentId: student?.id, submission }),
-        });
+        formData.append("studentId", String(student?.id));
+        const response = await fetch(
+          `/api/assignments/${assignmentId}/submit`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("sessionId")}`,
+            },
+            body: formData,
+          },
+        );
+        if (!response.ok) throw new Error("Failed to submit");
+        return response.json();
       }
     },
     onSuccess: () => {
@@ -163,9 +192,16 @@ export default function StudentDashboard() {
         assignmentId: 0,
         studentAssignmentId: 0,
         submission: "",
+        notes: "",
         hasStudentAssignment: false,
       });
+      setSubmissionFile(null);
       setSubmitDialogAssignmentId(null);
+      setIsSubmitting(false);
+    },
+    onError: () => {
+      setIsSubmitting(false);
+      toast({ title: "Failed to submit assignment", description: "Please try again" });
     },
   });
 
@@ -366,9 +402,11 @@ export default function StudentDashboard() {
                                         studentAssignmentId:
                                           a.studentAssignment?.id || 0,
                                         submission: "",
+                                        notes: "",
                                         hasStudentAssignment:
                                           !!a.studentAssignment,
                                       });
+                                      setSubmissionFile(null);
                                     } else {
                                       setSubmitDialogAssignmentId(null);
                                     }
@@ -389,18 +427,76 @@ export default function StudentDashboard() {
                                       </DialogTitle>
                                     </DialogHeader>
                                     <div className="space-y-4">
-                                      <Textarea
-                                        placeholder="Enter your work here..."
-                                        value={submissionForm.submission}
-                                        onChange={(e) =>
-                                          setSubmissionForm({
-                                            ...submissionForm,
-                                            submission: e.target.value,
-                                          })
-                                        }
-                                        rows={6}
-                                        data-testid="input-submission"
-                                      />
+                                      <div>
+                                        <label className="text-sm font-medium mb-2 block">
+                                          Upload Assignment Answers
+                                        </label>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                                          {submissionFile ? (
+                                            <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                              <span className="text-sm truncate">{submissionFile.name}</span>
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setSubmissionFile(null)}
+                                                data-testid="button-remove-file"
+                                              >
+                                                <X className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <label className="flex flex-col items-center cursor-pointer">
+                                              <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                              <span className="text-sm text-gray-500">Click to upload file</span>
+                                              <input
+                                                type="file"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                  if (e.target.files?.[0]) {
+                                                    setSubmissionFile(e.target.files[0]);
+                                                  }
+                                                }}
+                                                data-testid="input-file-upload"
+                                              />
+                                            </label>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="text-sm font-medium mb-2 block">
+                                          Submission Text
+                                        </label>
+                                        <Textarea
+                                          placeholder="Enter your work here..."
+                                          value={submissionForm.submission}
+                                          onChange={(e) =>
+                                            setSubmissionForm({
+                                              ...submissionForm,
+                                              submission: e.target.value,
+                                            })
+                                          }
+                                          rows={4}
+                                          data-testid="input-submission"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-sm font-medium mb-2 block">
+                                          Notes (Optional)
+                                        </label>
+                                        <Textarea
+                                          placeholder="Add any notes for your teacher..."
+                                          value={submissionForm.notes}
+                                          onChange={(e) =>
+                                            setSubmissionForm({
+                                              ...submissionForm,
+                                              notes: e.target.value,
+                                            })
+                                          }
+                                          rows={2}
+                                          data-testid="input-notes"
+                                        />
+                                      </div>
                                       <DialogFooter>
                                         <Button
                                           onClick={() =>
@@ -411,16 +507,18 @@ export default function StudentDashboard() {
                                                 submissionForm.studentAssignmentId,
                                               submission:
                                                 submissionForm.submission,
+                                              notes: submissionForm.notes,
                                               hasStudentAssignment:
                                                 submissionForm.hasStudentAssignment,
+                                              file: submissionFile,
                                             })
                                           }
                                           disabled={
-                                            submitAssignmentMutation.isPending
+                                            isSubmitting || submitAssignmentMutation.isPending
                                           }
                                           data-testid="button-submit-assignment"
                                         >
-                                          {submitAssignmentMutation.isPending
+                                          {isSubmitting || submitAssignmentMutation.isPending
                                             ? "Submitting..."
                                             : "Submit"}
                                         </Button>
