@@ -201,7 +201,10 @@ export default function StudentDashboard() {
     },
     onError: () => {
       setIsSubmitting(false);
-      toast({ title: "Failed to submit assignment", description: "Please try again" });
+      toast({
+        title: "Failed to submit assignment",
+        description: "Please try again",
+      });
     },
   });
 
@@ -434,12 +437,16 @@ export default function StudentDashboard() {
                                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
                                           {submissionFile ? (
                                             <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                              <span className="text-sm truncate">{submissionFile.name}</span>
+                                              <span className="text-sm truncate">
+                                                {submissionFile.name}
+                                              </span>
                                               <Button
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => setSubmissionFile(null)}
+                                                onClick={() =>
+                                                  setSubmissionFile(null)
+                                                }
                                                 data-testid="button-remove-file"
                                               >
                                                 <X className="h-4 w-4" />
@@ -448,13 +455,17 @@ export default function StudentDashboard() {
                                           ) : (
                                             <label className="flex flex-col items-center cursor-pointer">
                                               <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                                              <span className="text-sm text-gray-500">Click to upload file</span>
+                                              <span className="text-sm text-gray-500">
+                                                Click to upload file
+                                              </span>
                                               <input
                                                 type="file"
                                                 className="hidden"
                                                 onChange={(e) => {
                                                   if (e.target.files?.[0]) {
-                                                    setSubmissionFile(e.target.files[0]);
+                                                    setSubmissionFile(
+                                                      e.target.files[0],
+                                                    );
                                                   }
                                                 }}
                                                 data-testid="input-file-upload"
@@ -463,7 +474,7 @@ export default function StudentDashboard() {
                                           )}
                                         </div>
                                       </div>
-                                      <div>
+                                      {/* <div>
                                         <label className="text-sm font-medium mb-2 block">
                                           Submission Text
                                         </label>
@@ -479,7 +490,7 @@ export default function StudentDashboard() {
                                           rows={4}
                                           data-testid="input-submission"
                                         />
-                                      </div>
+                                      </div> */}
                                       <div>
                                         <label className="text-sm font-medium mb-2 block">
                                           Notes (Optional)
@@ -514,11 +525,13 @@ export default function StudentDashboard() {
                                             })
                                           }
                                           disabled={
-                                            isSubmitting || submitAssignmentMutation.isPending
+                                            isSubmitting ||
+                                            submitAssignmentMutation.isPending
                                           }
                                           data-testid="button-submit-assignment"
                                         >
-                                          {isSubmitting || submitAssignmentMutation.isPending
+                                          {isSubmitting ||
+                                          submitAssignmentMutation.isPending
                                             ? "Submitting..."
                                             : "Submit"}
                                         </Button>
@@ -552,7 +565,7 @@ export default function StudentDashboard() {
                           <TableHead>Assigned By</TableHead>
                           <TableHead>Due Date</TableHead>
                           <TableHead>Submitted</TableHead>
-                          <TableHead>Status</TableHead>
+                          {/* <TableHead>Status</TableHead> */}
                           <TableHead>Assignment</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -577,9 +590,9 @@ export default function StudentDashboard() {
                                   ).toLocaleDateString()
                                 : "-"}
                             </TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                               <Badge variant="secondary">Pending Review</Badge>
-                            </TableCell>
+                            </TableCell> */}
                             <TableCell>
                               <a
                                 href={a.fileUrl}
