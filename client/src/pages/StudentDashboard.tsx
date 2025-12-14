@@ -304,60 +304,7 @@ export default function StudentDashboard() {
             </TabsList> */}
 
             <TabsContent value="assignments">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Assignments</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Grade</TableHead>
-                        <TableHead>Assigned By</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Assignment Link</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingAssignments.map((s: any) => (
-                        <TableRow
-                          key={s.id}
-                          data-testid={`row-materials-${s.id}`}
-                        >
-                          <TableCell
-                            data-testid={`text-materials-name-${s.id}`}
-                          >
-                            {s.title}
-                          </TableCell>
-                          <TableCell>{s.description}</TableCell>
-                          <TableCell>{s.subject}</TableCell>
-                          <TableCell>{s.gradeLevel}</TableCell>
-                          <TableCell>{s.teacherName}</TableCell>
-                          <TableCell>
-                            {new Date(s.dueDate).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <a
-                              href={s.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline"
-                              data-testid={`link-materials-meeting-${s.id}`}
-                            >
-                              Access Assignment
-                            </a>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
-              {/* <div className="space-y-4">
+              <div className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>
@@ -366,107 +313,126 @@ export default function StudentDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {pendingAssignments.map((a: any) => (
-                        <div
-                          key={a.id}
-                          className="p-4 border rounded-lg"
-                          data-testid={`card-pending-${a.id}`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h3
-                                className="font-medium"
-                                data-testid={`text-assignment-title-${a.id}`}
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Subject</TableHead>
+                            <TableHead>Grade</TableHead>
+                            <TableHead>Assigned By</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Assignment</TableHead>
+                            <TableHead>Submit</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pendingAssignments.map((a: any) => (
+                            <TableRow
+                              key={a.id}
+                              data-testid={`row-materials-${a.id}`}
+                            >
+                              <TableCell
+                                data-testid={`text-materials-name-${a.id}`}
                               >
                                 {a.title}
-                              </h3>
-                              <p className="text-sm text-gray-600">
-                                {a.description}
-                              </p>
-                              <div className="mt-2 space-x-2">
-                                <Badge variant="outline">{a.subject}</Badge>
-                                <Badge>
-                                  Due:{" "}
-                                  {new Date(a.dueDate).toLocaleDateString()}
-                                </Badge>
-                                <Badge variant="secondary">
-                                  {a.points} points
-                                </Badge>
-                              </div>
-                            </div>
-                            <Dialog
-                              open={submitDialogAssignmentId === a.id}
-                              onOpenChange={(open) => {
-                                if (open) {
-                                  setSubmitDialogAssignmentId(a.id);
-                                  setSubmissionForm({
-                                    assignmentId: a.id,
-                                    studentAssignmentId:
-                                      a.studentAssignment?.id || 0,
-                                    submission: "",
-                                    hasStudentAssignment: !!a.studentAssignment,
-                                  });
-                                } else {
-                                  setSubmitDialogAssignmentId(null);
-                                }
-                              }}
-                            >
-                              <DialogTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  data-testid={`button-submit-${a.id}`}
+                              </TableCell>
+                              <TableCell>{a.description}</TableCell>
+                              <TableCell>{a.subject}</TableCell>
+                              <TableCell>{a.gradeLevel}</TableCell>
+                              <TableCell>{a.teacherName}</TableCell>
+                              <TableCell>
+                                {new Date(a.dueDate).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                <a
+                                  href={a.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                  data-testid={`link-materials-meeting-${a.id}`}
                                 >
-                                  Submit
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>
-                                    Submit Assignment: {a.title}
-                                  </DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                  <Textarea
-                                    placeholder="Enter your work here..."
-                                    value={submissionForm.submission}
-                                    onChange={(e) =>
+                                  Assignment
+                                </a>
+                              </TableCell>
+                              <TableCell>
+                                <Dialog
+                                  open={submitDialogAssignmentId === a.id}
+                                  onOpenChange={(open) => {
+                                    if (open) {
+                                      setSubmitDialogAssignmentId(a.id);
                                       setSubmissionForm({
-                                        ...submissionForm,
-                                        submission: e.target.value,
-                                      })
+                                        assignmentId: a.id,
+                                        studentAssignmentId:
+                                          a.studentAssignment?.id || 0,
+                                        submission: "",
+                                        hasStudentAssignment:
+                                          !!a.studentAssignment,
+                                      });
+                                    } else {
+                                      setSubmitDialogAssignmentId(null);
                                     }
-                                    rows={6}
-                                    data-testid="input-submission"
-                                  />
-                                  <DialogFooter>
+                                  }}
+                                >
+                                  <DialogTrigger asChild>
                                     <Button
-                                      onClick={() =>
-                                        submitAssignmentMutation.mutate({
-                                          assignmentId:
-                                            submissionForm.assignmentId,
-                                          studentAssignmentId:
-                                            submissionForm.studentAssignmentId,
-                                          submission: submissionForm.submission,
-                                          hasStudentAssignment:
-                                            submissionForm.hasStudentAssignment,
-                                        })
-                                      }
-                                      disabled={
-                                        submitAssignmentMutation.isPending
-                                      }
-                                      data-testid="button-submit-assignment"
+                                      size="sm"
+                                      data-testid={`button-submit-${a.id}`}
                                     >
-                                      {submitAssignmentMutation.isPending
-                                        ? "Submitting..."
-                                        : "Submit"}
+                                      Submit
                                     </Button>
-                                  </DialogFooter>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
-                          </div>
-                        </div>
-                      ))}
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>
+                                        Submit Assignment: {a.title}
+                                      </DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <Textarea
+                                        placeholder="Enter your work here..."
+                                        value={submissionForm.submission}
+                                        onChange={(e) =>
+                                          setSubmissionForm({
+                                            ...submissionForm,
+                                            submission: e.target.value,
+                                          })
+                                        }
+                                        rows={6}
+                                        data-testid="input-submission"
+                                      />
+                                      <DialogFooter>
+                                        <Button
+                                          onClick={() =>
+                                            submitAssignmentMutation.mutate({
+                                              assignmentId:
+                                                submissionForm.assignmentId,
+                                              studentAssignmentId:
+                                                submissionForm.studentAssignmentId,
+                                              submission:
+                                                submissionForm.submission,
+                                              hasStudentAssignment:
+                                                submissionForm.hasStudentAssignment,
+                                            })
+                                          }
+                                          disabled={
+                                            submitAssignmentMutation.isPending
+                                          }
+                                          data-testid="button-submit-assignment"
+                                        >
+                                          {submitAssignmentMutation.isPending
+                                            ? "Submitting..."
+                                            : "Submit"}
+                                        </Button>
+                                      </DialogFooter>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   </CardContent>
                 </Card>
@@ -481,10 +447,15 @@ export default function StudentDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Assignment</TableHead>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Description</TableHead>
                           <TableHead>Subject</TableHead>
+                          <TableHead>Grade</TableHead>
+                          <TableHead>Assigned By</TableHead>
+                          <TableHead>Due Date</TableHead>
                           <TableHead>Submitted</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Assignment</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -494,7 +465,13 @@ export default function StudentDashboard() {
                             data-testid={`row-submitted-${a.id}`}
                           >
                             <TableCell>{a.title}</TableCell>
+                            <TableCell>{a.description}</TableCell>
                             <TableCell>{a.subject}</TableCell>
+                            <TableCell>{a.gradeLevel}</TableCell>
+                            <TableCell>{a.teacherName}</TableCell>
+                            <TableCell>
+                              {new Date(a.dueDate).toLocaleDateString()}
+                            </TableCell>
                             <TableCell>
                               {a.studentAssignment.submittedAt
                                 ? new Date(
@@ -504,6 +481,17 @@ export default function StudentDashboard() {
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary">Pending Review</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <a
+                                href={a.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                                data-testid={`link-materials-meeting-${a.id}`}
+                              >
+                                Assignment
+                              </a>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -522,9 +510,13 @@ export default function StudentDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Assignment</TableHead>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Description</TableHead>
                           <TableHead>Subject</TableHead>
                           <TableHead>Grade</TableHead>
+                          <TableHead>Assigned By</TableHead>
+                          <TableHead>Assignment</TableHead>
+                          <TableHead>Percentage</TableHead>
                           <TableHead>Feedback</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -535,7 +527,23 @@ export default function StudentDashboard() {
                             data-testid={`row-graded-${a.id}`}
                           >
                             <TableCell>{a.title}</TableCell>
+                            <TableCell>{a.description}</TableCell>
                             <TableCell>{a.subject}</TableCell>
+                            <TableCell>{a.teacherName}</TableCell>
+                            <TableCell>
+                              {new Date(a.dueDate).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <a
+                                href={a.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                                data-testid={`link-materials-meeting-${a.id}`}
+                              >
+                                Assignment
+                              </a>
+                            </TableCell>
                             <TableCell>
                               <Badge
                                 variant={
@@ -556,7 +564,7 @@ export default function StudentDashboard() {
                     </Table>
                   </CardContent>
                 </Card>
-              </div> */}
+              </div>
             </TabsContent>
 
             <TabsContent value="teachers">
