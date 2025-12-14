@@ -1269,6 +1269,23 @@ export function registerRoutes(app: Express) {
             .json({ error: "Only teachers can grade assignments" });
         }
 
+        // Verify the teacher owns the assignment being graded
+        const studentAssignment = await storage.getStudentAssignmentById(
+          parseInt(req.params.id),
+        );
+        if (!studentAssignment) {
+          return res.status(404).json({ error: "Submission not found" });
+        }
+
+        const assignment = await storage.getAssignmentById(
+          studentAssignment.assignmentId,
+        );
+        if (!assignment || assignment.teacherId !== user.id) {
+          return res
+            .status(403)
+            .json({ error: "You can only grade your own assignments" });
+        }
+
         const { grade, feedback } = req.body;
         const sa = await storage.updateStudentAssignment(
           parseInt(req.params.id),
@@ -1280,21 +1297,13 @@ export function registerRoutes(app: Express) {
         );
 
         // Award points to student
-        const studentAssignment = await storage.getStudentAssignmentById(
-          parseInt(req.params.id),
+        const student = await storage.getStudentById(
+          studentAssignment.studentId,
         );
-        if (studentAssignment) {
-          const assignment = await storage.getAssignmentById(
-            studentAssignment.assignmentId,
-          );
-          const student = await storage.getStudentById(
-            studentAssignment.studentId,
-          );
-          if (assignment && student && grade >= 70) {
-            await storage.updateStudent(student.id, {
-              points: student.points + assignment.points,
-            });
-          }
+        if (assignment && student && grade >= 70) {
+          await storage.updateStudent(student.id, {
+            points: student.points + assignment.points,
+          });
         }
 
         res.json(sa);
