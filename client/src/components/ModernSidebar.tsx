@@ -9,6 +9,7 @@ import {
   Presentation,
   MessageSquareQuote,
   LibraryBig,
+  ClipboardCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -75,6 +76,11 @@ export default function ModernSidebar() {
       icon: <BookOpen className="w-6 h-6" />,
       label: "Assignments",
       hash: "assignments",
+    },
+    {
+      icon: <ClipboardCheck className="w-6 h-6" />,
+      label: "Grade Submissions",
+      hash: "submissions",
     },
     {
       icon: <LibraryBig className="w-6 h-6" />,

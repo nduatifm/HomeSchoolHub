@@ -1329,6 +1329,44 @@ export function registerRoutes(app: Express) {
     },
   );
 
+  // Get all student submissions for a teacher's assignments
+  app.get("/api/student-submissions/teacher", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "teacher") {
+        return res
+          .status(403)
+          .json({ error: "Only teachers can view submissions" });
+      }
+
+      // Get all assignments created by this teacher
+      const teacherAssignments = await storage.getAssignmentsByTeacher(user.id);
+
+      // For each assignment, get all student submissions
+      const allSubmissions = [];
+      for (const assignment of teacherAssignments) {
+        const studentAssignments =
+          await storage.getStudentAssignmentsByAssignment(assignment.id);
+
+        for (const sa of studentAssignments) {
+          // Only include submitted or graded assignments
+          if (sa.status === "submitted" || sa.status === "graded") {
+            const student = await storage.getStudentById(sa.studentId);
+            allSubmissions.push({
+              ...sa,
+              assignment,
+              student,
+            });
+          }
+        }
+      }
+
+      res.json(allSubmissions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ========== MATERIAL ROUTES ==========
 
   app.post("/api/materials", requireAuth, async (req, res) => {

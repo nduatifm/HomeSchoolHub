@@ -64,6 +64,8 @@ import {
   Presentation,
   Upload,
   Link,
+  ClipboardCheck,
+  Eye,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -182,6 +184,61 @@ export default function TeacherDashboard() {
   const schedules = schedulesQuery.data || [];
   const feedbacks = feedbacksQuery.data || [];
   const attendanceRecords = attendanceQuery.data || [];
+
+  // Fetch student submissions for grading
+  const { data: studentSubmissions = [], isLoading: submissionsLoading } = useQuery({
+    queryKey: ["/api/student-submissions/teacher"],
+  });
+
+  // Grading state
+  const [gradeDialogOpen, setGradeDialogOpen] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+  const [gradeForm, setGradeForm] = useState({
+    grade: "",
+    feedback: "",
+  });
+
+  // Grade submission mutation
+  const gradeSubmissionMutation = useMutation({
+    mutationFn: ({ id, grade, feedback }: { id: number; grade: number; feedback: string }) =>
+      apiRequest(`/api/student-assignments/${id}/grade`, {
+        method: "PATCH",
+        body: JSON.stringify({ grade, feedback }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-submissions/teacher"] });
+      toast({ title: "Assignment graded successfully!" });
+      setGradeDialogOpen(false);
+      setSelectedSubmission(null);
+      setGradeForm({ grade: "", feedback: "" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to grade assignment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenGradeDialog = (submission: any) => {
+    setSelectedSubmission(submission);
+    setGradeForm({
+      grade: submission.grade?.toString() || "",
+      feedback: submission.feedback || "",
+    });
+    setGradeDialogOpen(true);
+  };
+
+  const handleSubmitGrade = () => {
+    if (!selectedSubmission) return;
+    const gradeNum = parseInt(gradeForm.grade);
+    if (isNaN(gradeNum) || gradeNum < 0 || gradeNum > 100) {
+      toast({ title: "Please enter a valid grade between 0 and 100", variant: "destructive" });
+      return;
+    }
+    gradeSubmissionMutation.mutate({
+      id: selectedSubmission.id,
+      grade: gradeNum,
+      feedback: gradeForm.feedback,
+    });
+  };
 
   // Create assignment
   const [assignmentForm, setAssignmentForm] = useState({
@@ -1227,6 +1284,156 @@ export default function TeacherDashboard() {
                             : "Update"}
                         </Button>
                       </div>
+                    </DialogContent>
+                  </Dialog>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="submissions">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardCheck className="h-5 w-5" />
+                    Grade Student Submissions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {submissionsLoading ? (
+                    <div className="text-center py-8">Loading submissions...</div>
+                  ) : (studentSubmissions as any[]).length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No submissions to grade yet. Students will appear here once they submit their assignments.
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Student</TableHead>
+                          <TableHead>Assignment</TableHead>
+                          <TableHead>Subject</TableHead>
+                          <TableHead>Submitted</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Grade</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(studentSubmissions as any[]).map((sub: any) => (
+                          <TableRow key={sub.id} data-testid={`row-submission-${sub.id}`}>
+                            <TableCell>{sub.student?.name || "Unknown Student"}</TableCell>
+                            <TableCell>{sub.assignment?.title || "Unknown Assignment"}</TableCell>
+                            <TableCell>{sub.assignment?.subject}</TableCell>
+                            <TableCell>
+                              {sub.submittedAt
+                                ? new Date(sub.submittedAt).toLocaleDateString()
+                                : "N/A"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={sub.status === "graded" ? "default" : "secondary"}
+                              >
+                                {sub.status === "graded" ? "Graded" : "Pending Review"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {sub.grade !== null ? `${sub.grade}/100` : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                {sub.submission && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(sub.submission, "_blank")}
+                                    data-testid={`button-view-submission-${sub.id}`}
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    View
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleOpenGradeDialog(sub)}
+                                  data-testid={`button-grade-${sub.id}`}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  {sub.status === "graded" ? "Edit Grade" : "Grade"}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+
+                  {/* Grading Dialog */}
+                  <Dialog open={gradeDialogOpen} onOpenChange={setGradeDialogOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Grade Assignment</DialogTitle>
+                      </DialogHeader>
+                      {selectedSubmission && (
+                        <div className="space-y-4">
+                          <div className="bg-muted p-4 rounded-lg space-y-2">
+                            <p className="text-sm">
+                              <strong>Student:</strong> {selectedSubmission.student?.name}
+                            </p>
+                            <p className="text-sm">
+                              <strong>Assignment:</strong> {selectedSubmission.assignment?.title}
+                            </p>
+                            {selectedSubmission.submission && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(selectedSubmission.submission, "_blank")}
+                                data-testid="button-view-submission-dialog"
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View Submission
+                              </Button>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Grade (0-100)</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              placeholder="Enter grade (0-100)"
+                              value={gradeForm.grade}
+                              onChange={(e) =>
+                                setGradeForm({ ...gradeForm, grade: e.target.value })
+                              }
+                              data-testid="input-grade"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Students scoring 70 or above will receive assignment points.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Feedback (optional)</label>
+                            <Textarea
+                              placeholder="Enter feedback for the student..."
+                              value={gradeForm.feedback}
+                              onChange={(e) =>
+                                setGradeForm({ ...gradeForm, feedback: e.target.value })
+                              }
+                              rows={4}
+                              data-testid="input-feedback"
+                            />
+                          </div>
+                          <Button
+                            onClick={handleSubmitGrade}
+                            disabled={gradeSubmissionMutation.isPending}
+                            className="w-full"
+                            data-testid="button-submit-grade"
+                          >
+                            {gradeSubmissionMutation.isPending ? "Submitting..." : "Submit Grade"}
+                          </Button>
+                        </div>
+                      )}
                     </DialogContent>
                   </Dialog>
                 </CardContent>
