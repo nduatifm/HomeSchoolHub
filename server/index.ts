@@ -53,7 +53,15 @@ app.use((req, res, next) => {
   const server = createServer(app);
   
   registerRoutes(app);
-  await setupVite(app, server);
+
+  // In development, use Vite dev middleware; in production serve the built assets
+  if (process.env.NODE_ENV === "development") {
+    log("Using Vite dev middleware");
+    await setupVite(app, server);
+  } else {
+    log("Serving static files from dist/public");
+    serveStatic(app);
+  }
   
   const PORT = 5000;
   server.listen(PORT, "0.0.0.0", () => {
