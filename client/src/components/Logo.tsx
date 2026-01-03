@@ -13,9 +13,8 @@ export function Logo({ variant = "default", className = "" }: LogoProps) {
           <GraduationCap className="h-8 w-8 text-white" />
         </div>
         <div className="text-center">
-          <div className="text-xs font-bold text-white leading-tight">Home</div>
-          <div className="text-xs font-bold text-white leading-tight">School</div>
-          <div className="text-xs font-bold text-white leading-tight">Hub</div>
+          <div className="text-xs font-bold text-white leading-tight">Lyra</div>
+          <div className="text-xs font-bold text-white leading-tight">preparatory</div>
         </div>
       </div>
     );
@@ -28,7 +27,7 @@ export function Logo({ variant = "default", className = "" }: LogoProps) {
       </div>
       <div className="flex flex-col">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-          Home School Hub
+          Lyra Preparatory
         </h1>
         <p className="text-xs text-muted-foreground">Learning made simple</p>
       </div>

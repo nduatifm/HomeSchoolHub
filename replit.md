@@ -1,7 +1,7 @@
-# Home School Hub - Complete Educational Management System
+# Lyra Preparatory - Complete Educational Management System
 
 ## Overview
-**Home School Hub** is a comprehensive web-based tutoring platform designed to connect teachers, parents, and students. It offers a full suite of educational management capabilities, including role-based access, student invitations, assignment tracking, progress monitoring, real-time messaging, and payment management. The platform aims to streamline educational interactions and enhance the learning experience.
+**Lyra Preparatory** is a comprehensive web-based tutoring platform designed to connect teachers, parents, and students. It offers a full suite of educational management capabilities, including role-based access, student invitations, assignment tracking, progress monitoring, real-time messaging, and payment management. The platform aims to streamline educational interactions and enhance the learning experience.
 
 ## User Preferences
 - Communication style: Simple, everyday language
@@ -12,7 +12,7 @@
 ### UI/UX Decisions
 The platform utilizes React 18 with TypeScript for the frontend, styled with Tailwind CSS and Shadcn/UI components for a modern and consistent design. The platform features a **modern, colorful dashboard design** inspired by contemporary educational platforms:
 
-- **Branding**: "Home School Hub" logo with graduation cap icon in purple-to-pink gradient, displayed on all authentication pages and dashboard sidebars
+- **Branding**: "Lyra Preparatory" logo with graduation cap icon in purple-to-pink gradient, displayed on all authentication pages and dashboard sidebars
 - **Modern Vertical Sidebar**: Dark navy sidebar (fixed left, 96px wide) with icon navigation and branding logo at the top for quick access to key sections
 - **Vibrant Color Palette**: Purple, green, coral, and orange accent colors for visual hierarchy and engagement
 - **Welcome Cards**: Personalized hero cards with gradient backgrounds and call-to-action buttons
