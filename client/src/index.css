@@ -24,7 +24,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 232 60% 60%;
     --radius: 1rem;
-    --sidebar-bg: 222 47% 11%;
+    --sidebar-bg: 223 84% 5%;
     --purple: 258 89% 66%;
     --green: 123 38% 57%;
     --coral: 352 95% 72%;
@@ -40,6 +40,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -50,45 +51,58 @@
   .bg-purple {
     background-color: hsl(var(--purple));
   }
+
   .bg-green {
     background-color: hsl(var(--green));
   }
+
   .bg-coral {
     background-color: hsl(var(--coral));
   }
+
   .bg-orange {
     background-color: hsl(var(--orange));
   }
+
   .bg-light-purple {
     background-color: hsl(var(--light-purple));
   }
+
   .bg-light-green {
     background-color: hsl(var(--light-green));
   }
+
   .bg-light-coral {
     background-color: hsl(var(--light-coral));
   }
+
   .bg-light-orange {
     background-color: hsl(var(--light-orange));
   }
+
   .bg-sidebar {
     background-color: hsl(var(--sidebar-bg));
   }
+
   .text-purple {
     color: hsl(var(--purple));
   }
+
   .text-green {
     color: hsl(var(--green));
   }
+
   .text-coral {
     color: hsl(var(--coral));
   }
+
   .text-orange {
     color: hsl(var(--orange));
   }
 }
 
 @layer components {
+
   /* Modern Dialog Styles */
   [data-radix-dialog-content] {
     @apply rounded-3xl border-2 shadow-2xl;

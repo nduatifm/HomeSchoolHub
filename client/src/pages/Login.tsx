@@ -4,9 +4,28 @@ import { useLocation } from "wouter";
 import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
 import { ApiError } from "@/lib/queryClient";
@@ -19,7 +38,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-  
+
   // Google Sign In state for role selection
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
@@ -35,11 +54,12 @@ export default function Login() {
       setLocation("/dashboard");
     } catch (error: any) {
       setIsLoading(false);
-      toast({ 
-        title: "Login failed", 
-        description: error.message || "Please check your credentials and try again", 
+      toast({
+        title: "Login failed",
+        description:
+          error.message || "Please check your credentials and try again",
         type: "error",
-        duration: 5000
+        duration: 5000,
       });
     }
   }
@@ -48,7 +68,7 @@ export default function Login() {
     const credential = credentialResponse.credential;
     setGoogleCredential(credential);
     setIsLoading(true);
-    
+
     try {
       // First, try to sign in without a role - if user exists with role, this will succeed
       await googleSignIn(credential);
@@ -59,7 +79,11 @@ export default function Login() {
       if (apiError.requiresRole) {
         setShowRoleDialog(true);
       } else {
-        toast({ title: "Google Sign In failed", description: apiError.message, type: "error" });
+        toast({
+          title: "Google Sign In failed",
+          description: apiError.message,
+          type: "error",
+        });
       }
     } finally {
       setIsLoading(false);
@@ -68,14 +92,18 @@ export default function Login() {
 
   async function handleGoogleLoginComplete() {
     if (!googleCredential) return;
-    
+
     setIsLoading(true);
     try {
       await googleSignIn(googleCredential, googleRole);
       toast({ title: "Welcome back!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Google Sign In failed", description: error.message, type: "error" });
+      toast({
+        title: "Google Sign In failed",
+        description: error.message,
+        type: "error",
+      });
     } finally {
       setIsLoading(false);
       setShowRoleDialog(false);
@@ -87,13 +115,13 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4">
           <Logo className="mb-2" />
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <label htmlFor="email" className="text-sm font-medium">
+                Email
+              </label>
               <Input
                 id="email"
                 type="email"
@@ -105,7 +133,9 @@ export default function Login() {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">Password</label>
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
+              </label>
               <Input
                 id="password"
                 type="password"
@@ -116,11 +146,16 @@ export default function Login() {
                 data-testid="input-password"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-login">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading}
+              data-testid="button-login"
+            >
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          
+
           {googleClientId && (
             <>
               <div className="relative my-4">
@@ -128,15 +163,24 @@ export default function Login() {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
                 </div>
               </div>
 
-              <div className="flex justify-center" data-testid="google-login-container">
+              <div
+                className="flex justify-center"
+                data-testid="google-login-container"
+              >
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => {
-                    toast({ title: "Google Sign In failed", description: "Please try again", type: "error" });
+                    toast({
+                      title: "Google Sign In failed",
+                      description: "Please try again",
+                      type: "error",
+                    });
                   }}
                 />
               </div>
@@ -173,8 +217,13 @@ export default function Login() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label htmlFor="google-role" className="text-sm font-medium">I am a...</label>
-              <Select value={googleRole} onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}>
+              <label htmlFor="google-role" className="text-sm font-medium">
+                I am a...
+              </label>
+              <Select
+                value={googleRole}
+                onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}
+              >
                 <SelectTrigger data-testid="select-google-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -184,8 +233,8 @@ export default function Login() {
                 </SelectContent>
               </Select>
             </div>
-            <Button 
-              onClick={handleGoogleLoginComplete} 
+            <Button
+              onClick={handleGoogleLoginComplete}
               className="w-full"
               disabled={isLoading}
               data-testid="button-complete-google-login"
