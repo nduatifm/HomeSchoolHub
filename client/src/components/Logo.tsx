@@ -1,5 +1,5 @@
-import logo from "../assets/logo.jpeg";
-import logoSidebar from "../assets/logo-sidebar.png";
+import logo from "../assets/logo.webp";
+import logoSidebar from "../assets/logo-sidebar.webp";
 
 interface LogoProps {
   variant?: "default" | "sidebar";
