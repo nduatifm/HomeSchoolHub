@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
+import Landing from "./pages/Landing";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -86,7 +87,7 @@ function AppRoutes() {
         <DashboardRouter />
       </Route>
       <Route path="/">
-        {user ? <Redirect to="/dashboard" /> : <Redirect to="/login" />}
+        {user ? <Redirect to="/dashboard" /> : <Landing />}
       </Route>
     </Switch>
   );
