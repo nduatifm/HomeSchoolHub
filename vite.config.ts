@@ -16,6 +16,9 @@ export default defineConfig({
         ]
       : []),
   ],
+
+  // Read env files from the repository root so Vite picks up `.env` there
+  envDir: path.resolve(import.meta.dirname),
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
