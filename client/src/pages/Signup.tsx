@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
-import { ApiError } from "@/lib/queryClient";
+import { ApiError, apiRequest } from "@/lib/queryClient";
+import { Mail, RefreshCw } from "lucide-react";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -45,6 +46,11 @@ export default function Signup() {
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
   const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
+
+  // Resend verification state
+  const [showResendDialog, setShowResendDialog] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [isResending, setIsResending] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,13 +72,42 @@ export default function Signup() {
       // Redirect to login page after 2 seconds
       setTimeout(() => setLocation("/login"), 2000);
     } catch (error: any) {
+      if (error.requiresVerification) {
+        setUnverifiedEmail(error.email || email);
+        setShowResendDialog(true);
+      } else {
+        toast({
+          title: "Signup failed",
+          description: error.message,
+          type: "error",
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    setIsResending(true);
+    try {
+      await apiRequest("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
       toast({
-        title: "Signup failed",
+        title: "Verification email sent!",
+        description: "Please check your inbox and spam folder for the verification link.",
+        type: "success",
+      });
+      setShowResendDialog(false);
+    } catch (error: any) {
+      toast({
+        title: "Failed to resend",
         description: error.message,
         type: "error",
       });
     } finally {
-      setIsLoading(false);
+      setIsResending(false);
     }
   }
 
@@ -277,6 +312,61 @@ export default function Signup() {
             >
               {isLoading ? "Creating account..." : "Complete Signup"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showResendDialog} onOpenChange={setShowResendDialog}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <div className="flex justify-center mb-4">
+              <div className="p-3 bg-amber-100 rounded-full">
+                <Mail className="w-8 h-8 text-amber-600" />
+              </div>
+            </div>
+            <DialogTitle className="text-center">Account Not Verified</DialogTitle>
+            <DialogDescription className="text-center">
+              An account with <span className="font-medium text-foreground">{unverifiedEmail}</span> already exists but hasn't been verified yet. Would you like us to send a new verification email?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-4">
+            <Button
+              onClick={handleResendVerification}
+              className="w-full"
+              disabled={isResending}
+            >
+              {isResending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Resend Verification Email
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowResendDialog(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+            <p className="text-xs text-center text-muted-foreground">
+              Already verified?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResendDialog(false);
+                  setLocation("/login");
+                }}
+                className="text-primary hover:underline"
+              >
+                Go to login
+              </button>
+            </p>
           </div>
         </DialogContent>
       </Dialog>

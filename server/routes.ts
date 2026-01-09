@@ -85,6 +85,13 @@ export function registerRoutes(app: Express) {
 
       const existing = await storage.getUserByEmail(email);
       if (existing) {
+        if (!existing.isEmailVerified) {
+          return res.status(400).json({ 
+            error: "Email already registered but not verified",
+            requiresVerification: true,
+            email: existing.email
+          });
+        }
         return res.status(400).json({ error: "Email already registered" });
       }
 

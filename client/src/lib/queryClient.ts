@@ -2,12 +2,16 @@ import { QueryClient } from "@tanstack/react-query";
 
 export class ApiError extends Error {
   requiresRole?: boolean;
+  requiresVerification?: boolean;
+  email?: string;
   status?: number;
   
-  constructor(message: string, options?: { requiresRole?: boolean; status?: number }) {
+  constructor(message: string, options?: { requiresRole?: boolean; requiresVerification?: boolean; email?: string; status?: number }) {
     super(message);
     this.name = 'ApiError';
     this.requiresRole = options?.requiresRole;
+    this.requiresVerification = options?.requiresVerification;
+    this.email = options?.email;
     this.status = options?.status;
   }
 }
@@ -32,6 +36,8 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
     const errorData = await response.json().catch(() => ({ error: "Request failed" }));
     throw new ApiError(errorData.error || "Request failed", {
       requiresRole: errorData.requiresRole,
+      requiresVerification: errorData.requiresVerification,
+      email: errorData.email,
       status: response.status,
     });
   }
