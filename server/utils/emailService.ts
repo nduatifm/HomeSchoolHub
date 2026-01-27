@@ -15,21 +15,48 @@ function validateSmtpConfig() {
 
 const smtpConfigValid = validateSmtpConfig();
 
+// DEBUG: Log SMTP configuration on startup
+console.log('=== SMTP Configuration Debug ===');
+console.log('SMTP_HOST env:', process.env.SMTP_HOST || 'NOT SET');
+console.log('SMTP_USER env:', process.env.SMTP_USER ? `${process.env.SMTP_USER.substring(0, 3)}***` : 'NOT SET');
+console.log('SMTP_PASS env:', process.env.SMTP_PASS ? '***SET***' : 'NOT SET');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('================================');
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_PORT === '465',
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  connectionTimeout: 10000, // 10 seconds
+  socketTimeout: 10000, // 10 seconds
 });
 
 // Verify transporter connection in production
 if (smtpConfigValid && process.env.NODE_ENV === 'production') {
+  console.log(`📡 Testing SMTP connection to ${process.env.SMTP_HOST}:${process.env.SMTP_PORT}...`);
   transporter.verify((error, success) => {
     if (error) {
       console.error('❌ SMTP Connection Error:', error.message);
+      console.error('   Code:', error.code);
+      console.error('   Host:', process.env.SMTP_HOST);
+      console.error('   Port:', process.env.SMTP_PORT);
+      console.error('   Secure:', process.env.SMTP_PORT === '465');
+      console.error('');
+      console.error('💡 Troubleshooting:');
+      if (error.code === 'ETIMEDOUT' || error.code === 'EHOSTUNREACH') {
+        console.error('   - Connection timeout or host unreachable');
+        console.error('   - Check if SMTP_HOST and SMTP_PORT are correct');
+        console.error('   - Check if your hosting provider blocks outbound connections');
+        console.error('   - Try using port 587 (TLS) instead of 465 (SSL)');
+      } else if (error.code === 'EAUTH' || error.message.includes('Invalid login')) {
+        console.error('   - SMTP authentication failed');
+        console.error('   - Check SMTP_USER and SMTP_PASS are correct');
+        console.error('   - Some providers require app-specific passwords');
+      }
       console.error('Email service may not work properly');
     } else if (success) {
       console.log('✅ SMTP Connection verified successfully');
