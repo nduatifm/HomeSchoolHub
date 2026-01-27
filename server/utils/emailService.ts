@@ -1,5 +1,20 @@
 import nodemailer from 'nodemailer';
 
+// Validate SMTP configuration
+function validateSmtpConfig() {
+  const required = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.warn(`⚠️  SMTP Configuration missing: ${missing.join(', ')}`);
+    console.warn('Email sending will not work. Please set these environment variables.');
+    return false;
+  }
+  return true;
+}
+
+const smtpConfigValid = validateSmtpConfig();
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || '587'),
@@ -9,6 +24,18 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS,
   },
 });
+
+// Verify transporter connection in production
+if (smtpConfigValid && process.env.NODE_ENV === 'production') {
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error('❌ SMTP Connection Error:', error.message);
+      console.error('Email service may not work properly');
+    } else if (success) {
+      console.log('✅ SMTP Connection verified successfully');
+    }
+  });
+}
 
 function getBaseUrl(): string {
   // Check for explicit CLIENT_URL environment variable first
@@ -27,6 +54,11 @@ function getBaseUrl(): string {
 }
 
 export async function sendVerificationEmail(email: string, name: string, token: string) {
+  if (!smtpConfigValid) {
+    console.error('❌ Cannot send verification email: SMTP not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
   const baseUrl = getBaseUrl();
   const verificationUrl = `${baseUrl}/verify-email?token=${token}`;
   
@@ -63,16 +95,23 @@ export async function sendVerificationEmail(email: string, name: string, token: 
   `;
 
   try {
-    await transporter.sendMail({
+    console.log(`📧 Sending verification email to: ${email}`);
+    const info = await transporter.sendMail({
       from: `"Tutoring Platform" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'Verify Your Email Address',
       html: htmlContent,
       text: `Hi ${name}, please verify your email: ${verificationUrl}`,
     });
+    console.log(`✅ Verification email sent successfully. Message ID: ${info.messageId}`);
     return { success: true };
   } catch (error: any) {
-    console.error('Email send error:', error);
+    console.error('❌ Verification email send error:', {
+      email,
+      error: error.message,
+      code: error.code,
+      command: error.command,
+    });
     return { success: false, error: error.message };
   }
 }
@@ -83,6 +122,11 @@ export async function sendStudentInviteEmail(
   inviteCode: string,
   parentName: string
 ) {
+  if (!smtpConfigValid) {
+    console.error('❌ Cannot send student invite email: SMTP not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
   const baseUrl = getBaseUrl();
   const signupUrl = `${baseUrl}/student-signup`;
   
@@ -128,26 +172,40 @@ export async function sendStudentInviteEmail(
   `;
 
   try {
-    await transporter.sendMail({
+    console.log(`📧 Sending student invite email to: ${email} for student: ${studentName}`);
+    const info = await transporter.sendMail({
       from: `"Tutoring Platform" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'You have been invited to Tutoring Platform',
       html: htmlContent,
       text: `Hi ${studentName}, ${parentName} has invited you to join Tutoring Platform. Visit ${signupUrl} and use invite code: ${inviteCode}`,
     });
+    console.log(`✅ Student invite email sent successfully. Message ID: ${info.messageId}`);
     return { success: true };
   } catch (error: any) {
-    console.error('Student invite email error:', error);
+    console.error('❌ Student invite email send error:', {
+      email,
+      studentName,
+      error: error.message,
+      code: error.code,
+      command: error.command,
+    });
     return { success: false, error: error.message };
   }
 }
 
 export async function sendPasswordResetEmail(email: string, name: string, token: string) {
+  if (!smtpConfigValid) {
+    console.error('❌ Cannot send password reset email: SMTP not configured');
+    return { success: false, error: 'Email service not configured' };
+  }
+
   const baseUrl = getBaseUrl();
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
   
   try {
-    await transporter.sendMail({
+    console.log(`📧 Sending password reset email to: ${email}`);
+    const info = await transporter.sendMail({
       from: `"Tutoring Platform" <${process.env.SMTP_USER}>`,
       to: email,
       subject: 'Reset Your Password',
@@ -159,9 +217,15 @@ export async function sendPasswordResetEmail(email: string, name: string, token:
         <p>This link expires in 1 hour. If you didn't request this, please ignore this email.</p>
       `,
     });
+    console.log(`✅ Password reset email sent successfully. Message ID: ${info.messageId}`);
     return { success: true };
   } catch (error: any) {
-    console.error('Password reset email error:', error);
+    console.error('❌ Password reset email send error:', {
+      email,
+      error: error.message,
+      code: error.code,
+      command: error.command,
+    });
     return { success: false, error: error.message };
   }
 }
