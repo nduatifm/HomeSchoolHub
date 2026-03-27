@@ -12,6 +12,7 @@ import TeacherDashboard from "./pages/TeacherDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import Landing from "./pages/Landing";
+import DevRoleSwitcher from "./components/DevRoleSwitcher";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -98,6 +99,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AppRoutes />
+        {import.meta.env.DEV && <DevRoleSwitcher />}
       </AuthProvider>
       <Toaster />
     </QueryClientProvider>

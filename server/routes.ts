@@ -2497,4 +2497,337 @@ export function registerRoutes(app: Express) {
     const setting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
     return setting?.value === "true";
   }
+
+  // ========== DEV-ONLY: ROLE SWITCHER + SEED DATA ==========
+  // Only active outside production — allows instant role switching for previewing all dashboards.
+  if (process.env.NODE_ENV !== "production") {
+    app.post("/api/dev/become", async (req, res) => {
+      try {
+        const { role } = req.body as { role: "teacher" | "parent" | "student" };
+        if (!["teacher", "parent", "student"].includes(role)) {
+          return res.status(400).json({ error: "Invalid role" });
+        }
+
+        const today = new Date().toISOString().split("T")[0];
+        const hash = await hashPassword("Demo1234!");
+
+        // ── Ensure demo teacher ──
+        let teacher = await storage.getUserByEmail("demo.teacher@lyraprep.dev");
+        if (!teacher) {
+          teacher = await storage.createUser({
+            email: "demo.teacher@lyraprep.dev",
+            password: hash,
+            name: "Dr. Sarah Chen",
+            role: "teacher",
+            isEmailVerified: true,
+            bio: "Experienced educator specialising in Mathematics, Physics, and SAT Prep. Passionate about making complex topics accessible.",
+            teachingSubjects: ["Mathematics", "Physics", "SAT Prep"],
+            yearsExperience: 9,
+            qualifications: "M.Sc. Applied Mathematics, Certified SAT Tutor",
+            specialization: "STEM & College Entrance Exams",
+          });
+        }
+
+        // ── Ensure demo parent ──
+        let parent = await storage.getUserByEmail("demo.parent@lyraprep.dev");
+        if (!parent) {
+          parent = await storage.createUser({
+            email: "demo.parent@lyraprep.dev",
+            password: hash,
+            name: "James Wilson",
+            role: "parent",
+            isEmailVerified: true,
+            phone: "+1 555-0192",
+            preferredContact: "email",
+          });
+        }
+
+        // ── Ensure demo student user + Student record ──
+        let studentUser = await storage.getUserByEmail("demo.student@lyraprep.dev");
+        if (!studentUser) {
+          studentUser = await storage.createUser({
+            email: "demo.student@lyraprep.dev",
+            password: hash,
+            name: "Emily Wilson",
+            role: "student",
+            isEmailVerified: true,
+            favoriteSubject: "Mathematics",
+            learningGoals: "Improve SAT score, master calculus, get into a top university",
+            interests: ["Math Competitions", "Chess", "Piano"],
+          });
+        }
+
+        let studentRecord = await storage.getStudentByUserId(studentUser.id);
+        if (!studentRecord) {
+          studentRecord = await storage.createStudent({
+            userId: studentUser.id,
+            parentId: parent.id,
+            name: "Emily Wilson",
+            gradeLevel: "Grade 10",
+            badges: ["First Assignment", "Perfect Score", "5-Day Streak"],
+            points: 840,
+          });
+        }
+
+        // ── Seed rich test data (idempotent) ──
+        const seeded = await storage.getSystemSetting("DEV_SEED_DONE");
+        if (!seeded) {
+          // Assignments
+          const a1 = await storage.createAssignment({
+            title: "Quadratic Functions & Parabolas",
+            description: "Complete exercises 3.1–3.8 on quadratic functions. Show all working. Include a graph for each function.",
+            subject: "Mathematics",
+            dueDate: new Date(Date.now() + 5 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher.id,
+            gradeLevel: "Grade 10",
+            points: 100,
+            fileUrl: null,
+          });
+          const a2 = await storage.createAssignment({
+            title: "Newton's Laws Problem Set",
+            description: "Solve the 12 problems in the attached worksheet. Pay attention to units and significant figures.",
+            subject: "Physics",
+            dueDate: new Date(Date.now() + 8 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher.id,
+            gradeLevel: "Grade 10",
+            points: 120,
+            fileUrl: null,
+          });
+          const a3 = await storage.createAssignment({
+            title: "SAT Math Practice Test — Module 1",
+            description: "Complete the full timed module (35 min). Submit your answer sheet and a reflection on which question types were hardest.",
+            subject: "SAT Prep",
+            dueDate: new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher.id,
+            gradeLevel: "Grade 10",
+            points: 80,
+            fileUrl: null,
+          });
+          const a4 = await storage.createAssignment({
+            title: "Trigonometry Ratios Quiz",
+            description: "Short quiz covering sin, cos, tan, and their inverses. 20 questions, 30 minutes.",
+            subject: "Mathematics",
+            dueDate: new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher.id,
+            gradeLevel: "Grade 10",
+            points: 50,
+            fileUrl: null,
+          });
+
+          // Student assignments
+          await storage.createStudentAssignment({
+            assignmentId: a1.id,
+            studentId: studentRecord.id,
+            status: "pending",
+            submission: null,
+            fileUrl: null,
+            notes: null,
+            grade: null,
+            feedback: null,
+            submittedAt: null,
+          });
+          await storage.createStudentAssignment({
+            assignmentId: a2.id,
+            studentId: studentRecord.id,
+            status: "submitted",
+            submission: "I completed all 12 problems. Problem 7 required using Newton's 3rd law in a non-obvious way.",
+            fileUrl: null,
+            notes: "Submitted a bit late — please review",
+            grade: null,
+            feedback: null,
+            submittedAt: new Date(Date.now() - 86400000).toISOString(),
+          });
+          await storage.createStudentAssignment({
+            assignmentId: a3.id,
+            studentId: studentRecord.id,
+            status: "graded",
+            submission: "Completed full module under timed conditions.",
+            fileUrl: null,
+            notes: null,
+            grade: 72,
+            feedback: "Good effort on the algebra section. Focus on word problems — you lost 6 points there. We will practice those next session.",
+            submittedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+          });
+          await storage.createStudentAssignment({
+            assignmentId: a4.id,
+            studentId: studentRecord.id,
+            status: "graded",
+            submission: "Completed all 20 questions.",
+            fileUrl: null,
+            notes: null,
+            grade: 92,
+            feedback: "Excellent work! Strong grasp of inverse trig. Keep it up.",
+            submittedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+          });
+
+          // Materials
+          await storage.createMaterial({
+            title: "Quadratic Formula Cheat Sheet",
+            description: "A concise reference card covering the quadratic formula, discriminant analysis, vertex form, and factoring strategies.",
+            fileUrl: "https://example.com/materials/quadratic-cheatsheet.pdf",
+            subject: "Mathematics",
+            teacherId: teacher.id,
+            uploadDate: new Date(Date.now() - 10 * 86400000).toISOString().split("T")[0],
+            gradeLevel: "Grade 10",
+          });
+          await storage.createMaterial({
+            title: "SAT Math Formulas & Strategies",
+            description: "Official SAT formula sheet plus high-yield strategies for the math sections — includes annotated examples for each formula type.",
+            fileUrl: "https://example.com/materials/sat-math-strategies.pdf",
+            subject: "SAT Prep",
+            teacherId: teacher.id,
+            uploadDate: new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0],
+            gradeLevel: "Grade 10",
+          });
+          await storage.createMaterial({
+            title: "Newton's Laws — Illustrated Guide",
+            description: "Visual walkthrough of all three Newtonian laws with real-world examples and practice problems at the end.",
+            fileUrl: "https://example.com/materials/newtons-laws-guide.pdf",
+            subject: "Physics",
+            teacherId: teacher.id,
+            uploadDate: new Date(Date.now() - 14 * 86400000).toISOString().split("T")[0],
+            gradeLevel: "Grade 10",
+          });
+
+          // Sessions (past + upcoming)
+          const pastSession = await storage.createSession({
+            teacher: { connect: { id: teacher.id } },
+            studentIds: [studentRecord.id],
+            subject: "Mathematics",
+            sessionDate: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0],
+            startTime: "14:00",
+            endTime: "15:00",
+            title: "Quadratic Equations — Deep Dive",
+            description: "Reviewed completing the square and graphing parabolas. Emily showed great progress on vertex form.",
+            meetingUrl: "https://meet.google.com/abc-demo-xyz",
+            notes: "Emily needs more practice on word problems involving projectile motion.",
+            status: "completed",
+          });
+          await storage.createSession({
+            teacher: { connect: { id: teacher.id } },
+            studentIds: [studentRecord.id],
+            subject: "SAT Prep",
+            sessionDate: new Date(Date.now() + 4 * 86400000).toISOString().split("T")[0],
+            startTime: "15:00",
+            endTime: "16:30",
+            title: "SAT Math — Word Problems Workshop",
+            description: "We will drill the word problem types Emily found hardest in the practice module.",
+            meetingUrl: "https://meet.google.com/abc-demo-xyz",
+            notes: null,
+            status: "scheduled",
+          });
+
+          // Tutor request (approved)
+          const existingRequest = await prisma.tutorRequest.findFirst({
+            where: { parentId: parent.id, teacherId: teacher.id },
+          });
+          if (!existingRequest) {
+            await storage.createTutorRequest({
+              parentId: parent.id,
+              teacherId: teacher.id,
+              studentId: studentRecord.id,
+              status: "approved",
+              message: "We are looking for a dedicated tutor to help Emily with Mathematics and SAT preparation. She is aiming for a 1500+ score.",
+              requestDate: new Date(Date.now() - 20 * 86400000).toISOString().split("T")[0],
+              responseDate: new Date(Date.now() - 18 * 86400000).toISOString().split("T")[0],
+            });
+          }
+
+          // Teacher-student assignment (direct)
+          const existingTSA = await storage.getTeacherStudentAssignment(teacher.id, studentRecord.id);
+          if (!existingTSA) {
+            await storage.createTeacherStudentAssignment({
+              teacherId: teacher.id,
+              studentId: studentRecord.id,
+              assignedDate: today,
+              status: "active",
+            });
+          }
+
+          // Progress reports
+          await storage.createProgressReport({
+            studentId: studentRecord.id,
+            teacherId: teacher.id,
+            period: "March 2026",
+            content: "Emily has shown consistent improvement across all subjects this month. Her mathematical reasoning is noticeably sharper, and she is tackling multi-step problems with more confidence. SAT prep is going well — her practice scores have risen from 1280 to 1360 over the past four weeks. Areas to watch: word problems and time management under exam conditions.",
+            date: today,
+            grades: { Mathematics: 88, Physics: 81, "SAT Prep": 85 },
+          });
+          await storage.createProgressReport({
+            studentId: studentRecord.id,
+            teacherId: teacher.id,
+            period: "February 2026",
+            content: "A solid month overall. Emily completed all assignments on time and actively participated in sessions. Mathematics remains her strongest subject. Physics requires more attention — she struggles with vector-based problems. Recommended additional practice problems from the resource pack.",
+            date: "2026-02-28",
+            grades: { Mathematics: 85, Physics: 74, "SAT Prep": 78 },
+          });
+
+          // Feedback
+          await storage.createFeedback({
+            teacherId: teacher.id,
+            studentId: studentRecord.id,
+            message: "Fantastic work on today's quiz — you nailed the inverse trig section! Keep building on this momentum.",
+            date: new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0],
+            type: "positive",
+          });
+          await storage.createFeedback({
+            teacherId: teacher.id,
+            studentId: studentRecord.id,
+            message: "Word problems are your weakest area right now. Make sure to spend at least 20 minutes daily on the SAT word problem drills I sent — this will make a big difference before the exam.",
+            date: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0],
+            type: "constructive",
+          });
+
+          // Attendance
+          await storage.createAttendance({
+            studentId: studentRecord.id,
+            sessionId: pastSession.id,
+            date: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0],
+            status: "present",
+            notes: null,
+          });
+
+          // Mark seed done
+          await storage.setSystemSetting("DEV_SEED_DONE", "true", "Demo seed data has been inserted");
+        }
+
+        // Create session for the requested role
+        const targetUser =
+          role === "teacher" ? teacher :
+          role === "parent"  ? parent  :
+          studentUser;
+
+        const newSessionId = crypto.randomUUID();
+        sessions.set(newSessionId, targetUser.id);
+
+        const profile = role === "student" ? await storage.getStudentByUserId(targetUser.id) : null;
+
+        return res.json({
+          sessionId: newSessionId,
+          user: {
+            id: targetUser.id,
+            email: targetUser.email,
+            name: targetUser.name,
+            role: targetUser.role,
+            isEmailVerified: targetUser.isEmailVerified,
+            profilePicture: targetUser.profilePicture,
+            bio: targetUser.bio,
+            teachingSubjects: targetUser.teachingSubjects,
+            yearsExperience: targetUser.yearsExperience,
+            qualifications: targetUser.qualifications,
+            specialization: targetUser.specialization,
+            phone: targetUser.phone,
+            preferredContact: targetUser.preferredContact,
+            interests: targetUser.interests,
+            favoriteSubject: targetUser.favoriteSubject,
+            learningGoals: targetUser.learningGoals,
+          },
+          student: profile ?? null,
+        });
+      } catch (error: any) {
+        console.error("Dev become error:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+  }
 }
