@@ -2,15 +2,18 @@ import { Logo } from "@/components/Logo";
 import { Link } from "wouter";
 import { BookOpen, Users, TrendingUp, CheckCircle, Quote } from "lucide-react";
 
-// ─── Image constants — swap any path here to use your own real photo ─────────
-import HERO_IMAGE from "../assets/hero-teacher-student.jpg";
-import TESTIMONIAL_TEACHER_AVATAR from "../assets/avatar-teacher.jpg";
-import TESTIMONIAL_PARENT_AVATAR from "../assets/avatar-parent.jpg";
-import TESTIMONIAL_STUDENT_AVATAR from "../assets/avatar-student.jpg";
-export const ROLE_CARD_TEACHER_AVATAR = TESTIMONIAL_TEACHER_AVATAR;
-export const ROLE_CARD_PARENT_AVATAR = TESTIMONIAL_PARENT_AVATAR;
-export const ROLE_CARD_STUDENT_AVATAR = TESTIMONIAL_STUDENT_AVATAR;
-// ─────────────────────────────────────────────────────────────────────────────
+// Image constants — replace any path below to use your own real photo
+import _heroImg from "../assets/hero-teacher-student.jpg";
+import _teacherImg from "../assets/avatar-teacher.jpg";
+import _parentImg from "../assets/avatar-parent.jpg";
+import _studentImg from "../assets/avatar-student.jpg";
+export const HERO_IMAGE = _heroImg;
+export const TESTIMONIAL_TEACHER_AVATAR = _teacherImg;
+export const TESTIMONIAL_PARENT_AVATAR = _parentImg;
+export const TESTIMONIAL_STUDENT_AVATAR = _studentImg;
+export const ROLE_CARD_TEACHER_AVATAR = _teacherImg;
+export const ROLE_CARD_PARENT_AVATAR = _parentImg;
+export const ROLE_CARD_STUDENT_AVATAR = _studentImg;
 
 const features = [
   {
@@ -131,13 +134,8 @@ export default function Landing() {
       <main className="flex-1">
         {/* ── Hero ── */}
         <section className="max-w-6xl mx-auto px-6 pt-10 pb-14">
-          {/*
-            DOM order: image first, then text.
-            On mobile (single column) this renders image above fold, text below.
-            On desktop md:order-* swaps them back to image-right, text-left.
-          */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            {/* Image — first in DOM (shows above on mobile), pushed right on desktop */}
+            {/* Hero image */}
             <div className="relative flex justify-center md:order-2">
               <div className="relative w-full max-w-lg">
                 <div className="absolute inset-0 bg-primary/8 rounded-3xl translate-x-3 translate-y-3" />
@@ -158,7 +156,7 @@ export default function Landing() {
               </div>
             </div>
 
-            {/* Copy + CTAs — second in DOM, pulled left on desktop */}
+            {/* Copy + CTAs */}
             <div className="md:order-1 pt-6 md:pt-0">
               <div className="inline-flex items-center gap-2 bg-accent text-primary text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
                 <CheckCircle className="w-3.5 h-3.5" />
