@@ -12,30 +12,30 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 14%;
 
-    /* Primary: KA-inspired blue */
-    --primary: 220 96% 48%;           /* #1563E0 */
+    /* Primary: calm educational green */
+    --primary: 158 64% 36%;           /* #1E8C64 – calm forest teal-green */
     --primary-foreground: 0 0% 100%;
 
     /* Secondary: soft gray */
-    --secondary: 220 14% 94%;
-    --secondary-foreground: 220 20% 25%;
+    --secondary: 160 10% 93%;
+    --secondary-foreground: 160 15% 25%;
 
     /* Muted */
-    --muted: 220 14% 94%;
-    --muted-foreground: 220 10% 50%;
+    --muted: 160 10% 93%;
+    --muted-foreground: 160 8% 48%;
 
-    /* Accent: light blue */
-    --accent: 220 96% 95%;
-    --accent-foreground: 220 96% 40%;
+    /* Accent: light green */
+    --accent: 158 64% 93%;
+    --accent-foreground: 158 64% 28%;
 
     /* Destructive */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
     /* Border and input */
-    --border: 220 13% 88%;
-    --input: 220 13% 88%;
-    --ring: 220 96% 48%;
+    --border: 160 10% 87%;
+    --input: 160 10% 87%;
+    --ring: 158 64% 36%;
 
     /* Radius: moderate, professional */
     --radius: 0.5rem;
@@ -48,8 +48,8 @@
     --success-light: 142 60% 94%;
     --warning: 38 92% 50%;            /* Amber for pending */
     --warning-light: 38 100% 94%;
-    --info: 220 96% 48%;
-    --info-light: 220 96% 95%;
+    --info: 217 91% 60%;              /* Blue for informational */
+    --info-light: 217 91% 95%;
   }
 }
 

@@ -41,6 +41,7 @@ import {
   MessageSquare,
   Send,
   ClipboardCheck,
+  CheckCircle,
   Video,
   Star,
   LibraryBig,
@@ -277,36 +278,56 @@ export default function StudentDashboard() {
             }}
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6">
             <ColorfulStatCard
-              title="Assignments"
-              value={assignments.length}
+              title="Pending"
+              value={pendingAssignments.length}
               icon={BookOpen}
-              accent="blue"
-              subtitle={`${pendingAssignments.length} pending`}
+              accent="amber"
+              subtitle="Need to submit"
             />
             <ColorfulStatCard
-              title="Materials"
-              value={materials.length}
-              icon={LibraryBig}
-              accent="amber"
-              subtitle="Study resources"
+              title="Submitted"
+              value={submittedAssignments.length}
+              icon={ClipboardCheck}
+              accent="blue"
+              subtitle="Awaiting grades"
+            />
+            <ColorfulStatCard
+              title="Graded"
+              value={gradedAssignments.length}
+              icon={CheckCircle}
+              accent="green"
+              subtitle="Completed"
             />
             <ColorfulStatCard
               title="Sessions"
               value={sessions.length || 0}
               icon={Presentation}
-              accent="green"
+              accent="purple"
               subtitle="Total classes"
             />
-            {/* <ColorfulStatCard
-              title="Feedback"
-              value={feedback.length}
-              icon={MessageSquareQuote}
-              className="bg-pink-500"
-              subtitle="Your Progress"
-            /> */}
           </div>
+
+          {pendingAssignments.length > 0 && (
+            <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <BookOpen className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  You have {pendingAssignments.length} pending assignment{pendingAssignments.length !== 1 ? "s" : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">Stay on top of your work — check your assignments below</p>
+              </div>
+              <button
+                onClick={() => { setActiveTab("assignments"); window.location.hash = "assignments"; }}
+                className="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                View
+              </button>
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             {/* <TabsList className="mb-4">

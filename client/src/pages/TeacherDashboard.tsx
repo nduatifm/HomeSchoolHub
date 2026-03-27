@@ -821,10 +821,10 @@ export default function TeacherDashboard() {
           <WelcomeCard
             name={user?.name || "Teacher"}
             message="Ready to inspire and educate! Let's help your students reach their full potential."
-            buttonText="Today's Schedule"
+            buttonText="View Assignments"
             onButtonClick={() => {
-              setActiveTab("schedule");
-              window.location.hash = "schedule";
+              setActiveTab("assignments");
+              window.location.hash = "assignments";
             }}
           />
 
@@ -841,7 +841,7 @@ export default function TeacherDashboard() {
               value={assignments.length}
               icon={BookOpen}
               accent="blue"
-              subtitle="Total created"
+              subtitle={`${(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length} need grading`}
             />
             <ColorfulStatCard
               title="Sessions"
@@ -858,6 +858,26 @@ export default function TeacherDashboard() {
               subtitle="Study resources"
             />
           </div>
+
+          {(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length > 0 && (
+            <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <ClipboardCheck className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  {(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length} submission{(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length !== 1 ? "s" : ""} waiting to be graded
+                </p>
+                <p className="text-xs text-muted-foreground">Review student work in Grade Submissions</p>
+              </div>
+              <button
+                onClick={() => { setActiveTab("submissions"); window.location.hash = "submissions"; }}
+                className="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Grade Now
+              </button>
+            </div>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             {/* <TabsList className="mb-4">

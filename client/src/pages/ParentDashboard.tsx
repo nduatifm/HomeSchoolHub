@@ -314,6 +314,35 @@ export default function ParentDashboard() {
             }}
           />
 
+          {(students as any[]).length > 0 && (
+            <div className="my-6">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {(students as any[]).map((child: any) => (
+                  <button
+                    key={child.id}
+                    onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
+                    className="text-left p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-semibold text-primary">
+                          {child.name?.charAt(0).toUpperCase() || "?"}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">{child.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 my-6">
             <ColorfulStatCard
               title="Children"

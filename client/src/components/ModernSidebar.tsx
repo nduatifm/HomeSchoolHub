@@ -4,20 +4,13 @@ import {
   Settings,
   User,
   BookOpen,
-  FileText,
   UserPlus,
   Presentation,
   LibraryBig,
   ClipboardCheck,
   LogOut,
-  ChevronRight,
   Menu,
   X,
-  LayoutDashboard,
-  Calendar,
-  MessageSquare,
-  CheckSquare,
-  BarChart2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -78,19 +71,11 @@ export default function ModernSidebar() {
     { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
     { icon: <User className="w-5 h-5" />, label: "Students", hash: "students" },
     { icon: <Presentation className="w-5 h-5" />, label: "Sessions", hash: "sessions" },
-    { icon: <Calendar className="w-5 h-5" />, label: "Schedule", hash: "schedule" },
-    { icon: <CheckSquare className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
-    { icon: <MessageSquare className="w-5 h-5" />, label: "Messages", hash: "messages" },
-    { icon: <BarChart2 className="w-5 h-5" />, label: "Reports", hash: "reports" },
   ];
 
   const parentItems: SidebarItem[] = [
     { icon: <User className="w-5 h-5" />, label: "My Children", hash: "children" },
     { icon: <UserPlus className="w-5 h-5" />, label: "Invite Student", hash: "invites" },
-    { icon: <BarChart2 className="w-5 h-5" />, label: "Track Progress", hash: "progress" },
-    { icon: <FileText className="w-5 h-5" />, label: "Payments", hash: "payments" },
-    { icon: <CheckSquare className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
-    { icon: <MessageSquare className="w-5 h-5" />, label: "Messages", hash: "messages" },
   ];
 
   const studentItems: SidebarItem[] = [
@@ -98,10 +83,6 @@ export default function ModernSidebar() {
     { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
     { icon: <User className="w-5 h-5" />, label: "Teachers", hash: "teachers" },
     { icon: <Presentation className="w-5 h-5" />, label: "Sessions", hash: "sessions" },
-    { icon: <Calendar className="w-5 h-5" />, label: "Schedule", hash: "schedule" },
-    { icon: <CheckSquare className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
-    { icon: <MessageSquare className="w-5 h-5" />, label: "Messages", hash: "messages" },
-    { icon: <BarChart2 className="w-5 h-5" />, label: "Rewards", hash: "rewards" },
   ];
 
   const getItems = () => {
