@@ -55,6 +55,9 @@ import {
   Star,
   ClipboardCheck,
   Unlink2,
+  Trash2,
+  GraduationCap,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -124,17 +127,20 @@ export default function ParentDashboard() {
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students/parent"],
   });
-  const { data: invites = [] } = useQuery({
+  const { data: invites = [] } = useQuery<any[]>({
     queryKey: ["/api/invites/student/parent"],
   });
-  const { data: tutorRequests = [] } = useQuery({
+  const { data: tutorRequests = [] } = useQuery<any[]>({
     queryKey: ["/api/tutor-requests/parent"],
-    enabled: isTutorRequestModeEnabled, // Only fetch when tutor request mode is ON
+    enabled: isTutorRequestModeEnabled,
   });
   const paymentsQuery = useQuery({ queryKey: ["/api/payments/parent"] });
   const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
-  const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
-  const { data: teachers = [] } = useQuery({ queryKey: ["/api/users"] });
+  const { data: users = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
+  const { data: teachers = [] } = useQuery<any[]>({ queryKey: ["/api/teachers"] });
+  const { data: progressReports = [] } = useQuery<any[]>({
+    queryKey: ["/api/progress-reports/parent"],
+  });
   const ratingsQuery = useQuery({ queryKey: ["/api/tutor-ratings/parent"] });
 
   const [selectedStudentForAttendance, setSelectedStudentForAttendance] =
@@ -151,6 +157,13 @@ export default function ParentDashboard() {
   const childAssignmentQueries = useQueries({
     queries: students.map((child) => ({
       queryKey: ["/api/assignments/student", child.id],
+      enabled: students.length > 0,
+    })),
+  });
+
+  const childTeacherQueries = useQueries({
+    queries: students.map((child) => ({
+      queryKey: ["/api/teachers/student", child.id],
       enabled: students.length > 0,
     })),
   });
@@ -190,7 +203,7 @@ export default function ParentDashboard() {
       });
       toast({
         title: "Invite sent!",
-        description: `Invite code: ${data.token}`,
+        description: "Your child will receive an email with a direct signup link.",
         type: "success",
       });
       setInviteForm({ email: "", studentName: "", gradeLevel: "" });
@@ -198,9 +211,18 @@ export default function ParentDashboard() {
     },
   });
 
+  const revokeInviteMutation = useMutation({
+    mutationFn: (token: string) =>
+      apiRequest(`/api/invites/student/${token}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invites/student/parent"] });
+      toast({ title: "Invite revoked", type: "success" });
+    },
+  });
+
   // Request tutor form
   const [tutorRequestForm, setTutorRequestForm] = useState({
-    teacherId: 1,
+    teacherId: 0,
     message: "",
     studentId: null as number | null,
   });
@@ -216,7 +238,7 @@ export default function ParentDashboard() {
         queryKey: ["/api/tutor-requests/parent"],
       });
       toast({ title: "Tutor request sent!", type: "success" });
-      setTutorRequestForm({ teacherId: 1, message: "", studentId: null });
+      setTutorRequestForm({ teacherId: 0, message: "", studentId: null });
       setRequestTutorOpen(false);
     },
   });
@@ -346,43 +368,77 @@ export default function ParentDashboard() {
             <div className="my-6">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {childStats.map((child) => (
-                  <button
-                    key={child.id}
-                    onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
-                    className="text-left p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-sm font-semibold text-primary">
-                          {child.name?.charAt(0).toUpperCase() || "?"}
-                        </span>
+                {childStats.map((child, index) => {
+                  const assignedTeacher = childTeacherQueries[index]?.data as any;
+                  return (
+                    <div
+                      key={child.id}
+                      className="p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-sm font-semibold text-primary">
+                            {child.name?.charAt(0).toUpperCase() || "?"}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground text-sm truncate">{child.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
+                          className="text-muted-foreground hover:text-primary shrink-0"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground text-sm truncate">{child.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
-                        </p>
+
+                      {/* Assigned teacher */}
+                      <div className="flex items-center justify-between mb-3 py-2 border-y border-border/50">
+                        <div className="flex items-center gap-1.5">
+                          <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {assignedTeacher
+                              ? <span className="text-foreground font-medium">{assignedTeacher.name}</span>
+                              : <span className="italic">No teacher assigned yet</span>
+                            }
+                          </span>
+                        </div>
+                        {assignedTeacher && (
+                          <button
+                            onClick={() => {
+                              setMessageForm({ receiverId: assignedTeacher.id, content: "" });
+                              setSendMessageOpen(true);
+                            }}
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            Message
+                          </button>
+                        )}
                       </div>
+
+                      {child.pct !== null ? (
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
+                            <span className="font-medium text-foreground">{child.pct}%</span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${child.pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No assignments yet</p>
+                      )}
                     </div>
-                    {child.pct !== null ? (
-                      <div>
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
-                          <span className="font-medium text-foreground">{child.pct}%</span>
-                        </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${child.pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No assignments yet</p>
-                    )}
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -535,7 +591,7 @@ export default function ParentDashboard() {
                           <TableHead>Student Name</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Invite Code</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -547,13 +603,24 @@ export default function ParentDashboard() {
                             <TableCell>{i.studentName}</TableCell>
                             <TableCell>{i.email}</TableCell>
                             <TableCell>
-                              <Badge>{i.status}</Badge>
+                              <Badge variant={i.status === "accepted" ? "default" : i.status === "pending" ? "outline" : "secondary"}>
+                                {i.status}
+                              </Badge>
                             </TableCell>
-                            <TableCell
-                              className="font-mono text-xs"
-                              data-testid={`text-invite-token-${i.id}`}
-                            >
-                              {i.token}
+                            <TableCell>
+                              {i.status === "pending" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive h-7 px-2"
+                                  onClick={() => revokeInviteMutation.mutate(i.token)}
+                                  disabled={revokeInviteMutation.isPending}
+                                  data-testid={`button-revoke-invite-${i.id}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                  Revoke
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1110,25 +1177,73 @@ export default function ParentDashboard() {
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Request Tutor</DialogTitle>
+                          <DialogTitle>Request a Tutor</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
-                          <Textarea
-                            placeholder="Message to tutor..."
-                            value={tutorRequestForm.message}
-                            onChange={(e) =>
-                              setTutorRequestForm({
-                                ...tutorRequestForm,
-                                message: e.target.value,
-                              })
-                            }
-                            data-testid="input-tutor-request-message"
-                          />
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium">Which child needs a tutor?</label>
+                            <Select
+                              value={tutorRequestForm.studentId?.toString() || ""}
+                              onValueChange={(val) =>
+                                setTutorRequestForm({ ...tutorRequestForm, studentId: parseInt(val) })
+                              }
+                            >
+                              <SelectTrigger data-testid="select-student-tutor-request">
+                                <SelectValue placeholder="Select a child" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {students.map((s: any) => (
+                                  <SelectItem key={s.id} value={s.id.toString()}>
+                                    {s.name} {s.gradeLevel ? `(Grade ${s.gradeLevel})` : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium">Which teacher would you like?</label>
+                            <Select
+                              value={tutorRequestForm.teacherId?.toString() || ""}
+                              onValueChange={(val) =>
+                                setTutorRequestForm({ ...tutorRequestForm, teacherId: parseInt(val) })
+                              }
+                            >
+                              <SelectTrigger data-testid="select-teacher-tutor-request">
+                                <SelectValue placeholder="Select a teacher" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teachers.map((t: any) => (
+                                  <SelectItem key={t.id} value={t.id.toString()}>
+                                    {t.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium">Message (optional)</label>
+                            <Textarea
+                              placeholder="Any details about your child's needs, schedule, or subject..."
+                              value={tutorRequestForm.message}
+                              onChange={(e) =>
+                                setTutorRequestForm({
+                                  ...tutorRequestForm,
+                                  message: e.target.value,
+                                })
+                              }
+                              rows={3}
+                              data-testid="input-tutor-request-message"
+                            />
+                          </div>
                           <Button
                             onClick={() =>
                               requestTutorMutation.mutate(tutorRequestForm)
                             }
-                            disabled={requestTutorMutation.isPending}
+                            disabled={
+                              requestTutorMutation.isPending ||
+                              !tutorRequestForm.studentId ||
+                              !tutorRequestForm.teacherId
+                            }
                             className="w-full"
                             data-testid="button-submit-tutor-request"
                           >
@@ -1180,7 +1295,71 @@ export default function ParentDashboard() {
               </TabsContent>
             )}
 
-            {/* <TabsContent value="reports">
+            <TabsContent value="reports">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Progress Reports</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {progressReports.length === 0 ? (
+                    <div className="text-center py-12">
+                      <FileText className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+                      <p className="text-sm text-muted-foreground">No progress reports yet. Reports written by teachers will appear here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {progressReports.map((report: any) => (
+                        <div
+                          key={report.id}
+                          className="p-4 border rounded-lg hover:border-primary/30 transition-colors"
+                          data-testid={`card-report-${report.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-sm">{report.studentName || "Student"}</span>
+                                {report.overallGrade && (
+                                  <Badge variant="secondary">{report.overallGrade}</Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                By {report.teacherName || "Teacher"} · {new Date(report.reportDate).toLocaleDateString()}
+                              </p>
+                              {report.comments && (
+                                <p className="text-sm text-foreground line-clamp-2">{report.comments}</p>
+                              )}
+                              {report.strengths && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  <span className="font-medium text-green-700 dark:text-green-400">Strengths:</span> {report.strengths}
+                                </p>
+                              )}
+                              {report.improvements && (
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  <span className="font-medium text-amber-700 dark:text-amber-400">To improve:</span> {report.improvements}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => downloadReport(report)}
+                              data-testid={`button-download-${report.id}`}
+                              className="shrink-0"
+                            >
+                              <Download className="h-3.5 w-3.5 mr-1.5" />
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* old detailed reports (kept for reference) — replaced by live version above
+            <TabsContent value="reports-old">
               <Card>
                 <CardHeader>
                   <CardTitle>Student Progress Reports</CardTitle>
@@ -1491,6 +1670,48 @@ export default function ParentDashboard() {
           </Tabs>
         </main>
       </div>
+
+      {/* Standalone message dialog — can be triggered from child cards */}
+      <Dialog open={sendMessageOpen} onOpenChange={(open) => {
+        setSendMessageOpen(open);
+        if (!open) setMessageForm({ receiverId: 0, content: "" });
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Message</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">To</label>
+              <ModernCombobox
+                users={users}
+                selectedUserId={messageForm.receiverId}
+                onSelect={(userId) => setMessageForm({ ...messageForm, receiverId: userId })}
+                placeholder="Search users..."
+                testId="select-receiver"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Message</label>
+              <Textarea
+                placeholder="Type your message..."
+                value={messageForm.content}
+                onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
+                rows={4}
+                data-testid="input-message-content"
+              />
+            </div>
+            <Button
+              onClick={() => sendMessageMutation.mutate(messageForm)}
+              disabled={sendMessageMutation.isPending || !messageForm.receiverId || !messageForm.content}
+              className="w-full"
+              data-testid="button-send-message"
+            >
+              {sendMessageMutation.isPending ? "Sending..." : "Send"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

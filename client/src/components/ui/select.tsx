@@ -59,11 +59,15 @@ export function SelectTrigger({
   );
 }
 
-export function SelectValue() {
+export function SelectValue({ placeholder }: { placeholder?: string }) {
   const context = useContext(SelectContext);
   if (!context) throw new Error("SelectValue must be used within Select");
   
-  return <span>{context.value || "Select..."}</span>;
+  return (
+    <span className={context.value ? undefined : "text-muted-foreground"}>
+      {context.value || placeholder || "Select..."}
+    </span>
+  );
 }
 
 export function SelectContent({ children }: { children: React.ReactNode }) {

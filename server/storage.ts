@@ -155,6 +155,7 @@ export interface IStorage {
   createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
   getProgressReportsByStudent(studentId: number): Promise<ProgressReport[]>;
   getProgressReportsByTeacher(teacherId: number): Promise<ProgressReport[]>;
+  getProgressReportsByParent(parentId: number): Promise<(ProgressReport & { studentName?: string; teacherName?: string })[]>;
 
   createClarification(
     clarification: InsertClarification,
@@ -193,6 +194,7 @@ export interface IStorage {
     id: number,
     invite: Prisma.StudentInviteUpdateInput,
   ): Promise<StudentInvite>;
+  deleteStudentInvite(token: string): Promise<void>;
 
   getAllUsers(): Promise<User[]>;
 
@@ -290,24 +292,43 @@ class PrismaStorage implements IStorage {
 
   async getStudentsByTeacher(
     teacherId: number,
-  ): Promise<(Student & { email?: string })[]> {
+  ): Promise<(Student & { email?: string; parentName?: string; parentId?: number })[]> {
     const requests = await prisma.tutorRequest.findMany({
       where: { teacherId, status: "approved" },
       include: {
         parent: { include: { parentStudents: { include: { user: true } } } },
       },
     });
-    const students: (Student & { email?: string })[] = [];
+    const studentMap = new Map<number, Student & { email?: string; parentName?: string; parentId?: number }>();
     requests.forEach((r) => {
-      r.parent.parentStudents.forEach((s: any) => {
-        students.push({
-          ...s,
-          email: s.user?.email,
-          user: undefined,
-        } as Student & { email?: string });
-      });
+      if (r.studentId) {
+        // Specific student was requested — only include that student
+        const s = r.parent.parentStudents.find((ps: any) => ps.id === r.studentId);
+        if (s && !studentMap.has(s.id)) {
+          studentMap.set(s.id, {
+            ...s,
+            email: s.user?.email,
+            parentName: (r.parent as any).name,
+            parentId: r.parentId,
+            user: undefined,
+          } as Student & { email?: string; parentName?: string; parentId?: number });
+        }
+      } else {
+        // Legacy requests without studentId — include all of parent's students
+        r.parent.parentStudents.forEach((s: any) => {
+          if (!studentMap.has(s.id)) {
+            studentMap.set(s.id, {
+              ...s,
+              email: s.user?.email,
+              parentName: (r.parent as any).name,
+              parentId: r.parentId,
+              user: undefined,
+            } as Student & { email?: string; parentName?: string; parentId?: number });
+          }
+        });
+      }
     });
-    return students;
+    return Array.from(studentMap.values());
   }
 
   async updateStudent(
@@ -693,6 +714,29 @@ class PrismaStorage implements IStorage {
     })) as ProgressReport[];
   }
 
+  async getProgressReportsByParent(
+    parentId: number,
+  ): Promise<(ProgressReport & { studentName?: string; teacherName?: string })[]> {
+    const students = await prisma.student.findMany({ where: { parentId } });
+    const studentIds = students.map((s: any) => s.id);
+    if (studentIds.length === 0) return [];
+    const reports = await prisma.progressReport.findMany({
+      where: { studentId: { in: studentIds } },
+      include: {
+        student: true,
+        teacher: true,
+      },
+      orderBy: { date: "desc" },
+    });
+    return reports.map((r: any) => ({
+      ...r,
+      studentName: r.student?.name,
+      teacherName: r.teacher?.name,
+      student: undefined,
+      teacher: undefined,
+    })) as (ProgressReport & { studentName?: string; teacherName?: string })[];
+  }
+
   async createClarification(
     clarification: InsertClarification,
   ): Promise<Clarification> {
@@ -809,6 +853,10 @@ class PrismaStorage implements IStorage {
     })) as StudentInvite;
   }
 
+  async deleteStudentInvite(token: string): Promise<void> {
+    await prisma.studentInvite.delete({ where: { token } });
+  }
+
   async getAllUsers(): Promise<User[]> {
     return (await prisma.user.findMany({
       select: {
@@ -879,15 +927,17 @@ class PrismaStorage implements IStorage {
     })) as (Student & { email?: string })[];
   }
 
-  async getAllStudentsForTeachers(): Promise<(Student & { email?: string })[]> {
+  async getAllStudentsForTeachers(): Promise<(Student & { email?: string; parentName?: string; parentId?: number })[]> {
     const students = await prisma.student.findMany({
-      include: { user: true },
+      include: { user: true, parent: true },
     });
     return students.map((s: any) => ({
       ...s,
       email: s.user?.email,
+      parentName: s.parent?.name,
       user: undefined,
-    })) as (Student & { email?: string })[];
+      parent: undefined,
+    })) as (Student & { email?: string; parentName?: string; parentId?: number })[];
   }
 
   async assignStudentToFirstAvailableTeacher(

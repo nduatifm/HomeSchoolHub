@@ -153,23 +153,23 @@ export default function TeacherDashboard() {
   const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
 
   // Fetch data
-  const { data: students = [] } = useQuery({
+  const { data: students = [] } = useQuery<any[]>({
     queryKey: ["/api/students/teacher"],
   });
-  const { data: assignments = [] } = useQuery({
+  const { data: assignments = [] } = useQuery<any[]>({
     queryKey: ["/api/assignments/teacher"],
   });
-  const { data: materials = [] } = useQuery({
+  const { data: materials = [] } = useQuery<any[]>({
     queryKey: ["/api/materials/teacher"],
   });
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions/teacher"],
   });
-  const { data: tutorRequests = [] } = useQuery({
+  const { data: tutorRequests = [] } = useQuery<any[]>({
     queryKey: ["/api/tutor-requests/teacher"],
     enabled: isTutorRequestModeEnabled, // Only fetch when tutor request mode is ON
   });
-  const { data: earnings = [] } = useQuery({
+  const { data: earnings = [] } = useQuery<any[]>({
     queryKey: ["/api/earnings/teacher"],
   });
   const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
@@ -1956,7 +1956,9 @@ export default function TeacherDashboard() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Grade Level</TableHead>
+                        <TableHead>Grade</TableHead>
+                        <TableHead>Parent</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1969,7 +1971,31 @@ export default function TeacherDashboard() {
                             {s.name}
                           </TableCell>
                           <TableCell>{s.email}</TableCell>
-                          <TableCell>{s.gradeLevel}</TableCell>
+                          <TableCell>{s.gradeLevel || "-"}</TableCell>
+                          <TableCell>
+                            {s.parentName ? (
+                              <span className="text-sm text-muted-foreground">{s.parentName}</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50 italic">Unknown</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {s.parentId && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-muted-foreground hover:text-primary"
+                                onClick={() => {
+                                  setMessageForm({ receiverId: s.parentId, content: "" });
+                                  setSendMessageOpen(true);
+                                }}
+                                data-testid={`button-message-parent-${s.id}`}
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                                Message parent
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

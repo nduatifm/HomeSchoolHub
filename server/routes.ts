@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
+import prisma from "./db";
 import { z } from "zod";
 import {
   insertUserSchema,
@@ -821,6 +822,26 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.delete("/api/invites/student/:token", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (user?.role !== "parent") {
+        return res.status(403).json({ error: "Only parents can revoke invites" });
+      }
+      const invite = await storage.getStudentInviteByToken(req.params.token);
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found" });
+      }
+      if (invite.parentId !== user.id) {
+        return res.status(403).json({ error: "Not your invite" });
+      }
+      await storage.deleteStudentInvite(req.params.token);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ========== STUDENT ROUTES ==========
 
   app.get("/api/students/parent", requireAuth, async (req, res) => {
@@ -1520,9 +1541,39 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Student not found" });
       }
 
-      // When tutor request mode is OFF, show ALL materials
-      const teachers = await storage.getAllTeachers();
-      res.json(teachers);
+      const isTutorMode = await isTutorRequestModeEnabled();
+
+      if (!isTutorMode) {
+        // Direct assignment mode: look up from TeacherStudentAssignment
+        const assignments = await storage.getAssignedTeachersForStudent(studentId);
+        if (assignments.length === 0) {
+          return res.json(null);
+        }
+        const teacher = await storage.getUserById(assignments[0].teacherId);
+        return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
+      } else {
+        // Tutor request mode: find approved request for this student
+        const allRequests = await prisma.tutorRequest.findMany({
+          where: { studentId, status: "approved" },
+          orderBy: { requestDate: "desc" },
+          take: 1,
+        });
+        if (allRequests.length === 0) {
+          // Fallback: check if there's an approved request for the parent without studentId
+          const parentRequests = student.parentId
+            ? await prisma.tutorRequest.findMany({
+                where: { parentId: student.parentId, status: "approved" },
+                orderBy: { requestDate: "desc" },
+                take: 1,
+              })
+            : [];
+          if (parentRequests.length === 0) return res.json(null);
+          const teacher = await storage.getUserById(parentRequests[0].teacherId);
+          return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
+        }
+        const teacher = await storage.getUserById(allRequests[0].teacherId);
+        return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -2167,6 +2218,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/progress-reports/parent", requireAuth, async (req, res) => {
+    try {
+      const reports = await storage.getProgressReportsByParent(
+        req.session.userId!,
+      );
+      res.json(reports);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ========== CLARIFICATION ROUTES ==========
 
   app.post("/api/clarifications", requireAuth, async (req, res) => {
@@ -2342,9 +2404,8 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/teachers", requireAuth, async (req, res) => {
     try {
-      // This would normally query all teachers, for now return empty
-      // In a real app, you'd have a proper users table query
-      res.json([]);
+      const teachers = await storage.getAllTeachers();
+      res.json(teachers);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

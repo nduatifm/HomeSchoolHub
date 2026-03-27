@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +18,26 @@ export default function StudentSignup() {
   const [isCheckingToken, setIsCheckingToken] = useState(false);
   const { signupStudent } = useAuth();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const urlToken = params.get("token");
+    if (urlToken) {
+      setToken(urlToken);
+      setIsCheckingToken(true);
+      apiRequest(`/api/invites/student/${urlToken}`)
+        .then((data: any) => {
+          setInviteInfo(data);
+          toast({ title: "Invite verified!", description: `Welcome ${data.studentName}`, type: "success" });
+        })
+        .catch(() => {
+          toast({ title: "Invalid or expired invite link", description: "Please ask your parent to resend the invite.", type: "error" });
+        })
+        .finally(() => setIsCheckingToken(false));
+    }
+  }, [search]);
 
   async function checkToken() {
     if (!token) return;
@@ -64,7 +83,7 @@ export default function StudentSignup() {
           </div>
           <h2 className="text-white text-2xl font-bold mb-3">Student sign-up</h2>
           <p className="text-white/75 text-sm leading-relaxed">
-            Your parent or guardian will have sent you an invite code. Enter it here to create your account and start learning.
+            Your parent or guardian will have sent you an invite link. Click it to open this page with your invite pre-filled, then set your password.
           </p>
         </div>
         <p className="text-white/50 text-xs">© {new Date().getFullYear()} Lyra Preparatory</p>
@@ -122,9 +141,10 @@ export default function StudentSignup() {
                   <Input
                     id="password" type="password" value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min. 6 characters" required minLength={6}
+                    placeholder="Min. 8 characters" required minLength={8}
                     data-testid="input-password"
                   />
+                  <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -132,7 +152,7 @@ export default function StudentSignup() {
                   <Input
                     id="confirmPassword" type="password" value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••" required minLength={6}
+                    placeholder="••••••••" required minLength={8}
                     data-testid="input-confirm-password"
                   />
                 </div>
