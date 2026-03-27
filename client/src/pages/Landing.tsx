@@ -2,12 +2,14 @@ import { Logo } from "@/components/Logo";
 import { Link } from "wouter";
 import { BookOpen, Users, TrendingUp, CheckCircle, Quote } from "lucide-react";
 
-// ─── Image constants ─────────────────────────────────────────────────────────
-// Swap any of these paths to use your own real photos.
-import heroImageSrc from "@assets/stock_images/hero-teacher-student.jpg";
-import teacherAvatarSrc from "@assets/stock_images/avatar-teacher.jpg";
-import parentAvatarSrc from "@assets/stock_images/avatar-parent.jpg";
-import studentAvatarSrc from "@assets/stock_images/avatar-student.jpg";
+// ─── Image constants — swap any path here to use your own real photo ─────────
+import HERO_IMAGE from "../assets/hero-teacher-student.jpg";
+import TESTIMONIAL_TEACHER_AVATAR from "../assets/avatar-teacher.jpg";
+import TESTIMONIAL_PARENT_AVATAR from "../assets/avatar-parent.jpg";
+import TESTIMONIAL_STUDENT_AVATAR from "../assets/avatar-student.jpg";
+export const ROLE_CARD_TEACHER_AVATAR = TESTIMONIAL_TEACHER_AVATAR;
+export const ROLE_CARD_PARENT_AVATAR = TESTIMONIAL_PARENT_AVATAR;
+export const ROLE_CARD_STUDENT_AVATAR = TESTIMONIAL_STUDENT_AVATAR;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const features = [
@@ -35,7 +37,7 @@ const features = [
 
 const testimonials = [
   {
-    avatar: teacherAvatarSrc,
+    avatar: TESTIMONIAL_TEACHER_AVATAR,
     quote:
       "Lyra Preparatory has completely changed how I manage my classes. Grading and attendance used to take hours — now it's minutes.",
     name: "Sarah O.",
@@ -44,7 +46,7 @@ const testimonials = [
     roleColor: "text-blue-600",
   },
   {
-    avatar: parentAvatarSrc,
+    avatar: TESTIMONIAL_PARENT_AVATAR,
     quote:
       "As a parent I can finally see exactly what my son is working on and how he's progressing. It's given us so much more to talk about.",
     name: "Marcus T.",
@@ -53,7 +55,7 @@ const testimonials = [
     roleColor: "text-green-600",
   },
   {
-    avatar: studentAvatarSrc,
+    avatar: TESTIMONIAL_STUDENT_AVATAR,
     quote:
       "I love seeing my streak and earning badges — it actually makes me want to complete my work on time!",
     name: "Amara J.",
@@ -66,6 +68,7 @@ const testimonials = [
 const roleCards = [
   {
     role: "Teachers",
+    avatar: ROLE_CARD_TEACHER_AVATAR,
     color: "bg-blue-50 border-blue-200",
     dot: "bg-blue-500",
     items: [
@@ -77,6 +80,7 @@ const roleCards = [
   },
   {
     role: "Parents",
+    avatar: ROLE_CARD_PARENT_AVATAR,
     color: "bg-green-50 border-green-200",
     dot: "bg-green-500",
     items: [
@@ -88,6 +92,7 @@ const roleCards = [
   },
   {
     role: "Students",
+    avatar: ROLE_CARD_STUDENT_AVATAR,
     color: "bg-purple-50 border-purple-200",
     dot: "bg-purple-500",
     items: [
@@ -125,10 +130,36 @@ export default function Landing() {
 
       <main className="flex-1">
         {/* ── Hero ── */}
-        <section className="max-w-6xl mx-auto px-6 pt-16 pb-14">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            {/* Left: copy + CTAs */}
-            <div>
+        <section className="max-w-6xl mx-auto px-6 pt-10 pb-14">
+          {/*
+            DOM order: image first, then text.
+            On mobile (single column) this renders image above fold, text below.
+            On desktop md:order-* swaps them back to image-right, text-left.
+          */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            {/* Image — first in DOM (shows above on mobile), pushed right on desktop */}
+            <div className="relative flex justify-center md:order-2">
+              <div className="relative w-full max-w-lg">
+                <div className="absolute inset-0 bg-primary/8 rounded-3xl translate-x-3 translate-y-3" />
+                <img
+                  src={HERO_IMAGE}
+                  alt="Teacher helping a student learn at a desk"
+                  className="relative w-full h-[340px] sm:h-[380px] object-cover rounded-2xl shadow-lg border border-border"
+                />
+                <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-md border border-border px-4 py-2.5 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Progress tracked</p>
+                    <p className="text-xs text-muted-foreground">Every assignment, every day</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Copy + CTAs — second in DOM, pulled left on desktop */}
+            <div className="md:order-1 pt-6 md:pt-0">
               <div className="inline-flex items-center gap-2 bg-accent text-primary text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
                 <CheckCircle className="w-3.5 h-3.5" />
                 Built for home educators and tutors
@@ -167,29 +198,6 @@ export default function Landing() {
                 </Link>
               </p>
             </div>
-
-            {/* Right: hero image */}
-            <div className="relative flex justify-center md:justify-end">
-              <div className="relative w-full max-w-lg">
-                {/* Decorative background shape */}
-                <div className="absolute inset-0 bg-primary/8 rounded-3xl translate-x-3 translate-y-3" />
-                <img
-                  src={heroImageSrc}
-                  alt="Teacher helping a student learn at a desk"
-                  className="relative w-full h-[380px] object-cover rounded-2xl shadow-lg border border-border"
-                />
-                {/* Floating stat pill */}
-                <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-md border border-border px-4 py-2.5 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <TrendingUp className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">Progress tracked</p>
-                    <p className="text-xs text-muted-foreground">Every assignment, every day</p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -200,11 +208,18 @@ export default function Landing() {
               One platform, three journeys
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {roleCards.map(({ role, color, dot, items }) => (
+              {roleCards.map(({ role, avatar, color, dot, items }) => (
                 <div key={role} className={`rounded-xl border p-5 ${color}`}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-                    <h3 className="font-semibold text-foreground">{role}</h3>
+                  <div className="flex items-center gap-3 mb-4">
+                    <img
+                      src={avatar}
+                      alt={`${role} persona`}
+                      className="w-9 h-9 rounded-full object-cover shrink-0 border-2 border-white shadow-sm"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2 h-2 rounded-full ${dot}`} />
+                      <h3 className="font-semibold text-foreground">{role}</h3>
+                    </div>
                   </div>
                   <ul className="space-y-2">
                     {items.map((item) => (
