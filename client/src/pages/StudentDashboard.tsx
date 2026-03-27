@@ -280,32 +280,32 @@ export default function StudentDashboard() {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6">
             <ColorfulStatCard
-              title="Pending"
-              value={pendingAssignments.length}
-              icon={BookOpen}
-              accent="amber"
-              subtitle="Need to submit"
-            />
-            <ColorfulStatCard
-              title="Submitted"
-              value={submittedAssignments.length}
-              icon={ClipboardCheck}
-              accent="blue"
-              subtitle="Awaiting grades"
-            />
-            <ColorfulStatCard
-              title="Graded"
+              title="Completed"
               value={gradedAssignments.length}
               icon={CheckCircle}
               accent="green"
-              subtitle="Completed"
+              subtitle={`${(assignments as any[]).length} total assignments`}
             />
             <ColorfulStatCard
-              title="Sessions"
-              value={sessions.length || 0}
-              icon={Presentation}
+              title="Points Earned"
+              value={student?.points || 0}
+              icon={Trophy}
+              accent="amber"
+              subtitle="Keep learning!"
+            />
+            <ColorfulStatCard
+              title="Badges"
+              value={student?.badges?.length || 0}
+              icon={Star}
               accent="purple"
-              subtitle="Total classes"
+              subtitle="Achievements"
+            />
+            <ColorfulStatCard
+              title="Pending"
+              value={pendingAssignments.length}
+              icon={BookOpen}
+              accent="rose"
+              subtitle="Need to submit"
             />
           </div>
 

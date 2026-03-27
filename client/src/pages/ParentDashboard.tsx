@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -136,6 +136,23 @@ export default function ParentDashboard() {
   const payments = paymentsQuery.data || [];
   const tutorRatings = ratingsQuery.data || [];
   const studentAttendance = attendanceQuery.data || [];
+
+  const childAssignmentQueries = useQueries({
+    queries: (students as any[]).map((child: any) => ({
+      queryKey: ["/api/assignments/student", child.id],
+      enabled: (students as any[]).length > 0,
+    })),
+  });
+
+  const childStats = (students as any[]).map((child: any, index: number) => {
+    const data = (childAssignmentQueries[index]?.data as any[]) || [];
+    const completed = data.filter(
+      (a: any) => a.studentAssignment?.status === "graded",
+    ).length;
+    const total = data.length;
+    const pct = total > 0 ? Math.round((completed / total) * 100) : null;
+    return { ...child, pct, completed, total };
+  });
 
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const { data: studentAssignments = [] } = useQuery({
@@ -314,17 +331,17 @@ export default function ParentDashboard() {
             }}
           />
 
-          {(students as any[]).length > 0 && (
+          {childStats.length > 0 && (
             <div className="my-6">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {(students as any[]).map((child: any) => (
+                {childStats.map((child: any) => (
                   <button
                     key={child.id}
                     onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
                     className="text-left p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <span className="text-sm font-semibold text-primary">
                           {child.name?.charAt(0).toUpperCase() || "?"}
@@ -337,6 +354,22 @@ export default function ParentDashboard() {
                         </p>
                       </div>
                     </div>
+                    {child.pct !== null ? (
+                      <div>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
+                          <span className="font-medium text-foreground">{child.pct}%</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${child.pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No assignments yet</p>
+                    )}
                   </button>
                 ))}
               </div>

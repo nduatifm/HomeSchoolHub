@@ -10,13 +10,13 @@
 ## System Architecture
 
 ### UI/UX Decisions
-The platform utilizes React 18 with TypeScript for the frontend, styled with Tailwind CSS and Shadcn/UI components with a **Khan Academy-inspired design system** — clean, white backgrounds, calm blue primary color, labeled navigation, and progress-first layouts:
+The platform utilizes React 18 with TypeScript for the frontend, styled with Tailwind CSS and Shadcn/UI components with a **Khan Academy-inspired design system** — clean, white backgrounds, calm educational green primary, labeled navigation, and progress-first layouts:
 
-- **Design Inspiration**: Khan Academy — white/light backgrounds, calm blue (`hsl(220 96% 48%)` ~ #1563E0), minimal cognitive load, mobile-friendly
-- **Branding**: "Lyra Preparatory" with BookOpen icon in primary blue, displayed on all pages
-- **Sidebar (ModernSidebar)**: 240px wide, white background with right border; icons + text labels; active state with blue highlight; bottom profile/logout section; collapses to 56px hamburger top bar on mobile
+- **Design Inspiration**: Khan Academy — white/light backgrounds, calm educational green (`hsl(158 64% 36%)` ~ #1E8C64), minimal cognitive load, mobile-friendly
+- **Branding**: "Lyra Preparatory" with BookOpen icon in primary green, displayed on all pages
+- **Sidebar (ModernSidebar)**: 240px wide, white background with right border; icons + text labels; active state with green highlight; bottom profile/logout section; collapses to 56px hamburger top bar on mobile. Nav items match only active TabsContent per role.
 - **Dashboard Offset**: Main content uses `md:ml-[240px] pt-20 md:pt-0` to account for sidebar (desktop) and top bar (mobile)
-- **Design Tokens** (index.css): `--primary: 220 96% 48%`, `--success: 142 72% 36%`, `--warning: 38 95% 56%`, all other tokens use semantic names
+- **Design Tokens** (index.css): `--primary: 158 64% 36%` (calm forest teal-green), `--success: 142 72% 36%`, `--warning: 38 92% 50%`, `--info: 217 91% 60%` (blue for info), all other tokens use semantic names
 - **Stat Cards (ColorfulStatCard)**: White card with `accent` prop (blue/green/amber/purple/rose) - colored icon container + light tinted background
 - **Welcome Banner (WelcomeCard)**: Solid primary-color strip with white text and role info
 - **Auth Pages**: Two-panel layout (blue left panel + white form right) for Login/Signup; clean card layout for VerifyEmail/StudentSignup

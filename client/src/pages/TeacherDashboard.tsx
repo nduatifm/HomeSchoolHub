@@ -828,36 +828,47 @@ export default function TeacherDashboard() {
             }}
           />
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
-            <ColorfulStatCard
-              title="Students"
-              value={students.length}
-              icon={Users}
-              accent="purple"
-              subtitle="Active students"
-            />
-            <ColorfulStatCard
-              title="Assignments"
-              value={assignments.length}
-              icon={BookOpen}
-              accent="blue"
-              subtitle={`${(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length} need grading`}
-            />
-            <ColorfulStatCard
-              title="Sessions"
-              value={sessions.length}
-              icon={Presentation}
-              accent="rose"
-              subtitle="Scheduled"
-            />
-            <ColorfulStatCard
-              title="Materials"
-              value={materials.length}
-              icon={LibraryBig}
-              accent="amber"
-              subtitle="Study resources"
-            />
-          </div>
+          {(() => {
+            const todayStr = new Date().toISOString().split("T")[0];
+            const todaysSessions = (sessions as any[]).filter(
+              (s: any) => s.sessionDate === todayStr
+            );
+            const pendingSubmissions = (studentSubmissions as any[]).filter(
+              (s: any) => s.status === "submitted"
+            );
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
+                <ColorfulStatCard
+                  title="Sessions Today"
+                  value={todaysSessions.length}
+                  icon={Presentation}
+                  accent="rose"
+                  subtitle={`${(sessions as any[]).length} total`}
+                />
+                <ColorfulStatCard
+                  title="To Grade"
+                  value={pendingSubmissions.length}
+                  icon={ClipboardCheck}
+                  accent="amber"
+                  subtitle="Submissions waiting"
+                />
+                <ColorfulStatCard
+                  title="Students"
+                  value={students.length}
+                  icon={Users}
+                  accent="purple"
+                  subtitle="Under your care"
+                />
+                <ColorfulStatCard
+                  title="Materials"
+                  value={materials.length}
+                  icon={LibraryBig}
+                  accent="blue"
+                  subtitle="Study resources"
+                />
+              </div>
+            );
+          })()}
 
           {(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length > 0 && (
             <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 flex items-center gap-3">
