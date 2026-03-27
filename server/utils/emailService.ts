@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { buildEmailHtml, primaryButton } from './emailTemplates';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -11,120 +12,79 @@ const transporter = nodemailer.createTransport({
 });
 
 function getBaseUrl(): string {
-  // Check for explicit CLIENT_URL environment variable first
-  if (process.env.CLIENT_URL) {
-    return process.env.CLIENT_URL;
-  }
-  
-  // In production (Replit), use the Replit domain
+  if (process.env.CLIENT_URL) return process.env.CLIENT_URL;
   if (process.env.REPLIT_DOMAINS) {
-    const domains = process.env.REPLIT_DOMAINS.split(',');
-    return `https://${domains[0]}`;
+    return `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`;
   }
-  
-  // Fallback to localhost for development
   return 'http://localhost:5000';
 }
+
+const FROM = `"Lyra Preparatory" <${process.env.SMTP_USER}>`;
 
 export async function sendVerificationEmail(email: string, name: string, token: string) {
   const baseUrl = getBaseUrl();
   const verificationUrl = `${baseUrl}/verify-email?token=${token}`;
-  
-  const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Verify Your Email</title>
-</head>
-<body style="margin:0; padding:20px; font-family:Arial,sans-serif; background:#f4f4f4;">
-  <div style="max-width:600px; margin:0 auto; background:#ffffff; padding:40px; border-radius:8px;">
-    <h2 style="color:#333; margin-bottom:20px;">Welcome to Tutoring Platform, ${name}!</h2>
-    <p style="color:#666; font-size:16px; line-height:1.5;">
-      Thank you for registering. Please verify your email address to activate your account.
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">Welcome, ${name}!</h2>
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#4a5e50;">
+      Thanks for signing up. Please confirm your email address to activate your Lyra Preparatory account.
     </p>
-    <div style="text-align:center; margin:30px 0;">
-      <a href="${verificationUrl}" 
-         style="display:inline-block; background:#007bff; color:#ffffff; 
-                padding:14px 30px; text-decoration:none; border-radius:5px; 
-                font-weight:bold;">
-        Verify Email Address
-      </a>
-    </div>
-    <p style="color:#999; font-size:14px;">
-      This link expires in 24 hours. If you didn't create an account, please ignore this email.
+    ${primaryButton('Verify Email Address', verificationUrl)}
+    <p style="margin:24px 0 0;font-size:13px;color:#9bb09f;line-height:1.6;">
+      This link expires in <strong>24 hours</strong>. If you didn&rsquo;t create an account, you can safely ignore this email.
     </p>
-    <p style="color:#999; font-size:12px; margin-top:30px; border-top:1px solid #eee; padding-top:20px;">
-      Or copy and paste this URL: ${verificationUrl}
+    <p style="margin:12px 0 0;font-size:12px;color:#b8c8bb;word-break:break-all;">
+      Or copy and paste: ${verificationUrl}
     </p>
-  </div>
-</body>
-</html>
   `;
 
   try {
     await transporter.sendMail({
-      from: `"Tutoring Platform" <${process.env.SMTP_USER}>`,
+      from: FROM,
       to: email,
-      subject: 'Verify Your Email Address',
-      html: htmlContent,
-      text: `Hi ${name}, please verify your email: ${verificationUrl}`,
+      subject: 'Verify your email — Lyra Preparatory',
+      html: buildEmailHtml(bodyHtml, { preheader: `Hi ${name}, please verify your email to get started.` }),
+      text: `Hi ${name},\n\nPlease verify your email address to activate your Lyra Preparatory account:\n\n${verificationUrl}\n\nThis link expires in 24 hours.\n\n© Lyra Preparatory`,
     });
     return { success: true };
   } catch (error: any) {
-    console.error('Email send error:', error);
+    console.error('Verification email error:', error);
     return { success: false, error: error.message };
   }
 }
 
 export async function sendStudentInviteEmail(
-  email: string, 
-  studentName: string, 
+  email: string,
+  studentName: string,
   inviteCode: string,
   parentName: string
 ) {
   const baseUrl = getBaseUrl();
   const signupUrl = `${baseUrl}/student-signup?token=${inviteCode}`;
-  
-  const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Student Invitation</title>
-</head>
-<body style="margin:0; padding:20px; font-family:Arial,sans-serif; background:#f4f4f4;">
-  <div style="max-width:600px; margin:0 auto; background:#ffffff; padding:40px; border-radius:8px;">
-    <h2 style="color:#1E8C64; margin-bottom:20px;">Welcome to Lyra Preparatory, ${studentName}!</h2>
-    <p style="color:#666; font-size:16px; line-height:1.5;">
-      <strong>${parentName}</strong> has invited you to join as a student. Click the button below to create your account — your invite is pre-filled automatically.
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">You&rsquo;ve been invited, ${studentName}!</h2>
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#4a5e50;">
+      <strong>${parentName}</strong> has invited you to join <strong>Lyra Preparatory</strong> as a student.
+      Click the button below to create your account — your invite is pre-filled automatically.
     </p>
-    <div style="text-align:center; margin:30px 0;">
-      <a href="${signupUrl}" 
-         style="display:inline-block; background:#1E8C64; color:#ffffff; 
-                padding:14px 30px; text-decoration:none; border-radius:5px; 
-                font-weight:bold; font-size:16px;">
-        Create My Account
-      </a>
-    </div>
-    <p style="color:#999; font-size:14px;">
-      This invite expires in 7 days. If the button doesn't work, copy and paste this link into your browser:
+    ${primaryButton('Create My Account', signupUrl)}
+    <p style="margin:24px 0 0;font-size:13px;color:#9bb09f;line-height:1.6;">
+      This invite expires in <strong>7 days</strong>.
     </p>
-    <p style="color:#999; font-size:12px; word-break:break-all; margin-top:8px; border-top:1px solid #eee; padding-top:16px;">
-      ${signupUrl}
+    <p style="margin:12px 0 0;font-size:12px;color:#b8c8bb;word-break:break-all;">
+      Or copy and paste: ${signupUrl}
     </p>
-  </div>
-</body>
-</html>
   `;
 
   try {
     await transporter.sendMail({
-      from: `"Lyra Preparatory" <${process.env.SMTP_USER}>`,
+      from: FROM,
       to: email,
       subject: `${parentName} invited you to Lyra Preparatory`,
-      html: htmlContent,
-      text: `Hi ${studentName}, ${parentName} has invited you to join Lyra Preparatory. Click this link to create your account: ${signupUrl}`,
+      html: buildEmailHtml(bodyHtml, { preheader: `${parentName} has invited you to join Lyra Preparatory as a student.` }),
+      text: `Hi ${studentName},\n\n${parentName} has invited you to join Lyra Preparatory as a student.\n\nCreate your account here:\n${signupUrl}\n\nThis invite expires in 7 days.\n\n© Lyra Preparatory`,
     });
     return { success: true };
   } catch (error: any) {
@@ -136,19 +96,29 @@ export async function sendStudentInviteEmail(
 export async function sendPasswordResetEmail(email: string, name: string, token: string) {
   const baseUrl = getBaseUrl();
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;
-  
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">Reset your password</h2>
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#4a5e50;">
+      Hi ${name}, we received a request to reset the password for your Lyra Preparatory account.
+      Click the button below to choose a new password.
+    </p>
+    ${primaryButton('Reset Password', resetUrl)}
+    <p style="margin:24px 0 0;font-size:13px;color:#9bb09f;line-height:1.6;">
+      This link expires in <strong>1 hour</strong>. If you didn&rsquo;t request a password reset, you can safely ignore this email — your password will not change.
+    </p>
+    <p style="margin:12px 0 0;font-size:12px;color:#b8c8bb;word-break:break-all;">
+      Or copy and paste: ${resetUrl}
+    </p>
+  `;
+
   try {
     await transporter.sendMail({
-      from: `"Tutoring Platform" <${process.env.SMTP_USER}>`,
+      from: FROM,
       to: email,
-      subject: 'Reset Your Password',
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>Hi ${name},</p>
-        <p>You requested to reset your password. Click the link below to reset it:</p>
-        <a href="${resetUrl}">Reset Password</a>
-        <p>This link expires in 1 hour. If you didn't request this, please ignore this email.</p>
-      `,
+      subject: 'Reset your Lyra Preparatory password',
+      html: buildEmailHtml(bodyHtml, { preheader: `Hi ${name}, here's your password reset link. It expires in 1 hour.` }),
+      text: `Hi ${name},\n\nWe received a request to reset your Lyra Preparatory password.\n\nReset it here:\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.\n\n© Lyra Preparatory`,
     });
     return { success: true };
   } catch (error: any) {
