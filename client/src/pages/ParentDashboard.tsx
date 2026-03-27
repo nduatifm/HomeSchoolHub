@@ -61,6 +61,11 @@ import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
+import type { Student, Assignment, StudentAssignment } from "@shared/schema";
+
+type AssignmentWithStatus = Assignment & {
+  studentAssignment: StudentAssignment | null;
+};
 
 const paymentSchema = z.object({
   teacherId: z.number().min(1, "Teacher required"),
@@ -110,7 +115,7 @@ export default function ParentDashboard() {
   const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
 
   // Fetch data
-  const { data: students = [] } = useQuery({
+  const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students/parent"],
   });
   const { data: invites = [] } = useQuery({
@@ -138,16 +143,16 @@ export default function ParentDashboard() {
   const studentAttendance = attendanceQuery.data || [];
 
   const childAssignmentQueries = useQueries({
-    queries: (students as any[]).map((child: any) => ({
+    queries: students.map((child) => ({
       queryKey: ["/api/assignments/student", child.id],
-      enabled: (students as any[]).length > 0,
+      enabled: students.length > 0,
     })),
   });
 
-  const childStats = (students as any[]).map((child: any, index: number) => {
-    const data = (childAssignmentQueries[index]?.data as any[]) || [];
+  const childStats = students.map((child, index) => {
+    const data = (childAssignmentQueries[index]?.data as AssignmentWithStatus[]) || [];
     const completed = data.filter(
-      (a: any) => a.studentAssignment?.status === "graded",
+      (a) => a.studentAssignment?.status === "graded",
     ).length;
     const total = data.length;
     const pct = total > 0 ? Math.round((completed / total) * 100) : null;

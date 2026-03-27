@@ -73,6 +73,7 @@ import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
+import type { Session, StudentAssignment } from "@shared/schema";
 
 const scheduleSchema = z.object({
   studentId: z.number().min(1, "Student required"),
@@ -156,7 +157,7 @@ export default function TeacherDashboard() {
   const { data: materials = [] } = useQuery({
     queryKey: ["/api/materials/teacher"],
   });
-  const { data: sessions = [] } = useQuery({
+  const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions/teacher"],
   });
   const { data: tutorRequests = [] } = useQuery({
@@ -187,7 +188,7 @@ export default function TeacherDashboard() {
 
   // Fetch student submissions for grading
   const { data: studentSubmissions = [], isLoading: submissionsLoading } =
-    useQuery({
+    useQuery<StudentAssignment[]>({
       queryKey: ["/api/student-submissions/teacher"],
     });
 
@@ -830,11 +831,11 @@ export default function TeacherDashboard() {
 
           {(() => {
             const todayStr = new Date().toISOString().split("T")[0];
-            const todaysSessions = (sessions as any[]).filter(
-              (s: any) => s.sessionDate === todayStr
+            const todaysSessions = sessions.filter(
+              (s) => s.sessionDate === todayStr
             );
-            const pendingSubmissions = (studentSubmissions as any[]).filter(
-              (s: any) => s.status === "submitted"
+            const pendingSubmissions = studentSubmissions.filter(
+              (s) => s.status === "submitted"
             );
             return (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
@@ -843,7 +844,7 @@ export default function TeacherDashboard() {
                   value={todaysSessions.length}
                   icon={Presentation}
                   accent="rose"
-                  subtitle={`${(sessions as any[]).length} total`}
+                  subtitle={`${sessions.length} total`}
                 />
                 <ColorfulStatCard
                   title="To Grade"
@@ -870,14 +871,14 @@ export default function TeacherDashboard() {
             );
           })()}
 
-          {(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length > 0 && (
+          {studentSubmissions.filter((s) => s.status === "submitted").length > 0 && (
             <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
                 <ClipboardCheck className="w-4 h-4 text-amber-600" />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground">
-                  {(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length} submission{(studentSubmissions as any[]).filter((s: any) => s.status === "submitted").length !== 1 ? "s" : ""} waiting to be graded
+                  {studentSubmissions.filter((s) => s.status === "submitted").length} submission{studentSubmissions.filter((s) => s.status === "submitted").length !== 1 ? "s" : ""} waiting to be graded
                 </p>
                 <p className="text-xs text-muted-foreground">Review student work in Grade Submissions</p>
               </div>
@@ -1352,7 +1353,7 @@ export default function TeacherDashboard() {
                     <div className="text-center py-8">
                       Loading submissions...
                     </div>
-                  ) : (studentSubmissions as any[]).length === 0 ? (
+                  ) : studentSubmissions.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No submissions to grade yet. Students will appear here
                       once they submit their assignments.
@@ -1373,7 +1374,7 @@ export default function TeacherDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {(studentSubmissions as any[]).map((sub: any) => (
+                        {studentSubmissions.map((sub: any) => (
                           <TableRow
                             key={sub.id}
                             data-testid={`row-submission-${sub.id}`}

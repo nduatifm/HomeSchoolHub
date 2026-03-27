@@ -44,6 +44,7 @@ import {
   CheckCircle,
   Video,
   Star,
+  Flame,
   LibraryBig,
   Presentation,
   MessageSquareQuote,
@@ -55,6 +56,30 @@ import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
+import type { Assignment, StudentAssignment, Session } from "@shared/schema";
+
+type AssignmentWithStatus = Assignment & {
+  studentAssignment: StudentAssignment | null;
+};
+
+function computeStreak(graded: AssignmentWithStatus[]): number {
+  const dates = graded
+    .filter(a => a.studentAssignment?.submittedAt)
+    .map(a => a.studentAssignment!.submittedAt!.split("T")[0])
+    .sort()
+    .reverse();
+  if (dates.length === 0) return 0;
+  const uniqueDates = Array.from(new Set(dates));
+  let streak = 0;
+  for (let i = 0; i < uniqueDates.length; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const expected = d.toISOString().split("T")[0];
+    if (uniqueDates[i] === expected) streak++;
+    else break;
+  }
+  return streak;
+}
 
 export default function StudentDashboard() {
   const { user, student, logout } = useAuth();
@@ -83,7 +108,7 @@ export default function StudentDashboard() {
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
 
   // Fetch data
-  const { data: assignments = [] } = useQuery({
+  const { data: assignments = [] } = useQuery<AssignmentWithStatus[]>({
     queryKey: ["/api/assignments/student", student?.id],
     enabled: !!student,
   });
@@ -91,7 +116,7 @@ export default function StudentDashboard() {
     queryKey: ["/api/materials/student", student?.id],
     enabled: !!student,
   });
-  const { data: teachers = [] } = useQuery({
+  const { data: teachers = [] } = useQuery<Record<string, unknown>[]>({
     queryKey: ["/api/teachers/student", student?.id],
     enabled: !!student,
   });
@@ -99,7 +124,7 @@ export default function StudentDashboard() {
     queryKey: ["/api/feedback/student", student?.id],
     enabled: !!student,
   });
-  const sessionsQuery = useQuery({
+  const sessionsQuery = useQuery<Session[]>({
     queryKey: ["/api/sessions/student", student?.id],
     enabled: !!student,
   });
@@ -252,15 +277,15 @@ export default function StudentDashboard() {
   });
 
   const pendingAssignments = assignments.filter(
-    (a: any) =>
-      a.studentAssignment?.status === "pending" || !a.studentAssignment,
+    (a) => a.studentAssignment?.status === "pending" || !a.studentAssignment,
   );
   const submittedAssignments = assignments.filter(
-    (a: any) => a.studentAssignment?.status === "submitted",
+    (a) => a.studentAssignment?.status === "submitted",
   );
   const gradedAssignments = assignments.filter(
-    (a: any) => a.studentAssignment?.status === "graded",
+    (a) => a.studentAssignment?.status === "graded",
   );
+  const streak = computeStreak(gradedAssignments);
 
   return (
     <div className="min-h-screen bg-background">
@@ -284,7 +309,7 @@ export default function StudentDashboard() {
               value={gradedAssignments.length}
               icon={CheckCircle}
               accent="green"
-              subtitle={`${(assignments as any[]).length} total assignments`}
+              subtitle={`${assignments.length} total assignments`}
             />
             <ColorfulStatCard
               title="Points Earned"
@@ -294,11 +319,11 @@ export default function StudentDashboard() {
               subtitle="Keep learning!"
             />
             <ColorfulStatCard
-              title="Badges"
-              value={student?.badges?.length || 0}
-              icon={Star}
+              title="Day Streak"
+              value={streak}
+              icon={Flame}
               accent="purple"
-              subtitle="Achievements"
+              subtitle={streak === 1 ? "day in a row" : "days in a row"}
             />
             <ColorfulStatCard
               title="Pending"
