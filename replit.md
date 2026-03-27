@@ -15,7 +15,7 @@ The platform utilizes React 18 with TypeScript for the frontend, styled with Tai
 - **Design Inspiration**: Khan Academy — white/light backgrounds, calm educational green (`hsl(158 64% 36%)` ~ #1E8C64), minimal cognitive load, mobile-friendly
 - **Branding**: "Lyra Preparatory" with BookOpen icon in primary green, displayed on all pages
 - **Sidebar (ModernSidebar)**: 240px wide, white background with right border; icons + text labels; active state with green highlight; bottom profile/logout section; collapses to 56px hamburger top bar on mobile. Nav items match only active TabsContent per role.
-- **Dashboard Offset**: Main content uses `md:ml-[240px] pt-20 md:pt-0` to account for sidebar (desktop) and top bar (mobile)
+- **Dashboard Offset**: Main content uses `md:ml-[240px] pt-20 md:pt-6` to account for sidebar (desktop) and mobile top bar (mobile)
 - **Design Tokens** (index.css): `--primary: 158 64% 36%` (calm forest teal-green), `--success: 142 72% 36%`, `--warning: 38 92% 50%`, `--info: 217 91% 60%` (blue for info), all other tokens use semantic names
 - **Stat Cards (ColorfulStatCard)**: White card with `accent` prop (blue/green/amber/purple/rose) - colored icon container + light tinted background
 - **Welcome Banner (WelcomeCard)**: Solid primary-color strip with white text and role info
@@ -41,7 +41,7 @@ Icons are provided by Lucide React. The profile management features a modern tab
 - **Core Features**:
     - **Teacher Dashboard**: Assignment creation/grading with file uploads, material uploads with file management, schedule management, feedback system, attendance tracking, earnings view, tutoring session management.
     - **Parent Dashboard**: Child progress tracking, assignment monitoring, student invitations, payment management, tutor requests (when enabled), attendance viewing, tutor rating.
-    - **Student Dashboard**: Assignment submission, material access with file viewing, grade/feedback viewing, rewards/badges, clarification requests, schedule viewing, attendance viewing, session joining.
+    - **Student Dashboard**: Assignment submission, material access with file viewing, grade/feedback viewing, Day Streak metric (consecutive days with graded submissions via `submittedAt`), rewards/points, clarification requests, schedule viewing, attendance viewing, session joining.
     - **Additional**: Real-time messaging, progress reports, analytics, downloadable reports, comprehensive profile management with Cloudinary integration for profile pictures.
 - **Tutor Request Mode Toggle**:
     - **Flexible Teacher Assignment System**: The platform supports two modes for connecting students with teachers:
