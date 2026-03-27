@@ -302,8 +302,8 @@ export default function ParentDashboard() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
 
-      <div className="ml-24 flex">
-        <main className="flex-1 p-8">
+      <div className="md:ml-[240px] flex">
+        <main className="flex-1 p-6 pt-20 md:pt-6">
           <WelcomeCard
             name={user?.name || "Parent"}
             message="Stay connected with your child's learning journey. Monitor progress and support their growth."
@@ -314,19 +314,19 @@ export default function ParentDashboard() {
             }}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+          <div className="grid grid-cols-2 gap-4 my-6">
             <ColorfulStatCard
               title="Children"
               value={students.length}
               icon={Users}
-              className="bg-purple-500"
+              accent="blue"
               subtitle="Registered"
             />
             <ColorfulStatCard
               title="Invites"
               value={invites.length}
               icon={UserPlus}
-              className="bg-green-500"
+              accent="green"
               subtitle="Pending invites"
             />
           </div>
@@ -537,7 +537,7 @@ export default function ParentDashboard() {
                       </Table>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                       Select a child from "My Children" tab to view their
                       progress
                     </p>
@@ -690,7 +690,7 @@ export default function ParentDashboard() {
                       Error loading payments
                     </div>
                   ) : payments.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
+                    <p className="text-center text-muted-foreground py-8">
                       No payments yet
                     </p>
                   ) : (
@@ -868,7 +868,7 @@ export default function ParentDashboard() {
                       Error loading ratings
                     </div>
                   ) : tutorRatings.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
+                    <p className="text-center text-muted-foreground py-8">
                       No ratings submitted yet
                     </p>
                   ) : (
@@ -905,7 +905,7 @@ export default function ParentDashboard() {
                               >
                                 {r.comment}
                               </p>
-                              <p className="text-xs text-gray-500 mt-2">
+                              <p className="text-xs text-muted-foreground mt-2">
                                 {new Date(r.ratingDate).toLocaleDateString()}
                               </p>
                             </div>
@@ -967,7 +967,7 @@ export default function ParentDashboard() {
                             Error loading attendance
                           </div>
                         ) : studentAttendance.length === 0 ? (
-                          <p className="text-center text-gray-500 py-8">
+                          <p className="text-center text-muted-foreground py-8">
                             No attendance records yet
                           </p>
                         ) : (
@@ -1070,7 +1070,7 @@ export default function ParentDashboard() {
                   <CardContent>
                     <div className="space-y-4">
                       {tutorRequests.length === 0 ? (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                           No tutor requests yet. Click "Request Tutor" to get
                           started.
                         </p>
@@ -1087,7 +1087,7 @@ export default function ParentDashboard() {
                             >
                               {r.message}
                             </p>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                               Requested:{" "}
                               {new Date(r.requestDate).toLocaleDateString()}
                             </p>
@@ -1144,7 +1144,7 @@ export default function ParentDashboard() {
                           Progress Reports for {selectedStudent.name}
                         </h3>
                         {studentProgressReports.length === 0 ? (
-                          <p className="text-center text-gray-500 py-8">
+                          <p className="text-center text-muted-foreground py-8">
                             No reports available yet
                           </p>
                         ) : (
@@ -1163,7 +1163,7 @@ export default function ParentDashboard() {
                                       </h4>
                                       <Badge>{report.overallGrade}</Badge>
                                     </div>
-                                    <p className="text-sm text-gray-600">
+                                    <p className="text-sm text-muted-foreground">
                                       Date:{" "}
                                       {new Date(
                                         report.reportDate,
@@ -1377,7 +1377,7 @@ export default function ParentDashboard() {
                 <CardContent>
                   <div className="h-[500px] overflow-y-auto space-y-3">
                     {messages.length === 0 ? (
-                      <p className="text-center text-gray-500 py-8">
+                      <p className="text-center text-muted-foreground py-8">
                         No messages yet
                       </p>
                     ) : (
@@ -1393,7 +1393,7 @@ export default function ParentDashboard() {
                                 ? "You"
                                 : `User #${msg.senderId}`}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(msg.sentDate).toLocaleString()}
                             </span>
                           </div>

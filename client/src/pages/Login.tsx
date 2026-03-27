@@ -5,14 +5,6 @@ import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -29,6 +21,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
 import { ApiError } from "@/lib/queryClient";
+import { Link } from "wouter";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -39,7 +32,6 @@ export default function Login() {
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-  // Google Sign In state for role selection
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
   const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
@@ -47,7 +39,6 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
-
     try {
       await login(email, password);
       toast({ title: "Welcome back!", type: "success" });
@@ -56,8 +47,7 @@ export default function Login() {
       setIsLoading(false);
       toast({
         title: "Login failed",
-        description:
-          error.message || "Please check your credentials and try again",
+        description: error.message || "Please check your credentials and try again",
         type: "error",
         duration: 5000,
       });
@@ -68,9 +58,7 @@ export default function Login() {
     const credential = credentialResponse.credential;
     setGoogleCredential(credential);
     setIsLoading(true);
-
     try {
-      // First, try to sign in without a role - if user exists with role, this will succeed
       await googleSignIn(credential);
       toast({ title: "Welcome back!", type: "success" });
       setLocation("/dashboard");
@@ -79,11 +67,7 @@ export default function Login() {
       if (apiError.requiresRole) {
         setShowRoleDialog(true);
       } else {
-        toast({
-          title: "Google Sign In failed",
-          description: apiError.message,
-          type: "error",
-        });
+        toast({ title: "Google Sign In failed", description: apiError.message, type: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -92,18 +76,13 @@ export default function Login() {
 
   async function handleGoogleLoginComplete() {
     if (!googleCredential) return;
-
     setIsLoading(true);
     try {
       await googleSignIn(googleCredential, googleRole);
       toast({ title: "Welcome back!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({
-        title: "Google Sign In failed",
-        description: error.message,
-        type: "error",
-      });
+      toast({ title: "Google Sign In failed", description: error.message, type: "error" });
     } finally {
       setIsLoading(false);
       setShowRoleDialog(false);
@@ -111,16 +90,35 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4">
-          <Logo className="mb-2" />
-        </CardHeader>
-        <CardContent>
+    <div className="min-h-screen bg-background flex">
+      {/* Left panel - branding (hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-[420px] bg-primary flex-col justify-between p-10 shrink-0">
+        <Logo variant="sidebar" className="text-white [&_span]:text-white" />
+        <div>
+          <blockquote className="text-white/90 text-lg font-medium leading-relaxed mb-4">
+            "Education is the most powerful weapon which you can use to change the world."
+          </blockquote>
+          <p className="text-white/60 text-sm">— Nelson Mandela</p>
+        </div>
+        <p className="text-white/50 text-xs">© {new Date().getFullYear()} Lyra Preparatory</p>
+      </div>
+
+      {/* Right panel - form */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <div className="lg:hidden mb-8">
+            <Logo />
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-foreground mb-1">Sign in</h1>
+            <p className="text-sm text-muted-foreground">Enter your email and password to continue</p>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
+                Email address
               </label>
               <Input
                 id="email"
@@ -132,8 +130,8 @@ export default function Login() {
                 data-testid="input-email"
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
               </label>
               <Input
@@ -152,78 +150,57 @@ export default function Login() {
               disabled={isLoading}
               data-testid="button-login"
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
 
           {googleClientId && (
             <>
-              <div className="relative my-4">
+              <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
+                  <span className="w-full border-t border-border" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-background px-3 text-muted-foreground">or continue with</span>
                 </div>
               </div>
-
-              <div
-                className="flex justify-center"
-                data-testid="google-login-container"
-              >
+              <div className="flex justify-center" data-testid="google-login-container">
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
-                  onError={() => {
-                    toast({
-                      title: "Google Sign In failed",
-                      description: "Please try again",
-                      type: "error",
-                    });
-                  }}
+                  onError={() => toast({ title: "Google Sign In failed", description: "Please try again", type: "error" })}
                 />
               </div>
             </>
           )}
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <Button
-            variant="link"
-            onClick={() => setLocation("/signup")}
-            className="text-sm"
-            data-testid="link-signup"
-          >
-            Don't have an account? Sign up
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => setLocation("/student-signup")}
-            className="text-sm"
-            data-testid="link-student-signup"
-          >
-            Student? Join with invite code
-          </Button>
-        </CardFooter>
-      </Card>
 
+          <div className="mt-6 space-y-2 text-center">
+            <p className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-primary font-medium hover:underline" data-testid="link-signup">
+                Sign up
+              </Link>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Student?{" "}
+              <Link href="/student-signup" className="text-primary font-medium hover:underline" data-testid="link-student-signup">
+                Join with invite code
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Role selection dialog */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
-        <DialogContent className="rounded-3xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Select Your Role</DialogTitle>
-            <DialogDescription>
-              Please select your role to continue
-            </DialogDescription>
+            <DialogTitle>Select your role</DialogTitle>
+            <DialogDescription>Tell us how you'll be using Lyra Preparatory</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="google-role" className="text-sm font-medium">
-                I am a...
-              </label>
-              <Select
-                value={googleRole}
-                onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}
-              >
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label htmlFor="google-role" className="text-sm font-medium">I am a...</label>
+              <Select value={googleRole} onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}>
                 <SelectTrigger data-testid="select-google-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -233,12 +210,7 @@ export default function Login() {
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              onClick={handleGoogleLoginComplete}
-              className="w-full"
-              disabled={isLoading}
-              data-testid="button-complete-google-login"
-            >
+            <Button onClick={handleGoogleLoginComplete} className="w-full" disabled={isLoading} data-testid="button-complete-google-login">
               {isLoading ? "Signing in..." : "Continue"}
             </Button>
           </div>

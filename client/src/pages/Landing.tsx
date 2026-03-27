@@ -1,125 +1,177 @@
-import React from "react";
-import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
 import { Link } from "wouter";
+import { BookOpen, Users, TrendingUp, CheckCircle } from "lucide-react";
+
+const features = [
+  {
+    icon: BookOpen,
+    title: "Assignments & Materials",
+    description: "Create, assign, and track work in one organized place.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Progress Tracking",
+    description: "See how students are improving with clear, visual reports.",
+  },
+  {
+    icon: Users,
+    title: "Family Connected",
+    description: "Parents stay informed and involved in their child's learning.",
+  },
+  {
+    icon: CheckCircle,
+    title: "Simple & Focused",
+    description: "A distraction-free environment built for learning, not browsing.",
+  },
+];
 
 export default function Landing() {
-    return (
-        <div className="min-h-screen landing-gradient flex items-center justify-center relative overflow-hidden">
-            {/* Decorative floating blobs */}
-            <motion.div
-                className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-purple/30 blur-3xl"
-                animate={{ y: [0, 30, 0], x: [0, -20, 0] }}
-                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            />
-
-            <motion.div
-                className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-green/25 blur-3xl"
-                animate={{ y: [0, -30, 0], x: [0, 20, 0] }}
-                transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-            />
-
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8 }}
-                className="relative z-10 w-full max-w-6xl px-6 py-20"
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Nav */}
+      <header className="border-b border-border bg-white sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Logo variant="transparent" />
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="text-sm font-medium text-foreground hover:text-primary transition-colors px-4 py-2 rounded-lg hover:bg-accent"
             >
-                <div className="flex items-center justify-between mb-8">
-                    <Logo variant={"transparent"} />
-                    <div className="space-x-4">
-                        <Link href="/login">
-                            <a className="px-4 py-2 rounded-xl bg-white/90 hover:bg-white">Log in</a>
-                        </Link>
-                        <Link href="/signup">
-                            <a className="px-4 py-2 rounded-xl bg-purple text-white">Sign up</a>
-                        </Link>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-                    <div>
-                        <motion.h1
-                            initial={{ x: -40, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            transition={{ delay: 0.2 }}
-                            className="text-4xl md:text-6xl font-extrabold leading-tight mb-6"
-                        >
-                            Grow learners. Empower families. Simplify teaching.
-                        </motion.h1>
-
-                        <motion.p
-                            initial={{ x: -20, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            transition={{ delay: 0.35 }}
-                            className="text-lg text-muted-foreground mb-6 max-w-prose"
-                        >
-                            HomeSchoolHub is an all-in-one platform for parents, tutors, and students —
-                            with attendance, assignments, progress tracking, and live chat built for
-                            modern education.
-                        </motion.p>
-
-                        <motion.div
-                            initial={{ scale: 0.98 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.5 }}
-                            className="flex gap-4"
-                        >
-                            <Link href="/signup">
-                                <a className="px-6 py-3 rounded-xl bg-purple text-white font-semibold shadow-lg">Get started</a>
-                            </Link>
-                            <Link href="/login">
-                                <a className="px-6 py-3 rounded-xl border border-white/30">Learn more</a>
-                            </Link>
-                        </motion.div>
-
-                        <div className="mt-10 grid grid-cols-2 gap-4">
-                            <div className="rounded-xl bg-white/70 p-4 shadow-lg">
-                                <h3 className="font-semibold">For Parents</h3>
-                                <p className="text-sm text-muted-foreground">Track progress and communicate with tutors easily.</p>
-                            </div>
-                            <div className="rounded-xl bg-white/70 p-4 shadow-lg">
-                                <h3 className="font-semibold">For Tutors</h3>
-                                <p className="text-sm text-muted-foreground">Manage classes and assignments in one place.</p>
-                            </div>
-                        </div>
-                        <div className="rounded-xl bg-white/70 p-4 shadow-lg mt-4">
-                            <h3 className="font-semibold">For Student</h3>
-                            <p className="text-sm text-muted-foreground">Access classes, track assignments, and monitor your learning progress easily.</p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-center">
-                        <motion.div
-                            initial={{ scale: 0.95, rotate: -6, opacity: 0 }}
-                            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                            transition={{ delay: 0.45 }}
-                            className="relative w-full max-w-sm"
-                        >
-                            <div className="rounded-2xl p-6 bg-white/90 shadow-2xl">
-                                <h4 className="font-bold mb-2">Live class preview</h4>
-                                <p className="text-sm text-muted-foreground">See how sessions, assignments and progress appear to students.</p>
-                                <div className="mt-4 grid grid-cols-2 gap-3">
-                                    <div className="rounded-lg bg-light-purple p-2 text-center">Attendance</div>
-                                    <div className="rounded-lg bg-light-green p-2 text-center">Assignments</div>
-                                    <div className="rounded-lg bg-light-coral p-2 text-center">Progress</div>
-                                    <div className="rounded-lg bg-light-orange p-2 text-center">Chat</div>
-                                </div>
-                            </div>
-
-                            <motion.div
-                                className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-purple/90 shadow-lg"
-                                animate={{ y: [0, -8, 0] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                            />
-                        </motion.div>
-                    </div>
-                </div>
-
-                <footer className="mt-16 text-sm text-muted-foreground text-center">
-                    © {new Date().getFullYear()} HomeSchoolHub — Built with care for modern families.
-                </footer>
-            </motion.div>
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="text-sm font-medium bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Get started
+            </Link>
+          </div>
         </div>
-    );
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1">
+        <section className="max-w-5xl mx-auto px-6 pt-20 pb-16 text-center">
+          <div className="inline-flex items-center gap-2 bg-accent text-primary text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
+            <CheckCircle className="w-3.5 h-3.5" />
+            Built for home educators and tutors
+          </div>
+          <h1 className="text-5xl font-bold text-foreground mb-5 leading-tight">
+            Learning made simple.<br />
+            <span className="text-primary">Progress made visible.</span>
+          </h1>
+          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
+            Lyra Preparatory connects teachers, parents, and students in one clean platform —
+            with assignments, attendance, progress tracking, and live sessions.
+          </p>
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            <Link
+              href="/signup"
+              className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors text-sm"
+            >
+              Start for free
+            </Link>
+            <Link
+              href="/login"
+              className="border border-border text-foreground px-6 py-3 rounded-lg font-semibold hover:bg-muted transition-colors text-sm"
+            >
+              Sign in to your account
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Students —{" "}
+            <Link href="/student-signup" className="text-primary hover:underline">
+              join with an invite code
+            </Link>
+          </p>
+        </section>
+
+        {/* Role cards */}
+        <section className="bg-muted border-y border-border py-14">
+          <div className="max-w-5xl mx-auto px-6">
+            <h2 className="text-center text-xl font-semibold text-foreground mb-8">
+              One platform, three journeys
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[
+                {
+                  role: "Teachers",
+                  color: "bg-blue-50 border-blue-200",
+                  dot: "bg-blue-500",
+                  items: ["Create & grade assignments", "Upload study materials", "Track attendance", "Run live sessions"],
+                },
+                {
+                  role: "Parents",
+                  color: "bg-green-50 border-green-200",
+                  dot: "bg-green-500",
+                  items: ["Monitor child's progress", "Invite & manage students", "View attendance records", "Request tutors"],
+                },
+                {
+                  role: "Students",
+                  color: "bg-purple-50 border-purple-200",
+                  dot: "bg-purple-500",
+                  items: ["Submit assignments", "Access study materials", "Join live sessions", "Earn badges & rewards"],
+                },
+              ].map(({ role, color, dot, items }) => (
+                <div key={role} className={`rounded-xl border p-5 ${color}`}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+                    <h3 className="font-semibold text-foreground">{role}</h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {items.map((item) => (
+                      <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <CheckCircle className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section className="max-w-5xl mx-auto px-6 py-14">
+          <h2 className="text-center text-xl font-semibold text-foreground mb-8">
+            Everything you need to teach and learn
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {features.map(({ icon: Icon, title, description }) => (
+              <div key={title} className="flex items-start gap-4 p-5 rounded-xl border border-border bg-white">
+                <div className="bg-accent p-2.5 rounded-lg shrink-0">
+                  <Icon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground mb-1">{title}</h3>
+                  <p className="text-sm text-muted-foreground">{description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="bg-primary py-14">
+          <div className="max-w-xl mx-auto px-6 text-center">
+            <h2 className="text-2xl font-bold text-white mb-3">Ready to get started?</h2>
+            <p className="text-white/80 text-sm mb-6">
+              Create your free account today and bring your classroom together.
+            </p>
+            <Link
+              href="/signup"
+              className="inline-block bg-white text-primary font-semibold px-6 py-3 rounded-lg hover:bg-white/90 transition-colors text-sm"
+            >
+              Create your account
+            </Link>
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-border bg-white py-6 text-center text-xs text-muted-foreground">
+        © {new Date().getFullYear()} Lyra Preparatory — Built with care for modern learners.
+      </footer>
+    </div>
+  );
 }

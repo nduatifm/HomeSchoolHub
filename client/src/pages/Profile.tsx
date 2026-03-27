@@ -282,16 +282,16 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       <ModernSidebar />
       
-      <div className="ml-24 p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+      <div className="md:ml-[240px] p-6 pt-20 md:pt-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-foreground mb-1">
               Profile Settings
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Manage your account settings and preferences
             </p>
           </div>
@@ -344,9 +344,9 @@ export default function Profile() {
                       data-testid="input-email"
                       value={user?.email || ""}
                       disabled
-                      className="bg-gray-100 dark:bg-gray-800"
+                      className="bg-muted"
                     />
-                    <p className="text-sm text-gray-500">Email cannot be changed</p>
+                    <p className="text-sm text-muted-foreground">Email cannot be changed</p>
                   </div>
 
                   <div className="space-y-2">
@@ -356,7 +356,7 @@ export default function Profile() {
                       data-testid="input-role"
                       value={user?.role || ""}
                       disabled
-                      className="bg-gray-100 dark:bg-gray-800 capitalize"
+                      className="bg-muted capitalize"
                     />
                   </div>
 
@@ -399,7 +399,7 @@ export default function Profile() {
                       className="min-h-[100px]"
                       maxLength={500}
                     />
-                    <p className="text-xs text-gray-500">{bio.length}/500 characters</p>
+                    <p className="text-xs text-muted-foreground">{bio.length}/500 characters</p>
                   </div>
 
                   {/* Teacher-specific fields */}
@@ -433,7 +433,7 @@ export default function Profile() {
                           {teachingSubjects.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                               {teachingSubjects.map((subject, index) => (
-                                <div key={index} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full" data-testid={`tag-subject-${index}`}>
+                                <div key={index} className="flex items-center gap-1 bg-muted px-3 py-1 rounded-full" data-testid={`tag-subject-${index}`}>
                                   <span className="text-sm">{subject}</span>
                                   <Button
                                     type="button"
@@ -553,7 +553,7 @@ export default function Profile() {
                           {interests.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                               {interests.map((interest, index) => (
-                                <div key={index} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full" data-testid={`tag-interest-${index}`}>
+                                <div key={index} className="flex items-center gap-1 bg-muted px-3 py-1 rounded-full" data-testid={`tag-interest-${index}`}>
                                   <span className="text-sm">{interest}</span>
                                   <Button
                                     type="button"
@@ -638,14 +638,14 @@ export default function Profile() {
                     >
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
                         {uploadingImage ? (
-                          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-2" />
+                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
                         ) : (
-                          <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                         )}
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-muted-foreground">
                           {uploadingImage ? "Uploading..." : "Click to upload profile picture"}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 5MB</p>
                       </div>
                       <Input
                         id="profile-picture"
@@ -674,7 +674,7 @@ export default function Profile() {
               <CardContent>
                 {user?.googleId ? (
                   <div className="text-center py-8">
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-muted-foreground">
                       You signed in with Google. Password change is not available.
                     </p>
                   </div>

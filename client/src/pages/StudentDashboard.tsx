@@ -265,39 +265,39 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
 
-      <div className="ml-24 flex">
-        <main className="flex-1 p-8">
+      <div className="md:ml-[240px] flex">
+        <main className="flex-1 p-6 pt-20 md:pt-6">
           <WelcomeCard
             name={user?.name || "Student"}
             message="Let's start the day by learning something new. Don't forget to check your To-Do list."
-            buttonText="To-Do List"
+            buttonText="My Assignments"
             onButtonClick={() => {
               setActiveTab("assignments");
               window.location.hash = "assignments";
             }}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
             <ColorfulStatCard
               title="Assignments"
               value={assignments.length}
               icon={BookOpen}
-              className="bg-purple-500"
+              accent="blue"
               subtitle={`${pendingAssignments.length} pending`}
             />
             <ColorfulStatCard
               title="Materials"
               value={materials.length}
               icon={LibraryBig}
-              className="bg-orange-500"
+              accent="amber"
               subtitle="Study resources"
             />
             <ColorfulStatCard
               title="Sessions"
               value={sessions.length || 0}
               icon={Presentation}
-              className="bg-green-500"
-              subtitle="Total Classes"
+              accent="green"
+              subtitle="Total classes"
             />
             {/* <ColorfulStatCard
               title="Feedback"
@@ -455,7 +455,7 @@ export default function StudentDashboard() {
                                           ) : (
                                             <label className="flex flex-col items-center cursor-pointer">
                                               <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                                              <span className="text-sm text-gray-500">
+                                              <span className="text-sm text-muted-foreground">
                                                 Click to upload file
                                               </span>
                                               <input
@@ -781,7 +781,7 @@ export default function StudentDashboard() {
                             >
                               {f.message}
                             </p>
-                            <p className="text-sm text-gray-600 mt-1">
+                            <p className="text-sm text-muted-foreground mt-1">
                               {new Date(f.date).toLocaleDateString()}
                             </p>
                           </div>
@@ -813,7 +813,7 @@ export default function StudentDashboard() {
                       Error loading schedule
                     </div>
                   ) : schedule.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
+                    <p className="text-center text-muted-foreground py-8">
                       No schedule items yet
                     </p>
                   ) : (
@@ -853,7 +853,7 @@ export default function StudentDashboard() {
                         Error loading sessions
                       </div>
                     ) : sessions.length === 0 ? (
-                      <p className="text-center text-gray-500 py-8">
+                      <p className="text-center text-muted-foreground py-8">
                         No sessions yet
                       </p>
                     ) : (
@@ -867,7 +867,7 @@ export default function StudentDashboard() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <p className="font-medium">{s.subject}</p>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                   {new Date(s.date).toLocaleDateString()} at{" "}
                                   {s.startTime}
                                 </p>
@@ -898,7 +898,7 @@ export default function StudentDashboard() {
                       Error loading attendance
                     </div>
                   ) : attendance.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
+                    <p className="text-center text-muted-foreground py-8">
                       No attendance records yet
                     </p>
                   ) : (
@@ -1018,7 +1018,7 @@ export default function StudentDashboard() {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-2" />
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                               Total Points
                             </p>
                             <p
@@ -1034,7 +1034,7 @@ export default function StudentDashboard() {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <Award className="h-12 w-12 text-purple-500 mx-auto mb-2" />
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                               Total Badges
                             </p>
                             <p
@@ -1051,7 +1051,7 @@ export default function StudentDashboard() {
                     <div>
                       <h3 className="text-lg font-semibold mb-4">My Badges</h3>
                       {!student?.badges || student.badges.length === 0 ? (
-                        <p className="text-center text-gray-500 py-8">
+                        <p className="text-center text-muted-foreground py-8">
                           No badges earned yet. Keep working hard!
                         </p>
                       ) : (
@@ -1077,7 +1077,7 @@ export default function StudentDashboard() {
                       <h3 className="text-lg font-semibold mb-2">
                         Keep Going!
                       </h3>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         Complete assignments, attend sessions, and participate
                         actively to earn more points and badges!
                       </p>
@@ -1170,7 +1170,7 @@ export default function StudentDashboard() {
                       >
                         <div className="space-y-2">
                           <div>
-                            <p className="text-sm font-medium text-gray-600">
+                            <p className="text-sm font-medium text-muted-foreground">
                               Your Question:
                             </p>
                             <p
@@ -1179,7 +1179,7 @@ export default function StudentDashboard() {
                             >
                               {c.question}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                               Asked:{" "}
                               {new Date(c.askedDate).toLocaleDateString()}
                             </p>
@@ -1281,7 +1281,7 @@ export default function StudentDashboard() {
                 <CardContent>
                   <div className="h-[500px] overflow-y-auto space-y-3">
                     {messages.length === 0 ? (
-                      <p className="text-center text-gray-500 py-8">
+                      <p className="text-center text-muted-foreground py-8">
                         No messages yet
                       </p>
                     ) : (
@@ -1297,7 +1297,7 @@ export default function StudentDashboard() {
                                 ? "You"
                                 : `User #${msg.senderId}`}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(msg.sentDate).toLocaleString()}
                             </span>
                           </div>

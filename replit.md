@@ -10,19 +10,16 @@
 ## System Architecture
 
 ### UI/UX Decisions
-The platform utilizes React 18 with TypeScript for the frontend, styled with Tailwind CSS and Shadcn/UI components for a modern and consistent design. The platform features a **modern, colorful dashboard design** inspired by contemporary educational platforms:
+The platform utilizes React 18 with TypeScript for the frontend, styled with Tailwind CSS and Shadcn/UI components with a **Khan Academy-inspired design system** — clean, white backgrounds, calm blue primary color, labeled navigation, and progress-first layouts:
 
-- **Branding**: "Lyra Preparatory" logo with graduation cap icon in purple-to-pink gradient, displayed on all authentication pages and dashboard sidebars
-- **Modern Vertical Sidebar**: Dark navy sidebar (fixed left, 96px wide) with icon navigation and branding logo at the top for quick access to key sections
-- **Vibrant Color Palette**: Purple, green, coral, and orange accent colors for visual hierarchy and engagement
-- **Welcome Cards**: Personalized hero cards with gradient backgrounds and call-to-action buttons
-- **Colorful Stat Cards**: Vibrant metric cards with icons, gradients, and hover effects
-- **Rounded Design Language**: Generous border-radius (1rem default, up to 3rem on cards) for friendly, modern aesthetic
-- **Modern Dialogs & Dropdowns**: 
-  - All dialogs feature rounded corners (3xl), enhanced shadows, and backdrop blur effects
-  - Instagram-style ModernCombobox for user selection with searchable interface, avatar previews, and gradient themes
-  - Form inputs with rounded borders, focus rings, and smooth transitions
-  - Button animations with scale effects on hover and click
+- **Design Inspiration**: Khan Academy — white/light backgrounds, calm blue (`hsl(220 96% 48%)` ~ #1563E0), minimal cognitive load, mobile-friendly
+- **Branding**: "Lyra Preparatory" with BookOpen icon in primary blue, displayed on all pages
+- **Sidebar (ModernSidebar)**: 240px wide, white background with right border; icons + text labels; active state with blue highlight; bottom profile/logout section; collapses to 56px hamburger top bar on mobile
+- **Dashboard Offset**: Main content uses `md:ml-[240px] pt-20 md:pt-0` to account for sidebar (desktop) and top bar (mobile)
+- **Design Tokens** (index.css): `--primary: 220 96% 48%`, `--success: 142 72% 36%`, `--warning: 38 95% 56%`, all other tokens use semantic names
+- **Stat Cards (ColorfulStatCard)**: White card with `accent` prop (blue/green/amber/purple/rose) - colored icon container + light tinted background
+- **Welcome Banner (WelcomeCard)**: Solid primary-color strip with white text and role info
+- **Auth Pages**: Two-panel layout (blue left panel + white form right) for Login/Signup; clean card layout for VerifyEmail/StudentSignup
 
 Icons are provided by Lucide React. The profile management features a modern tabbed interface for easy navigation and role-specific fields. All interactive elements include `data-testid` attributes for robust testing and full keyboard accessibility support.
 

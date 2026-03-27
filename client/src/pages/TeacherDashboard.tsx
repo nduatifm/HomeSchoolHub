@@ -816,8 +816,8 @@ export default function TeacherDashboard() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
 
-      <div className="ml-24 flex">
-        <main className="flex-1 p-8">
+      <div className="md:ml-[240px] flex">
+        <main className="flex-1 p-6 pt-20 md:pt-6">
           <WelcomeCard
             name={user?.name || "Teacher"}
             message="Ready to inspire and educate! Let's help your students reach their full potential."
@@ -828,33 +828,33 @@ export default function TeacherDashboard() {
             }}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
             <ColorfulStatCard
               title="Students"
               value={students.length}
               icon={Users}
-              className="bg-purple-500"
+              accent="purple"
               subtitle="Active students"
             />
             <ColorfulStatCard
               title="Assignments"
               value={assignments.length}
               icon={BookOpen}
-              className="bg-green-500"
+              accent="blue"
               subtitle="Total created"
             />
             <ColorfulStatCard
               title="Sessions"
               value={sessions.length}
               icon={Presentation}
-              className="bg-pink-500"
+              accent="rose"
               subtitle="Scheduled"
             />
             <ColorfulStatCard
               title="Materials"
               value={materials.length}
               icon={LibraryBig}
-              className="bg-orange-500"
+              accent="amber"
               subtitle="Study resources"
             />
           </div>
@@ -2613,7 +2613,7 @@ export default function TeacherDashboard() {
                       Error loading schedules
                     </div>
                   ) : schedules.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
+                    <p className="text-center text-muted-foreground py-8">
                       No schedules created yet
                     </p>
                   ) : (
@@ -2940,7 +2940,7 @@ export default function TeacherDashboard() {
                       Error loading feedback
                     </div>
                   ) : feedbacks.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
+                    <p className="text-center text-muted-foreground py-8">
                       No feedback given yet
                     </p>
                   ) : (
@@ -2980,7 +2980,7 @@ export default function TeacherDashboard() {
                               >
                                 {f.message}
                               </p>
-                              <p className="text-xs text-gray-500 mt-2">
+                              <p className="text-xs text-muted-foreground mt-2">
                                 {new Date(f.date).toLocaleDateString()}
                               </p>
                             </div>
@@ -3173,7 +3173,7 @@ export default function TeacherDashboard() {
                             Error loading attendance
                           </div>
                         ) : attendanceRecords.length === 0 ? (
-                          <p className="text-center text-gray-500 py-8">
+                          <p className="text-center text-muted-foreground py-8">
                             No attendance records yet
                           </p>
                         ) : (
@@ -3236,7 +3236,7 @@ export default function TeacherDashboard() {
                   <CardContent>
                     <div className="space-y-4">
                       {tutorRequests.length === 0 ? (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                           No tutor requests pending.
                         </p>
                       ) : (
@@ -3254,7 +3254,7 @@ export default function TeacherDashboard() {
                                 >
                                   {r.message}
                                 </p>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                   Requested:{" "}
                                   {new Date(r.requestDate).toLocaleDateString()}
                                 </p>
@@ -3457,7 +3457,7 @@ export default function TeacherDashboard() {
                       <Card>
                         <CardContent className="pt-6">
                           <div className="text-center">
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                               Total Reports
                             </p>
                             <p className="text-3xl font-bold">
@@ -3469,7 +3469,7 @@ export default function TeacherDashboard() {
                       <Card>
                         <CardContent className="pt-6">
                           <div className="text-center">
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                               Students Tracked
                             </p>
                             <p className="text-3xl font-bold">
@@ -3481,7 +3481,7 @@ export default function TeacherDashboard() {
                       <Card>
                         <CardContent className="pt-6">
                           <div className="text-center">
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                               Total Earnings
                             </p>
                             <p className="text-3xl font-bold">
@@ -3496,7 +3496,7 @@ export default function TeacherDashboard() {
                       Recent Progress Reports
                     </h3>
                     {progressReports.length === 0 ? (
-                      <p className="text-center text-gray-500 py-8">
+                      <p className="text-center text-muted-foreground py-8">
                         No reports generated yet
                       </p>
                     ) : (
@@ -3514,7 +3514,7 @@ export default function TeacherDashboard() {
                                 </h4>
                                 <Badge>{report.overallGrade}</Badge>
                               </div>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-muted-foreground">
                                 Date:{" "}
                                 {new Date(
                                   report.reportDate,
@@ -3625,7 +3625,7 @@ export default function TeacherDashboard() {
                 <CardContent>
                   <div className="h-[500px] overflow-y-auto space-y-3">
                     {messages.length === 0 ? (
-                      <p className="text-center text-gray-500 py-8">
+                      <p className="text-center text-muted-foreground py-8">
                         No messages yet
                       </p>
                     ) : (
@@ -3641,7 +3641,7 @@ export default function TeacherDashboard() {
                                 ? "You"
                                 : `User #${msg.senderId}`}
                             </span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(msg.sentDate).toLocaleString()}
                             </span>
                           </div>

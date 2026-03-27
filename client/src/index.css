@@ -4,35 +4,52 @@
 
 @layer base {
   :root {
-    --background: 44 40% 96%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Khan Academy-inspired palette */
+    --background: 220 20% 97%;        /* Very light blue-gray app bg */
+    --foreground: 220 20% 14%;        /* Near-black text */
+    --card: 0 0% 100%;                /* White cards */
+    --card-foreground: 220 20% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 232 60% 60%;
+    --popover-foreground: 220 20% 14%;
+
+    /* Primary: KA-inspired blue */
+    --primary: 220 96% 48%;           /* #1563E0 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 232 60% 60%;
-    --radius: 1rem;
-    --sidebar-bg: 223 84% 5%;
-    --purple: 258 89% 66%;
-    --green: 123 38% 57%;
-    --coral: 352 95% 72%;
-    --orange: 25 95% 68%;
-    --light-purple: 258 100% 95%;
-    --light-green: 123 41% 92%;
-    --light-coral: 352 100% 94%;
-    --light-orange: 25 100% 93%;
+
+    /* Secondary: soft gray */
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 220 20% 25%;
+
+    /* Muted */
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 10% 50%;
+
+    /* Accent: light blue */
+    --accent: 220 96% 95%;
+    --accent-foreground: 220 96% 40%;
+
+    /* Destructive */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border and input */
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 220 96% 48%;
+
+    /* Radius: moderate, professional */
+    --radius: 0.5rem;
+
+    /* Sidebar: white with right border */
+    --sidebar-width: 240px;
+
+    /* Semantic colors */
+    --success: 142 72% 36%;           /* Green for correct/done */
+    --success-light: 142 60% 94%;
+    --warning: 38 92% 50%;            /* Amber for pending */
+    --warning-light: 38 100% 94%;
+    --info: 220 96% 48%;
+    --info-light: 220 96% 95%;
   }
 }
 
@@ -43,89 +60,65 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-size: 15px;
+    line-height: 1.6;
   }
+
+  h1 { @apply text-3xl font-bold tracking-tight; }
+  h2 { @apply text-2xl font-semibold tracking-tight; }
+  h3 { @apply text-xl font-semibold; }
+  h4 { @apply text-lg font-semibold; }
 }
 
 @layer utilities {
-  .bg-purple {
-    background-color: hsl(var(--purple));
+  /* Semantic color utilities */
+  .bg-success {
+    background-color: hsl(var(--success));
+  }
+  .bg-success-light {
+    background-color: hsl(var(--success-light));
+  }
+  .text-success {
+    color: hsl(var(--success));
+  }
+  .bg-warning {
+    background-color: hsl(var(--warning));
+  }
+  .bg-warning-light {
+    background-color: hsl(var(--warning-light));
+  }
+  .text-warning {
+    color: hsl(var(--warning));
+  }
+  .bg-info-light {
+    background-color: hsl(var(--info-light));
+  }
+  .text-info {
+    color: hsl(var(--info));
   }
 
-  .bg-green {
-    background-color: hsl(var(--green));
+  /* Sidebar width utility */
+  .sidebar-width {
+    width: var(--sidebar-width);
   }
-
-  .bg-coral {
-    background-color: hsl(var(--coral));
-  }
-
-  .bg-orange {
-    background-color: hsl(var(--orange));
-  }
-
-  .bg-light-purple {
-    background-color: hsl(var(--light-purple));
-  }
-
-  .bg-light-green {
-    background-color: hsl(var(--light-green));
-  }
-
-  .bg-light-coral {
-    background-color: hsl(var(--light-coral));
-  }
-
-  .bg-light-orange {
-    background-color: hsl(var(--light-orange));
-  }
-
-  /* Animated landing background */
-  @keyframes gradient {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-
-  .landing-gradient {
-    background: linear-gradient(270deg, hsl(var(--light-purple)), hsl(var(--light-green)), hsl(var(--light-coral)));
-    background-size: 600% 600%;
-    animation: gradient 15s ease infinite;
-  }
-
-  .bg-sidebar {
-    background-color: hsl(var(--sidebar-bg));
-  }
-
-  .text-purple {
-    color: hsl(var(--purple));
-  }
-
-  .text-green {
-    color: hsl(var(--green));
-  }
-
-  .text-coral {
-    color: hsl(var(--coral));
-  }
-
-  .text-orange {
-    color: hsl(var(--orange));
+  .ml-sidebar {
+    margin-left: var(--sidebar-width);
   }
 }
 
 @layer components {
-
-  /* Modern Dialog Styles */
+  /* Clean dialog styles */
   [data-radix-dialog-content] {
-    @apply rounded-3xl border-2 shadow-2xl;
+    @apply rounded-xl border shadow-lg;
   }
 
   [data-radix-dialog-overlay] {
     @apply backdrop-blur-sm;
   }
 
-  /* Modern Input Styles */
+  /* Input styles - clean and accessible */
   input[type="text"],
   input[type="email"],
   input[type="password"],
@@ -134,23 +127,42 @@
   input[type="time"],
   textarea,
   select {
-    @apply rounded-xl border-2 transition-all;
+    @apply rounded-md border transition-colors;
   }
 
   input:focus,
   textarea:focus,
   select:focus {
-    @apply border-primary/50 ring-4 ring-primary/10;
+    @apply border-primary/60 ring-2 ring-primary/15;
+    outline: none;
   }
 
-  /* Modern Button Styles */
-  button[type="submit"],
-  button[data-testid*="button-"] {
-    @apply rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98];
-  }
-
-  /* Modern Select Trigger */
+  /* Select trigger */
   [data-radix-select-trigger] {
-    @apply rounded-xl border-2 transition-all;
+    @apply rounded-md border transition-colors;
+  }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer w-full;
+    @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+  }
+  .nav-item.active {
+    @apply bg-accent text-primary;
+  }
+
+  /* Clean stat card */
+  .stat-card {
+    @apply bg-white rounded-xl border p-5 flex items-center gap-4;
+  }
+
+  /* Page header */
+  .page-header {
+    @apply mb-6 flex items-center justify-between;
+  }
+
+  /* Section card */
+  .section-card {
+    @apply bg-white rounded-xl border shadow-sm;
   }
 }

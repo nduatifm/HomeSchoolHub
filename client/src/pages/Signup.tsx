@@ -5,14 +5,6 @@ import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -30,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
 import { ApiError, apiRequest } from "@/lib/queryClient";
 import { Mail, RefreshCw } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -42,12 +35,10 @@ export default function Signup() {
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-  // Google Sign In state
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
   const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
 
-  // Resend verification state
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [isResending, setIsResending] = useState(false);
@@ -55,32 +46,21 @@ export default function Signup() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
-
     try {
       const response = await signup(email, password, name, role);
       toast({
         title: "Account created!",
-        description:
-          response.message ||
-          "Please check your email to verify your account before logging in.",
+        description: response.message || "Please check your email to verify your account.",
         type: "success",
       });
-      // Clear form
-      setEmail("");
-      setPassword("");
-      setName("");
-      // Redirect to login page after 2 seconds
+      setEmail(""); setPassword(""); setName("");
       setTimeout(() => setLocation("/login"), 2000);
     } catch (error: any) {
       if (error.requiresVerification) {
         setUnverifiedEmail(error.email || email);
         setShowResendDialog(true);
       } else {
-        toast({
-          title: "Signup failed",
-          description: error.message,
-          type: "error",
-        });
+        toast({ title: "Signup failed", description: error.message, type: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -96,16 +76,12 @@ export default function Signup() {
       });
       toast({
         title: "Verification email sent!",
-        description: "Please check your inbox and spam folder for the verification link.",
+        description: "Please check your inbox and spam folder.",
         type: "success",
       });
       setShowResendDialog(false);
     } catch (error: any) {
-      toast({
-        title: "Failed to resend",
-        description: error.message,
-        type: "error",
-      });
+      toast({ title: "Failed to resend", description: error.message, type: "error" });
     } finally {
       setIsResending(false);
     }
@@ -115,9 +91,7 @@ export default function Signup() {
     const credential = credentialResponse.credential;
     setGoogleCredential(credential);
     setIsLoading(true);
-
     try {
-      // First, try to sign in without a role - if user exists with role, this will succeed
       await googleSignIn(credential);
       toast({ title: "Welcome back!", type: "success" });
       setLocation("/dashboard");
@@ -126,11 +100,7 @@ export default function Signup() {
       if (apiError.requiresRole) {
         setShowRoleDialog(true);
       } else {
-        toast({
-          title: "Google Sign Up failed",
-          description: apiError.message,
-          type: "error",
-        });
+        toast({ title: "Google Sign Up failed", description: apiError.message, type: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -139,18 +109,13 @@ export default function Signup() {
 
   async function handleGoogleSignupComplete() {
     if (!googleCredential) return;
-
     setIsLoading(true);
     try {
       await googleSignIn(googleCredential, googleRole);
       toast({ title: "Account created!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({
-        title: "Google Sign Up failed",
-        description: error.message,
-        type: "error",
-      });
+      toast({ title: "Google Sign Up failed", description: error.message, type: "error" });
     } finally {
       setIsLoading(false);
       setShowRoleDialog(false);
@@ -158,64 +123,65 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-4">
-          <Logo className="mb-2" />
-        </CardHeader>
-        <CardContent>
+    <div className="min-h-screen bg-background flex">
+      {/* Left panel - branding */}
+      <div className="hidden lg:flex lg:w-[420px] bg-primary flex-col justify-between p-10 shrink-0">
+        <Logo variant="sidebar" className="text-white [&_span]:text-white" />
+        <div>
+          <h2 className="text-white text-2xl font-bold mb-3">
+            Join a growing community of learners
+          </h2>
+          <p className="text-white/75 text-sm leading-relaxed">
+            Thousands of students, teachers, and parents use Lyra Preparatory to
+            make learning organized, clear, and effective.
+          </p>
+        </div>
+        <p className="text-white/50 text-xs">© {new Date().getFullYear()} Lyra Preparatory</p>
+      </div>
+
+      {/* Right panel - form */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <div className="lg:hidden mb-8">
+            <Logo />
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-foreground mb-1">Create an account</h1>
+            <p className="text-sm text-muted-foreground">Fill in your details to get started</p>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                Full Name
-              </label>
+            <div className="space-y-1.5">
+              <label htmlFor="name" className="text-sm font-medium text-foreground">Full name</label>
               <Input
-                id="name"
-                type="text"
-                value={name}
+                id="name" type="text" value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="John Doe"
-                required
+                placeholder="John Doe" required
                 data-testid="input-name"
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">Email address</label>
               <Input
-                id="email"
-                type="email"
-                value={email}
+                id="email" type="email" value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
+                placeholder="you@example.com" required
                 data-testid="input-email"
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">Password</label>
               <Input
-                id="password"
-                type="password"
-                value={password}
+                id="password" type="password" value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={6}
+                placeholder="Min. 6 characters" required minLength={6}
                 data-testid="input-password"
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="role" className="text-sm font-medium">
-                I am a...
-              </label>
-              <Select
-                value={role}
-                onValueChange={(v) => setRole(v as "teacher" | "parent")}
-              >
+            <div className="space-y-1.5">
+              <label htmlFor="role" className="text-sm font-medium text-foreground">I am a...</label>
+              <Select value={role} onValueChange={(v) => setRole(v as "teacher" | "parent")}>
                 <SelectTrigger data-testid="select-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -225,143 +191,96 @@ export default function Signup() {
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-              data-testid="button-signup"
-            >
-              {isLoading ? "Creating account..." : "Sign Up"}
+            <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-signup">
+              {isLoading ? "Creating account..." : "Create account"}
             </Button>
           </form>
 
           {googleClientId && (
             <>
-              <div className="relative my-4">
+              <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
+                  <span className="w-full border-t border-border" />
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-background px-3 text-muted-foreground">or continue with</span>
                 </div>
               </div>
-
-              <div
-                className="flex justify-center"
-                data-testid="google-signup-container"
-              >
+              <div className="flex justify-center" data-testid="google-signup-container">
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
-                  onError={() => {
-                    toast({
-                      title: "Google Sign Up failed",
-                      description: "Please try again",
-                      type: "error",
-                    });
-                  }}
+                  onError={() => toast({ title: "Google Sign Up failed", description: "Please try again", type: "error" })}
                 />
               </div>
             </>
           )}
-        </CardContent>
-        <CardFooter>
-          <Button
-            variant="link"
-            onClick={() => setLocation("/login")}
-            className="text-sm w-full"
-            data-testid="link-login"
-          >
-            Already have an account? Sign in
-          </Button>
-        </CardFooter>
-      </Card>
 
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary font-medium hover:underline" data-testid="link-login">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Google role dialog */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
-        <DialogContent className="rounded-3xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Complete Your Signup</DialogTitle>
-            <DialogDescription>
-              Please select your role to finish creating your account
-            </DialogDescription>
+            <DialogTitle>Complete your signup</DialogTitle>
+            <DialogDescription>Please select your role to finish creating your account</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="google-role" className="text-sm font-medium">
-                I am a...
-              </label>
-              <Select
-                value={googleRole}
-                onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}
-              >
-                <SelectTrigger data-testid="select-google-role">
-                  <SelectValue />
-                </SelectTrigger>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">I am a...</label>
+              <Select value={googleRole} onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}>
+                <SelectTrigger data-testid="select-google-role"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="parent">Parent</SelectItem>
                   <SelectItem value="teacher">Teacher</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              onClick={handleGoogleSignupComplete}
-              className="w-full"
-              disabled={isLoading}
-              data-testid="button-complete-google-signup"
-            >
-              {isLoading ? "Creating account..." : "Complete Signup"}
+            <Button onClick={handleGoogleSignupComplete} className="w-full" disabled={isLoading} data-testid="button-complete-google-signup">
+              {isLoading ? "Creating account..." : "Complete signup"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Resend verification dialog */}
       <Dialog open={showResendDialog} onOpenChange={setShowResendDialog}>
-        <DialogContent className="rounded-3xl">
+        <DialogContent>
           <DialogHeader>
-            <div className="flex justify-center mb-4">
-              <div className="p-3 bg-amber-100 rounded-full">
-                <Mail className="w-8 h-8 text-amber-600" />
+            <div className="flex justify-center mb-3">
+              <div className="p-3 bg-amber-50 rounded-full border border-amber-200">
+                <Mail className="w-7 h-7 text-amber-600" />
               </div>
             </div>
-            <DialogTitle className="text-center">Account Not Verified</DialogTitle>
+            <DialogTitle className="text-center">Account not verified</DialogTitle>
             <DialogDescription className="text-center">
-              An account with <span className="font-medium text-foreground">{unverifiedEmail}</span> already exists but hasn't been verified yet. Would you like us to send a new verification email?
+              An account with <span className="font-medium text-foreground">{unverifiedEmail}</span> already exists but hasn't been verified yet. Would you like a new verification email?
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 pt-4">
-            <Button
-              onClick={handleResendVerification}
-              className="w-full"
-              disabled={isResending}
-            >
+          <div className="space-y-3 pt-2">
+            <Button onClick={handleResendVerification} className="w-full" disabled={isResending}>
               {isResending ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Sending...
-                </>
+                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Sending...</>
               ) : (
-                <>
-                  <Mail className="w-4 h-4 mr-2" />
-                  Resend Verification Email
-                </>
+                <><Mail className="w-4 h-4 mr-2" />Resend verification email</>
               )}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowResendDialog(false)}
-              className="w-full"
-            >
+            <Button variant="outline" onClick={() => setShowResendDialog(false)} className="w-full">
               Cancel
             </Button>
             <p className="text-xs text-center text-muted-foreground">
               Already verified?{" "}
               <button
                 type="button"
-                onClick={() => {
-                  setShowResendDialog(false);
-                  setLocation("/login");
-                }}
+                onClick={() => { setShowResendDialog(false); setLocation("/login"); }}
                 className="text-primary hover:underline"
               >
                 Go to login

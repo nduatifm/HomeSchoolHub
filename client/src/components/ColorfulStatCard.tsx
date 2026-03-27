@@ -4,40 +4,49 @@ interface ColorfulStatCardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  className: string;
+  className?: string;
   subtitle?: string;
+  accent?: "blue" | "green" | "amber" | "purple" | "rose";
 }
+
+const accentMap = {
+  blue:   { bg: "bg-blue-50",   icon: "text-blue-600",   value: "text-blue-700" },
+  green:  { bg: "bg-green-50",  icon: "text-green-600",  value: "text-green-700" },
+  amber:  { bg: "bg-amber-50",  icon: "text-amber-600",  value: "text-amber-700" },
+  purple: { bg: "bg-purple-50", icon: "text-purple-600", value: "text-purple-700" },
+  rose:   { bg: "bg-rose-50",   icon: "text-rose-600",   value: "text-rose-700" },
+};
 
 export default function ColorfulStatCard({
   title,
   value,
   icon: Icon,
-  className,
+  className = "",
   subtitle,
+  accent = "blue",
 }: ColorfulStatCardProps) {
   const testIdBase = title.toLowerCase().replace(/\s+/g, "-");
+  const colors = accentMap[accent] || accentMap.blue;
 
   return (
     <div
-      className={`${className} rounded-3xl p-6 text-white shadow-lg hover:scale-105 transition-transform cursor-pointer`}
+      className={`stat-card ${className}`}
       data-testid={`stat-card-${testIdBase}`}
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className={`bg-white/20 p-3 rounded-2xl`}>
-          <Icon className="w-6 h-6" />
-        </div>
-        <div className="text-right">
-          <div
-            className="text-3xl font-bold"
-            data-testid={`text-${testIdBase}`}
-          >
-            {value}
-          </div>
-        </div>
+      <div className={`${colors.bg} ${colors.icon} p-3 rounded-lg shrink-0`}>
+        <Icon className="w-5 h-5" />
       </div>
-      <div className="space-y-1">
-        <h3 className="text-sm font-medium opacity-90">{title}</h3>
-        {subtitle && <p className="text-xs opacity-75">{subtitle}</p>}
+      <div className="min-w-0">
+        <div
+          className={`text-2xl font-bold ${colors.value}`}
+          data-testid={`text-${testIdBase}`}
+        >
+          {value}
+        </div>
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+        )}
       </div>
     </div>
   );

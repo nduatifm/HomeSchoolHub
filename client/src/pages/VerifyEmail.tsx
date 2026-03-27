@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/Logo";
 
 export default function VerifyEmail() {
   const [, setLocation] = useLocation();
@@ -20,7 +21,7 @@ export default function VerifyEmail() {
 
         if (!token) {
           setStatus("error");
-          setMessage("Invalid verification link - no token provided");
+          setMessage("Invalid verification link — no token provided.");
           return;
         }
 
@@ -30,17 +31,14 @@ export default function VerifyEmail() {
         if (response.ok) {
           setStatus("success");
           setMessage(data.message || "Email verified successfully!");
-          
-          setTimeout(() => {
-            setLocation("/login");
-          }, 3000);
+          setTimeout(() => setLocation("/login"), 3000);
         } else {
           setStatus("error");
-          setMessage(data.error || "Verification failed");
+          setMessage(data.error || "Verification failed.");
         }
       } catch (error) {
         setStatus("error");
-        setMessage("An error occurred during verification");
+        setMessage("Something went wrong. Please try again.");
       }
     };
 
@@ -48,66 +46,67 @@ export default function VerifyEmail() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-        <div className="text-center">
-          {status === "loading" && (
-            <>
-              <Loader2 className="h-16 w-16 text-blue-600 animate-spin mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Verifying Email
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300">
-                Please wait while we verify your email address...
-              </p>
-            </>
-          )}
-
-          {status === "success" && (
-            <>
-              <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Email Verified!
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
-                {message}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Redirecting to login in 3 seconds...
-              </p>
-              <Link href="/login">
-                <Button data-testid="button-go-to-login" className="w-full">
-                  Go to Login Now
-                </Button>
-              </Link>
-            </>
-          )}
-
-          {status === "error" && (
-            <>
-              <XCircle className="h-16 w-16 text-red-600 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                Verification Failed
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
-                {message}
-              </p>
-              <div className="space-y-3">
-                <Link href="/login">
-                  <Button data-testid="button-back-to-login" className="w-full">
-                    Back to Login
-                  </Button>
-                </Link>
-                <Link href="/signup">
-                  <Button data-testid="button-sign-up-again" variant="outline" className="w-full">
-                    Sign Up Again
-                  </Button>
-                </Link>
-              </div>
-            </>
-          )}
-        </div>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+      <div className="mb-8">
+        <Logo />
       </div>
+
+      <div className="w-full max-w-md bg-white rounded-xl border border-border shadow-sm p-8 text-center">
+        {status === "loading" && (
+          <>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            </div>
+            <h1 className="text-xl font-bold text-foreground mb-2">Verifying your email</h1>
+            <p className="text-sm text-muted-foreground">Please wait a moment...</p>
+          </>
+        )}
+
+        {status === "success" && (
+          <>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+            </div>
+            <h1 className="text-xl font-bold text-foreground mb-2">Email verified!</h1>
+            <p className="text-sm text-muted-foreground mb-2">{message}</p>
+            <p className="text-xs text-muted-foreground mb-6">Redirecting you to login in 3 seconds...</p>
+            <Link href="/login">
+              <Button data-testid="button-go-to-login" className="w-full">Go to login</Button>
+            </Link>
+          </>
+        )}
+
+        {status === "error" && (
+          <>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">
+                <XCircle className="w-8 h-8 text-red-500" />
+              </div>
+            </div>
+            <h1 className="text-xl font-bold text-foreground mb-2">Verification failed</h1>
+            <p className="text-sm text-muted-foreground mb-6">{message}</p>
+            <div className="space-y-3">
+              <Link href="/login">
+                <Button data-testid="button-back-to-login" className="w-full">Back to login</Button>
+              </Link>
+              <Link href="/signup">
+                <Button data-testid="button-sign-up-again" variant="outline" className="w-full">Sign up again</Button>
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+
+      <p className="mt-8 text-xs text-muted-foreground">
+        Having trouble?{" "}
+        <Link href="/signup" className="text-primary hover:underline">
+          Request a new verification email
+        </Link>
+      </p>
     </div>
   );
 }

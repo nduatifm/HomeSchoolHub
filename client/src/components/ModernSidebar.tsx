@@ -7,9 +7,17 @@ import {
   FileText,
   UserPlus,
   Presentation,
-  MessageSquareQuote,
   LibraryBig,
   ClipboardCheck,
+  LogOut,
+  ChevronRight,
+  Menu,
+  X,
+  LayoutDashboard,
+  Calendar,
+  MessageSquare,
+  CheckSquare,
+  BarChart2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -31,9 +39,8 @@ export default function ModernSidebar() {
         ? "children"
         : "assignments",
   );
-
-  const [openMenu, setOpenMenu] = useState(false);
-  const menuRef = useRef(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -50,14 +57,8 @@ export default function ModernSidebar() {
   }, []);
 
   useEffect(() => {
-    function handleClickOutside(e: any) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setOpenMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    setMobileOpen(false);
+  }, [currentHash, location]);
 
   const handleNavigation = (hash: string) => {
     if (location !== "/dashboard") {
@@ -68,73 +69,39 @@ export default function ModernSidebar() {
     } else {
       window.location.hash = hash;
     }
+    setMobileOpen(false);
   };
 
-  // Teacher sidebar items
   const teacherItems: SidebarItem[] = [
-    {
-      icon: <BookOpen className="w-6 h-6" />,
-      label: "Assignments",
-      hash: "assignments",
-    },
-    {
-      icon: <ClipboardCheck className="w-6 h-6" />,
-      label: "Grade Submissions",
-      hash: "submissions",
-    },
-    {
-      icon: <LibraryBig className="w-6 h-6" />,
-      label: "Study Materials",
-      hash: "materials",
-    },
-    {
-      icon: <User className="w-6 h-6" />,
-      label: "Students",
-      hash: "students",
-    },
-    {
-      icon: <Presentation className="w-6 h-6" />,
-      label: "Sessions",
-      hash: "sessions",
-    },
+    { icon: <BookOpen className="w-5 h-5" />, label: "Assignments", hash: "assignments" },
+    { icon: <ClipboardCheck className="w-5 h-5" />, label: "Grade Submissions", hash: "submissions" },
+    { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
+    { icon: <User className="w-5 h-5" />, label: "Students", hash: "students" },
+    { icon: <Presentation className="w-5 h-5" />, label: "Sessions", hash: "sessions" },
+    { icon: <Calendar className="w-5 h-5" />, label: "Schedule", hash: "schedule" },
+    { icon: <CheckSquare className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
+    { icon: <MessageSquare className="w-5 h-5" />, label: "Messages", hash: "messages" },
+    { icon: <BarChart2 className="w-5 h-5" />, label: "Reports", hash: "reports" },
   ];
 
-  // Parent sidebar items
   const parentItems: SidebarItem[] = [
-    {
-      icon: <User className="w-6 h-6" />,
-      label: "My Children",
-      hash: "children",
-    },
-    {
-      icon: <UserPlus className="w-6 h-6" />,
-      label: "Invite Student",
-      hash: "invites",
-    },
+    { icon: <User className="w-5 h-5" />, label: "My Children", hash: "children" },
+    { icon: <UserPlus className="w-5 h-5" />, label: "Invite Student", hash: "invites" },
+    { icon: <BarChart2 className="w-5 h-5" />, label: "Track Progress", hash: "progress" },
+    { icon: <FileText className="w-5 h-5" />, label: "Payments", hash: "payments" },
+    { icon: <CheckSquare className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
+    { icon: <MessageSquare className="w-5 h-5" />, label: "Messages", hash: "messages" },
   ];
 
-  // Student sidebar items
   const studentItems: SidebarItem[] = [
-    {
-      icon: <BookOpen className="w-6 h-6" />,
-      label: "Assignments",
-      hash: "assignments",
-    },
-    {
-      icon: <LibraryBig className="w-6 h-6" />,
-      label: "Study Materials",
-      hash: "materials",
-    },
-    {
-      icon: <User className="w-6 h-6" />,
-      label: "Teachers",
-      hash: "teachers",
-    },
-    {
-      icon: <Presentation className="w-6 h-6" />,
-      label: "Sessions",
-      hash: "sessions",
-    },
+    { icon: <BookOpen className="w-5 h-5" />, label: "Assignments", hash: "assignments" },
+    { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
+    { icon: <User className="w-5 h-5" />, label: "Teachers", hash: "teachers" },
+    { icon: <Presentation className="w-5 h-5" />, label: "Sessions", hash: "sessions" },
+    { icon: <Calendar className="w-5 h-5" />, label: "Schedule", hash: "schedule" },
+    { icon: <CheckSquare className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
+    { icon: <MessageSquare className="w-5 h-5" />, label: "Messages", hash: "messages" },
+    { icon: <BarChart2 className="w-5 h-5" />, label: "Rewards", hash: "rewards" },
   ];
 
   const getItems = () => {
@@ -146,83 +113,124 @@ export default function ModernSidebar() {
 
   const items = getItems();
 
-  return (
-    <aside
-      className="fixed left-0 top-0 h-screen w-24 bg-sidebar flex flex-col items-center py-6 shadow-xl z-50"
-      data-testid="sidebar"
-    >
-      <Logo variant="sidebar" className="mb-4" />
+  const isActive = (hash: string) =>
+    currentHash === hash && location === "/dashboard";
 
-      <div className="flex flex-col items-center gap-8 flex-1">
+  const roleLabel =
+    user?.role === "teacher"
+      ? "Teacher"
+      : user?.role === "parent"
+        ? "Parent"
+        : "Student";
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-border">
+        <Logo variant="sidebar" />
+      </div>
+
+      {/* Nav items */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {items.map((item, index) => (
           <button
             key={index}
             onClick={() => handleNavigation(item.hash)}
-            className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all hover:scale-110 ${
-              currentHash === item.hash && location === "/dashboard"
-                ? "bg-white text-sidebar-bg shadow-md"
-                : "text-white hover:bg-white/10"
-            }`}
-            title={item.label}
+            className={`nav-item ${isActive(item.hash) ? "active" : ""}`}
             data-testid={`sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+            title={item.label}
           >
-            {item.icon}
+            <span className={isActive(item.hash) ? "text-primary" : "text-muted-foreground"}>
+              {item.icon}
+            </span>
+            <span>{item.label}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
-      <div className="flex flex-col items-center gap-4 mt-auto">
+      {/* Bottom: profile & settings */}
+      <div className="border-t border-border px-3 py-4 space-y-0.5">
         <Link href="/profile">
-          <div
-            className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all hover:scale-110 cursor-pointer ${
-              location === "/profile"
-                ? "bg-white text-sidebar-bg shadow-md"
-                : "text-white hover:bg-white/10"
-            }`}
+          <button
+            className={`nav-item ${location === "/profile" ? "active" : ""}`}
             data-testid="sidebar-profile"
           >
-            <Settings className="w-6 h-6" />
-          </div>
+            <span className={location === "/profile" ? "text-primary" : "text-muted-foreground"}>
+              <Settings className="w-5 h-5" />
+            </span>
+            <span>Settings</span>
+          </button>
         </Link>
 
-        <div className="relative" ref={menuRef}>
+        {/* User info + logout */}
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mt-1">
+          <Avatar className="w-8 h-8 shrink-0">
+            <AvatarImage src={user?.profilePicture || ""} />
+            <AvatarFallback className="bg-primary text-white text-sm">
+              {user?.name?.charAt(0).toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{user?.name}</p>
+            <p className="text-xs text-muted-foreground">{roleLabel}</p>
+          </div>
           <button
-            onClick={() => setOpenMenu(!openMenu)}
-            className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-white/20 hover:ring-white/40 transition-all"
+            onClick={logout}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+            title="Log out"
           >
-            <Avatar className="w-full h-full">
-              <AvatarImage src={user?.profilePicture || ""} />
-              <AvatarFallback className="bg-primary text-white">
-                {user?.name?.charAt(0).toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
+            <LogOut className="w-4 h-4" />
           </button>
-
-          {openMenu && (
-            <div className="absolute left-16 bottom-0 w-60 bg-white shadow-2xl rounded-2xl border p-4 z-[100]">
-              <div className="flex items-center gap-3 mb-4">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={user?.profilePicture || ""} />
-                  <AvatarFallback className="bg-primary text-white text-lg">
-                    {user?.name?.charAt(0).toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-semibold text-gray-900">{user?.name}</p>
-                  <p className="text-sm text-gray-600">{user?.email}</p>
-                </div>
-              </div>
-
-              <button
-                onClick={logout}
-                className="w-full bg-red-500 hover:bg-red-600 text-white py-2 rounded-xl transition-all"
-              >
-                Logout
-              </button>
-            </div>
-          )}
         </div>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside
+        className="fixed left-0 top-0 h-screen w-[240px] bg-white border-r border-border z-50 hidden md:flex flex-col"
+        data-testid="sidebar"
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile: top bar with hamburger */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-border z-50 flex items-center px-4 gap-3">
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+          aria-label="Toggle menu"
+        >
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+        <Logo variant="mobile" />
+        <div className="flex-1" />
+        <Avatar className="w-8 h-8">
+          <AvatarImage src={user?.profilePicture || ""} />
+          <AvatarFallback className="bg-primary text-white text-sm">
+            {user?.name?.charAt(0).toUpperCase() || "U"}
+          </AvatarFallback>
+        </Avatar>
+      </div>
+
+      {/* Mobile drawer overlay */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/30"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        className={`md:hidden fixed left-0 top-14 bottom-0 w-[240px] bg-white border-r border-border z-50 flex flex-col transition-transform duration-200 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <SidebarContent />
+      </aside>
+    </>
   );
 }
