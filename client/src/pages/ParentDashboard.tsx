@@ -64,7 +64,21 @@ import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
-import type { Student, Assignment, StudentAssignment } from "@shared/schema";
+import type {
+  Student,
+  Assignment,
+  StudentAssignment,
+  StudentInvite,
+  TutorRequest,
+  User,
+  ProgressReport,
+  Message,
+} from "@shared/schema";
+
+type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
+type PublicTeacher = Pick<User, "id" | "name" | "email" | "teachingSubjects" | "yearsExperience">;
+type ProgressReportEnriched = ProgressReport & { studentName?: string; teacherName?: string };
+type AssignedTeacherRef = { id: number; name: string; email: string } | null;
 
 type AssignmentWithStatus = Assignment & {
   studentAssignment: StudentAssignment | null;
@@ -127,18 +141,18 @@ export default function ParentDashboard() {
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students/parent"],
   });
-  const { data: invites = [] } = useQuery<any[]>({
+  const { data: invites = [] } = useQuery<StudentInvite[]>({
     queryKey: ["/api/invites/student/parent"],
   });
-  const { data: tutorRequests = [] } = useQuery<any[]>({
+  const { data: tutorRequests = [] } = useQuery<TutorRequest[]>({
     queryKey: ["/api/tutor-requests/parent"],
     enabled: isTutorRequestModeEnabled,
   });
   const paymentsQuery = useQuery({ queryKey: ["/api/payments/parent"] });
-  const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
-  const { data: users = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
-  const { data: teachers = [] } = useQuery<any[]>({ queryKey: ["/api/teachers"] });
-  const { data: progressReports = [] } = useQuery<any[]>({
+  const { data: messages = [] } = useQuery<Message[]>({ queryKey: ["/api/messages"] });
+  const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
+  const { data: teachers = [] } = useQuery<PublicTeacher[]>({ queryKey: ["/api/teachers"] });
+  const { data: progressReports = [] } = useQuery<ProgressReportEnriched[]>({
     queryKey: ["/api/progress-reports/parent"],
   });
   const ratingsQuery = useQuery({ queryKey: ["/api/tutor-ratings/parent"] });
@@ -369,7 +383,7 @@ export default function ParentDashboard() {
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {childStats.map((child, index) => {
-                  const assignedTeacher = childTeacherQueries[index]?.data as any;
+                  const assignedTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
                   return (
                     <div
                       key={child.id}

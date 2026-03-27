@@ -1582,17 +1582,7 @@ export function registerRoutes(app: Express) {
           take: 1,
         });
         if (allRequests.length === 0) {
-          // Fallback: check if there's an approved request for the parent without studentId
-          const parentRequests = student.parentId
-            ? await prisma.tutorRequest.findMany({
-                where: { parentId: student.parentId, status: "approved" },
-                orderBy: { requestDate: "desc" },
-                take: 1,
-              })
-            : [];
-          if (parentRequests.length === 0) return res.json(null);
-          const teacher = await storage.getUserById(parentRequests[0].teacherId);
-          return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
+          return res.json(null);
         }
         const teacher = await storage.getUserById(allRequests[0].teacherId);
         return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);

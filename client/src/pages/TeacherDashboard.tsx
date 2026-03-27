@@ -73,7 +73,27 @@ import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
-import type { Session, StudentAssignment } from "@shared/schema";
+import type {
+  Session,
+  StudentAssignment,
+  Student,
+  Assignment,
+  Material,
+  Earnings,
+  TutorRequest,
+  User,
+  Message,
+  ProgressReport,
+} from "@shared/schema";
+
+type StudentWithParent = Student & {
+  email?: string;
+  parentName?: string;
+  parentId?: number;
+};
+
+type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
+type ProgressReportEnriched = ProgressReport & { studentName?: string; teacherName?: string };
 
 type StudentSubmissionWithRelations = StudentAssignment & {
   student?: { id: number; name: string };
@@ -153,30 +173,30 @@ export default function TeacherDashboard() {
   const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
 
   // Fetch data
-  const { data: students = [] } = useQuery<any[]>({
+  const { data: students = [] } = useQuery<StudentWithParent[]>({
     queryKey: ["/api/students/teacher"],
   });
-  const { data: assignments = [] } = useQuery<any[]>({
+  const { data: assignments = [] } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments/teacher"],
   });
-  const { data: materials = [] } = useQuery<any[]>({
+  const { data: materials = [] } = useQuery<Material[]>({
     queryKey: ["/api/materials/teacher"],
   });
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions/teacher"],
   });
-  const { data: tutorRequests = [] } = useQuery<any[]>({
+  const { data: tutorRequests = [] } = useQuery<TutorRequest[]>({
     queryKey: ["/api/tutor-requests/teacher"],
     enabled: isTutorRequestModeEnabled, // Only fetch when tutor request mode is ON
   });
-  const { data: earnings = [] } = useQuery<any[]>({
+  const { data: earnings = [] } = useQuery<Earnings[]>({
     queryKey: ["/api/earnings/teacher"],
   });
-  const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
-  const { data: progressReports = [] } = useQuery({
+  const { data: messages = [] } = useQuery<Message[]>({ queryKey: ["/api/messages"] });
+  const { data: progressReports = [] } = useQuery<ProgressReportEnriched[]>({
     queryKey: ["/api/progress-reports/teacher"],
   });
-  const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
+  const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
   const schedulesQuery = useQuery({ queryKey: ["/api/schedules/teacher"] });
   const feedbacksQuery = useQuery({ queryKey: ["/api/feedback/teacher"] });
 
@@ -3736,15 +3756,15 @@ export default function TeacherDashboard() {
               {messageForm.receiverId ? (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/40 text-sm">
                   <span className="font-medium">
-                    {(users as any[]).find((u: any) => u.id === messageForm.receiverId)?.name || `User #${messageForm.receiverId}`}
+                    {users.find((u) => u.id === messageForm.receiverId)?.name || `User #${messageForm.receiverId}`}
                   </span>
                   <span className="text-xs text-muted-foreground ml-auto">
-                    {(users as any[]).find((u: any) => u.id === messageForm.receiverId)?.email}
+                    {users.find((u) => u.id === messageForm.receiverId)?.email}
                   </span>
                 </div>
               ) : (
                 <ModernCombobox
-                  users={users as any[]}
+                  users={users}
                   selectedUserId={messageForm.receiverId}
                   onSelect={(userId) => setMessageForm({ ...messageForm, receiverId: userId })}
                   placeholder="Search users..."
