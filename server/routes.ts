@@ -2503,15 +2503,13 @@ export function registerRoutes(app: Express) {
   if (process.env.NODE_ENV !== "production") {
     app.post("/api/dev/become", async (req, res) => {
       try {
-        const { role } = req.body as { role: "teacher" | "parent" | "student" };
-        if (!["teacher", "parent", "student"].includes(role)) {
-          return res.status(400).json({ error: "Invalid role" });
-        }
+        // Accept either { email } for a specific persona or legacy { role } for primary persona
+        const { email: targetEmail, role: legacyRole } = req.body as { email?: string; role?: string };
 
         const today = new Date().toISOString().split("T")[0];
         const hash = await hashPassword("Demo1234!");
 
-        // ── Ensure demo teacher ──
+        // ── Ensure demo teachers ──
         let teacher = await storage.getUserByEmail("demo.teacher@lyraprep.dev");
         if (!teacher) {
           teacher = await storage.createUser({
@@ -2525,6 +2523,38 @@ export function registerRoutes(app: Express) {
             yearsExperience: 9,
             qualifications: "M.Sc. Applied Mathematics, Certified SAT Tutor",
             specialization: "STEM & College Entrance Exams",
+          });
+        }
+
+        let teacher2 = await storage.getUserByEmail("demo.teacher2@lyraprep.dev");
+        if (!teacher2) {
+          teacher2 = await storage.createUser({
+            email: "demo.teacher2@lyraprep.dev",
+            password: hash,
+            name: "Mr. Marcus Johnson",
+            role: "teacher",
+            isEmailVerified: true,
+            bio: "English Literature and History specialist with a talent for bringing texts and events to life. Experienced with middle and high school learners.",
+            teachingSubjects: ["English", "History", "Essay Writing"],
+            yearsExperience: 6,
+            qualifications: "B.A. English Literature, PGCE Secondary Education",
+            specialization: "Humanities & Creative Writing",
+          });
+        }
+
+        let teacher3 = await storage.getUserByEmail("demo.teacher3@lyraprep.dev");
+        if (!teacher3) {
+          teacher3 = await storage.createUser({
+            email: "demo.teacher3@lyraprep.dev",
+            password: hash,
+            name: "Ms. Aisha Patel",
+            role: "teacher",
+            isEmailVerified: true,
+            bio: "Biology and Chemistry tutor focused on AP and IB level science. Loves helping students connect lab work to real-world applications.",
+            teachingSubjects: ["Biology", "Chemistry", "AP Science"],
+            yearsExperience: 11,
+            qualifications: "Ph.D. Biochemistry, AP Certified Teacher",
+            specialization: "Advanced Sciences & University Prep",
           });
         }
 
@@ -2542,7 +2572,8 @@ export function registerRoutes(app: Express) {
           });
         }
 
-        // ── Ensure demo student user + Student record ──
+        // ── Ensure demo students (all under James Wilson) ──
+        // Student 1: Emily Wilson, Grade 10 — Sarah Chen's student
         let studentUser = await storage.getUserByEmail("demo.student@lyraprep.dev");
         if (!studentUser) {
           studentUser = await storage.createUser({
@@ -2556,7 +2587,6 @@ export function registerRoutes(app: Express) {
             interests: ["Math Competitions", "Chess", "Piano"],
           });
         }
-
         let studentRecord = await storage.getStudentByUserId(studentUser.id);
         if (!studentRecord) {
           studentRecord = await storage.createStudent({
@@ -2569,8 +2599,60 @@ export function registerRoutes(app: Express) {
           });
         }
 
+        // Student 2: Liam Wilson, Grade 7 — Marcus Johnson's student
+        let studentUser2 = await storage.getUserByEmail("demo.student2@lyraprep.dev");
+        if (!studentUser2) {
+          studentUser2 = await storage.createUser({
+            email: "demo.student2@lyraprep.dev",
+            password: hash,
+            name: "Liam Wilson",
+            role: "student",
+            isEmailVerified: true,
+            favoriteSubject: "History",
+            learningGoals: "Improve reading comprehension, write stronger essays, learn more about world history",
+            interests: ["Football", "Video Games", "Reading"],
+          });
+        }
+        let studentRecord2 = await storage.getStudentByUserId(studentUser2.id);
+        if (!studentRecord2) {
+          studentRecord2 = await storage.createStudent({
+            userId: studentUser2.id,
+            parentId: parent.id,
+            name: "Liam Wilson",
+            gradeLevel: "Grade 7",
+            badges: ["First Assignment", "Bookworm"],
+            points: 430,
+          });
+        }
+
+        // Student 3: Sophie Wilson, Grade 12 — Aisha Patel's student
+        let studentUser3 = await storage.getUserByEmail("demo.student3@lyraprep.dev");
+        if (!studentUser3) {
+          studentUser3 = await storage.createUser({
+            email: "demo.student3@lyraprep.dev",
+            password: hash,
+            name: "Sophie Wilson",
+            role: "student",
+            isEmailVerified: true,
+            favoriteSubject: "Biology",
+            learningGoals: "Score 5 on AP Biology and AP Chemistry, apply to pre-med programs",
+            interests: ["Science Olympiad", "Volunteering", "Running"],
+          });
+        }
+        let studentRecord3 = await storage.getStudentByUserId(studentUser3.id);
+        if (!studentRecord3) {
+          studentRecord3 = await storage.createStudent({
+            userId: studentUser3.id,
+            parentId: parent.id,
+            name: "Sophie Wilson",
+            gradeLevel: "Grade 12",
+            badges: ["First Assignment", "Perfect Score", "Top Performer", "Science Star"],
+            points: 1250,
+          });
+        }
+
         // ── Seed rich test data (idempotent) ──
-        const seeded = await storage.getSystemSetting("DEV_SEED_DONE");
+        const seeded = await storage.getSystemSetting("DEV_SEED_V2_DONE");
         if (!seeded) {
           // Assignments
           const a1 = await storage.createAssignment({
@@ -2787,20 +2869,290 @@ export function registerRoutes(app: Express) {
             notes: null,
           });
 
-          // Mark seed done
-          await storage.setSystemSetting("DEV_SEED_DONE", "true", "Demo seed data has been inserted");
+          // ── Teacher 2 (Marcus Johnson) — Liam Wilson, Grade 7 ──
+          const b1 = await storage.createAssignment({
+            title: "The Diary of a Young Girl — Chapter Analysis",
+            description: "Read chapters 1–5 of Anne Frank's diary. Write a 300-word analysis of how Anne's voice changes across these chapters.",
+            subject: "English",
+            dueDate: new Date(Date.now() + 6 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher2.id,
+            gradeLevel: "Grade 7",
+            points: 80,
+            fileUrl: null,
+          });
+          const b2 = await storage.createAssignment({
+            title: "World War II Timeline",
+            description: "Create an illustrated timeline of key WW2 events from 1939–1945. Include at least 15 events with a 2-sentence explanation each.",
+            subject: "History",
+            dueDate: new Date(Date.now() + 10 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher2.id,
+            gradeLevel: "Grade 7",
+            points: 100,
+            fileUrl: null,
+          });
+          const b3 = await storage.createAssignment({
+            title: "Persuasive Essay — Homework Debate",
+            description: "Write a 400-word persuasive essay arguing for OR against homework. Use at least 3 supporting points with evidence.",
+            subject: "Essay Writing",
+            dueDate: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher2.id,
+            gradeLevel: "Grade 7",
+            points: 90,
+            fileUrl: null,
+          });
+
+          await storage.createStudentAssignment({
+            assignmentId: b1.id, studentId: studentRecord2.id,
+            status: "pending", submission: null, fileUrl: null, notes: null, grade: null, feedback: null, submittedAt: null,
+          });
+          await storage.createStudentAssignment({
+            assignmentId: b2.id, studentId: studentRecord2.id,
+            status: "submitted",
+            submission: "I created a 16-event timeline covering from the German invasion of Poland through the dropping of the atomic bombs.",
+            fileUrl: null, notes: null, grade: null, feedback: null,
+            submittedAt: new Date(Date.now() - 86400000).toISOString(),
+          });
+          await storage.createStudentAssignment({
+            assignmentId: b3.id, studentId: studentRecord2.id,
+            status: "graded",
+            submission: "I argued against homework using three main points: stress, lack of play time, and diminishing returns after school hours.",
+            fileUrl: null, notes: null,
+            grade: 78,
+            feedback: "Good argument structure, Liam! Your second point about play time was the strongest. Work on citing evidence more specifically next time.",
+            submittedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+          });
+
+          await storage.createMaterial({
+            title: "Essay Writing Framework",
+            description: "A step-by-step guide to structuring persuasive and analytical essays — includes topic sentence, evidence, and conclusion templates.",
+            fileUrl: "https://example.com/materials/essay-framework.pdf",
+            subject: "Essay Writing",
+            teacherId: teacher2.id,
+            uploadDate: new Date(Date.now() - 8 * 86400000).toISOString().split("T")[0],
+            gradeLevel: "Grade 7",
+          });
+          await storage.createMaterial({
+            title: "WW2 Key Figures Reference Sheet",
+            description: "Quick-reference cards for major figures of WWII — leaders, generals, and civilians who shaped the war's outcome.",
+            fileUrl: "https://example.com/materials/ww2-figures.pdf",
+            subject: "History",
+            teacherId: teacher2.id,
+            uploadDate: new Date(Date.now() - 12 * 86400000).toISOString().split("T")[0],
+            gradeLevel: "Grade 7",
+          });
+
+          const pastSession2 = await storage.createSession({
+            teacher: { connect: { id: teacher2.id } },
+            studentIds: [studentRecord2.id],
+            subject: "English",
+            sessionDate: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0],
+            startTime: "16:00", endTime: "17:00",
+            title: "Reading Comprehension Strategies",
+            description: "Worked through active reading techniques — annotation, summarising, and identifying author's intent.",
+            meetingUrl: "https://meet.google.com/def-demo-lmn",
+            notes: "Liam is engaged but needs to slow down when annotating. Recommend re-reading each paragraph before moving on.",
+            status: "completed",
+          });
+          await storage.createSession({
+            teacher: { connect: { id: teacher2.id } },
+            studentIds: [studentRecord2.id],
+            subject: "History",
+            sessionDate: new Date(Date.now() + 6 * 86400000).toISOString().split("T")[0],
+            startTime: "16:00", endTime: "17:00",
+            title: "WW2 Causes — Interactive Discussion",
+            description: "Deep dive into the political and economic causes of WWII ahead of the timeline assignment.",
+            meetingUrl: "https://meet.google.com/def-demo-lmn",
+            notes: null, status: "scheduled",
+          });
+
+          const existingReq2 = await prisma.tutorRequest.findFirst({ where: { parentId: parent.id, teacherId: teacher2.id } });
+          if (!existingReq2) {
+            await storage.createTutorRequest({
+              parentId: parent.id, teacherId: teacher2.id, studentId: studentRecord2.id,
+              status: "approved",
+              message: "Liam struggles with writing and needs help with comprehension. He loves history so we hope that helps as an entry point.",
+              requestDate: new Date(Date.now() - 25 * 86400000).toISOString().split("T")[0],
+              responseDate: new Date(Date.now() - 23 * 86400000).toISOString().split("T")[0],
+            });
+          }
+          const existingTSA2 = await storage.getTeacherStudentAssignment(teacher2.id, studentRecord2.id);
+          if (!existingTSA2) {
+            await storage.createTeacherStudentAssignment({ teacherId: teacher2.id, studentId: studentRecord2.id, assignedDate: today, status: "active" });
+          }
+
+          await storage.createProgressReport({
+            studentId: studentRecord2.id, teacherId: teacher2.id,
+            period: "March 2026",
+            content: "Liam is showing real enthusiasm for History — his timeline work is detailed and thoughtful. Writing remains the primary growth area: sentence variety and evidence citation need work. We are making steady progress with the essay framework. He consistently attends sessions and asks good questions.",
+            date: today,
+            grades: { English: 74, History: 82, "Essay Writing": 71 },
+          });
+          await storage.createProgressReport({
+            studentId: studentRecord2.id, teacherId: teacher2.id,
+            period: "February 2026",
+            content: "A promising start. Liam is confident in History but tentative with written work. Introduced the essay framework; early signs are positive. Recommended daily reading of at least 20 minutes to build vocabulary and comprehension.",
+            date: "2026-02-28",
+            grades: { English: 68, History: 79, "Essay Writing": 65 },
+          });
+
+          await storage.createFeedback({ teacherId: teacher2.id, studentId: studentRecord2.id, message: "Your WW2 submission was thorough and well-organised — I was impressed with the level of detail!", date: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0], type: "positive" });
+          await storage.createFeedback({ teacherId: teacher2.id, studentId: studentRecord2.id, message: "For your next essay, try to include a quote or statistic for each point — it will make your arguments much more convincing.", date: new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0], type: "constructive" });
+          await storage.createAttendance({ studentId: studentRecord2.id, sessionId: pastSession2.id, date: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0], status: "present", notes: null });
+
+          // ── Teacher 3 (Aisha Patel) — Sophie Wilson, Grade 12 ──
+          const c1 = await storage.createAssignment({
+            title: "AP Biology — Cellular Respiration Lab Report",
+            description: "Write a full lab report for the fermentation experiment we ran in our last session. Include hypothesis, method, data, analysis, and conclusion (800–1000 words).",
+            subject: "Biology",
+            dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher3.id,
+            gradeLevel: "Grade 12",
+            points: 150,
+            fileUrl: null,
+          });
+          const c2 = await storage.createAssignment({
+            title: "AP Chemistry — Equilibrium Problem Set",
+            description: "Complete all 20 equilibrium problems. Show equilibrium expressions, ICE tables where applicable, and calculations. Due at start of our next session.",
+            subject: "Chemistry",
+            dueDate: new Date(Date.now() + 2 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher3.id,
+            gradeLevel: "Grade 12",
+            points: 120,
+            fileUrl: null,
+          });
+          const c3 = await storage.createAssignment({
+            title: "AP Biology Practice MCQ — Genetics Unit",
+            description: "Complete the 40-question genetics MCQ under timed conditions (50 min). Justify your answers for any you were unsure about.",
+            subject: "AP Science",
+            dueDate: new Date(Date.now() - 1 * 86400000).toISOString().split("T")[0],
+            teacherId: teacher3.id,
+            gradeLevel: "Grade 12",
+            points: 100,
+            fileUrl: null,
+          });
+
+          await storage.createStudentAssignment({
+            assignmentId: c1.id, studentId: studentRecord3.id,
+            status: "submitted",
+            submission: "Lab report attached. The yeast showed higher respiration rates at 37°C than at 25°C or 15°C, consistent with enzyme optimal temperature theory.",
+            fileUrl: null, notes: "Happy to revise if needed!", grade: null, feedback: null,
+            submittedAt: new Date(Date.now() - 86400000).toISOString(),
+          });
+          await storage.createStudentAssignment({
+            assignmentId: c2.id, studentId: studentRecord3.id,
+            status: "pending", submission: null, fileUrl: null, notes: null, grade: null, feedback: null, submittedAt: null,
+          });
+          await storage.createStudentAssignment({
+            assignmentId: c3.id, studentId: studentRecord3.id,
+            status: "graded",
+            submission: "Completed all 40 questions under 50 minutes. Was unsure about Mendel's law questions at the end.",
+            fileUrl: null, notes: null,
+            grade: 93,
+            feedback: "Outstanding, Sophie — 37/40 is a 5-level score! Review questions 28 and 35 on linked genes. You are well on track for the AP exam.",
+            submittedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+          });
+
+          await storage.createMaterial({
+            title: "AP Biology — Genetics Quick Reference",
+            description: "Covers Mendelian genetics, linked genes, codominance, and non-disjunction with worked examples and AP-style questions.",
+            fileUrl: "https://example.com/materials/ap-bio-genetics.pdf",
+            subject: "Biology",
+            teacherId: teacher3.id,
+            uploadDate: new Date(Date.now() - 9 * 86400000).toISOString().split("T")[0],
+            gradeLevel: "Grade 12",
+          });
+          await storage.createMaterial({
+            title: "AP Chemistry — Equilibrium & Ksp Master Sheet",
+            description: "Complete coverage of chemical equilibrium, Le Chatelier's principle, Ksp calculations, and common exam question patterns.",
+            fileUrl: "https://example.com/materials/ap-chem-equilibrium.pdf",
+            subject: "Chemistry",
+            teacherId: teacher3.id,
+            uploadDate: new Date(Date.now() - 11 * 86400000).toISOString().split("T")[0],
+            gradeLevel: "Grade 12",
+          });
+
+          const pastSession3 = await storage.createSession({
+            teacher: { connect: { id: teacher3.id } },
+            studentIds: [studentRecord3.id],
+            subject: "Biology",
+            sessionDate: new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0],
+            startTime: "17:00", endTime: "18:30",
+            title: "Genetics Unit — Linked Genes Deep Dive",
+            description: "Worked through complex linked-gene problems and non-disjunction scenarios. Sophie grasped the concept quickly once we drew chromosome diagrams.",
+            meetingUrl: "https://meet.google.com/ghi-demo-opq",
+            notes: "Review questions 28 and 35 from the MCQ for next session.",
+            status: "completed",
+          });
+          await storage.createSession({
+            teacher: { connect: { id: teacher3.id } },
+            studentIds: [studentRecord3.id],
+            subject: "Chemistry",
+            sessionDate: new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0],
+            startTime: "17:00", endTime: "18:30",
+            title: "Equilibrium Problem Workshop",
+            description: "Go through the problem set together, focusing on multi-step ICE table problems which are high-frequency on the AP exam.",
+            meetingUrl: "https://meet.google.com/ghi-demo-opq",
+            notes: null, status: "scheduled",
+          });
+
+          const existingReq3 = await prisma.tutorRequest.findFirst({ where: { parentId: parent.id, teacherId: teacher3.id } });
+          if (!existingReq3) {
+            await storage.createTutorRequest({
+              parentId: parent.id, teacherId: teacher3.id, studentId: studentRecord3.id,
+              status: "approved",
+              message: "Sophie is targeting top AP scores in Biology and Chemistry and needs a specialist tutor. She is very motivated and self-directed.",
+              requestDate: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0],
+              responseDate: new Date(Date.now() - 28 * 86400000).toISOString().split("T")[0],
+            });
+          }
+          const existingTSA3 = await storage.getTeacherStudentAssignment(teacher3.id, studentRecord3.id);
+          if (!existingTSA3) {
+            await storage.createTeacherStudentAssignment({ teacherId: teacher3.id, studentId: studentRecord3.id, assignedDate: today, status: "active" });
+          }
+
+          await storage.createProgressReport({
+            studentId: studentRecord3.id, teacherId: teacher3.id,
+            period: "March 2026",
+            content: "Sophie is performing at an exceptional level. Her genetics MCQ score of 93% puts her firmly in AP 5 territory. Lab reports are thorough and well-written. The remaining gap is equilibrium chemistry — she sometimes skips ICE table steps under time pressure. Addressing this in our next session.",
+            date: today,
+            grades: { Biology: 95, Chemistry: 88, "AP Science": 93 },
+          });
+          await storage.createProgressReport({
+            studentId: studentRecord3.id, teacherId: teacher3.id,
+            period: "February 2026",
+            content: "An outstanding student who comes prepared and asks precise questions. February scores show strong growth in both subjects. Identified chemical equilibrium as the only area requiring more attention. Sophie took on extra practice problems without being asked — excellent attitude.",
+            date: "2026-02-28",
+            grades: { Biology: 91, Chemistry: 82, "AP Science": 88 },
+          });
+
+          await storage.createFeedback({ teacherId: teacher3.id, studentId: studentRecord3.id, message: "37/40 on the genetics MCQ is exceptional work — you are absolutely ready for AP exam level questions.", date: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0], type: "positive" });
+          await storage.createFeedback({ teacherId: teacher3.id, studentId: studentRecord3.id, message: "Always show your ICE table working even when it feels obvious — AP graders award method marks and you don't want to lose them.", date: new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0], type: "constructive" });
+          await storage.createAttendance({ studentId: studentRecord3.id, sessionId: pastSession3.id, date: new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0], status: "present", notes: null });
+
+          // Mark seed done (v2)
+          await storage.setSystemSetting("DEV_SEED_V2_DONE", "true", "Demo seed data v2 — 3 teachers, 3 students under one parent");
         }
 
-        // Create session for the requested role
-        const targetUser =
-          role === "teacher" ? teacher :
-          role === "parent"  ? parent  :
-          studentUser;
+        // ── Resolve the target user ──
+        const DEMO_EMAILS: Record<string, string> = {
+          teacher:  "demo.teacher@lyraprep.dev",
+          teacher2: "demo.teacher2@lyraprep.dev",
+          teacher3: "demo.teacher3@lyraprep.dev",
+          parent:   "demo.parent@lyraprep.dev",
+          student:  "demo.student@lyraprep.dev",
+          student2: "demo.student2@lyraprep.dev",
+          student3: "demo.student3@lyraprep.dev",
+        };
+
+        const resolvedEmail = targetEmail ?? (legacyRole ? DEMO_EMAILS[legacyRole] : null);
+        if (!resolvedEmail) return res.status(400).json({ error: "Provide email or role" });
+
+        const targetUser = await storage.getUserByEmail(resolvedEmail);
+        if (!targetUser) return res.status(404).json({ error: "Demo user not found" });
 
         const newSessionId = crypto.randomUUID();
         sessions.set(newSessionId, targetUser.id);
-
-        const profile = role === "student" ? await storage.getStudentByUserId(targetUser.id) : null;
+        const studentProfile = targetUser.role === "student" ? await storage.getStudentByUserId(targetUser.id) : null;
 
         return res.json({
           sessionId: newSessionId,
@@ -2822,7 +3174,7 @@ export function registerRoutes(app: Express) {
             favoriteSubject: targetUser.favoriteSubject,
             learningGoals: targetUser.learningGoals,
           },
-          student: profile ?? null,
+          student: studentProfile ?? null,
         });
       } catch (error: any) {
         console.error("Dev become error:", error);
