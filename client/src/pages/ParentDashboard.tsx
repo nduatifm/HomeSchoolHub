@@ -67,6 +67,12 @@ type AssignmentWithStatus = Assignment & {
   studentAssignment: StudentAssignment | null;
 };
 
+type ChildStat = Student & {
+  pct: number | null;
+  completed: number;
+  total: number;
+};
+
 const paymentSchema = z.object({
   teacherId: z.number().min(1, "Teacher required"),
   amount: z.number().min(0.01, "Amount must be greater than 0"),
@@ -149,7 +155,7 @@ export default function ParentDashboard() {
     })),
   });
 
-  const childStats = students.map((child, index) => {
+  const childStats: ChildStat[] = students.map((child, index) => {
     const data = (childAssignmentQueries[index]?.data as AssignmentWithStatus[]) || [];
     const completed = data.filter(
       (a) => a.studentAssignment?.status === "graded",
@@ -340,7 +346,7 @@ export default function ParentDashboard() {
             <div className="my-6">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {childStats.map((child: any) => (
+                {childStats.map((child) => (
                   <button
                     key={child.id}
                     onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}

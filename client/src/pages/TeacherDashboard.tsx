@@ -75,6 +75,11 @@ import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
 import type { Session, StudentAssignment } from "@shared/schema";
 
+type StudentSubmissionWithRelations = StudentAssignment & {
+  student?: { id: number; name: string };
+  assignment?: { id: number; title: string; subject: string; fileUrl?: string | null };
+};
+
 const scheduleSchema = z.object({
   studentId: z.number().min(1, "Student required"),
   dayOfWeek: z.string().min(1, "Day required"),
@@ -188,7 +193,7 @@ export default function TeacherDashboard() {
 
   // Fetch student submissions for grading
   const { data: studentSubmissions = [], isLoading: submissionsLoading } =
-    useQuery<StudentAssignment[]>({
+    useQuery<StudentSubmissionWithRelations[]>({
       queryKey: ["/api/student-submissions/teacher"],
     });
 
@@ -1374,7 +1379,7 @@ export default function TeacherDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {studentSubmissions.map((sub: any) => (
+                        {studentSubmissions.map((sub) => (
                           <TableRow
                             key={sub.id}
                             data-testid={`row-submission-${sub.id}`}
@@ -1409,7 +1414,7 @@ export default function TeacherDashboard() {
                             </TableCell>
                             <TableCell>
                               <a
-                                href={sub.assignment?.fileUrl}
+                                href={sub.assignment?.fileUrl ?? undefined}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-600 hover:underline"
@@ -1420,7 +1425,7 @@ export default function TeacherDashboard() {
                             </TableCell>
                             <TableCell>
                               <a
-                                href={sub?.fileUrl}
+                                href={sub?.fileUrl ?? undefined}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-600 hover:underline"
@@ -1436,7 +1441,7 @@ export default function TeacherDashboard() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>
-                                      window.open(sub.submission, "_blank")
+                                      window.open(sub.submission ?? undefined, "_blank")
                                     }
                                     data-testid={`button-view-submission-${sub.id}`}
                                   >

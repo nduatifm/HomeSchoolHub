@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Settings,
@@ -33,8 +33,6 @@ export default function ModernSidebar() {
         : "assignments",
   );
   const [mobileOpen, setMobileOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const handleHashChange = () => {
       setCurrentHash(
