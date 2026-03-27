@@ -1541,6 +1541,16 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Student not found" });
       }
 
+      // Authorization: only the student's parent or an assigned teacher may look this up
+      const requestingUser = await storage.getUserById(req.session.userId!);
+      if (!requestingUser) return res.status(401).json({ error: "Unauthorized" });
+
+      const isParent = requestingUser.role === "parent" && student.parentId === requestingUser.id;
+      const isTeacher = requestingUser.role === "teacher";
+      if (!isParent && !isTeacher) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       const isTutorMode = await isTutorRequestModeEnabled();
 
       if (!isTutorMode) {
@@ -2179,10 +2189,26 @@ export function registerRoutes(app: Express) {
           .json({ error: "Only teachers can create reports" });
       }
 
+      const body = req.body;
+      // Map legacy form fields (reportDate/comments/overallGrade) to schema fields (date/content/grades)
+      const overallNum = parseFloat(body.overallGrade);
+      const grades = !isNaN(overallNum)
+        ? { Overall: overallNum }
+        : (typeof body.grades === "object" && body.grades) || {};
+
+      const contentParts = [
+        body.content || body.comments || "",
+        body.strengths ? `Strengths: ${body.strengths}` : "",
+        body.improvements ? `To improve: ${body.improvements}` : "",
+      ].filter(Boolean);
+
       const data = insertProgressReportSchema.parse({
-        ...req.body,
+        studentId: body.studentId,
         teacherId: user.id,
-        date: new Date().toISOString(),
+        date: body.date || body.reportDate || new Date().toISOString().split("T")[0],
+        period: body.period || body.reportDate || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+        content: contentParts.join("\n\n"),
+        grades,
       });
 
       const report = await storage.createProgressReport(data);

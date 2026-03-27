@@ -1214,7 +1214,15 @@ export default function ParentDashboard() {
                               <SelectContent>
                                 {teachers.map((t: any) => (
                                   <SelectItem key={t.id} value={t.id.toString()}>
-                                    {t.name}
+                                    <span className="font-medium">{t.name}</span>
+                                    {(t.teachingSubjects?.length > 0 || t.yearsExperience) && (
+                                      <span className="text-xs text-muted-foreground ml-1.5">
+                                        {[
+                                          t.teachingSubjects?.slice(0, 2).join(", "),
+                                          t.yearsExperience && `${t.yearsExperience}y exp`,
+                                        ].filter(Boolean).join(" · ")}
+                                      </span>
+                                    )}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1318,25 +1326,16 @@ export default function ParentDashboard() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-medium text-sm">{report.studentName || "Student"}</span>
-                                {report.overallGrade && (
-                                  <Badge variant="secondary">{report.overallGrade}</Badge>
+                                <span className="text-xs text-muted-foreground font-medium">{report.period}</span>
+                                {report.grades?.Overall !== undefined && (
+                                  <Badge variant="secondary">{report.grades.Overall}%</Badge>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground mb-2">
-                                By {report.teacherName || "Teacher"} · {new Date(report.reportDate).toLocaleDateString()}
+                                By {report.teacherName || "Teacher"} · {report.date ? new Date(report.date).toLocaleDateString() : ""}
                               </p>
-                              {report.comments && (
-                                <p className="text-sm text-foreground line-clamp-2">{report.comments}</p>
-                              )}
-                              {report.strengths && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  <span className="font-medium text-green-700 dark:text-green-400">Strengths:</span> {report.strengths}
-                                </p>
-                              )}
-                              {report.improvements && (
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  <span className="font-medium text-amber-700 dark:text-amber-400">To improve:</span> {report.improvements}
-                                </p>
+                              {report.content && (
+                                <p className="text-sm text-foreground line-clamp-2">{report.content}</p>
                               )}
                             </div>
                             <Button

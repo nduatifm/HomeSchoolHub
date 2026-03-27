@@ -466,6 +466,8 @@ class PrismaStorage implements IStorage {
         isEmailVerified: true,
         googleId: true,
         profilePicture: true,
+        teachingSubjects: true,
+        yearsExperience: true,
         // Exclude password and emailVerifyToken for security
       },
     })) as User[];

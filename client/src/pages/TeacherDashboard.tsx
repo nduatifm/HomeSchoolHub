@@ -655,7 +655,7 @@ export default function TeacherDashboard() {
   // Generate progress report
   const [reportForm, setReportForm] = useState({
     studentId: 0,
-    reportDate: new Date().toISOString().split("T")[0],
+    period: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
     overallGrade: "",
     comments: "",
     strengths: "",
@@ -675,7 +675,7 @@ export default function TeacherDashboard() {
       toast({ title: "Progress report created!", type: "success" });
       setReportForm({
         studentId: 0,
-        reportDate: new Date().toISOString().split("T")[0],
+        period: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
         overallGrade: "",
         comments: "",
         strengths: "",
@@ -3414,18 +3414,18 @@ export default function TeacherDashboard() {
                         </div>
                         <div>
                           <label className="text-sm font-medium">
-                            Report Date
+                            Period
                           </label>
                           <Input
-                            type="date"
-                            value={reportForm.reportDate}
+                            placeholder="e.g. March 2026, Q1 2026, Week 3"
+                            value={reportForm.period}
                             onChange={(e) =>
                               setReportForm({
                                 ...reportForm,
-                                reportDate: e.target.value,
+                                period: e.target.value,
                               })
                             }
-                            data-testid="input-report-date"
+                            data-testid="input-report-period"
                           />
                         </div>
                         <div>
@@ -3573,28 +3573,22 @@ export default function TeacherDashboard() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <h4 className="font-medium">
-                                  Report #{report.id}
+                                  {report.period || `Report #${report.id}`}
                                 </h4>
-                                <Badge>{report.overallGrade}</Badge>
+                                {report.grades?.Overall !== undefined && (
+                                  <Badge>{report.grades.Overall}%</Badge>
+                                )}
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                Date:{" "}
-                                {new Date(
-                                  report.reportDate,
-                                ).toLocaleDateString()}
+                                {report.date
+                                  ? new Date(report.date).toLocaleDateString()
+                                  : "Date unknown"}
                               </p>
-                              <div className="mt-2 space-y-1">
-                                <p className="text-sm">
-                                  <strong>Comments:</strong> {report.comments}
+                              {report.content && (
+                                <p className="text-sm mt-2 text-foreground line-clamp-3">
+                                  {report.content}
                                 </p>
-                                <p className="text-sm">
-                                  <strong>Strengths:</strong> {report.strengths}
-                                </p>
-                                <p className="text-sm">
-                                  <strong>Improvements:</strong>{" "}
-                                  {report.improvements}
-                                </p>
-                              </div>
+                              )}
                             </div>
                             <Button
                               size="sm"
