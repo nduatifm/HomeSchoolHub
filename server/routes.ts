@@ -1541,13 +1541,26 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Student not found" });
       }
 
-      // Authorization: only the student's parent or an assigned teacher may look this up
+      // Authorization: only the student's parent or a teacher assigned/approved for that student
       const requestingUser = await storage.getUserById(req.session.userId!);
       if (!requestingUser) return res.status(401).json({ error: "Unauthorized" });
 
       const isParent = requestingUser.role === "parent" && student.parentId === requestingUser.id;
-      const isTeacher = requestingUser.role === "teacher";
-      if (!isParent && !isTeacher) {
+
+      let isAssignedTeacher = false;
+      if (requestingUser.role === "teacher") {
+        const teacherAssignments = await storage.getAssignedTeachersForStudent(studentId);
+        isAssignedTeacher = teacherAssignments.some((a) => a.teacherId === requestingUser.id);
+        if (!isAssignedTeacher) {
+          // Also check tutor request approval
+          const approvedRequest = await prisma.tutorRequest.findFirst({
+            where: { studentId, teacherId: requestingUser.id, status: "approved" },
+          });
+          isAssignedTeacher = !!approvedRequest;
+        }
+      }
+
+      if (!isParent && !isAssignedTeacher) {
         return res.status(403).json({ error: "Forbidden" });
       }
 

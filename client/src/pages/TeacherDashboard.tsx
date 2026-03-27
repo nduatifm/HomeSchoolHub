@@ -3723,6 +3723,67 @@ export default function TeacherDashboard() {
           </Tabs>
         </main>
       </div>
+
+      {/* Standalone send-message dialog — opened by "Message parent" button in students tab */}
+      <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Message</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">To</label>
+              {messageForm.receiverId ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/40 text-sm">
+                  <span className="font-medium">
+                    {(users as any[]).find((u: any) => u.id === messageForm.receiverId)?.name || `User #${messageForm.receiverId}`}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {(users as any[]).find((u: any) => u.id === messageForm.receiverId)?.email}
+                  </span>
+                </div>
+              ) : (
+                <ModernCombobox
+                  users={users as any[]}
+                  selectedUserId={messageForm.receiverId}
+                  onSelect={(userId) => setMessageForm({ ...messageForm, receiverId: userId })}
+                  placeholder="Search users..."
+                  testId="select-receiver-teacher"
+                />
+              )}
+            </div>
+            <div>
+              <label className="text-sm font-medium">Message</label>
+              <Textarea
+                placeholder="Type your message..."
+                value={messageForm.content}
+                onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
+                rows={4}
+                data-testid="input-message-content"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSendMessageOpen(false);
+                  setMessageForm({ receiverId: 0, content: "" });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => sendMessageMutation.mutate(messageForm)}
+                disabled={sendMessageMutation.isPending || !messageForm.receiverId || !messageForm.content}
+                data-testid="button-send-message"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {sendMessageMutation.isPending ? "Sending..." : "Send"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
