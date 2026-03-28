@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -1581,113 +1582,41 @@ export default function ParentDashboard() {
 
             <TabsContent value="messages">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle>Messages</CardTitle>
-                  <Dialog
-                    open={sendMessageOpen}
-                    onOpenChange={setSendMessageOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button data-testid="button-new-message">
-                        <Send className="h-4 w-4 mr-2" />
-                        New Message
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Send Message</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            To
-                          </label>
-                          <ModernCombobox
-                            users={users}
-                            selectedUserId={messageForm.receiverId}
-                            onSelect={(userId) =>
-                              setMessageForm({
-                                ...messageForm,
-                                receiverId: userId,
-                              })
-                            }
-                            placeholder="Search users..."
-                            testId="select-receiver"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Message</label>
-                          <Textarea
-                            placeholder="Type your message..."
-                            value={messageForm.content}
-                            onChange={(e) =>
-                              setMessageForm({
-                                ...messageForm,
-                                content: e.target.value,
-                              })
-                            }
-                            rows={4}
-                            data-testid="input-message-content"
-                          />
-                        </div>
-                        <Button
-                          onClick={() =>
-                            sendMessageMutation.mutate(messageForm)
-                          }
-                          disabled={
-                            sendMessageMutation.isPending ||
-                            !messageForm.receiverId ||
-                            !messageForm.content
-                          }
-                          className="w-full"
-                          data-testid="button-send-message"
-                        >
-                          {sendMessageMutation.isPending
-                            ? "Sending..."
-                            : "Send"}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[500px] overflow-y-auto space-y-3">
-                    {messages.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">
-                        No messages yet
-                      </p>
-                    ) : (
-                      messages.map((msg: any) => (
-                        <div
-                          key={msg.id}
-                          className={`p-4 rounded-lg border ${msg.senderId === user?.id ? "bg-blue-50 ml-8" : "bg-gray-50 mr-8"}`}
-                          data-testid={`message-${msg.id}`}
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-medium text-sm">
-                              {msg.senderId === user?.id
-                                ? "You"
-                                : `User #${msg.senderId}`}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(msg.sentDate).toLocaleString()}
-                            </span>
+                  {students.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <p className="text-sm">No children registered yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {students.map((child, index) => {
+                        const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
+                        return (
+                          <div key={child.id}>
+                            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+                              <span>{child.name}</span>
+                              {childTeacher && (
+                                <span className="text-muted-foreground font-normal">— with {childTeacher.name}</span>
+                              )}
+                            </h3>
+                            {!childTeacher ? (
+                              <p className="text-sm text-muted-foreground">No teacher assigned yet.</p>
+                            ) : (
+                              <MessageThread
+                                teacherId={childTeacher.id}
+                                studentId={child.id}
+                                myUserId={user!.id}
+                                receiverId={childTeacher.id}
+                              />
+                            )}
                           </div>
-                          <p
-                            className="text-sm"
-                            data-testid={`text-message-content-${msg.id}`}
-                          >
-                            {msg.content}
-                          </p>
-                          {!msg.isRead && msg.receiverId === user?.id && (
-                            <Badge variant="secondary" className="mt-2">
-                              Unread
-                            </Badge>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

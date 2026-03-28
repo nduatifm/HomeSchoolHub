@@ -151,6 +151,7 @@ export interface IStorage {
   getMessagesBetweenUsers(user1Id: number, user2Id: number): Promise<Message[]>;
   getMessagesByUser(userId: number): Promise<Message[]>;
   markMessageAsRead(id: number): Promise<Message>;
+  getThreadMessages(teacherUserId: number, studentId: number): Promise<(Message & { senderName?: string })[]>;
 
   createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
   getProgressReportsByStudent(studentId: number): Promise<ProgressReport[]>;
@@ -690,6 +691,31 @@ class PrismaStorage implements IStorage {
       where: { id },
       data: { isRead: true },
     })) as Message;
+  }
+
+  async getThreadMessages(teacherUserId: number, studentId: number): Promise<(Message & { senderName?: string })[]> {
+    const student = await prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) return [];
+    const participantIds = [teacherUserId, student.userId, student.parentId];
+    const messages = await (prisma.message.findMany as any)({
+      where: {
+        AND: [
+          { senderId: { in: participantIds } },
+          { receiverId: { in: participantIds } },
+        ],
+      },
+      include: { sender: { select: { name: true } } },
+      orderBy: { timestamp: "asc" },
+    });
+    return messages.map((m: any) => ({
+      id: m.id,
+      senderId: m.senderId,
+      receiverId: m.receiverId,
+      message: m.message,
+      timestamp: m.timestamp,
+      isRead: m.isRead,
+      senderName: m.sender?.name,
+    }));
   }
 
   async createProgressReport(

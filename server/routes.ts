@@ -2169,6 +2169,20 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/messages/thread", requireAuth, async (req, res) => {
+    try {
+      const teacherId = parseInt(req.query.teacherId as string);
+      const studentId = parseInt(req.query.studentId as string);
+      if (!teacherId || !studentId) {
+        return res.status(400).json({ error: "teacherId and studentId are required" });
+      }
+      const messages = await storage.getThreadMessages(teacherId, studentId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages/:userId", requireAuth, async (req, res) => {
     try {
       const messages = await storage.getMessagesBetweenUsers(

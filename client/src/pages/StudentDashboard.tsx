@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -257,6 +258,16 @@ export default function StudentDashboard() {
       setRequestClarificationOpen(false);
     },
   });
+
+  // Derive assigned teacher for the messages thread
+  // teachers query returns a single object or null (not an array); default [] means still loading
+  const assignedTeacher: { id: number; name: string; email: string } | null =
+    teachers !== null &&
+    teachers !== undefined &&
+    !Array.isArray(teachers) &&
+    typeof (teachers as any).id === "number"
+      ? (teachers as unknown as { id: number; name: string; email: string })
+      : null;
 
   // Send message
   const [messageForm, setMessageForm] = useState({
@@ -1267,113 +1278,23 @@ export default function StudentDashboard() {
 
             <TabsContent value="messages">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle>Messages</CardTitle>
-                  <Dialog
-                    open={sendMessageOpen}
-                    onOpenChange={setSendMessageOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button data-testid="button-new-message">
-                        <Send className="h-4 w-4 mr-2" />
-                        New Message
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Send Message</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium mb-2 block">
-                            To
-                          </label>
-                          <ModernCombobox
-                            users={users}
-                            selectedUserId={messageForm.receiverId}
-                            onSelect={(userId) =>
-                              setMessageForm({
-                                ...messageForm,
-                                receiverId: userId,
-                              })
-                            }
-                            placeholder="Search users..."
-                            testId="select-receiver"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium">Message</label>
-                          <Textarea
-                            placeholder="Type your message..."
-                            value={messageForm.content}
-                            onChange={(e) =>
-                              setMessageForm({
-                                ...messageForm,
-                                content: e.target.value,
-                              })
-                            }
-                            rows={4}
-                            data-testid="input-message-content"
-                          />
-                        </div>
-                        <Button
-                          onClick={() =>
-                            sendMessageMutation.mutate(messageForm)
-                          }
-                          disabled={
-                            sendMessageMutation.isPending ||
-                            !messageForm.receiverId ||
-                            !messageForm.content
-                          }
-                          className="w-full"
-                          data-testid="button-send-message"
-                        >
-                          {sendMessageMutation.isPending
-                            ? "Sending..."
-                            : "Send"}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[500px] overflow-y-auto space-y-3">
-                    {messages.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">
-                        No messages yet
-                      </p>
-                    ) : (
-                      messages.map((msg: any) => (
-                        <div
-                          key={msg.id}
-                          className={`p-4 rounded-lg border ${msg.senderId === user?.id ? "bg-blue-50 ml-8" : "bg-gray-50 mr-8"}`}
-                          data-testid={`message-${msg.id}`}
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-medium text-sm">
-                              {msg.senderId === user?.id
-                                ? "You"
-                                : `User #${msg.senderId}`}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(msg.sentDate).toLocaleString()}
-                            </span>
-                          </div>
-                          <p
-                            className="text-sm"
-                            data-testid={`text-message-content-${msg.id}`}
-                          >
-                            {msg.content}
-                          </p>
-                          {!msg.isRead && msg.receiverId === user?.id && (
-                            <Badge variant="secondary" className="mt-2">
-                              Unread
-                            </Badge>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  {!assignedTeacher ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <p className="text-sm">No teacher assigned yet. Your thread will appear here once a teacher is assigned.</p>
+                    </div>
+                  ) : (
+                    <MessageThread
+                      teacherId={assignedTeacher.id}
+                      studentId={student!.id}
+                      myUserId={user!.id}
+                      receiverId={assignedTeacher.id}
+                      title={`Thread with ${assignedTeacher.name}`}
+                    />
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
