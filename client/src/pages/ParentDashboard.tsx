@@ -899,6 +899,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent> */}
 
+{/*
             <TabsContent value="rate-tutor">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -1076,7 +1077,9 @@ export default function ParentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
+{/*
             <TabsContent value="attendance">
               <Card>
                 <CardHeader>
@@ -1179,6 +1182,7 @@ export default function ParentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
             <TabsContent value="tutors">
                 <Card>
@@ -1473,6 +1477,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent> */}
 
+{/*
             <TabsContent value="controls">
               <Card>
                 <CardHeader>
@@ -1570,6 +1575,7 @@ export default function ParentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
             <TabsContent value="messages">
               <Card>

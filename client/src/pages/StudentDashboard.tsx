@@ -724,6 +724,7 @@ export default function StudentDashboard() {
               </div>
             </TabsContent>
 
+{/*
             <TabsContent value="teachers">
               <Card>
                 <CardHeader>
@@ -754,6 +755,7 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
             <TabsContent value="materials">
               <Card>
@@ -846,6 +848,7 @@ export default function StudentDashboard() {
               </Card>
             </TabsContent>
 
+{/*
             <TabsContent value="schedule">
               <Card>
                 <CardHeader>
@@ -928,7 +931,9 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
+{/*
             <TabsContent value="attendance">
               <Card>
                 <CardHeader>
@@ -994,7 +999,9 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
+{/*
             <TabsContent value="sessions">
               <Card>
                 <CardHeader>
@@ -1051,7 +1058,9 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
+{/*
             <TabsContent value="rewards">
               <Card>
                 <CardHeader>
@@ -1132,6 +1141,7 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
             {/* <TabsContent value="clarifications">
               <Card>

@@ -2024,6 +2024,7 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
 
+{/*
             <TabsContent value="sessions">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -2521,7 +2522,9 @@ export default function TeacherDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
+{/*
             <TabsContent value="schedule">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -2893,6 +2896,7 @@ export default function TeacherDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
             <TabsContent value="feedback">
               <Card>
@@ -3076,6 +3080,7 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
 
+{/*
             <TabsContent value="attendance">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -3309,6 +3314,7 @@ export default function TeacherDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
             {/* {isTutorRequestModeEnabled && (
               <TabsContent value="requests">
@@ -3390,6 +3396,7 @@ export default function TeacherDashboard() {
               </TabsContent>
             )} */}
 
+{/*
             <TabsContent value="reports">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -3627,6 +3634,7 @@ export default function TeacherDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+*/}
 
             <TabsContent value="messages">
               <Card>
