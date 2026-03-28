@@ -106,19 +106,21 @@ const ratingSchema = z.object({
   comment: z.string(),
 });
 
+const PARENT_TABS = ["children", "tutors", "invites", "reports", "messages"];
+
 export default function ParentDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace("#", "");
-    return hash || "children";
+    return PARENT_TABS.includes(hash) ? hash : "children";
   });
 
   // Listen to hash changes from sidebar navigation
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash) setActiveTab(hash);
+      if (hash && PARENT_TABS.includes(hash)) setActiveTab(hash);
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);

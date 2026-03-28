@@ -134,19 +134,21 @@ const sessionFormSchema = z.object({
   status: z.string(),
 });
 
+const TEACHER_TABS = ["assignments", "submissions", "materials", "students", "feedback", "messages"];
+
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace("#", "");
-    return hash || "assignments";
+    return TEACHER_TABS.includes(hash) ? hash : "assignments";
   });
 
   // Listen to hash changes from sidebar navigation
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash) setActiveTab(hash);
+      if (hash && TEACHER_TABS.includes(hash)) setActiveTab(hash);
     };
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
