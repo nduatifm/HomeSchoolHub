@@ -2078,20 +2078,24 @@ export function registerRoutes(app: Express) {
           responseDate: new Date().toISOString(),
         });
 
-        // Create the TeacherStudentAssignment if not already linked
+        // Create or reactivate the TeacherStudentAssignment
         if (data.studentId) {
-          const existing = await storage.getTeacherStudentAssignment(
-            data.teacherId,
-            data.studentId,
-          );
-          if (!existing) {
-            await storage.createTeacherStudentAssignment({
+          const today = new Date().toISOString().split("T")[0];
+          await prisma.teacherStudentAssignment.upsert({
+            where: {
+              teacherId_studentId: {
+                teacherId: data.teacherId,
+                studentId: data.studentId,
+              },
+            },
+            create: {
               teacherId: data.teacherId,
               studentId: data.studentId,
-              assignedDate: new Date().toISOString().split("T")[0],
+              assignedDate: today,
               status: "active",
-            });
-          }
+            },
+            update: { status: "active", assignedDate: today },
+          });
         }
       }
 
