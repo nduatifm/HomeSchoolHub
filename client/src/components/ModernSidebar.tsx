@@ -14,6 +14,13 @@ import {
   FileText,
   Users,
   GraduationCap,
+  Clock,
+  MessageSquare,
+  Calendar,
+  BarChart,
+  Send,
+  Star,
+  Trophy,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -72,6 +79,11 @@ export default function ModernSidebar() {
     { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
     { icon: <User className="w-5 h-5" />, label: "Students", hash: "students" },
     { icon: <Presentation className="w-5 h-5" />, label: "Sessions", hash: "sessions" },
+    { icon: <Clock className="w-5 h-5" />, label: "Schedule", hash: "schedule" },
+    { icon: <MessageSquare className="w-5 h-5" />, label: "Feedback", hash: "feedback" },
+    { icon: <Calendar className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
+    { icon: <BarChart className="w-5 h-5" />, label: "Reports", hash: "reports" },
+    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages" },
   ];
 
   const parentItems: SidebarItem[] = [
@@ -79,6 +91,10 @@ export default function ModernSidebar() {
     { icon: <GraduationCap className="w-5 h-5" />, label: "Find a Tutor", hash: "tutors" },
     { icon: <UserPlus className="w-5 h-5" />, label: "Invite Student", hash: "invites" },
     { icon: <FileText className="w-5 h-5" />, label: "Progress Reports", hash: "reports" },
+    { icon: <Star className="w-5 h-5" />, label: "Rate Tutor", hash: "rate-tutor" },
+    { icon: <Calendar className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
+    { icon: <Settings className="w-5 h-5" />, label: "Parental Controls", hash: "controls" },
+    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages" },
   ];
 
   const studentItems: SidebarItem[] = [
@@ -86,6 +102,11 @@ export default function ModernSidebar() {
     { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
     { icon: <User className="w-5 h-5" />, label: "Teachers", hash: "teachers" },
     { icon: <Presentation className="w-5 h-5" />, label: "Sessions", hash: "sessions" },
+    { icon: <MessageSquare className="w-5 h-5" />, label: "Feedback", hash: "feedback" },
+    { icon: <Calendar className="w-5 h-5" />, label: "Schedule", hash: "schedule" },
+    { icon: <ClipboardCheck className="w-5 h-5" />, label: "Attendance", hash: "attendance" },
+    { icon: <Trophy className="w-5 h-5" />, label: "Rewards", hash: "rewards" },
+    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages" },
   ];
 
   const getItems = () => {

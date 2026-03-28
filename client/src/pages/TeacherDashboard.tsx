@@ -2522,7 +2522,7 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
 
-            {/* <TabsContent value="schedule">
+            <TabsContent value="schedule">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Student Schedules</CardTitle>
@@ -2892,9 +2892,9 @@ export default function TeacherDashboard() {
                   </Dialog>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
-            {/* <TabsContent value="feedback">
+            <TabsContent value="feedback">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Student Feedback</CardTitle>
@@ -3074,9 +3074,9 @@ export default function TeacherDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
-            {/* <TabsContent value="attendance">
+            <TabsContent value="attendance">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Mark Student Attendance</CardTitle>
@@ -3308,7 +3308,7 @@ export default function TeacherDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
             {/* {isTutorRequestModeEnabled && (
               <TabsContent value="requests">
@@ -3390,7 +3390,7 @@ export default function TeacherDashboard() {
               </TabsContent>
             )} */}
 
-            {/* <TabsContent value="reports">
+            <TabsContent value="reports">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Progress Reports & Analytics</CardTitle>
@@ -3626,9 +3626,9 @@ export default function TeacherDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
-            {/* <TabsContent value="messages">
+            <TabsContent value="messages">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Messages</CardTitle>
@@ -3739,7 +3739,7 @@ export default function TeacherDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
           </Tabs>
         </main>
       </div>

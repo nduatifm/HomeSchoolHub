@@ -899,7 +899,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent> */}
 
-            {/* <TabsContent value="rate-tutor">
+            <TabsContent value="rate-tutor">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Rate Tutor</CardTitle>
@@ -1075,9 +1075,9 @@ export default function ParentDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
-            {/* <TabsContent value="attendance">
+            <TabsContent value="attendance">
               <Card>
                 <CardHeader>
                   <CardTitle>Children's Attendance</CardTitle>
@@ -1178,7 +1178,7 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
             <TabsContent value="tutors">
                 <Card>
@@ -1473,7 +1473,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent> */}
 
-            {/* <TabsContent value="controls">
+            <TabsContent value="controls">
               <Card>
                 <CardHeader>
                   <CardTitle>Parental Controls</CardTitle>
@@ -1569,9 +1569,9 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
-            {/* <TabsContent value="messages">
+            <TabsContent value="messages">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Messages</CardTitle>
@@ -1682,7 +1682,7 @@ export default function ParentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
           </Tabs>
         </main>
       </div>

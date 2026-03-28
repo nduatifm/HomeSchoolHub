@@ -806,7 +806,7 @@ export default function StudentDashboard() {
               </Card>
             </TabsContent>
 
-            {/* <TabsContent value="feedback">
+            <TabsContent value="feedback">
               <Card>
                 <CardHeader>
                   <CardTitle>Feedback</CardTitle>
@@ -844,9 +844,9 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
-            {/* <TabsContent value="schedule">
+            <TabsContent value="schedule">
               <Card>
                 <CardHeader>
                   <CardTitle>My Schedule</CardTitle>
@@ -927,9 +927,9 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
-            {/* <TabsContent value="attendance">
+            <TabsContent value="attendance">
               <Card>
                 <CardHeader>
                   <CardTitle>My Attendance</CardTitle>
@@ -993,7 +993,7 @@ export default function StudentDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
             <TabsContent value="sessions">
               <Card>
@@ -1052,7 +1052,7 @@ export default function StudentDashboard() {
               </Card>
             </TabsContent>
 
-            {/* <TabsContent value="rewards">
+            <TabsContent value="rewards">
               <Card>
                 <CardHeader>
                   <CardTitle>My Rewards & Achievements</CardTitle>
@@ -1131,7 +1131,7 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
 
             {/* <TabsContent value="clarifications">
               <Card>
@@ -1253,7 +1253,7 @@ export default function StudentDashboard() {
               </Card>
             </TabsContent> */}
 
-            {/* <TabsContent value="messages">
+            <TabsContent value="messages">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Messages</CardTitle>
@@ -1364,7 +1364,7 @@ export default function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent> */}
+            </TabsContent>
           </Tabs>
         </main>
       </div>
