@@ -697,7 +697,7 @@ class PrismaStorage implements IStorage {
     const student = await prisma.student.findUnique({ where: { id: studentId } });
     if (!student) return [];
     const participantIds = [teacherUserId, student.userId, student.parentId];
-    const messages = await (prisma.message.findMany as any)({
+    const messages = await prisma.message.findMany({
       where: {
         AND: [
           { senderId: { in: participantIds } },
@@ -707,14 +707,14 @@ class PrismaStorage implements IStorage {
       include: { sender: { select: { name: true } } },
       orderBy: { timestamp: "asc" },
     });
-    return messages.map((m: any) => ({
+    return messages.map((m) => ({
       id: m.id,
       senderId: m.senderId,
       receiverId: m.receiverId,
       message: m.message,
       timestamp: m.timestamp,
       isRead: m.isRead,
-      senderName: m.sender?.name,
+      senderName: m.sender.name,
     }));
   }
 

@@ -119,7 +119,8 @@ export default function StudentDashboard() {
     queryKey: ["/api/materials/student", student?.id],
     enabled: !!student,
   });
-  const { data: teachers = [] } = useQuery<Record<string, unknown>[]>({
+  type AssignedTeacher = { id: number; name: string; email: string };
+  const { data: assignedTeacher = null } = useQuery<AssignedTeacher | null>({
     queryKey: ["/api/teachers/student", student?.id],
     enabled: !!student,
   });

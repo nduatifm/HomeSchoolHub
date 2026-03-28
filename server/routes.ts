@@ -1541,10 +1541,11 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: "Student not found" });
       }
 
-      // Authorization: only the student's parent or a teacher assigned/approved for that student
+      // Authorization: the student themselves, the student's parent, or an assigned/approved teacher
       const requestingUser = await storage.getUserById(req.session.userId!);
       if (!requestingUser) return res.status(401).json({ error: "Unauthorized" });
 
+      const isOwnStudent = requestingUser.role === "student" && student.userId === requestingUser.id;
       const isParent = requestingUser.role === "parent" && student.parentId === requestingUser.id;
 
       let isAssignedTeacher = false;
@@ -1560,7 +1561,7 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      if (!isParent && !isAssignedTeacher) {
+      if (!isOwnStudent && !isParent && !isAssignedTeacher) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -2176,6 +2177,20 @@ export function registerRoutes(app: Express) {
       if (!teacherId || !studentId) {
         return res.status(400).json({ error: "teacherId and studentId are required" });
       }
+
+      // Authorization: requester must be the teacher, the student, or the student's parent
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const requesterId = req.session.userId!;
+      const isTeacher = requesterId === teacherId;
+      const isStudent = requesterId === student.userId;
+      const isParent = requesterId === student.parentId;
+
+      if (!isTeacher && !isStudent && !isParent) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       const messages = await storage.getThreadMessages(teacherId, studentId);
       res.json(messages);
     } catch (error: any) {
