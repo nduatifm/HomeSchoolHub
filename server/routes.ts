@@ -2060,6 +2060,14 @@ export function registerRoutes(app: Express) {
         responseDate: null,
       });
 
+      // Validate that studentId (if provided) belongs to this parent
+      if (data.studentId) {
+        const student = await storage.getStudentById(data.studentId);
+        if (!student || student.parentId !== user.id) {
+          return res.status(403).json({ error: "Student does not belong to you" });
+        }
+      }
+
       let request = await storage.createTutorRequest(data);
 
       // When tutor-request mode is OFF, auto-approve immediately and link the teacher
@@ -2070,7 +2078,7 @@ export function registerRoutes(app: Express) {
           responseDate: new Date().toISOString(),
         });
 
-        // If a specific student was specified, create the TeacherStudentAssignment
+        // Create the TeacherStudentAssignment if not already linked
         if (data.studentId) {
           const existing = await storage.getTeacherStudentAssignment(
             data.teacherId,

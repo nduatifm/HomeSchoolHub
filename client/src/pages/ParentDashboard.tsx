@@ -246,10 +246,17 @@ export default function ParentDashboard() {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tutor-requests/parent"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teachers/student"] });
-      toast({ title: "Tutor request sent!", description: "Your child has been linked to the selected teacher.", type: "success" });
+      const approved = data?.status === "approved";
+      toast({
+        title: approved ? "Teacher assigned!" : "Request sent!",
+        description: approved
+          ? "Your child has been linked to the selected teacher."
+          : "Your request is pending teacher approval.",
+        type: "success",
+      });
       setTutorRequestForm({ teacherId: 0, message: "", studentId: null });
       setRequestTutorOpen(false);
     },
