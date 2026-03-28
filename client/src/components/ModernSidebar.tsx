@@ -13,6 +13,7 @@ import {
   X,
   FileText,
   Users,
+  GraduationCap,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -75,6 +76,7 @@ export default function ModernSidebar() {
 
   const parentItems: SidebarItem[] = [
     { icon: <Users className="w-5 h-5" />, label: "My Children", hash: "children" },
+    { icon: <GraduationCap className="w-5 h-5" />, label: "Find a Tutor", hash: "tutors" },
     { icon: <UserPlus className="w-5 h-5" />, label: "Invite Student", hash: "invites" },
     { icon: <FileText className="w-5 h-5" />, label: "Progress Reports", hash: "reports" },
   ];

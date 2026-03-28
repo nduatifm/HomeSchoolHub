@@ -2060,7 +2060,33 @@ export function registerRoutes(app: Express) {
         responseDate: null,
       });
 
-      const request = await storage.createTutorRequest(data);
+      let request = await storage.createTutorRequest(data);
+
+      // When tutor-request mode is OFF, auto-approve immediately and link the teacher
+      const isRequestMode = await isTutorRequestModeEnabled();
+      if (!isRequestMode) {
+        request = await storage.updateTutorRequest(request.id, {
+          status: "approved",
+          responseDate: new Date().toISOString(),
+        });
+
+        // If a specific student was specified, create the TeacherStudentAssignment
+        if (data.studentId) {
+          const existing = await storage.getTeacherStudentAssignment(
+            data.teacherId,
+            data.studentId,
+          );
+          if (!existing) {
+            await storage.createTeacherStudentAssignment({
+              teacherId: data.teacherId,
+              studentId: data.studentId,
+              assignedDate: new Date().toISOString().split("T")[0],
+              status: "active",
+            });
+          }
+        }
+      }
+
       res.json(request);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

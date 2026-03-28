@@ -146,7 +146,6 @@ export default function ParentDashboard() {
   });
   const { data: tutorRequests = [] } = useQuery<TutorRequest[]>({
     queryKey: ["/api/tutor-requests/parent"],
-    enabled: isTutorRequestModeEnabled,
   });
   const paymentsQuery = useQuery({ queryKey: ["/api/payments/parent"] });
   const { data: messages = [] } = useQuery<Message[]>({ queryKey: ["/api/messages"] });
@@ -248,10 +247,9 @@ export default function ParentDashboard() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/tutor-requests/parent"],
-      });
-      toast({ title: "Tutor request sent!", type: "success" });
+      queryClient.invalidateQueries({ queryKey: ["/api/tutor-requests/parent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers/student"] });
+      toast({ title: "Tutor request sent!", description: "Your child has been linked to the selected teacher.", type: "success" });
       setTutorRequestForm({ teacherId: 0, message: "", studentId: null });
       setRequestTutorOpen(false);
     },
@@ -1175,8 +1173,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent> */}
 
-            {isTutorRequestModeEnabled && (
-              <TabsContent value="tutors">
+            <TabsContent value="tutors">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Tutor Requests</CardTitle>
@@ -1314,8 +1311,7 @@ export default function ParentDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-              </TabsContent>
-            )}
+            </TabsContent>
 
             <TabsContent value="reports">
               <Card>
