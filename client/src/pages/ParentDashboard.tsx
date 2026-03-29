@@ -1609,7 +1609,7 @@ export default function ParentDashboard() {
                                 teacherId={childTeacher.id}
                                 studentId={child.id}
                                 myUserId={user!.id}
-                                receiverId={childTeacher.id}
+                                receiverId={child.userId}
                               />
                             )}
                           </div>

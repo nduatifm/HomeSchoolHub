@@ -2191,6 +2191,18 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      // Validate that teacherId is actually assigned to this student
+      const assignments = await storage.getAssignedTeachersForStudent(studentId);
+      const isAssigned = assignments.some((a) => a.teacherId === teacherId);
+      if (!isAssigned) {
+        const approvedRequest = await prisma.tutorRequest.findFirst({
+          where: { studentId, teacherId, status: "approved" },
+        });
+        if (!approvedRequest) {
+          return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
+        }
+      }
+
       const messages = await storage.getThreadMessages(teacherId, studentId);
       res.json(messages);
     } catch (error: any) {
