@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import {
   queryClient,
   apiRequest,
@@ -100,6 +100,18 @@ type StudentSubmissionWithRelations = StudentAssignment & {
   assignment?: { id: number; title: string; subject: string; fileUrl?: string | null };
 };
 
+function formatPreviewTime(ts: string): string {
+  const date = new Date(ts);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 const scheduleSchema = z.object({
   studentId: z.number().min(1, "Student required"),
   dayOfWeek: z.string().min(1, "Day required"),
@@ -178,6 +190,16 @@ export default function TeacherDashboard() {
   const { data: students = [] } = useQuery<StudentWithParent[]>({
     queryKey: ["/api/students/teacher"],
   });
+
+  const threadPreviewQueries = useQueries({
+    queries: students.map((s) => ({
+      queryKey: ["/api/messages/thread", user?.id ?? 0, s.id],
+      queryFn: () => apiRequest(`/api/messages/thread?teacherId=${user!.id}&studentId=${s.id}`),
+      enabled: !!user && students.length > 0,
+      staleTime: 30000,
+    })),
+  });
+
   const { data: assignments = [] } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments/teacher"],
   });
@@ -3661,8 +3683,10 @@ export default function TeacherDashboard() {
                           <p className="text-xs text-muted-foreground">No students assigned yet</p>
                         </div>
                       ) : (
-                        students.map((s) => {
+                        students.map((s, index) => {
                           const isActive = selectedStudentForMessages?.id === s.id;
+                          const threadMsgs: any[] = (threadPreviewQueries[index]?.data as any[]) ?? [];
+                          const lastMsg = threadMsgs[threadMsgs.length - 1];
                           return (
                             <button
                               key={s.id}
@@ -3678,9 +3702,18 @@ export default function TeacherDashboard() {
                                 </span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate text-foreground">{s.name}</p>
+                                <div className="flex items-center justify-between gap-2 mb-0.5">
+                                  <p className="text-sm font-medium truncate text-foreground">{s.name}</p>
+                                  {lastMsg && (
+                                    <span className="text-[11px] text-muted-foreground shrink-0">
+                                      {formatPreviewTime(lastMsg.timestamp)}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {s.parentName ? `Parent: ${s.parentName}` : "Open conversation →"}
+                                  {lastMsg
+                                    ? lastMsg.message.length > 42 ? lastMsg.message.slice(0, 42) + "…" : lastMsg.message
+                                    : "No messages yet"}
                                 </p>
                               </div>
                             </button>

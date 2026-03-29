@@ -62,6 +62,18 @@ type AssignmentWithStatus = Assignment & {
   studentAssignment: StudentAssignment | null;
 };
 
+function formatPreviewTime(ts: string): string {
+  const date = new Date(ts);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 function computeStreak(graded: AssignmentWithStatus[]): number {
   const dates = graded
     .filter(a => a.studentAssignment?.submittedAt)
@@ -121,6 +133,13 @@ export default function StudentDashboard() {
     queryKey: ["/api/teachers/student", student?.id],
     enabled: !!student,
   });
+  const { data: teacherThreadPreview = [] } = useQuery<any[]>({
+    queryKey: ["/api/messages/thread", assignedTeacher?.id ?? 0, student?.id ?? 0],
+    queryFn: () => apiRequest(`/api/messages/thread?teacherId=${assignedTeacher!.id}&studentId=${student!.id}`),
+    enabled: !!assignedTeacher && !!student,
+    staleTime: 30000,
+  });
+
   const { data: feedback = [] } = useQuery({
     queryKey: ["/api/feedback/student", student?.id],
     enabled: !!student,
@@ -1256,22 +1275,36 @@ export default function StudentDashboard() {
                           <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
                           <p className="text-xs text-muted-foreground">No teacher assigned yet</p>
                         </div>
-                      ) : (
-                        <button
-                          className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
-                          style={{ background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" }}
-                        >
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-bold text-primary">
-                              {assignedTeacher.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate text-foreground">{assignedTeacher.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">Your teacher</p>
-                          </div>
-                        </button>
-                      )}
+                      ) : (() => {
+                        const lastMsg = teacherThreadPreview[teacherThreadPreview.length - 1];
+                        return (
+                          <button
+                            className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
+                            style={{ background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" }}
+                          >
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-bold text-primary">
+                                {assignedTeacher.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-0.5">
+                                <p className="text-sm font-medium truncate text-foreground">{assignedTeacher.name}</p>
+                                {lastMsg && (
+                                  <span className="text-[11px] text-muted-foreground shrink-0">
+                                    {formatPreviewTime(lastMsg.timestamp)}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {lastMsg
+                                  ? lastMsg.message.length > 42 ? lastMsg.message.slice(0, 42) + "…" : lastMsg.message
+                                  : "No messages yet"}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 

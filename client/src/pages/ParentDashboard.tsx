@@ -90,6 +90,18 @@ type ChildStat = Student & {
   total: number;
 };
 
+function formatPreviewTime(ts: string): string {
+  const date = new Date(ts);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
 const paymentSchema = z.object({
   teacherId: z.number().min(1, "Teacher required"),
   amount: z.number().min(0.01, "Amount must be greater than 0"),
@@ -188,6 +200,18 @@ export default function ParentDashboard() {
       queryKey: ["/api/teachers/student", child.id],
       enabled: students.length > 0,
     })),
+  });
+
+  const threadPreviewQueries = useQueries({
+    queries: students.map((child, index) => {
+      const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef | null;
+      return {
+        queryKey: ["/api/messages/thread", childTeacher?.id ?? 0, child.id],
+        queryFn: () => apiRequest(`/api/messages/thread?teacherId=${childTeacher!.id}&studentId=${child.id}`),
+        enabled: !!childTeacher,
+        staleTime: 30000,
+      };
+    }),
   });
 
   const childStats: ChildStat[] = students.map((child, index) => {
@@ -1602,8 +1626,9 @@ export default function ParentDashboard() {
                         </div>
                       ) : (
                         students.map((child, index) => {
-                          const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
                           const isActive = selectedChildForMessages?.id === child.id;
+                          const threadMsgs: any[] = (threadPreviewQueries[index]?.data as any[]) ?? [];
+                          const lastMsg = threadMsgs[threadMsgs.length - 1];
                           return (
                             <button
                               key={child.id}
@@ -1619,9 +1644,18 @@ export default function ParentDashboard() {
                                 </span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate text-foreground">{child.name}</p>
+                                <div className="flex items-center justify-between gap-2 mb-0.5">
+                                  <p className="text-sm font-medium truncate text-foreground">{child.name}</p>
+                                  {lastMsg && (
+                                    <span className="text-[11px] text-muted-foreground shrink-0">
+                                      {formatPreviewTime(lastMsg.timestamp)}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {childTeacher ? `Teacher: ${childTeacher.name}` : "No teacher assigned yet"}
+                                  {lastMsg
+                                    ? lastMsg.message.length > 42 ? lastMsg.message.slice(0, 42) + "…" : lastMsg.message
+                                    : "No messages yet"}
                                 </p>
                               </div>
                             </button>
