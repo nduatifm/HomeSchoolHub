@@ -51,7 +51,6 @@ import {
   MessageSquareQuote,
   Upload,
   X,
-  ChevronDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -108,7 +107,6 @@ export default function StudentDashboard() {
   >(null);
   const [requestClarificationOpen, setRequestClarificationOpen] =
     useState(false);
-  const [threadOpen, setThreadOpen] = useState(true);
   // Fetch data
   const { data: assignments = [] } = useQuery<AssignmentWithStatus[]>({
     queryKey: ["/api/assignments/student", student?.id],
@@ -1245,51 +1243,55 @@ export default function StudentDashboard() {
             </TabsContent> */}
 
             <TabsContent value="messages">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Messages</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {!assignedTeacher ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <p className="text-sm">No teacher assigned yet. Your thread will appear here once a teacher is assigned.</p>
+              <Card className="overflow-hidden">
+                <div className="flex h-[620px]">
+                  {/* Left conversation sidebar */}
+                  <div className="w-64 border-r flex flex-col shrink-0 bg-muted/20">
+                    <div className="px-4 py-3 border-b bg-background">
+                      <p className="text-sm font-semibold text-foreground">Conversations</p>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => setThreadOpen((o) => !o)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-lg border hover:shadow-sm transition-all text-left ${
-                          threadOpen
-                            ? "border-primary/40 bg-muted/20"
-                            : "hover:border-primary/40 hover:bg-muted/30"
-                        }`}
-                      >
-                        <div className="w-10 h-10 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-semibold text-primary">
-                            {assignedTeacher.name.charAt(0).toUpperCase()}
-                          </span>
+                    <div className="flex-1 overflow-y-auto">
+                      {!assignedTeacher ? (
+                        <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center gap-2">
+                          <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
+                          <p className="text-xs text-muted-foreground">No teacher assigned yet</p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{assignedTeacher.name}</p>
-                          <p className="text-xs text-muted-foreground">Your teacher</p>
-                        </div>
-                        <span className={`transition-transform duration-200 ${threadOpen ? "rotate-180" : ""}`}>
-                          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                        </span>
-                      </button>
-                      {threadOpen && (
-                        <div className="mt-2">
-                          <MessageThread
-                            teacherId={assignedTeacher.id}
-                            studentId={student!.id}
-                            myUserId={user!.id}
-                            receiverId={assignedTeacher.id}
-                          />
-                        </div>
+                      ) : (
+                        <button
+                          className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
+                          style={{ background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" }}
+                        >
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-primary">
+                              {assignedTeacher.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate text-foreground">{assignedTeacher.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">Your teacher</p>
+                          </div>
+                        </button>
                       )}
                     </div>
-                  )}
-                </CardContent>
+                  </div>
+
+                  {/* Right thread panel */}
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    {assignedTeacher ? (
+                      <MessageThread
+                        teacherId={assignedTeacher.id}
+                        studentId={student!.id}
+                        myUserId={user!.id}
+                        receiverId={assignedTeacher.id}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                        <MessageSquare className="w-10 h-10 opacity-20" />
+                        <p className="text-sm">Your teacher thread will appear here once assigned</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </Card>
             </TabsContent>
           </Tabs>

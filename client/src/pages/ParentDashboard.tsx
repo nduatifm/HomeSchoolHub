@@ -132,6 +132,13 @@ export default function ParentDashboard() {
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [selectedChildForMessages, setSelectedChildForMessages] = useState<Student | null>(null);
+
+  useEffect(() => {
+    if (students.length > 0 && !selectedChildForMessages) {
+      setSelectedChildForMessages(students[0]);
+    }
+  }, [students]);
+
   const [rateTutorOpen, setRateTutorOpen] = useState(false);
 
   // Check if tutor request mode is enabled (for showing/hiding tutor request UI)
@@ -1580,85 +1587,85 @@ export default function ParentDashboard() {
 */}
 
             <TabsContent value="messages">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Messages</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {(() => {
-                    if (students.length === 0) {
-                      return (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <p className="text-sm">No children registered yet.</p>
+              <Card className="overflow-hidden">
+                <div className="flex h-[620px]">
+                  {/* Left conversation sidebar */}
+                  <div className="w-64 border-r flex flex-col shrink-0 bg-muted/20">
+                    <div className="px-4 py-3 border-b bg-background">
+                      <p className="text-sm font-semibold text-foreground">Conversations</p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      {students.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center gap-2">
+                          <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
+                          <p className="text-xs text-muted-foreground">No children registered yet</p>
                         </div>
-                      );
-                    }
-                    const selectedIndex = selectedChildForMessages
-                      ? students.findIndex((s) => s.id === selectedChildForMessages.id)
-                      : -1;
-                    const selectedTeacher = selectedIndex >= 0
-                      ? (childTeacherQueries[selectedIndex]?.data ?? null) as AssignedTeacherRef
-                      : null;
-
-                    if (selectedChildForMessages) {
-                      return (
-                        <>
-                          {selectedTeacher ? (
-                            <MessageThread
-                              teacherId={selectedTeacher.id}
-                              studentId={selectedChildForMessages.id}
-                              myUserId={user!.id}
-                              receiverId={selectedChildForMessages.userId}
-                              title={`Thread with ${selectedTeacher.name} — ${selectedChildForMessages.name}`}
-                              onBack={() => setSelectedChildForMessages(null)}
-                            />
-                          ) : (
-                            <div>
-                              <button
-                                onClick={() => setSelectedChildForMessages(null)}
-                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
-                              >
-                                ← Back
-                              </button>
-                              <p className="text-sm text-muted-foreground">No teacher assigned to {selectedChildForMessages.name} yet.</p>
-                            </div>
-                          )}
-                        </>
-                      );
-                    }
-
-                    return (
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground mb-3">Select a child to open their shared thread</p>
-                        {students.map((child, index) => {
+                      ) : (
+                        students.map((child, index) => {
                           const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
+                          const isActive = selectedChildForMessages?.id === child.id;
                           return (
                             <button
                               key={child.id}
                               onClick={() => setSelectedChildForMessages(child)}
-                              className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 hover:shadow-sm transition-all text-left"
+                              className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
+                              style={isActive ? { background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" } : { paddingLeft: "13px" }}
+                              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "hsl(var(--muted))"; }}
+                              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = ""; }}
                             >
-                              <div className="w-10 h-10 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center shrink-0">
-                                <span className="text-sm font-semibold text-primary">
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-primary">
                                   {child.name.charAt(0).toUpperCase()}
                                 </span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium">{child.name}</p>
-                                {childTeacher ? (
-                                  <p className="text-xs text-muted-foreground">Teacher: {childTeacher.name}</p>
-                                ) : (
-                                  <p className="text-xs text-muted-foreground">No teacher assigned yet</p>
-                                )}
+                                <p className="text-sm font-medium truncate text-foreground">{child.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {childTeacher ? `Teacher: ${childTeacher.name}` : "No teacher assigned yet"}
+                                </p>
                               </div>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                             </button>
                           );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </CardContent>
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right thread panel */}
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    {(() => {
+                      if (!selectedChildForMessages) {
+                        return (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                            <MessageSquare className="w-10 h-10 opacity-20" />
+                            <p className="text-sm">Select a child to view their thread</p>
+                          </div>
+                        );
+                      }
+                      const selectedIndex = students.findIndex((s) => s.id === selectedChildForMessages.id);
+                      const selectedTeacher = selectedIndex >= 0
+                        ? (childTeacherQueries[selectedIndex]?.data ?? null) as AssignedTeacherRef
+                        : null;
+                      if (!selectedTeacher) {
+                        return (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                            <MessageSquare className="w-10 h-10 opacity-20" />
+                            <p className="text-sm">No teacher assigned to {selectedChildForMessages.name} yet</p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <MessageThread
+                          teacherId={selectedTeacher.id}
+                          studentId={selectedChildForMessages.id}
+                          myUserId={user!.id}
+                          receiverId={selectedChildForMessages.userId}
+                          title={`Thread: ${selectedChildForMessages.name} & ${selectedTeacher.name}`}
+                        />
+                      );
+                    })()}
+                  </div>
+                </div>
               </Card>
             </TabsContent>
           </Tabs>

@@ -67,7 +67,6 @@ import {
   Link,
   ClipboardCheck,
   Eye,
-  ChevronRight,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -654,8 +653,14 @@ export default function TeacherDashboard() {
     },
   });
 
-  // Messages tab — selected student for thread view
+  // Messages tab — selected student for thread view (auto-select first on load)
   const [selectedStudentForMessages, setSelectedStudentForMessages] = useState<StudentWithParent | null>(null);
+
+  useEffect(() => {
+    if (students.length > 0 && !selectedStudentForMessages) {
+      setSelectedStudentForMessages(students[0]);
+    }
+  }, [students]);
 
   // Send message
   const [messageForm, setMessageForm] = useState({
@@ -3642,50 +3647,67 @@ export default function TeacherDashboard() {
 */}
 
             <TabsContent value="messages">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Messages</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {selectedStudentForMessages ? (
-                    <MessageThread
-                      teacherId={user!.id}
-                      studentId={selectedStudentForMessages.id}
-                      myUserId={user!.id}
-                      receiverId={selectedStudentForMessages.userId}
-                      title={`Thread with ${selectedStudentForMessages.name}`}
-                      onBack={() => setSelectedStudentForMessages(null)}
-                    />
-                  ) : students.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <p className="text-sm">No students assigned yet. Student threads will appear here once assigned.</p>
+              <Card className="overflow-hidden">
+                <div className="flex h-[620px]">
+                  {/* Left conversation sidebar */}
+                  <div className="w-64 border-r flex flex-col shrink-0 bg-muted/20">
+                    <div className="px-4 py-3 border-b bg-background">
+                      <p className="text-sm font-semibold text-foreground">Conversations</p>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground mb-3">Select a student to open the shared thread</p>
-                      {students.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => setSelectedStudentForMessages(s)}
-                          className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 hover:shadow-sm transition-all text-left"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center shrink-0">
-                            <span className="text-sm font-semibold text-primary">
-                              {s.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{s.name}</p>
-                            {s.parentName && (
-                              <p className="text-xs text-muted-foreground">Parent: {s.parentName}</p>
-                            )}
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                        </button>
-                      ))}
+                    <div className="flex-1 overflow-y-auto">
+                      {students.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center gap-2">
+                          <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
+                          <p className="text-xs text-muted-foreground">No students assigned yet</p>
+                        </div>
+                      ) : (
+                        students.map((s) => {
+                          const isActive = selectedStudentForMessages?.id === s.id;
+                          return (
+                            <button
+                              key={s.id}
+                              onClick={() => setSelectedStudentForMessages(s)}
+                              className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
+                              style={isActive ? { background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" } : { paddingLeft: "13px" }}
+                              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "hsl(var(--muted))"; }}
+                              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = ""; }}
+                            >
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-primary">
+                                  {s.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate text-foreground">{s.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {s.parentName ? `Parent: ${s.parentName}` : "Open conversation →"}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
-                  )}
-                </CardContent>
+                  </div>
+
+                  {/* Right thread panel */}
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    {selectedStudentForMessages ? (
+                      <MessageThread
+                        teacherId={user!.id}
+                        studentId={selectedStudentForMessages.id}
+                        myUserId={user!.id}
+                        receiverId={selectedStudentForMessages.userId}
+                        title={`Thread: ${selectedStudentForMessages.name}${selectedStudentForMessages.parentName ? ` & ${selectedStudentForMessages.parentName}` : ""}`}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+                        <MessageSquare className="w-10 h-10 opacity-20" />
+                        <p className="text-sm">Select a student to view the thread</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </Card>
             </TabsContent>
           </Tabs>
