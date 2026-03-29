@@ -3666,19 +3666,20 @@ export default function TeacherDashboard() {
                         <button
                           key={s.id}
                           onClick={() => setSelectedStudentForMessages(s)}
-                          className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 transition-all text-left"
+                          className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 hover:shadow-sm transition-all text-left"
                         >
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center shrink-0">
                             <span className="text-sm font-semibold text-primary">
                               {s.name.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">{s.name}</p>
                             {s.parentName && (
                               <p className="text-xs text-muted-foreground">Parent: {s.parentName}</p>
                             )}
                           </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                         </button>
                       ))}
                     </div>
