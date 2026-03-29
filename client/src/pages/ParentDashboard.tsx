@@ -1616,7 +1616,7 @@ export default function ParentDashboard() {
               <Card className="overflow-hidden">
                 <div className="flex h-[620px]">
                   {/* Left conversation sidebar */}
-                  <div className="w-64 border-r flex flex-col shrink-0 bg-muted/20">
+                  <div className="w-72 border-r flex flex-col shrink-0 bg-muted/20">
                     <div className="px-4 py-3 border-b bg-background">
                       <p className="text-sm font-semibold text-foreground">Conversations</p>
                     </div>
