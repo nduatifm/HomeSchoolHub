@@ -202,12 +202,14 @@ export default function ParentDashboard() {
     })),
   });
 
+  type ThreadMessage = { id: number; senderId: number; receiverId: number; message: string; timestamp: string; isRead: boolean };
+
   const threadPreviewQueries = useQueries({
     queries: students.map((child, index) => {
       const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef | null;
       return {
         queryKey: ["/api/messages/thread", childTeacher?.id ?? 0, child.id],
-        queryFn: () => apiRequest(`/api/messages/thread?teacherId=${childTeacher!.id}&studentId=${child.id}`),
+        queryFn: (): Promise<ThreadMessage[]> => apiRequest(`/api/messages/thread?teacherId=${childTeacher!.id}&studentId=${child.id}`),
         enabled: !!childTeacher,
         staleTime: 30000,
       };
@@ -1627,8 +1629,9 @@ export default function ParentDashboard() {
                       ) : (
                         students.map((child, index) => {
                           const isActive = selectedChildForMessages?.id === child.id;
-                          const threadMsgs: any[] = (threadPreviewQueries[index]?.data as any[]) ?? [];
-                          const lastMsg = threadMsgs[threadMsgs.length - 1];
+                          const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
+                          const threadMsgs: ThreadMessage[] = threadPreviewQueries[index]?.data ?? [];
+                          const lastMsg: ThreadMessage | null = threadMsgs[threadMsgs.length - 1] ?? null;
                           return (
                             <button
                               key={child.id}
@@ -1657,6 +1660,11 @@ export default function ParentDashboard() {
                                     ? lastMsg.message.length > 42 ? lastMsg.message.slice(0, 42) + "…" : lastMsg.message
                                     : "No messages yet"}
                                 </p>
+                                {childTeacher && (
+                                  <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
+                                    Teacher: {childTeacher.name}
+                                  </p>
+                                )}
                               </div>
                             </button>
                           );

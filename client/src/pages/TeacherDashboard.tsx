@@ -191,10 +191,12 @@ export default function TeacherDashboard() {
     queryKey: ["/api/students/teacher"],
   });
 
+  type ThreadMessage = { id: number; senderId: number; receiverId: number; message: string; timestamp: string; isRead: boolean };
+
   const threadPreviewQueries = useQueries({
     queries: students.map((s) => ({
       queryKey: ["/api/messages/thread", user?.id ?? 0, s.id],
-      queryFn: () => apiRequest(`/api/messages/thread?teacherId=${user!.id}&studentId=${s.id}`),
+      queryFn: (): Promise<ThreadMessage[]> => apiRequest(`/api/messages/thread?teacherId=${user!.id}&studentId=${s.id}`),
       enabled: !!user && students.length > 0,
       staleTime: 30000,
     })),
@@ -3685,8 +3687,8 @@ export default function TeacherDashboard() {
                       ) : (
                         students.map((s, index) => {
                           const isActive = selectedStudentForMessages?.id === s.id;
-                          const threadMsgs: any[] = (threadPreviewQueries[index]?.data as any[]) ?? [];
-                          const lastMsg = threadMsgs[threadMsgs.length - 1];
+                          const threadMsgs: ThreadMessage[] = threadPreviewQueries[index]?.data ?? [];
+                          const lastMsg = threadMsgs[threadMsgs.length - 1] ?? null;
                           return (
                             <button
                               key={s.id}
@@ -3715,6 +3717,11 @@ export default function TeacherDashboard() {
                                     ? lastMsg.message.length > 42 ? lastMsg.message.slice(0, 42) + "…" : lastMsg.message
                                     : "No messages yet"}
                                 </p>
+                                {s.parentName && (
+                                  <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
+                                    Parent: {s.parentName}
+                                  </p>
+                                )}
                               </div>
                             </button>
                           );

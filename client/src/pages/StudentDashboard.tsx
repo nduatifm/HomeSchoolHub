@@ -133,9 +133,11 @@ export default function StudentDashboard() {
     queryKey: ["/api/teachers/student", student?.id],
     enabled: !!student,
   });
-  const { data: teacherThreadPreview = [] } = useQuery<any[]>({
+  type ThreadMessage = { id: number; senderId: number; receiverId: number; message: string; timestamp: string; isRead: boolean };
+
+  const { data: teacherThreadPreview = [] } = useQuery<ThreadMessage[]>({
     queryKey: ["/api/messages/thread", assignedTeacher?.id ?? 0, student?.id ?? 0],
-    queryFn: () => apiRequest(`/api/messages/thread?teacherId=${assignedTeacher!.id}&studentId=${student!.id}`),
+    queryFn: (): Promise<ThreadMessage[]> => apiRequest(`/api/messages/thread?teacherId=${assignedTeacher!.id}&studentId=${student!.id}`),
     enabled: !!assignedTeacher && !!student,
     staleTime: 30000,
   });
@@ -1276,7 +1278,7 @@ export default function StudentDashboard() {
                           <p className="text-xs text-muted-foreground">No teacher assigned yet</p>
                         </div>
                       ) : (() => {
-                        const lastMsg = teacherThreadPreview[teacherThreadPreview.length - 1];
+                        const lastMsg: ThreadMessage | null = teacherThreadPreview[teacherThreadPreview.length - 1] ?? null;
                         return (
                           <button
                             className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
