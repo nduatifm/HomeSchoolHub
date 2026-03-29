@@ -73,7 +73,6 @@ import type {
   TutorRequest,
   User,
   ProgressReport,
-  Message,
 } from "@shared/schema";
 
 type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
@@ -151,7 +150,6 @@ export default function ParentDashboard() {
     queryKey: ["/api/tutor-requests/parent"],
   });
   const paymentsQuery = useQuery({ queryKey: ["/api/payments/parent"] });
-  const { data: messages = [] } = useQuery<Message[]>({ queryKey: ["/api/messages"] });
   const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
   const { data: teachers = [] } = useQuery<PublicTeacher[]>({ queryKey: ["/api/teachers"] });
   const { data: progressReports = [] } = useQuery<ProgressReportEnriched[]>({

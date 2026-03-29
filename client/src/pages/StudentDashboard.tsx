@@ -56,7 +56,6 @@ import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
-import ModernCombobox from "@/components/ModernCombobox";
 import type { Assignment, StudentAssignment, Session } from "@shared/schema";
 
 type AssignmentWithStatus = Assignment & {
@@ -108,8 +107,6 @@ export default function StudentDashboard() {
   >(null);
   const [requestClarificationOpen, setRequestClarificationOpen] =
     useState(false);
-  const [sendMessageOpen, setSendMessageOpen] = useState(false);
-
   // Fetch data
   const { data: assignments = [] } = useQuery<AssignmentWithStatus[]>({
     queryKey: ["/api/assignments/student", student?.id],
@@ -140,8 +137,6 @@ export default function StudentDashboard() {
     queryKey: ["/api/clarifications/student", student?.id],
     enabled: !!student,
   });
-  const { data: messages = [] } = useQuery({ queryKey: ["/api/messages"] });
-  const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
   const attendanceQuery = useQuery({
     queryKey: ["/api/attendance/student", student?.id],
     enabled: !!student,
@@ -257,26 +252,6 @@ export default function StudentDashboard() {
       toast({ title: "Clarification requested!", type: "success" });
       setClarificationForm({ assignmentId: 0, question: "" });
       setRequestClarificationOpen(false);
-    },
-  });
-
-  // Send message
-  const [messageForm, setMessageForm] = useState({
-    receiverId: 0,
-    content: "",
-  });
-
-  const sendMessageMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/messages", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
-      toast({ title: "Message sent!", type: "success" });
-      setMessageForm({ receiverId: 0, content: "" });
-      setSendMessageOpen(false);
     },
   });
 

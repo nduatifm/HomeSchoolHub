@@ -83,7 +83,6 @@ import type {
   Earnings,
   TutorRequest,
   User,
-  Message,
   ProgressReport,
 } from "@shared/schema";
 
@@ -195,7 +194,6 @@ export default function TeacherDashboard() {
   const { data: earnings = [] } = useQuery<Earnings[]>({
     queryKey: ["/api/earnings/teacher"],
   });
-  const { data: messages = [] } = useQuery<Message[]>({ queryKey: ["/api/messages"] });
   const { data: progressReports = [] } = useQuery<ProgressReportEnriched[]>({
     queryKey: ["/api/progress-reports/teacher"],
   });
