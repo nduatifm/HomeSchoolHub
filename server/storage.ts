@@ -731,28 +731,90 @@ class PrismaStorage implements IStorage {
   }
 
   async getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]> {
-    const summaries: ConversationSummary[] = [];
+    // Helper: batch-fetch last message and unread count for each conversation group.
+    // A group is a (teacherUserId, studentUserId, parentUserId) triplet identifying a thread.
+    type ConvGroup = {
+      studentId: number;
+      teacherUserId: number;
+      studentUserId: number;
+      parentUserId: number;
+    };
 
+    const buildSummaries = async (
+      groups: ConvGroup[],
+      requesterUserId: number,
+      teacherName: string,
+      parentName: string | null,
+      studentNames: Map<number, string>,
+    ): Promise<ConversationSummary[]> => {
+      if (groups.length === 0) return [];
+
+      // Batch: collect all participant IDs across all groups, then fetch messages once
+      const allParticipantIds = new Set<number>();
+      for (const g of groups) {
+        allParticipantIds.add(g.teacherUserId);
+        allParticipantIds.add(g.studentUserId);
+        allParticipantIds.add(g.parentUserId);
+      }
+      const participantArr = Array.from(allParticipantIds);
+
+      // Single message query ordered newest-first; we scan it once per group
+      const allMessages = await prisma.message.findMany({
+        where: {
+          AND: [
+            { senderId: { in: participantArr } },
+            { receiverId: { in: participantArr } },
+          ],
+        },
+        orderBy: { timestamp: "desc" },
+        select: { senderId: true, receiverId: true, message: true, timestamp: true, isRead: true },
+      });
+
+      const result: ConversationSummary[] = [];
+      for (const g of groups) {
+        const triplet = new Set([g.teacherUserId, g.studentUserId, g.parentUserId]);
+        let lastMsg: { message: string; timestamp: string } | null = null;
+        let unreadCount = 0;
+        for (const m of allMessages) {
+          if (triplet.has(m.senderId) && triplet.has(m.receiverId)) {
+            if (!lastMsg) lastMsg = m;
+            if (!m.isRead && m.receiverId === requesterUserId) unreadCount++;
+          }
+        }
+        result.push({
+          studentId: g.studentId,
+          teacherUserId: g.teacherUserId,
+          studentName: studentNames.get(g.studentId) ?? "",
+          teacherName,
+          parentName,
+          lastMessage: lastMsg?.message ?? null,
+          lastMessageTimestamp: lastMsg?.timestamp ?? null,
+          unreadCount,
+        });
+      }
+      return result;
+    };
+
+    // ── TEACHER ──────────────────────────────────────────────────────────────
     if (role === "teacher") {
-      // Get all students visible to this teacher
-      const isTutorMode = await (async () => {
-        const setting = await prisma.systemSettings.findFirst({ where: { key: "tutor_request_mode" } });
-        return setting?.value === "true";
-      })();
+      const setting = await prisma.systemSettings.findFirst({ where: { key: "tutor_request_mode" } });
+      const isTutorMode = setting?.value === "true";
 
-      let students: Array<{ id: number; name: string; userId: number; parentId: number }>;
+      type StudentRow = { id: number; name: string; userId: number; parentId: number };
+      let students: StudentRow[];
+
       if (isTutorMode) {
         const requests = await prisma.tutorRequest.findMany({
           where: { teacherId: userId, status: "approved" },
-          include: { parent: { include: { parentStudents: true } } },
+          include: { parent: { include: { parentStudents: { select: { id: true, name: true, userId: true, parentId: true } } } } },
         });
         const seen = new Set<number>();
         students = [];
         for (const r of requests) {
-          const candidateStudents = r.studentId
+          const candidates = r.studentId
             ? r.parent.parentStudents.filter((s: any) => s.id === r.studentId)
             : r.parent.parentStudents;
-          for (const s of candidateStudents) {
+          for (const s of candidates as any[]) {
             if (!seen.has(s.id)) {
               seen.add(s.id);
               students.push({ id: s.id, name: s.name, userId: s.userId, parentId: s.parentId });
@@ -760,164 +822,154 @@ class PrismaStorage implements IStorage {
           }
         }
       } else {
-        const all = await prisma.student.findMany();
-        students = all.map((s: any) => ({ id: s.id, name: s.name, userId: s.userId, parentId: s.parentId }));
+        const all = await prisma.student.findMany({
+          select: { id: true, name: true, userId: true, parentId: true },
+        });
+        students = all;
       }
 
-      const teacher = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      if (students.length === 0) return [];
+
+      // Batch-fetch teacher name and all parent names in parallel
+      const parentIds = Array.from(new Set(students.map((s) => s.parentId).filter(Boolean))) as number[];
+      const [teacher, parentUsers] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+        prisma.user.findMany({ where: { id: { in: parentIds } }, select: { id: true, name: true } }),
+      ]);
       if (!teacher) return [];
 
-      for (const student of students) {
-        const participantIds = [userId, student.userId, student.parentId];
-        const lastMsg = await prisma.message.findFirst({
-          where: {
-            AND: [{ senderId: { in: participantIds } }, { receiverId: { in: participantIds } }],
-          },
-          orderBy: { timestamp: "desc" },
-        });
-        const unreadCount = await prisma.message.count({
-          where: {
-            AND: [
-              { senderId: { in: participantIds } },
-              { receiverId: { in: participantIds } },
-              { receiverId: userId },
-              { isRead: false },
-            ],
-          },
-        });
-        const parent = student.parentId ? await prisma.user.findUnique({ where: { id: student.parentId }, select: { name: true } }) : null;
-        summaries.push({
-          studentId: student.id,
-          teacherUserId: userId,
-          studentName: student.name,
-          teacherName: teacher.name,
-          parentName: parent?.name ?? null,
-          lastMessage: lastMsg?.message ?? null,
-          lastMessageTimestamp: lastMsg?.timestamp ?? null,
-          unreadCount,
-        });
-      }
-    } else if (role === "parent") {
-      // Parent's children
-      const parentStudents = await prisma.student.findMany({
-        where: { parentId: userId },
-      });
-      const parent = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      const parentNameMap = new Map(parentUsers.map((p) => [p.id, p.name]));
+      const studentNames = new Map(students.map((s) => [s.id, s.name]));
+      const groups: ConvGroup[] = students.map((s) => ({
+        studentId: s.id,
+        teacherUserId: userId,
+        studentUserId: s.userId,
+        parentUserId: s.parentId,
+      }));
 
-      for (const student of parentStudents) {
-        // Find assigned teacher for this student
-        const assignment = await prisma.teacherStudentAssignment.findFirst({
-          where: { studentId: student.id, status: "active" },
-          include: { teacher: { select: { id: true, name: true } } },
-        });
-        let teacherUser: { id: number; name: string } | null = assignment?.teacher ?? null;
-
-        // Fallback to tutor request if no direct assignment
-        if (!teacherUser) {
-          const request = await prisma.tutorRequest.findFirst({
-            where: {
-              OR: [{ studentId: student.id }, { parentId: userId }],
-              status: "approved",
-            },
-            include: { teacher: { select: { id: true, name: true } } },
-          });
-          if (request) teacherUser = request.teacher as { id: number; name: string };
-        }
-
-        if (!teacherUser) {
-          summaries.push({
-            studentId: student.id,
-            teacherUserId: 0,
-            studentName: student.name,
-            teacherName: "",
-            parentName: parent?.name ?? null,
-            lastMessage: null,
-            lastMessageTimestamp: null,
-            unreadCount: 0,
-          });
-          continue;
-        }
-
-        const participantIds = [teacherUser.id, student.userId, userId];
-        const lastMsg = await prisma.message.findFirst({
-          where: {
-            AND: [{ senderId: { in: participantIds } }, { receiverId: { in: participantIds } }],
-          },
-          orderBy: { timestamp: "desc" },
-        });
-        const unreadCount = await prisma.message.count({
-          where: {
-            AND: [
-              { senderId: { in: participantIds } },
-              { receiverId: { in: participantIds } },
-              { receiverId: userId },
-              { isRead: false },
-            ],
-          },
-        });
-        summaries.push({
-          studentId: student.id,
-          teacherUserId: teacherUser.id,
-          studentName: student.name,
-          teacherName: teacherUser.name,
-          parentName: parent?.name ?? null,
-          lastMessage: lastMsg?.message ?? null,
-          lastMessageTimestamp: lastMsg?.timestamp ?? null,
-          unreadCount,
-        });
-      }
-    } else if (role === "student") {
-      // Find this student record and their assigned teacher
-      const studentRecord = await prisma.student.findUnique({ where: { userId } });
-      if (!studentRecord) return [];
-
-      const assignment = await prisma.teacherStudentAssignment.findFirst({
-        where: { studentId: studentRecord.id, status: "active" },
-        include: { teacher: { select: { id: true, name: true } } },
-      });
-      let teacherUser: { id: number; name: string } | null = assignment?.teacher ?? null;
-
-      if (!teacherUser) {
-        const request = await prisma.tutorRequest.findFirst({
-          where: { parentId: studentRecord.parentId, status: "approved" },
-          include: { teacher: { select: { id: true, name: true } } },
-        });
-        if (request) teacherUser = request.teacher as { id: number; name: string };
-      }
-
-      if (!teacherUser) return [];
-
-      const participantIds = [teacherUser.id, userId, studentRecord.parentId];
-      const lastMsg = await prisma.message.findFirst({
-        where: {
-          AND: [{ senderId: { in: participantIds } }, { receiverId: { in: participantIds } }],
-        },
-        orderBy: { timestamp: "desc" },
-      });
-      const unreadCount = await prisma.message.count({
-        where: {
-          AND: [
-            { senderId: { in: participantIds } },
-            { receiverId: { in: participantIds } },
-            { receiverId: userId },
-            { isRead: false },
-          ],
-        },
-      });
-      const parent = studentRecord.parentId ? await prisma.user.findUnique({ where: { id: studentRecord.parentId }, select: { name: true } }) : null;
-      summaries.push({
-        studentId: studentRecord.id,
-        teacherUserId: teacherUser.id,
-        studentName: studentRecord.name,
-        teacherName: teacherUser.name,
-        parentName: parent?.name ?? null,
-        lastMessage: lastMsg?.message ?? null,
-        lastMessageTimestamp: lastMsg?.timestamp ?? null,
-        unreadCount,
+      // buildSummaries uses a shared parentName param; patch per-student after
+      const base = await buildSummaries(groups, userId, teacher.name, null, studentNames);
+      return base.map((s) => {
+        const student = students.find((st) => st.id === s.studentId)!;
+        return { ...s, parentName: parentNameMap.get(student.parentId) ?? null };
       });
     }
 
-    return summaries;
+    // ── PARENT ───────────────────────────────────────────────────────────────
+    if (role === "parent") {
+      const [parentStudents, parentUser, directAssignments, tutorRequests] = await Promise.all([
+        prisma.student.findMany({
+          where: { parentId: userId },
+          select: { id: true, name: true, userId: true, parentId: true },
+        }),
+        prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+        // Direct assignments for this parent's children (student-specific)
+        prisma.teacherStudentAssignment.findMany({
+          where: { student: { parentId: userId }, status: "active" },
+          include: { teacher: { select: { id: true, name: true } } },
+        }),
+        // Student-specific tutor requests for this parent's children
+        prisma.tutorRequest.findMany({
+          where: { parentId: userId, status: "approved", studentId: { not: null } },
+          include: { teacher: { select: { id: true, name: true } } },
+        }),
+      ]);
+
+      if (parentStudents.length === 0) return [];
+
+      // Build student→teacher map (prefer direct assignment, fallback to student-specific request)
+      const directMap = new Map<number, { id: number; name: string }>();
+      for (const a of directAssignments) {
+        directMap.set((a as any).studentId, a.teacher as { id: number; name: string });
+      }
+      const requestMap = new Map<number, { id: number; name: string }>();
+      for (const r of tutorRequests) {
+        if (r.studentId != null && !requestMap.has(r.studentId)) {
+          requestMap.set(r.studentId, r.teacher as { id: number; name: string });
+        }
+      }
+
+      type StudentWithTeacher = { id: number; name: string; userId: number; parentId: number; teacher: { id: number; name: string } | null };
+      const studentsWithTeacher: StudentWithTeacher[] = parentStudents.map((s) => ({
+        ...s,
+        teacher: directMap.get(s.id) ?? requestMap.get(s.id) ?? null,
+      }));
+
+      // Group by teacher to share one message batch per teacher group
+      const teacherGroups = new Map<number, StudentWithTeacher[]>();
+      const noTeacherStudents: StudentWithTeacher[] = [];
+      for (const s of studentsWithTeacher) {
+        if (!s.teacher) { noTeacherStudents.push(s); continue; }
+        const key = s.teacher.id;
+        if (!teacherGroups.has(key)) teacherGroups.set(key, []);
+        teacherGroups.get(key)!.push(s);
+      }
+
+      const summaries: ConversationSummary[] = [];
+      for (const [teacherId, group] of Array.from(teacherGroups.entries())) {
+        const teacherName = group[0].teacher!.name;
+        const convGroups: ConvGroup[] = group.map((s: StudentWithTeacher) => ({
+          studentId: s.id,
+          teacherUserId: teacherId,
+          studentUserId: s.userId,
+          parentUserId: userId,
+        }));
+        const studentNames = new Map(group.map((s: StudentWithTeacher) => [s.id, s.name]));
+        const partial = await buildSummaries(convGroups, userId, teacherName, parentUser?.name ?? null, studentNames);
+        summaries.push(...partial);
+      }
+
+      for (const s of noTeacherStudents) {
+        summaries.push({
+          studentId: s.id,
+          teacherUserId: 0,
+          studentName: s.name,
+          teacherName: "",
+          parentName: parentUser?.name ?? null,
+          lastMessage: null,
+          lastMessageTimestamp: null,
+          unreadCount: 0,
+        });
+      }
+
+      return summaries;
+    }
+
+    // ── STUDENT ──────────────────────────────────────────────────────────────
+    if (role === "student") {
+      const studentRecord = await prisma.student.findUnique({
+        where: { userId },
+        select: { id: true, name: true, userId: true, parentId: true },
+      });
+      if (!studentRecord) return [];
+
+      // Fetch teacher in parallel (direct assignment preferred, then student-specific tutor request)
+      const [directAssignment, tutorRequest, parentUser] = await Promise.all([
+        prisma.teacherStudentAssignment.findFirst({
+          where: { studentId: studentRecord.id, status: "active" },
+          include: { teacher: { select: { id: true, name: true } } },
+        }),
+        prisma.tutorRequest.findFirst({
+          where: { studentId: studentRecord.id, status: "approved" },
+          include: { teacher: { select: { id: true, name: true } } },
+        }),
+        prisma.user.findUnique({ where: { id: studentRecord.parentId }, select: { name: true } }),
+      ]);
+
+      const teacherUser = (directAssignment?.teacher ?? tutorRequest?.teacher ?? null) as { id: number; name: string } | null;
+      if (!teacherUser) return [];
+
+      const groups: ConvGroup[] = [{
+        studentId: studentRecord.id,
+        teacherUserId: teacherUser.id,
+        studentUserId: userId,
+        parentUserId: studentRecord.parentId,
+      }];
+      const studentNames = new Map([[studentRecord.id, studentRecord.name]]);
+      return buildSummaries(groups, userId, teacherUser.name, parentUser?.name ?? null, studentNames);
+    }
+
+    return [];
   }
 
   async createProgressReport(
