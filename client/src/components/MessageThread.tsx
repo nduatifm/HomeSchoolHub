@@ -229,15 +229,17 @@ export default function MessageThread({
               }
 
               elements.push(
-                <div key={`group-${gi}`} className="flex gap-3 mb-4">
-                  {/* Avatar column — always reserve space */}
+                <div
+                  key={`group-${gi}`}
+                  className={`flex gap-3 mb-4 ${group.isMe ? "flex-row-reverse" : ""}`}
+                >
+                  {/* Avatar */}
                   <div className="shrink-0 pt-0.5" style={{ width: 32 }}>
-                    {/* Show avatar only on first message of group */}
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold"
                       style={{
-                        background: group.isMe ? "#dbeafe" : "#f3f4f6",
-                        color: group.isMe ? "#1d4ed8" : "#374151",
+                        background: group.isMe ? "hsl(158 64% 36%)" : "#f3f4f6",
+                        color: group.isMe ? "#ffffff" : "#374151",
                       }}
                     >
                       {getInitials(group.senderName)}
@@ -245,9 +247,9 @@ export default function MessageThread({
                   </div>
 
                   {/* Content column */}
-                  <div className="flex flex-col gap-1 min-w-0 flex-1">
-                    {/* Name + timestamp on first bubble */}
-                    <div className="flex items-baseline gap-2">
+                  <div className={`flex flex-col gap-1 min-w-0 flex-1 ${group.isMe ? "items-end" : ""}`}>
+                    {/* Name + timestamp */}
+                    <div className={`flex items-baseline gap-2 ${group.isMe ? "flex-row-reverse" : ""}`}>
                       <span
                         className="text-[13px] font-semibold leading-none"
                         style={{ color: "#111827" }}
@@ -260,7 +262,7 @@ export default function MessageThread({
                     </div>
 
                     {/* Bubbles */}
-                    {group.messages.map((msg, mi) => (
+                    {group.messages.map((msg) => (
                       <div
                         key={msg.id}
                         className="text-sm leading-relaxed"
@@ -269,10 +271,10 @@ export default function MessageThread({
                           maxWidth: "85%",
                           padding: "8px 14px",
                           borderRadius: 16,
-                          background: group.isMe ? "#eff6ff" : "#f3f4f6",
-                          color: "#111827",
+                          background: group.isMe ? "hsl(158 64% 36%)" : "#f3f4f6",
+                          color: group.isMe ? "#ffffff" : "#111827",
                           wordBreak: "break-word",
-                          alignSelf: "flex-start",
+                          alignSelf: group.isMe ? "flex-end" : "flex-start",
                         }}
                       >
                         {msg.message}
