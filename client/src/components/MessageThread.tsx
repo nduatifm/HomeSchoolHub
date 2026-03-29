@@ -22,11 +22,6 @@ interface MessageThreadProps {
   onBack?: () => void;
 }
 
-function formatTime(ts: string): string {
-  const date = new Date(ts);
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
 function formatSmartTimestamp(ts: string): string {
   const date = new Date(ts);
   const now = new Date();
@@ -128,7 +123,6 @@ export default function MessageThread({
   };
 
   const groups: Group[] = [];
-  let prevDayKey = "";
 
   for (const msg of messages) {
     const isMe = msg.senderId === myUserId;
@@ -150,7 +144,6 @@ export default function MessageThread({
         messages: [msg],
       });
     }
-    prevDayKey = dayKey;
   }
 
   return (
@@ -244,7 +237,7 @@ export default function MessageThread({
                           className={`max-w-[72%] px-4 py-2.5 text-sm shadow-sm leading-relaxed
                             ${group.isMe
                               ? `bg-primary text-primary-foreground rounded-2xl ${sentCorner}`
-                              : `bg-white dark:bg-slate-800 text-foreground border border-border/50 rounded-2xl ${receivedCorner}`
+                              : `bg-slate-100 dark:bg-slate-800 text-foreground rounded-2xl ${receivedCorner}`
                             }`}
                         >
                           {msg.message}
