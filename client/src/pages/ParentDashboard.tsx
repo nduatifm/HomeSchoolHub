@@ -333,6 +333,7 @@ export default function ParentDashboard() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       toast({ title: "Message sent!", type: "success" });
       setMessageForm({ receiverId: 0, content: "" });
       setSendMessageOpen(false);

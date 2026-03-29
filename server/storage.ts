@@ -731,7 +731,6 @@ class PrismaStorage implements IStorage {
   }
 
   async getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]> {
-    // Typed conversation group: identifies a three-way thread
     type ConvGroup = {
       studentId: number;
       teacherUserId: number;
@@ -739,9 +738,6 @@ class PrismaStorage implements IStorage {
       parentUserId: number;
     };
 
-    // Raw-SQL helper: given a set of groups, return the last message and unread count for each.
-    // Uses two single-pass SQL queries (one for last messages, one for unread counts) instead of
-    // per-thread queries, achieving O(1) DB round-trips regardless of conversation count.
     const fetchThreadStats = async (
       groups: ConvGroup[],
       requesterUserId: number,
@@ -749,59 +745,42 @@ class PrismaStorage implements IStorage {
       const result = new Map<number, { lastMessage: string | null; lastMessageTimestamp: string | null; unreadCount: number }>();
       if (groups.length === 0) return result;
 
-      // Each group represents a three-way thread (teacher, student, parent).
-      // We pass the participant triplets as a VALUES list to the CTE and use a window function
-      // to get the latest message per thread in one query.
-      const tripletValues = groups
-        .map((g) => `(${g.studentId}, ${g.teacherUserId}, ${g.studentUserId}, ${g.parentUserId})`)
-        .join(', ');
-
-      // Query 1: last message per thread via window function (ROW_NUMBER per studentId thread)
-      const lastMsgRows = await prisma.$queryRawUnsafe<
-        Array<{ student_id: number; last_message: string | null; last_ts: string | null }>
-      >(`
-        WITH triplets(student_id, p1, p2, p3) AS (
-          VALUES ${tripletValues}
-        ),
-        ranked AS (
-          SELECT
-            t.student_id,
-            m.message AS last_message,
-            m.timestamp AS last_ts,
-            ROW_NUMBER() OVER (PARTITION BY t.student_id ORDER BY m.timestamp DESC) AS rn
-          FROM triplets t
-          JOIN "Message" m
-            ON m."senderId" IN (t.p1, t.p2, t.p3)
-           AND m."receiverId" IN (t.p1, t.p2, t.p3)
-        )
-        SELECT student_id, last_message, last_ts
-        FROM ranked
-        WHERE rn = 1
-      `);
-
-      // Query 2: unread count per thread (messages addressed to requester, not yet read)
-      const unreadRows = await prisma.$queryRawUnsafe<
-        Array<{ student_id: number; unread_count: bigint }>
-      >(`
-        WITH triplets(student_id, p1, p2, p3) AS (
-          VALUES ${tripletValues}
-        )
-        SELECT
-          t.student_id,
-          COUNT(m.id) AS unread_count
-        FROM triplets t
-        JOIN "Message" m
-          ON m."senderId" IN (t.p1, t.p2, t.p3)
-         AND m."receiverId" IN (t.p1, t.p2, t.p3)
-         AND m."receiverId" = ${requesterUserId}
-         AND m."isRead" = false
-        GROUP BY t.student_id
-      `);
-
-      // Initialise all groups with empty stats
       for (const g of groups) {
         result.set(g.studentId, { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 });
       }
+
+      // Build a VALUES list of integer-cast triplets for the CTE (all values are server-derived numeric IDs)
+      const valuesClause = groups
+        .map((g) => `(${g.studentId}::int, ${g.teacherUserId}::int, ${g.studentUserId}::int, ${g.parentUserId}::int)`)
+        .join(', ');
+
+      const lastMsgRows = await prisma.$queryRaw<
+        Array<{ student_id: number; last_message: string | null; last_ts: string | null }>
+      >(Prisma.sql`
+        WITH triplets(student_id, p1, p2, p3) AS (VALUES ${Prisma.raw(valuesClause)}),
+        ranked AS (
+          SELECT t.student_id, m.message AS last_message, m.timestamp AS last_ts,
+                 ROW_NUMBER() OVER (PARTITION BY t.student_id ORDER BY m.timestamp DESC) AS rn
+          FROM triplets t
+          JOIN "Message" m ON m."senderId" IN (t.p1, t.p2, t.p3)
+                          AND m."receiverId" IN (t.p1, t.p2, t.p3)
+        )
+        SELECT student_id, last_message, last_ts FROM ranked WHERE rn = 1
+      `);
+
+      const unreadRows = await prisma.$queryRaw<
+        Array<{ student_id: number; unread_count: bigint }>
+      >(Prisma.sql`
+        WITH triplets(student_id, p1, p2, p3) AS (VALUES ${Prisma.raw(valuesClause)})
+        SELECT t.student_id, COUNT(m.id) AS unread_count
+        FROM triplets t
+        JOIN "Message" m ON m."senderId" IN (t.p1, t.p2, t.p3)
+                        AND m."receiverId" IN (t.p1, t.p2, t.p3)
+                        AND m."receiverId" = ${requesterUserId}
+                        AND m."isRead" = false
+        GROUP BY t.student_id
+      `);
+
       for (const row of lastMsgRows) {
         const entry = result.get(Number(row.student_id));
         if (entry) {
@@ -817,7 +796,6 @@ class PrismaStorage implements IStorage {
       return result;
     };
 
-    // ── TEACHER ──────────────────────────────────────────────────────────────
     if (role === "teacher") {
       const setting = await prisma.systemSettings.findFirst({ where: { key: "tutor_request_mode" } });
       const isTutorMode = setting?.value === "true";
@@ -857,9 +835,9 @@ class PrismaStorage implements IStorage {
 
       if (students.length === 0) return [];
 
-      // Batch-fetch teacher name and all parent names in parallel
-      const parentIdSet = new Set(students.map((s) => s.parentId).filter((id): id is number => id != null));
-      const parentIdArr = Array.from(parentIdSet);
+      const parentIdArr = Array.from(
+        new Set(students.map((s) => s.parentId).filter((id): id is number => id != null)),
+      );
       const [teacher, parentUsers] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
         prisma.user.findMany({ where: { id: { in: parentIdArr } }, select: { id: true, name: true } }),
@@ -885,7 +863,6 @@ class PrismaStorage implements IStorage {
       }));
     }
 
-    // ── PARENT ───────────────────────────────────────────────────────────────
     if (role === "parent") {
       type TeacherRef = { id: number; name: string };
       const [parentStudents, parentUser, directAssignments, tutorRequests] = await Promise.all([
@@ -894,35 +871,23 @@ class PrismaStorage implements IStorage {
           select: { id: true, name: true, userId: true, parentId: true },
         }),
         prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
-        // Direct assignments for this parent's children (typed to include studentId)
         prisma.teacherStudentAssignment.findMany({
           where: { student: { parentId: userId }, status: "active" },
-          select: {
-            studentId: true,
-            teacher: { select: { id: true, name: true } },
-          },
+          select: { studentId: true, teacher: { select: { id: true, name: true } } },
         }),
-        // Student-specific tutor requests for this parent's children
         prisma.tutorRequest.findMany({
           where: { parentId: userId, status: "approved", studentId: { not: null } },
-          select: {
-            studentId: true,
-            teacher: { select: { id: true, name: true } },
-          },
+          select: { studentId: true, teacher: { select: { id: true, name: true } } },
         }),
       ]);
 
       if (parentStudents.length === 0) return [];
 
-      // Build student→teacher map (prefer direct assignment, fallback to student-specific request)
       const teacherMap = new Map<number, TeacherRef>();
       for (const r of tutorRequests) {
-        if (r.studentId != null && !teacherMap.has(r.studentId)) {
-          teacherMap.set(r.studentId, r.teacher);
-        }
+        if (r.studentId != null && !teacherMap.has(r.studentId)) teacherMap.set(r.studentId, r.teacher);
       }
       for (const a of directAssignments) {
-        // Direct assignment takes priority — overwrite any tutor-request entry
         teacherMap.set(a.studentId, a.teacher);
       }
 
@@ -963,7 +928,6 @@ class PrismaStorage implements IStorage {
       return summaries;
     }
 
-    // ── STUDENT ──────────────────────────────────────────────────────────────
     if (role === "student") {
       const studentRecord = await prisma.student.findUnique({
         where: { userId },
@@ -971,7 +935,6 @@ class PrismaStorage implements IStorage {
       });
       if (!studentRecord) return [];
 
-      // Fetch teacher in parallel (direct assignment preferred, then student-specific tutor request)
       const [directAssignment, tutorRequest, parentUser] = await Promise.all([
         prisma.teacherStudentAssignment.findFirst({
           where: { studentId: studentRecord.id, status: "active" },
