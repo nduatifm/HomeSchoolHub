@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Send,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Logo } from "@/components/Logo";
@@ -24,11 +25,19 @@ interface SidebarItem {
   icon: React.ReactNode;
   label: string;
   hash: string;
+  badge?: number;
 }
 
 export default function ModernSidebar() {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/messages/unread-count"],
+    refetchInterval: 15000,
+  });
+  const unreadCount = unreadData?.count ?? 0;
+
   const [currentHash, setCurrentHash] = useState(
     window.location.hash
       ? window.location.hash.replace("#", "")
@@ -73,7 +82,7 @@ export default function ModernSidebar() {
     { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
     { icon: <User className="w-5 h-5" />, label: "Students", hash: "students" },
     { icon: <MessageSquare className="w-5 h-5" />, label: "Feedback", hash: "feedback" },
-    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages" },
+    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages", badge: unreadCount },
   ];
 
   const parentItems: SidebarItem[] = [
@@ -81,14 +90,14 @@ export default function ModernSidebar() {
     { icon: <GraduationCap className="w-5 h-5" />, label: "Find a Tutor", hash: "tutors" },
     { icon: <UserPlus className="w-5 h-5" />, label: "Invite Student", hash: "invites" },
     { icon: <FileText className="w-5 h-5" />, label: "Progress Reports", hash: "reports" },
-    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages" },
+    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages", badge: unreadCount },
   ];
 
   const studentItems: SidebarItem[] = [
     { icon: <BookOpen className="w-5 h-5" />, label: "Assignments", hash: "assignments" },
     { icon: <LibraryBig className="w-5 h-5" />, label: "Study Materials", hash: "materials" },
     { icon: <MessageSquare className="w-5 h-5" />, label: "Feedback", hash: "feedback" },
-    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages" },
+    { icon: <Send className="w-5 h-5" />, label: "Messages", hash: "messages", badge: unreadCount },
   ];
 
   const getItems = () => {
@@ -130,7 +139,12 @@ export default function ModernSidebar() {
             <span className={isActive(item.hash) ? "text-primary" : "text-muted-foreground"}>
               {item.icon}
             </span>
-            <span>{item.label}</span>
+            <span className="flex-1">{item.label}</span>
+            {item.badge && item.badge > 0 ? (
+              <span className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                {item.badge > 99 ? "99+" : item.badge}
+              </span>
+            ) : null}
           </button>
         ))}
       </nav>

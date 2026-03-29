@@ -2170,6 +2170,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
+    try {
+      const count = await prisma.message.count({
+        where: { receiverId: req.session.userId!, isRead: false },
+      });
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages/thread", requireAuth, async (req, res) => {
     try {
       const teacherId = parseInt(req.query.teacherId as string);

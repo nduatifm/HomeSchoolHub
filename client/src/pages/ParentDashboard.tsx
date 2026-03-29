@@ -131,6 +131,7 @@ export default function ParentDashboard() {
   const [requestTutorOpen, setRequestTutorOpen] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
+  const [selectedChildForMessages, setSelectedChildForMessages] = useState<Student | null>(null);
   const [rateTutorOpen, setRateTutorOpen] = useState(false);
 
   // Check if tutor request mode is enabled (for showing/hiding tutor request UI)
@@ -1584,37 +1585,78 @@ export default function ParentDashboard() {
                   <CardTitle>Messages</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {students.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <p className="text-sm">No children registered yet.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-8">
-                      {students.map((child, index) => {
-                        const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
-                        return (
-                          <div key={child.id}>
-                            <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-                              <span>{child.name}</span>
-                              {childTeacher && (
-                                <span className="text-muted-foreground font-normal">— with {childTeacher.name}</span>
-                              )}
-                            </h3>
-                            {!childTeacher ? (
-                              <p className="text-sm text-muted-foreground">No teacher assigned yet.</p>
-                            ) : (
-                              <MessageThread
-                                teacherId={childTeacher.id}
-                                studentId={child.id}
-                                myUserId={user!.id}
-                                receiverId={child.userId}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {(() => {
+                    if (students.length === 0) {
+                      return (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <p className="text-sm">No children registered yet.</p>
+                        </div>
+                      );
+                    }
+                    const selectedIndex = selectedChildForMessages
+                      ? students.findIndex((s) => s.id === selectedChildForMessages.id)
+                      : -1;
+                    const selectedTeacher = selectedIndex >= 0
+                      ? (childTeacherQueries[selectedIndex]?.data ?? null) as AssignedTeacherRef
+                      : null;
+
+                    if (selectedChildForMessages) {
+                      return (
+                        <>
+                          {selectedTeacher ? (
+                            <MessageThread
+                              teacherId={selectedTeacher.id}
+                              studentId={selectedChildForMessages.id}
+                              myUserId={user!.id}
+                              receiverId={selectedChildForMessages.userId}
+                              title={`Thread with ${selectedTeacher.name} — ${selectedChildForMessages.name}`}
+                              onBack={() => setSelectedChildForMessages(null)}
+                            />
+                          ) : (
+                            <div>
+                              <button
+                                onClick={() => setSelectedChildForMessages(null)}
+                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
+                              >
+                                ← Back
+                              </button>
+                              <p className="text-sm text-muted-foreground">No teacher assigned to {selectedChildForMessages.name} yet.</p>
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground mb-3">Select a child to open their shared thread</p>
+                        {students.map((child, index) => {
+                          const childTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
+                          return (
+                            <button
+                              key={child.id}
+                              onClick={() => setSelectedChildForMessages(child)}
+                              className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 transition-all text-left"
+                            >
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-sm font-semibold text-primary">
+                                  {child.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{child.name}</p>
+                                {childTeacher ? (
+                                  <p className="text-xs text-muted-foreground">Teacher: {childTeacher.name}</p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">No teacher assigned yet</p>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </TabsContent>

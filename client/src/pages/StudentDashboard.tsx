@@ -51,6 +51,8 @@ import {
   MessageSquareQuote,
   Upload,
   X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -107,6 +109,7 @@ export default function StudentDashboard() {
   >(null);
   const [requestClarificationOpen, setRequestClarificationOpen] =
     useState(false);
+  const [threadOpen, setThreadOpen] = useState(true);
   // Fetch data
   const { data: assignments = [] } = useQuery<AssignmentWithStatus[]>({
     queryKey: ["/api/assignments/student", student?.id],
@@ -1253,13 +1256,37 @@ export default function StudentDashboard() {
                       <p className="text-sm">No teacher assigned yet. Your thread will appear here once a teacher is assigned.</p>
                     </div>
                   ) : (
-                    <MessageThread
-                      teacherId={assignedTeacher.id}
-                      studentId={student!.id}
-                      myUserId={user!.id}
-                      receiverId={assignedTeacher.id}
-                      title={`Thread with ${assignedTeacher.name}`}
-                    />
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setThreadOpen((o) => !o)}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 transition-all text-left"
+                      >
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-sm font-semibold text-primary">
+                            {assignedTeacher.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{assignedTeacher.name}</p>
+                          <p className="text-xs text-muted-foreground">Your teacher</p>
+                        </div>
+                        {threadOpen ? (
+                          <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                        )}
+                      </button>
+                      {threadOpen && (
+                        <div className="mt-2">
+                          <MessageThread
+                            teacherId={assignedTeacher.id}
+                            studentId={student!.id}
+                            myUserId={user!.id}
+                            receiverId={assignedTeacher.id}
+                          />
+                        </div>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
