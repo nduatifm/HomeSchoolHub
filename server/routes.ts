@@ -1548,24 +1548,28 @@ export function registerRoutes(app: Express) {
       const isOwnStudent = requestingUser.role === "student" && student.userId === requestingUser.id;
       const isParent = requestingUser.role === "parent" && student.parentId === requestingUser.id;
 
+      const isTutorMode = await isTutorRequestModeEnabled();
+
       let isAssignedTeacher = false;
       if (requestingUser.role === "teacher") {
-        const teacherAssignments = await storage.getAssignedTeachersForStudent(studentId);
-        isAssignedTeacher = teacherAssignments.some((a) => a.teacherId === requestingUser.id);
-        if (!isAssignedTeacher) {
-          // Also check tutor request approval
-          const approvedRequest = await prisma.tutorRequest.findFirst({
-            where: { studentId, teacherId: requestingUser.id, status: "approved" },
-          });
-          isAssignedTeacher = !!approvedRequest;
+        if (!isTutorMode) {
+          // In direct-assignment mode, any teacher can look up any student's teacher
+          isAssignedTeacher = true;
+        } else {
+          const teacherAssignments = await storage.getAssignedTeachersForStudent(studentId);
+          isAssignedTeacher = teacherAssignments.some((a) => a.teacherId === requestingUser.id);
+          if (!isAssignedTeacher) {
+            const approvedRequest = await prisma.tutorRequest.findFirst({
+              where: { studentId, teacherId: requestingUser.id, status: "approved" },
+            });
+            isAssignedTeacher = !!approvedRequest;
+          }
         }
       }
 
       if (!isOwnStudent && !isParent && !isAssignedTeacher) {
         return res.status(403).json({ error: "Forbidden" });
       }
-
-      const isTutorMode = await isTutorRequestModeEnabled();
 
       if (!isTutorMode) {
         // Direct assignment mode: look up from TeacherStudentAssignment
@@ -2202,15 +2206,20 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      // Validate that teacherId is actually assigned to this student
-      const assignments = await storage.getAssignedTeachersForStudent(studentId);
-      const isAssigned = assignments.some((a) => a.teacherId === teacherId);
-      if (!isAssigned) {
-        const approvedRequest = await prisma.tutorRequest.findFirst({
-          where: { studentId, teacherId, status: "approved" },
-        });
-        if (!approvedRequest) {
-          return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
+      // In tutor-request mode, validate the teacher is actually assigned/approved for this student.
+      // In direct-assignment mode (mode OFF), any teacher can access any student's thread
+      // since all students are visible to all teachers with no formal per-teacher assignments.
+      const tutorRequestMode = await isTutorRequestModeEnabled();
+      if (tutorRequestMode) {
+        const assignments = await storage.getAssignedTeachersForStudent(studentId);
+        const isAssigned = assignments.some((a) => a.teacherId === teacherId);
+        if (!isAssigned) {
+          const approvedRequest = await prisma.tutorRequest.findFirst({
+            where: { studentId, teacherId, status: "approved" },
+          });
+          if (!approvedRequest) {
+            return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
+          }
         }
       }
 
