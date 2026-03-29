@@ -2185,6 +2185,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/messages/conversations", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      const summaries = await storage.getConversationSummaries(user.id, user.role);
+      res.json(summaries);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages/thread", requireAuth, async (req, res) => {
     try {
       const teacherId = parseInt(req.query.teacherId as string);

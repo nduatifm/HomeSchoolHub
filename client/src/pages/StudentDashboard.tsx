@@ -133,14 +133,23 @@ export default function StudentDashboard() {
     queryKey: ["/api/teachers/student", student?.id],
     enabled: !!student,
   });
-  type ThreadMessage = { id: number; senderId: number; receiverId: number; message: string; timestamp: string; isRead: boolean };
+  type ConversationSummary = {
+    studentId: number;
+    teacherUserId: number;
+    studentName: string;
+    teacherName: string;
+    parentName: string | null;
+    lastMessage: string | null;
+    lastMessageTimestamp: string | null;
+    unreadCount: number;
+  };
 
-  const { data: teacherThreadPreview = [] } = useQuery<ThreadMessage[]>({
-    queryKey: ["/api/messages/thread", assignedTeacher?.id ?? 0, student?.id ?? 0],
-    queryFn: (): Promise<ThreadMessage[]> => apiRequest(`/api/messages/thread?teacherId=${assignedTeacher!.id}&studentId=${student!.id}`),
-    enabled: !!assignedTeacher && !!student,
+  const { data: conversationSummaries = [] } = useQuery<ConversationSummary[]>({
+    queryKey: ["/api/messages/conversations"],
+    enabled: !!student,
     staleTime: 30000,
   });
+  const teacherSummary = conversationSummaries[0] ?? null;
 
   const { data: feedback = [] } = useQuery({
     queryKey: ["/api/feedback/student", student?.id],
@@ -1277,36 +1286,33 @@ export default function StudentDashboard() {
                           <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
                           <p className="text-xs text-muted-foreground">No teacher assigned yet</p>
                         </div>
-                      ) : (() => {
-                        const lastMsg: ThreadMessage | null = teacherThreadPreview[teacherThreadPreview.length - 1] ?? null;
-                        return (
-                          <button
-                            className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
-                            style={{ background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" }}
-                          >
-                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-xs font-bold text-primary">
-                                {assignedTeacher.name.charAt(0).toUpperCase()}
-                              </span>
+                      ) : (
+                        <button
+                          className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
+                          style={{ background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" }}
+                        >
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-primary">
+                              {assignedTeacher.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <p className="text-sm font-medium truncate text-foreground">{assignedTeacher.name}</p>
+                              {teacherSummary?.lastMessageTimestamp && (
+                                <span className="text-[11px] text-muted-foreground shrink-0">
+                                  {formatPreviewTime(teacherSummary.lastMessageTimestamp)}
+                                </span>
+                              )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2 mb-0.5">
-                                <p className="text-sm font-medium truncate text-foreground">{assignedTeacher.name}</p>
-                                {lastMsg && (
-                                  <span className="text-[11px] text-muted-foreground shrink-0">
-                                    {formatPreviewTime(lastMsg.timestamp)}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {lastMsg
-                                  ? lastMsg.message.length > 42 ? lastMsg.message.slice(0, 42) + "…" : lastMsg.message
-                                  : "No messages yet"}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })()}
+                            <p className="text-xs text-muted-foreground truncate">
+                              {teacherSummary?.lastMessage
+                                ? teacherSummary.lastMessage.length > 42 ? teacherSummary.lastMessage.slice(0, 42) + "…" : teacherSummary.lastMessage
+                                : "No messages yet"}
+                            </p>
+                          </div>
+                        </button>
+                      )}
                     </div>
                   </div>
 

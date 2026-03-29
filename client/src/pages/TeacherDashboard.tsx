@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   queryClient,
   apiRequest,
@@ -191,15 +191,20 @@ export default function TeacherDashboard() {
     queryKey: ["/api/students/teacher"],
   });
 
-  type ThreadMessage = { id: number; senderId: number; receiverId: number; message: string; timestamp: string; isRead: boolean };
+  type ConversationSummary = {
+    studentId: number;
+    teacherUserId: number;
+    studentName: string;
+    teacherName: string;
+    parentName: string | null;
+    lastMessage: string | null;
+    lastMessageTimestamp: string | null;
+    unreadCount: number;
+  };
 
-  const threadPreviewQueries = useQueries({
-    queries: students.map((s) => ({
-      queryKey: ["/api/messages/thread", user?.id ?? 0, s.id],
-      queryFn: (): Promise<ThreadMessage[]> => apiRequest(`/api/messages/thread?teacherId=${user!.id}&studentId=${s.id}`),
-      enabled: !!user && students.length > 0,
-      staleTime: 30000,
-    })),
+  const { data: conversationSummaries = [] } = useQuery<ConversationSummary[]>({
+    queryKey: ["/api/messages/conversations"],
+    staleTime: 30000,
   });
 
   const { data: assignments = [] } = useQuery<Assignment[]>({
@@ -3685,10 +3690,9 @@ export default function TeacherDashboard() {
                           <p className="text-xs text-muted-foreground">No students assigned yet</p>
                         </div>
                       ) : (
-                        students.map((s, index) => {
+                        students.map((s) => {
                           const isActive = selectedStudentForMessages?.id === s.id;
-                          const threadMsgs: ThreadMessage[] = threadPreviewQueries[index]?.data ?? [];
-                          const lastMsg = threadMsgs[threadMsgs.length - 1] ?? null;
+                          const summary = conversationSummaries.find((c) => c.studentId === s.id) ?? null;
                           return (
                             <button
                               key={s.id}
@@ -3706,20 +3710,20 @@ export default function TeacherDashboard() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2 mb-0.5">
                                   <p className="text-sm font-medium truncate text-foreground">{s.name}</p>
-                                  {lastMsg && (
+                                  {summary?.lastMessageTimestamp && (
                                     <span className="text-[11px] text-muted-foreground shrink-0">
-                                      {formatPreviewTime(lastMsg.timestamp)}
+                                      {formatPreviewTime(summary.lastMessageTimestamp)}
                                     </span>
                                   )}
                                 </div>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {lastMsg
-                                    ? lastMsg.message.length > 42 ? lastMsg.message.slice(0, 42) + "…" : lastMsg.message
+                                  {summary?.lastMessage
+                                    ? summary.lastMessage.length > 42 ? summary.lastMessage.slice(0, 42) + "…" : summary.lastMessage
                                     : "No messages yet"}
                                 </p>
-                                {s.parentName && (
+                                {(summary?.parentName ?? s.parentName) && (
                                   <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                                    Parent: {s.parentName}
+                                    Parent: {summary?.parentName ?? s.parentName}
                                   </p>
                                 )}
                               </div>

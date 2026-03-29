@@ -43,6 +43,17 @@ import type {
   InsertTeacherStudentAssignment,
 } from "@shared/schema";
 
+export type ConversationSummary = {
+  studentId: number;
+  teacherUserId: number;
+  studentName: string;
+  teacherName: string;
+  parentName: string | null;
+  lastMessage: string | null;
+  lastMessageTimestamp: string | null;
+  unreadCount: number;
+};
+
 export interface IStorage {
   createUser(user: Prisma.UserCreateInput): Promise<User>;
   getUserById(id: number): Promise<User | null>;
@@ -152,6 +163,7 @@ export interface IStorage {
   getMessagesByUser(userId: number): Promise<Message[]>;
   markMessageAsRead(id: number): Promise<Message>;
   getThreadMessages(teacherUserId: number, studentId: number): Promise<(Message & { senderName?: string })[]>;
+  getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]>;
 
   createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
   getProgressReportsByStudent(studentId: number): Promise<ProgressReport[]>;
@@ -716,6 +728,196 @@ class PrismaStorage implements IStorage {
       isRead: m.isRead,
       senderName: m.sender.name,
     }));
+  }
+
+  async getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]> {
+    const summaries: ConversationSummary[] = [];
+
+    if (role === "teacher") {
+      // Get all students visible to this teacher
+      const isTutorMode = await (async () => {
+        const setting = await prisma.systemSettings.findFirst({ where: { key: "tutor_request_mode" } });
+        return setting?.value === "true";
+      })();
+
+      let students: Array<{ id: number; name: string; userId: number; parentId: number }>;
+      if (isTutorMode) {
+        const requests = await prisma.tutorRequest.findMany({
+          where: { teacherId: userId, status: "approved" },
+          include: { parent: { include: { parentStudents: true } } },
+        });
+        const seen = new Set<number>();
+        students = [];
+        for (const r of requests) {
+          const candidateStudents = r.studentId
+            ? r.parent.parentStudents.filter((s: any) => s.id === r.studentId)
+            : r.parent.parentStudents;
+          for (const s of candidateStudents) {
+            if (!seen.has(s.id)) {
+              seen.add(s.id);
+              students.push({ id: s.id, name: s.name, userId: s.userId, parentId: s.parentId });
+            }
+          }
+        }
+      } else {
+        const all = await prisma.student.findMany();
+        students = all.map((s: any) => ({ id: s.id, name: s.name, userId: s.userId, parentId: s.parentId }));
+      }
+
+      const teacher = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+      if (!teacher) return [];
+
+      for (const student of students) {
+        const participantIds = [userId, student.userId, student.parentId];
+        const lastMsg = await prisma.message.findFirst({
+          where: {
+            AND: [{ senderId: { in: participantIds } }, { receiverId: { in: participantIds } }],
+          },
+          orderBy: { timestamp: "desc" },
+        });
+        const unreadCount = await prisma.message.count({
+          where: {
+            AND: [
+              { senderId: { in: participantIds } },
+              { receiverId: { in: participantIds } },
+              { receiverId: userId },
+              { isRead: false },
+            ],
+          },
+        });
+        const parent = student.parentId ? await prisma.user.findUnique({ where: { id: student.parentId }, select: { name: true } }) : null;
+        summaries.push({
+          studentId: student.id,
+          teacherUserId: userId,
+          studentName: student.name,
+          teacherName: teacher.name,
+          parentName: parent?.name ?? null,
+          lastMessage: lastMsg?.message ?? null,
+          lastMessageTimestamp: lastMsg?.timestamp ?? null,
+          unreadCount,
+        });
+      }
+    } else if (role === "parent") {
+      // Parent's children
+      const parentStudents = await prisma.student.findMany({
+        where: { parentId: userId },
+      });
+      const parent = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+
+      for (const student of parentStudents) {
+        // Find assigned teacher for this student
+        const assignment = await prisma.teacherStudentAssignment.findFirst({
+          where: { studentId: student.id, status: "active" },
+          include: { teacher: { select: { id: true, name: true } } },
+        });
+        let teacherUser: { id: number; name: string } | null = assignment?.teacher ?? null;
+
+        // Fallback to tutor request if no direct assignment
+        if (!teacherUser) {
+          const request = await prisma.tutorRequest.findFirst({
+            where: {
+              OR: [{ studentId: student.id }, { parentId: userId }],
+              status: "approved",
+            },
+            include: { teacher: { select: { id: true, name: true } } },
+          });
+          if (request) teacherUser = request.teacher as { id: number; name: string };
+        }
+
+        if (!teacherUser) {
+          summaries.push({
+            studentId: student.id,
+            teacherUserId: 0,
+            studentName: student.name,
+            teacherName: "",
+            parentName: parent?.name ?? null,
+            lastMessage: null,
+            lastMessageTimestamp: null,
+            unreadCount: 0,
+          });
+          continue;
+        }
+
+        const participantIds = [teacherUser.id, student.userId, userId];
+        const lastMsg = await prisma.message.findFirst({
+          where: {
+            AND: [{ senderId: { in: participantIds } }, { receiverId: { in: participantIds } }],
+          },
+          orderBy: { timestamp: "desc" },
+        });
+        const unreadCount = await prisma.message.count({
+          where: {
+            AND: [
+              { senderId: { in: participantIds } },
+              { receiverId: { in: participantIds } },
+              { receiverId: userId },
+              { isRead: false },
+            ],
+          },
+        });
+        summaries.push({
+          studentId: student.id,
+          teacherUserId: teacherUser.id,
+          studentName: student.name,
+          teacherName: teacherUser.name,
+          parentName: parent?.name ?? null,
+          lastMessage: lastMsg?.message ?? null,
+          lastMessageTimestamp: lastMsg?.timestamp ?? null,
+          unreadCount,
+        });
+      }
+    } else if (role === "student") {
+      // Find this student record and their assigned teacher
+      const studentRecord = await prisma.student.findUnique({ where: { userId } });
+      if (!studentRecord) return [];
+
+      const assignment = await prisma.teacherStudentAssignment.findFirst({
+        where: { studentId: studentRecord.id, status: "active" },
+        include: { teacher: { select: { id: true, name: true } } },
+      });
+      let teacherUser: { id: number; name: string } | null = assignment?.teacher ?? null;
+
+      if (!teacherUser) {
+        const request = await prisma.tutorRequest.findFirst({
+          where: { parentId: studentRecord.parentId, status: "approved" },
+          include: { teacher: { select: { id: true, name: true } } },
+        });
+        if (request) teacherUser = request.teacher as { id: number; name: string };
+      }
+
+      if (!teacherUser) return [];
+
+      const participantIds = [teacherUser.id, userId, studentRecord.parentId];
+      const lastMsg = await prisma.message.findFirst({
+        where: {
+          AND: [{ senderId: { in: participantIds } }, { receiverId: { in: participantIds } }],
+        },
+        orderBy: { timestamp: "desc" },
+      });
+      const unreadCount = await prisma.message.count({
+        where: {
+          AND: [
+            { senderId: { in: participantIds } },
+            { receiverId: { in: participantIds } },
+            { receiverId: userId },
+            { isRead: false },
+          ],
+        },
+      });
+      const parent = studentRecord.parentId ? await prisma.user.findUnique({ where: { id: studentRecord.parentId }, select: { name: true } }) : null;
+      summaries.push({
+        studentId: studentRecord.id,
+        teacherUserId: teacherUser.id,
+        studentName: studentRecord.name,
+        teacherName: teacherUser.name,
+        parentName: parent?.name ?? null,
+        lastMessage: lastMsg?.message ?? null,
+        lastMessageTimestamp: lastMsg?.timestamp ?? null,
+        unreadCount,
+      });
+    }
+
+    return summaries;
   }
 
   async createProgressReport(
