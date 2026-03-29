@@ -138,6 +138,17 @@ export default function ParentDashboard() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
+  // Check if tutor request mode is enabled (for showing/hiding tutor request UI)
+  const { data: tutorRequestModeData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/system-settings/tutor-request-mode"],
+  });
+  const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
+
+  // Fetch data
+  const { data: students = [] } = useQuery<Student[]>({
+    queryKey: ["/api/students/parent"],
+  });
+
   // Dialog state
   const [inviteStudentOpen, setInviteStudentOpen] = useState(false);
   const [requestTutorOpen, setRequestTutorOpen] = useState(false);
@@ -152,17 +163,6 @@ export default function ParentDashboard() {
   }, [students]);
 
   const [rateTutorOpen, setRateTutorOpen] = useState(false);
-
-  // Check if tutor request mode is enabled (for showing/hiding tutor request UI)
-  const { data: tutorRequestModeData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/system-settings/tutor-request-mode"],
-  });
-  const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
-
-  // Fetch data
-  const { data: students = [] } = useQuery<Student[]>({
-    queryKey: ["/api/students/parent"],
-  });
   const { data: invites = [] } = useQuery<StudentInvite[]>({
     queryKey: ["/api/invites/student/parent"],
   });
