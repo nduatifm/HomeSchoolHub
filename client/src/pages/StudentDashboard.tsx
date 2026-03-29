@@ -260,16 +260,6 @@ export default function StudentDashboard() {
     },
   });
 
-  // Derive assigned teacher for the messages thread
-  // teachers query returns a single object or null (not an array); default [] means still loading
-  const assignedTeacher: { id: number; name: string; email: string } | null =
-    teachers !== null &&
-    teachers !== undefined &&
-    !Array.isArray(teachers) &&
-    typeof (teachers as any).id === "number"
-      ? (teachers as unknown as { id: number; name: string; email: string })
-      : null;
-
   // Send message
   const [messageForm, setMessageForm] = useState({
     receiverId: 0,
