@@ -52,7 +52,6 @@ import {
   Upload,
   X,
   ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -1259,22 +1258,24 @@ export default function StudentDashboard() {
                     <div className="space-y-2">
                       <button
                         onClick={() => setThreadOpen((o) => !o)}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/40 hover:bg-muted/30 transition-all text-left"
+                        className={`w-full flex items-center gap-3 p-3 rounded-lg border hover:shadow-sm transition-all text-left ${
+                          threadOpen
+                            ? "border-primary/40 bg-muted/20"
+                            : "hover:border-primary/40 hover:bg-muted/30"
+                        }`}
                       >
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 ring-2 ring-primary/20 flex items-center justify-center shrink-0">
                           <span className="text-sm font-semibold text-primary">
                             {assignedTeacher.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium">{assignedTeacher.name}</p>
                           <p className="text-xs text-muted-foreground">Your teacher</p>
                         </div>
-                        {threadOpen ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" />
-                        ) : (
+                        <span className={`transition-transform duration-200 ${threadOpen ? "rotate-180" : ""}`}>
                           <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-                        )}
+                        </span>
                       </button>
                       {threadOpen && (
                         <div className="mt-2">
