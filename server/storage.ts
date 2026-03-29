@@ -731,8 +731,7 @@ class PrismaStorage implements IStorage {
   }
 
   async getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]> {
-    // Helper: batch-fetch last message and unread count for each conversation group.
-    // A group is a (teacherUserId, studentUserId, parentUserId) triplet identifying a thread.
+    // Typed conversation group: identifies a three-way thread
     type ConvGroup = {
       studentId: number;
       teacherUserId: number;
@@ -740,58 +739,81 @@ class PrismaStorage implements IStorage {
       parentUserId: number;
     };
 
-    const buildSummaries = async (
+    // Raw-SQL helper: given a set of groups, return the last message and unread count for each.
+    // Uses two single-pass SQL queries (one for last messages, one for unread counts) instead of
+    // per-thread queries, achieving O(1) DB round-trips regardless of conversation count.
+    const fetchThreadStats = async (
       groups: ConvGroup[],
       requesterUserId: number,
-      teacherName: string,
-      parentName: string | null,
-      studentNames: Map<number, string>,
-    ): Promise<ConversationSummary[]> => {
-      if (groups.length === 0) return [];
+    ): Promise<Map<number, { lastMessage: string | null; lastMessageTimestamp: string | null; unreadCount: number }>> => {
+      const result = new Map<number, { lastMessage: string | null; lastMessageTimestamp: string | null; unreadCount: number }>();
+      if (groups.length === 0) return result;
 
-      // Batch: collect all participant IDs across all groups, then fetch messages once
-      const allParticipantIds = new Set<number>();
+      // Each group represents a three-way thread (teacher, student, parent).
+      // We pass the participant triplets as a VALUES list to the CTE and use a window function
+      // to get the latest message per thread in one query.
+      const tripletValues = groups
+        .map((g) => `(${g.studentId}, ${g.teacherUserId}, ${g.studentUserId}, ${g.parentUserId})`)
+        .join(', ');
+
+      // Query 1: last message per thread via window function (ROW_NUMBER per studentId thread)
+      const lastMsgRows = await prisma.$queryRawUnsafe<
+        Array<{ student_id: number; last_message: string | null; last_ts: string | null }>
+      >(`
+        WITH triplets(student_id, p1, p2, p3) AS (
+          VALUES ${tripletValues}
+        ),
+        ranked AS (
+          SELECT
+            t.student_id,
+            m.message AS last_message,
+            m.timestamp AS last_ts,
+            ROW_NUMBER() OVER (PARTITION BY t.student_id ORDER BY m.timestamp DESC) AS rn
+          FROM triplets t
+          JOIN "Message" m
+            ON m."senderId" IN (t.p1, t.p2, t.p3)
+           AND m."receiverId" IN (t.p1, t.p2, t.p3)
+        )
+        SELECT student_id, last_message, last_ts
+        FROM ranked
+        WHERE rn = 1
+      `);
+
+      // Query 2: unread count per thread (messages addressed to requester, not yet read)
+      const unreadRows = await prisma.$queryRawUnsafe<
+        Array<{ student_id: number; unread_count: bigint }>
+      >(`
+        WITH triplets(student_id, p1, p2, p3) AS (
+          VALUES ${tripletValues}
+        )
+        SELECT
+          t.student_id,
+          COUNT(m.id) AS unread_count
+        FROM triplets t
+        JOIN "Message" m
+          ON m."senderId" IN (t.p1, t.p2, t.p3)
+         AND m."receiverId" IN (t.p1, t.p2, t.p3)
+         AND m."receiverId" = ${requesterUserId}
+         AND m."isRead" = false
+        GROUP BY t.student_id
+      `);
+
+      // Initialise all groups with empty stats
       for (const g of groups) {
-        allParticipantIds.add(g.teacherUserId);
-        allParticipantIds.add(g.studentUserId);
-        allParticipantIds.add(g.parentUserId);
+        result.set(g.studentId, { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 });
       }
-      const participantArr = Array.from(allParticipantIds);
-
-      // Single message query ordered newest-first; we scan it once per group
-      const allMessages = await prisma.message.findMany({
-        where: {
-          AND: [
-            { senderId: { in: participantArr } },
-            { receiverId: { in: participantArr } },
-          ],
-        },
-        orderBy: { timestamp: "desc" },
-        select: { senderId: true, receiverId: true, message: true, timestamp: true, isRead: true },
-      });
-
-      const result: ConversationSummary[] = [];
-      for (const g of groups) {
-        const triplet = new Set([g.teacherUserId, g.studentUserId, g.parentUserId]);
-        let lastMsg: { message: string; timestamp: string } | null = null;
-        let unreadCount = 0;
-        for (const m of allMessages) {
-          if (triplet.has(m.senderId) && triplet.has(m.receiverId)) {
-            if (!lastMsg) lastMsg = m;
-            if (!m.isRead && m.receiverId === requesterUserId) unreadCount++;
-          }
+      for (const row of lastMsgRows) {
+        const entry = result.get(Number(row.student_id));
+        if (entry) {
+          entry.lastMessage = row.last_message;
+          entry.lastMessageTimestamp = row.last_ts ? String(row.last_ts) : null;
         }
-        result.push({
-          studentId: g.studentId,
-          teacherUserId: g.teacherUserId,
-          studentName: studentNames.get(g.studentId) ?? "",
-          teacherName,
-          parentName,
-          lastMessage: lastMsg?.message ?? null,
-          lastMessageTimestamp: lastMsg?.timestamp ?? null,
-          unreadCount,
-        });
       }
+      for (const row of unreadRows) {
+        const entry = result.get(Number(row.student_id));
+        if (entry) entry.unreadCount = Number(row.unread_count);
+      }
+
       return result;
     };
 
@@ -806,15 +828,21 @@ class PrismaStorage implements IStorage {
       if (isTutorMode) {
         const requests = await prisma.tutorRequest.findMany({
           where: { teacherId: userId, status: "approved" },
-          include: { parent: { include: { parentStudents: { select: { id: true, name: true, userId: true, parentId: true } } } } },
+          include: {
+            parent: {
+              include: {
+                parentStudents: { select: { id: true, name: true, userId: true, parentId: true } },
+              },
+            },
+          },
         });
         const seen = new Set<number>();
         students = [];
         for (const r of requests) {
           const candidates = r.studentId
-            ? r.parent.parentStudents.filter((s: any) => s.id === r.studentId)
+            ? r.parent.parentStudents.filter((s) => s.id === r.studentId)
             : r.parent.parentStudents;
-          for (const s of candidates as any[]) {
+          for (const s of candidates) {
             if (!seen.has(s.id)) {
               seen.add(s.id);
               students.push({ id: s.id, name: s.name, userId: s.userId, parentId: s.parentId });
@@ -822,24 +850,23 @@ class PrismaStorage implements IStorage {
           }
         }
       } else {
-        const all = await prisma.student.findMany({
+        students = await prisma.student.findMany({
           select: { id: true, name: true, userId: true, parentId: true },
         });
-        students = all;
       }
 
       if (students.length === 0) return [];
 
       // Batch-fetch teacher name and all parent names in parallel
-      const parentIds = Array.from(new Set(students.map((s) => s.parentId).filter(Boolean))) as number[];
+      const parentIdSet = new Set(students.map((s) => s.parentId).filter((id): id is number => id != null));
+      const parentIdArr = Array.from(parentIdSet);
       const [teacher, parentUsers] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
-        prisma.user.findMany({ where: { id: { in: parentIds } }, select: { id: true, name: true } }),
+        prisma.user.findMany({ where: { id: { in: parentIdArr } }, select: { id: true, name: true } }),
       ]);
       if (!teacher) return [];
 
       const parentNameMap = new Map(parentUsers.map((p) => [p.id, p.name]));
-      const studentNames = new Map(students.map((s) => [s.id, s.name]));
       const groups: ConvGroup[] = students.map((s) => ({
         studentId: s.id,
         teacherUserId: userId,
@@ -847,79 +874,80 @@ class PrismaStorage implements IStorage {
         parentUserId: s.parentId,
       }));
 
-      // buildSummaries uses a shared parentName param; patch per-student after
-      const base = await buildSummaries(groups, userId, teacher.name, null, studentNames);
-      return base.map((s) => {
-        const student = students.find((st) => st.id === s.studentId)!;
-        return { ...s, parentName: parentNameMap.get(student.parentId) ?? null };
-      });
+      const stats = await fetchThreadStats(groups, userId);
+      return students.map((s) => ({
+        studentId: s.id,
+        teacherUserId: userId,
+        studentName: s.name,
+        teacherName: teacher.name,
+        parentName: parentNameMap.get(s.parentId) ?? null,
+        ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
+      }));
     }
 
     // ── PARENT ───────────────────────────────────────────────────────────────
     if (role === "parent") {
+      type TeacherRef = { id: number; name: string };
       const [parentStudents, parentUser, directAssignments, tutorRequests] = await Promise.all([
         prisma.student.findMany({
           where: { parentId: userId },
           select: { id: true, name: true, userId: true, parentId: true },
         }),
         prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
-        // Direct assignments for this parent's children (student-specific)
+        // Direct assignments for this parent's children (typed to include studentId)
         prisma.teacherStudentAssignment.findMany({
           where: { student: { parentId: userId }, status: "active" },
-          include: { teacher: { select: { id: true, name: true } } },
+          select: {
+            studentId: true,
+            teacher: { select: { id: true, name: true } },
+          },
         }),
         // Student-specific tutor requests for this parent's children
         prisma.tutorRequest.findMany({
           where: { parentId: userId, status: "approved", studentId: { not: null } },
-          include: { teacher: { select: { id: true, name: true } } },
+          select: {
+            studentId: true,
+            teacher: { select: { id: true, name: true } },
+          },
         }),
       ]);
 
       if (parentStudents.length === 0) return [];
 
       // Build student→teacher map (prefer direct assignment, fallback to student-specific request)
-      const directMap = new Map<number, { id: number; name: string }>();
-      for (const a of directAssignments) {
-        directMap.set((a as any).studentId, a.teacher as { id: number; name: string });
-      }
-      const requestMap = new Map<number, { id: number; name: string }>();
+      const teacherMap = new Map<number, TeacherRef>();
       for (const r of tutorRequests) {
-        if (r.studentId != null && !requestMap.has(r.studentId)) {
-          requestMap.set(r.studentId, r.teacher as { id: number; name: string });
+        if (r.studentId != null && !teacherMap.has(r.studentId)) {
+          teacherMap.set(r.studentId, r.teacher);
         }
       }
+      for (const a of directAssignments) {
+        // Direct assignment takes priority — overwrite any tutor-request entry
+        teacherMap.set(a.studentId, a.teacher);
+      }
 
-      type StudentWithTeacher = { id: number; name: string; userId: number; parentId: number; teacher: { id: number; name: string } | null };
-      const studentsWithTeacher: StudentWithTeacher[] = parentStudents.map((s) => ({
-        ...s,
-        teacher: directMap.get(s.id) ?? requestMap.get(s.id) ?? null,
+      const assignedStudents = parentStudents.filter((s) => teacherMap.has(s.id));
+      const unassignedStudents = parentStudents.filter((s) => !teacherMap.has(s.id));
+
+      const groups: ConvGroup[] = assignedStudents.map((s) => ({
+        studentId: s.id,
+        teacherUserId: teacherMap.get(s.id)!.id,
+        studentUserId: s.userId,
+        parentUserId: userId,
       }));
 
-      // Group by teacher to share one message batch per teacher group
-      const teacherGroups = new Map<number, StudentWithTeacher[]>();
-      const noTeacherStudents: StudentWithTeacher[] = [];
-      for (const s of studentsWithTeacher) {
-        if (!s.teacher) { noTeacherStudents.push(s); continue; }
-        const key = s.teacher.id;
-        if (!teacherGroups.has(key)) teacherGroups.set(key, []);
-        teacherGroups.get(key)!.push(s);
-      }
+      const stats = await fetchThreadStats(groups, userId);
 
-      const summaries: ConversationSummary[] = [];
-      for (const [teacherId, group] of Array.from(teacherGroups.entries())) {
-        const teacherName = group[0].teacher!.name;
-        const convGroups: ConvGroup[] = group.map((s: StudentWithTeacher) => ({
-          studentId: s.id,
-          teacherUserId: teacherId,
-          studentUserId: s.userId,
-          parentUserId: userId,
-        }));
-        const studentNames = new Map(group.map((s: StudentWithTeacher) => [s.id, s.name]));
-        const partial = await buildSummaries(convGroups, userId, teacherName, parentUser?.name ?? null, studentNames);
-        summaries.push(...partial);
-      }
+      const summaries: ConversationSummary[] = assignedStudents.map((s) => ({
+        studentId: s.id,
+        teacherUserId: teacherMap.get(s.id)!.id,
+        studentName: s.name,
+        teacherName: teacherMap.get(s.id)!.name,
+        parentName: parentUser?.name ?? null,
+        ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
+      }));
 
-      for (const s of noTeacherStudents) {
+      for (const s of unassignedStudents) {
         summaries.push({
           studentId: s.id,
           teacherUserId: 0,
@@ -947,16 +975,16 @@ class PrismaStorage implements IStorage {
       const [directAssignment, tutorRequest, parentUser] = await Promise.all([
         prisma.teacherStudentAssignment.findFirst({
           where: { studentId: studentRecord.id, status: "active" },
-          include: { teacher: { select: { id: true, name: true } } },
+          select: { teacher: { select: { id: true, name: true } } },
         }),
         prisma.tutorRequest.findFirst({
           where: { studentId: studentRecord.id, status: "approved" },
-          include: { teacher: { select: { id: true, name: true } } },
+          select: { teacher: { select: { id: true, name: true } } },
         }),
         prisma.user.findUnique({ where: { id: studentRecord.parentId }, select: { name: true } }),
       ]);
 
-      const teacherUser = (directAssignment?.teacher ?? tutorRequest?.teacher ?? null) as { id: number; name: string } | null;
+      const teacherUser = directAssignment?.teacher ?? tutorRequest?.teacher ?? null;
       if (!teacherUser) return [];
 
       const groups: ConvGroup[] = [{
@@ -965,8 +993,16 @@ class PrismaStorage implements IStorage {
         studentUserId: userId,
         parentUserId: studentRecord.parentId,
       }];
-      const studentNames = new Map([[studentRecord.id, studentRecord.name]]);
-      return buildSummaries(groups, userId, teacherUser.name, parentUser?.name ?? null, studentNames);
+
+      const stats = await fetchThreadStats(groups, userId);
+      return [{
+        studentId: studentRecord.id,
+        teacherUserId: teacherUser.id,
+        studentName: studentRecord.name,
+        teacherName: teacherUser.name,
+        parentName: parentUser?.name ?? null,
+        ...(stats.get(studentRecord.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
+      }];
     }
 
     return [];
