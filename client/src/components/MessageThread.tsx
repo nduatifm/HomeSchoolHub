@@ -223,8 +223,8 @@ export default function MessageThread({
                     const isFirst = mi === 0;
                     const isLast = mi === group.messages.length - 1;
 
-                    const sentCorner = isFirst ? "" : "rounded-tr-sm";
-                    const receivedCorner = isFirst ? "" : "rounded-tl-sm";
+                    const sentCorner = isFirst ? "" : "rounded-tl-sm";
+                    const receivedCorner = isFirst ? "" : "rounded-tr-sm";
 
                     return (
                       <div
