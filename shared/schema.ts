@@ -39,6 +39,8 @@ export const insertUserSchema = userSchema.omit({
   isEmailVerified: true,
   emailVerifyToken: true,
   emailVerifyExpires: true,
+  isAdmin: true,
+  isSuperAdmin: true,
 });
 export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;

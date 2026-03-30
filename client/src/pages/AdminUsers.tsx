@@ -61,7 +61,6 @@ type AdminUser = {
   googleId: string | null;
   isAdmin: boolean;
   isSuperAdmin: boolean;
-  createdAt: string | null;
 };
 
 function RoleBadge({ role }: { role: string | null }) {
@@ -119,19 +118,6 @@ export default function AdminUsers() {
       setRoleDialogOpen(false);
     },
     onError: (e: any) => toast({ title: "Failed to update role", description: e.message, type: "error" }),
-  });
-
-  const toggleAdminMutation = useMutation({
-    mutationFn: ({ id, isAdmin }: { id: number; isAdmin: boolean }) =>
-      apiRequest(`/api/admin/users/${id}/admin`, {
-        method: "PATCH",
-        body: JSON.stringify({ isAdmin }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Admin status updated" });
-    },
-    onError: (e: any) => toast({ title: "Failed to update admin", description: e.message, type: "error" }),
   });
 
   const toggleSuperAdminMutation = useMutation({
@@ -232,6 +218,7 @@ export default function AdminUsers() {
                   <TableHead>Method</TableHead>
                   <TableHead>Verified</TableHead>
                   <TableHead>Admin</TableHead>
+                  <TableHead>ID</TableHead>
                   {currentUser?.isSuperAdmin && <TableHead className="text-right pr-4">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -248,14 +235,14 @@ export default function AdminUsers() {
                           </div>
                         </div>
                       </TableCell>
-                      {Array.from({ length: currentUser?.isSuperAdmin ? 5 : 4 }).map((_, j) => (
+                      {Array.from({ length: currentUser?.isSuperAdmin ? 6 : 5 }).map((_, j) => (
                         <TableCell key={j}><div className="h-3 w-16 bg-muted animate-pulse rounded" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={currentUser?.isSuperAdmin ? 6 : 5} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={currentUser?.isSuperAdmin ? 7 : 6} className="text-center py-10 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -318,6 +305,11 @@ export default function AdminUsers() {
                         )}
                       </TableCell>
 
+                      {/* User ID */}
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground font-mono">#{u.id}</span>
+                      </TableCell>
+
                       {/* Actions (super admin only) */}
                       {currentUser?.isSuperAdmin && (
                         <TableCell className="text-right pr-4">
@@ -332,36 +324,19 @@ export default function AdminUsers() {
                                 <DropdownMenuLabel>Manage {u.name.split(" ")[0]}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
 
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedUser(u);
-                                    setNewRole(u.role || "");
-                                    setRoleDialogOpen(true);
-                                  }}
-                                >
-                                  Change role
-                                </DropdownMenuItem>
+                                {u.role !== "student" && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setSelectedUser(u);
+                                      setNewRole(u.role || "");
+                                      setRoleDialogOpen(true);
+                                    }}
+                                  >
+                                    Change role
+                                  </DropdownMenuItem>
+                                )}
 
                                 <DropdownMenuSeparator />
-
-                                {u.isAdmin && !u.isSuperAdmin && (
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: false })}
-                                  >
-                                    <ShieldOff className="w-4 h-4 mr-2" />
-                                    Remove admin
-                                  </DropdownMenuItem>
-                                )}
-
-                                {!u.isAdmin && (
-                                  <DropdownMenuItem
-                                    onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: true })}
-                                  >
-                                    <Shield className="w-4 h-4 mr-2" />
-                                    Make admin
-                                  </DropdownMenuItem>
-                                )}
 
                                 {u.isSuperAdmin ? (
                                   <DropdownMenuItem
@@ -401,7 +376,7 @@ export default function AdminUsers() {
         </main>
       </div>
 
-      {/* Change role dialog */}
+      {/* Change role dialog — teacher/parent only */}
       <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -431,7 +406,6 @@ export default function AdminUsers() {
                   <SelectContent>
                     <SelectItem value="teacher">Teacher</SelectItem>
                     <SelectItem value="parent">Parent</SelectItem>
-                    <SelectItem value="student">Student</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

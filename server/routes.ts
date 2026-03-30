@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import prisma from "./db";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
   insertUserSchema,
@@ -95,25 +96,28 @@ async function requireSuperAdmin(req: Request, res: Response, next: Function) {
   next();
 }
 
-// Sync SUPER_ADMIN_EMAIL and ADMIN_EMAIL env vars to DB flags on startup
+// Sync SUPER_ADMIN_EMAIL and ADMIN_EMAIL env vars to DB flags on startup.
+// Enforces exact desired state: promotes target users and demotes previous ones.
 async function syncAdminFlags() {
   try {
-    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL?.trim();
-    const adminEmail = process.env.ADMIN_EMAIL?.trim();
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL?.trim() || null;
+    const adminEmail = process.env.ADMIN_EMAIL?.trim() || null;
 
-    if (superAdminEmail) {
-      const user = await storage.getUserByEmail(superAdminEmail);
-      if (user && (!user.isSuperAdmin || !user.isAdmin)) {
-        await storage.updateUser(user.id, { isSuperAdmin: true, isAdmin: true });
-        console.log(`[admin] Super admin synced: ${superAdminEmail}`);
-      }
-    }
+    const allUsers = await storage.getAllUsers();
 
-    if (adminEmail && adminEmail !== superAdminEmail) {
-      const user = await storage.getUserByEmail(adminEmail);
-      if (user && !user.isAdmin) {
-        await storage.updateUser(user.id, { isAdmin: true });
-        console.log(`[admin] Admin synced: ${adminEmail}`);
+    for (const u of allUsers) {
+      const shouldBeSuperAdmin = !!superAdminEmail && u.email === superAdminEmail;
+      const shouldBeAdmin = shouldBeSuperAdmin || (!!adminEmail && u.email === adminEmail);
+
+      const currentIsAdmin = u.isAdmin ?? false;
+      const currentIsSuperAdmin = u.isSuperAdmin ?? false;
+
+      if (currentIsAdmin !== shouldBeAdmin || currentIsSuperAdmin !== shouldBeSuperAdmin) {
+        await storage.updateUser(u.id, {
+          isAdmin: shouldBeAdmin,
+          isSuperAdmin: shouldBeSuperAdmin,
+        } as Prisma.UserUpdateInput);
+        console.log(`[admin] Synced ${u.email}: isAdmin=${shouldBeAdmin}, isSuperAdmin=${shouldBeSuperAdmin}`);
       }
     }
   } catch (err) {
@@ -582,8 +586,8 @@ export function registerRoutes(app: Express) {
           interests: user.interests,
           favoriteSubject: user.favoriteSubject,
           learningGoals: user.learningGoals,
-          isAdmin: (user as any).isAdmin ?? false,
-          isSuperAdmin: (user as any).isSuperAdmin ?? false,
+          isAdmin: user.isAdmin ?? false,
+          isSuperAdmin: user.isSuperAdmin ?? false,
         },
         profile,
       });
@@ -3600,7 +3604,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
-      const sanitized = users.map((u: any) => ({
+      const sanitized = users.map((u) => ({
         id: u.id,
         email: u.email,
         name: u.name,
@@ -3610,7 +3614,6 @@ export function registerRoutes(app: Express) {
         googleId: u.googleId ?? null,
         isAdmin: u.isAdmin ?? false,
         isSuperAdmin: u.isSuperAdmin ?? false,
-        createdAt: u.createdAt ?? null,
       }));
       res.json(sanitized);
     } catch (error: any) {
@@ -3618,37 +3621,16 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/admin/users/:id/role — change role (super admin only)
+  // PATCH /api/admin/users/:id/role — change role (super admin only, teacher/parent only)
   app.patch("/api/admin/users/:id/role", requireSuperAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { role } = req.body;
-      if (!["teacher", "parent", "student"].includes(role)) {
-        return res.status(400).json({ error: "Invalid role" });
+      if (!["teacher", "parent"].includes(role)) {
+        return res.status(400).json({ error: "Role must be teacher or parent" });
       }
       const updated = await storage.updateUser(id, { role });
-      res.json({ success: true, id: updated.id, role: (updated as any).role });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // PATCH /api/admin/users/:id/admin — toggle isAdmin (super admin only)
-  app.patch("/api/admin/users/:id/admin", requireSuperAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { isAdmin } = req.body;
-      if (typeof isAdmin !== "boolean") {
-        return res.status(400).json({ error: "isAdmin must be boolean" });
-      }
-      // Cannot remove isAdmin from isSuperAdmin users via this endpoint
-      const target = await storage.getUserById(id);
-      if (!target) return res.status(404).json({ error: "User not found" });
-      if ((target as any).isSuperAdmin && !isAdmin) {
-        return res.status(400).json({ error: "Cannot remove admin from a super admin user" });
-      }
-      const updated = await storage.updateUser(id, { isAdmin } as any);
-      res.json({ success: true, id: updated.id, isAdmin: (updated as any).isAdmin });
+      res.json({ success: true, id: updated.id, role: updated.role });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -3666,10 +3648,12 @@ export function registerRoutes(app: Express) {
       if (req.session.userId === id && !isSuperAdmin) {
         return res.status(400).json({ error: "Cannot remove your own super admin status" });
       }
-      const updateData: any = { isSuperAdmin };
-      if (isSuperAdmin) updateData.isAdmin = true;
-      const updated = await storage.updateUser(id, updateData);
-      res.json({ success: true, id: updated.id, isSuperAdmin: (updated as any).isSuperAdmin, isAdmin: (updated as any).isAdmin });
+      const updatePayload: Prisma.UserUpdateInput = {
+        isSuperAdmin,
+        ...(isSuperAdmin ? { isAdmin: true } : {}),
+      };
+      const updated = await storage.updateUser(id, updatePayload);
+      res.json({ success: true, id: updated.id, isSuperAdmin: updated.isSuperAdmin, isAdmin: updated.isAdmin });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
