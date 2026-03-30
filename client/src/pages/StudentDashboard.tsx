@@ -1323,7 +1323,6 @@ export default function StudentDashboard() {
                         teacherId={assignedTeacher.id}
                         studentId={student!.id}
                         myUserId={user!.id}
-                        receiverId={assignedTeacher.id}
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">

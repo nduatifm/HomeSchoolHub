@@ -1702,7 +1702,6 @@ export default function ParentDashboard() {
                           teacherId={selectedTeacher.id}
                           studentId={selectedChildForMessages.id}
                           myUserId={user!.id}
-                          receiverId={selectedChildForMessages.userId}
                           title={`Thread: ${selectedChildForMessages.name} & ${selectedTeacher.name}`}
                         />
                       );

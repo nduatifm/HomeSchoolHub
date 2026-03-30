@@ -3742,7 +3742,6 @@ export default function TeacherDashboard() {
                         teacherId={user!.id}
                         studentId={selectedStudentForMessages.id}
                         myUserId={user!.id}
-                        receiverId={selectedStudentForMessages.userId}
                         title={`Thread: ${selectedStudentForMessages.name}${selectedStudentForMessages.parentName ? ` & ${selectedStudentForMessages.parentName}` : ""}`}
                       />
                     ) : (

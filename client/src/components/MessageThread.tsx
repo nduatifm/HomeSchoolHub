@@ -19,7 +19,6 @@ interface MessageThreadProps {
   teacherId: number;
   studentId: number;
   myUserId: number;
-  receiverId: number;
   title?: string;
   onBack?: () => void;
 }
@@ -102,7 +101,6 @@ export default function MessageThread({
   teacherId,
   studentId,
   myUserId,
-  receiverId,
   title,
   onBack,
 }: MessageThreadProps) {
@@ -131,13 +129,14 @@ export default function MessageThread({
 
   const sendMutation = useMutation({
     mutationFn: () =>
-      apiRequest("/api/messages", {
+      apiRequest("/api/messages/thread", {
         method: "POST",
-        body: JSON.stringify({ receiverId, message: text }),
+        body: JSON.stringify({ teacherUserId: teacherId, studentId, message: text }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       setText("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
     },

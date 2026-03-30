@@ -2174,6 +2174,66 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/messages/thread", requireAuth, async (req, res) => {
+    try {
+      const teacherUserId = parseInt(req.body.teacherUserId);
+      const studentId = parseInt(req.body.studentId);
+      const messageText = req.body.message as string;
+
+      if (!teacherUserId || !studentId || !messageText?.trim()) {
+        return res.status(400).json({ error: "teacherUserId, studentId, and message are required" });
+      }
+
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const requesterId = req.session.userId!;
+      const isTeacher = requesterId === teacherUserId;
+      const isStudent = requesterId === student.userId;
+      const isParent = student.parentId != null && requesterId === student.parentId;
+
+      if (!isTeacher && !isStudent && !isParent) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const tutorRequestMode = await isTutorRequestModeEnabled();
+      if (tutorRequestMode) {
+        const assignments = await storage.getAssignedTeachersForStudent(studentId);
+        const isAssigned = assignments.some((a) => a.teacherId === teacherUserId);
+        if (!isAssigned) {
+          const approvedRequest = await prisma.tutorRequest.findFirst({
+            where: { studentId, teacherId: teacherUserId, status: "approved" },
+          });
+          if (!approvedRequest) {
+            return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
+          }
+        }
+      }
+
+      const allParticipants = [teacherUserId, student.userId, student.parentId].filter(
+        (id): id is number => id != null,
+      );
+      const recipients = allParticipants.filter((id) => id !== requesterId);
+
+      const timestamp = new Date().toISOString();
+      const created = await Promise.all(
+        recipients.map((receiverId) =>
+          storage.createMessage({
+            senderId: requesterId,
+            receiverId,
+            message: messageText.trim(),
+            timestamp,
+            isRead: false,
+          }),
+        ),
+      );
+
+      res.json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages/unread-count", requireAuth, async (req, res) => {
     try {
       const count = await prisma.message.count({
