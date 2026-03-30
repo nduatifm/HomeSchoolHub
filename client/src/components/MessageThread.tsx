@@ -249,7 +249,7 @@ export default function MessageThread({
                   {/* Content column */}
                   <div className={`flex flex-col gap-1 min-w-0 flex-1 ${group.isMe ? "items-end" : ""}`}>
                     {/* Name + timestamp */}
-                    <div className={`flex items-baseline gap-2 ${group.isMe ? "flex-row-reverse" : ""}`}>
+                    <div className={`flex items-baseline gap-2 ${group.isMe ? "justify-end" : ""}`}>
                       <span
                         className="text-[13px] font-semibold leading-none"
                         style={{ color: "#111827" }}
