@@ -41,11 +41,32 @@ import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
 import { uploadBufferToCloudinary } from "./utils/cloudinary";
 
-// Simple session management
-const sessions = new Map<string, number>();
-
 // Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// DB-backed session helpers
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+async function createSession(userId: number): Promise<string> {
+  const id = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  await prisma.authSession.create({ data: { id, userId, expiresAt } });
+  return id;
+}
+
+async function getSessionUserId(sessionId: string): Promise<number | null> {
+  const session = await prisma.authSession.findUnique({ where: { id: sessionId } });
+  if (!session) return null;
+  if (session.expiresAt < new Date()) {
+    await prisma.authSession.delete({ where: { id: sessionId } });
+    return null;
+  }
+  return session.userId;
+}
+
+async function deleteSession(sessionId: string): Promise<void> {
+  await prisma.authSession.deleteMany({ where: { id: sessionId } });
+}
 
 // Generate 6-character uppercase alphanumeric invite code
 function generateInviteCode(): string {
@@ -59,23 +80,31 @@ function generateInviteCode(): string {
 }
 
 // Auth middleware
-function requireAuth(req: Request, res: Response, next: Function) {
+async function requireAuth(req: Request, res: Response, next: Function) {
   const sessionId = req.headers.authorization?.replace("Bearer ", "");
-  if (!sessionId || !sessions.has(sessionId)) {
+  if (!sessionId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  req.session = { userId: sessions.get(sessionId)! };
+  const userId = await getSessionUserId(sessionId);
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  req.session = { userId };
   next();
 }
 
 // Admin middleware
 async function requireAdmin(req: Request, res: Response, next: Function) {
   const sessionId = req.headers.authorization?.replace("Bearer ", "");
-  if (!sessionId || !sessions.has(sessionId)) {
+  if (!sessionId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  req.session = { userId: sessions.get(sessionId)! };
-  const user = await storage.getUserById(req.session.userId!);
+  const userId = await getSessionUserId(sessionId);
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  req.session = { userId };
+  const user = await storage.getUserById(userId);
   if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
     return res.status(403).json({ error: "Forbidden" });
   }
@@ -85,11 +114,15 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
 // Super admin middleware
 async function requireSuperAdmin(req: Request, res: Response, next: Function) {
   const sessionId = req.headers.authorization?.replace("Bearer ", "");
-  if (!sessionId || !sessions.has(sessionId)) {
+  if (!sessionId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  req.session = { userId: sessions.get(sessionId)! };
-  const user = await storage.getUserById(req.session.userId!);
+  const userId = await getSessionUserId(sessionId);
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  req.session = { userId };
+  const user = await storage.getUserById(userId);
   if (!user || !user.isSuperAdmin) {
     return res.status(403).json({ error: "Forbidden" });
   }
@@ -141,6 +174,11 @@ async function verifyPassword(
 export function registerRoutes(app: Express) {
   // Sync admin flags from env vars on startup
   syncAdminFlags();
+
+  // Delete expired sessions on startup
+  prisma.authSession.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+    .then((r) => { if (r.count > 0) console.log(`[sessions] Deleted ${r.count} expired sessions`); })
+    .catch((err) => console.error("[sessions] Failed to clean expired sessions:", err));
 
   // ========== AUTH ROUTES ==========
 
@@ -248,8 +286,7 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, user.id);
+      const sessionId = await createSession(user.id);
 
       res.json({
         user: {
@@ -333,8 +370,7 @@ export function registerRoutes(app: Express) {
       await storage.updateStudentInvite(invite.id, { status: "accepted" });
 
       // Create session immediately - student verified via invite code
-      const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, user.id);
+      const sessionId = await createSession(user.id);
 
       res.json({
         user: {
@@ -443,8 +479,7 @@ export function registerRoutes(app: Express) {
       await storage.updateStudentInvite(invite.id, { status: "accepted" });
 
       // Create session
-      const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, user.id);
+      const sessionId = await createSession(user.id);
 
       res.json({
         user: {
@@ -536,8 +571,7 @@ export function registerRoutes(app: Express) {
       }
 
       // Create session
-      const sessionId = crypto.randomUUID();
-      sessions.set(sessionId, user.id);
+      const sessionId = await createSession(user.id);
 
       res.json({
         user: {
@@ -597,10 +631,10 @@ export function registerRoutes(app: Express) {
   });
 
   // Logout
-  app.post("/api/auth/logout", requireAuth, (req, res) => {
+  app.post("/api/auth/logout", requireAuth, async (req, res) => {
     const sessionId = req.headers.authorization?.replace("Bearer ", "");
     if (sessionId) {
-      sessions.delete(sessionId);
+      await deleteSession(sessionId);
     }
     res.json({ success: true });
   });
@@ -3565,8 +3599,7 @@ export function registerRoutes(app: Express) {
         const targetUser = await storage.getUserByEmail(resolvedEmail);
         if (!targetUser) return res.status(404).json({ error: "Demo user not found" });
 
-        const newSessionId = crypto.randomUUID();
-        sessions.set(newSessionId, targetUser.id);
+        const newSessionId = await createSession(targetUser.id);
         const studentProfile = targetUser.role === "student" ? await storage.getStudentByUserId(targetUser.id) : null;
 
         return res.json({

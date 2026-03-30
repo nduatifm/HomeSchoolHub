@@ -60,6 +60,7 @@ model User {
   receivedMessages           Message[]                   @relation("ReceivedMessages")
   teacherReports             ProgressReport[]
   teacherStudentAssignments  TeacherStudentAssignment[]
+  authSessions               AuthSession[]
 
   @@index([email])
   @@index([googleId])
@@ -385,4 +386,14 @@ model ThreadLabel {
   @@unique([teacherUserId, studentId])
   @@index([teacherUserId])
   @@index([studentId])
+}
+
+model AuthSession {
+  id        String   @id
+  userId    Int
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
