@@ -13,6 +13,7 @@ import ParentDashboard from "./pages/ParentDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import Landing from "./pages/Landing";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
+import AdminUsers from "./pages/AdminUsers";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -64,6 +65,27 @@ function DashboardRouter() {
   return <Redirect to="/login" />;
 }
 
+function AdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
+    return <Redirect to="/dashboard" />;
+  }
+
+  return <Component />;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
 
@@ -83,6 +105,9 @@ function AppRoutes() {
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={Profile} />
+      </Route>
+      <Route path="/admin">
+        <AdminRoute component={AdminUsers} />
       </Route>
       <Route path="/dashboard">
         <DashboardRouter />

@@ -25,6 +25,9 @@ export const userSchema = z.object({
   // Parent-specific fields
   phone: z.string().nullable(),
   preferredContact: z.string().nullable(),
+  // Admin flags
+  isAdmin: z.boolean(),
+  isSuperAdmin: z.boolean(),
   // Student-specific fields
   interests: z.array(z.string()),
   favoriteSubject: z.string().nullable(),

@@ -60,6 +60,19 @@ Icons are provided by Lucide React. The profile management features a modern tab
 - **API**: RESTful API endpoints for authentication, student invites, assignments, materials, and various other functionalities, all protected by session-based authentication and validated using Zod.
 - **Email System**: Dynamic base URL detection for email verification and password reset links.
 
+### Admin / Super Admin System
+- **Two-tier admin flags**: `isAdmin` and `isSuperAdmin` Boolean fields on the `User` model (default `false`)
+- **Env-based seeding**: Set `SUPER_ADMIN_EMAIL` and/or `ADMIN_EMAIL` env vars; on server startup, `syncAdminFlags()` automatically promotes those users to their respective tier
+- **Middleware**: `requireAdmin` (isAdmin OR isSuperAdmin) and `requireSuperAdmin` (isSuperAdmin only)
+- **Admin API routes**:
+  - `GET /api/admin/users` — list all users (admin+)
+  - `PATCH /api/admin/users/:id/role` — change user role (super admin only)
+  - `PATCH /api/admin/users/:id/admin` — toggle isAdmin flag (super admin only)
+  - `PATCH /api/admin/users/:id/super-admin` — toggle isSuperAdmin flag (super admin only)
+- **Admin page**: `/admin` route → `AdminUsers.tsx` — table with search, stat cards, avatar+badge user rows, ⋯ dropdown for super admins
+- **Sidebar**: `ModernSidebar` shows "Admin Panel" link (with shield icon) for users with `isAdmin` or `isSuperAdmin`; shows "Super" badge for super admins
+- **AuthContext**: User type includes `isAdmin?: boolean` and `isSuperAdmin?: boolean`
+
 ## External Dependencies
 - **Database**: PostgreSQL (Neon-hosted)
 - **Cloud Storage**: Cloudinary (for profile picture uploads)

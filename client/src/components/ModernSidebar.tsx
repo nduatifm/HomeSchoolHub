@@ -15,6 +15,7 @@ import {
   GraduationCap,
   MessageSquare,
   Send,
+  ShieldCheck,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -151,6 +152,22 @@ export default function ModernSidebar() {
 
       {/* Bottom: profile & settings */}
       <div className="border-t border-border px-3 py-4 space-y-0.5">
+        {(user?.isAdmin || user?.isSuperAdmin) && (
+          <Link href="/admin">
+            <button
+              className={`nav-item ${location === "/admin" ? "active" : ""}`}
+              data-testid="sidebar-admin"
+            >
+              <span className={location === "/admin" ? "text-primary" : "text-muted-foreground"}>
+                <ShieldCheck className="w-5 h-5" />
+              </span>
+              <span>Admin Panel</span>
+              {user?.isSuperAdmin && (
+                <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-primary">Super</span>
+              )}
+            </button>
+          </Link>
+        )}
         <Link href="/profile">
           <button
             className={`nav-item ${location === "/profile" ? "active" : ""}`}

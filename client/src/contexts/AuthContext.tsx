@@ -19,6 +19,8 @@ interface User {
   interests?: string[];
   favoriteSubject?: string | null;
   learningGoals?: string | null;
+  isAdmin?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 interface Student {

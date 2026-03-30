@@ -30,6 +30,10 @@ model User {
   phone              String?
   preferredContact   String?
   
+  // Admin flags
+  isAdmin            Boolean   @default(false)
+  isSuperAdmin       Boolean   @default(false)
+
   // Student-specific fields (via Student model relation)
   interests          String[]
   favoriteSubject    String?

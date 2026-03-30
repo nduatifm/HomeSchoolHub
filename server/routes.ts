@@ -67,6 +67,60 @@ function requireAuth(req: Request, res: Response, next: Function) {
   next();
 }
 
+// Admin middleware
+async function requireAdmin(req: Request, res: Response, next: Function) {
+  const sessionId = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionId || !sessions.has(sessionId)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  req.session = { userId: sessions.get(sessionId)! };
+  const user = await storage.getUserById(req.session.userId!);
+  if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+}
+
+// Super admin middleware
+async function requireSuperAdmin(req: Request, res: Response, next: Function) {
+  const sessionId = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionId || !sessions.has(sessionId)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  req.session = { userId: sessions.get(sessionId)! };
+  const user = await storage.getUserById(req.session.userId!);
+  if (!user || !user.isSuperAdmin) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+}
+
+// Sync SUPER_ADMIN_EMAIL and ADMIN_EMAIL env vars to DB flags on startup
+async function syncAdminFlags() {
+  try {
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL?.trim();
+    const adminEmail = process.env.ADMIN_EMAIL?.trim();
+
+    if (superAdminEmail) {
+      const user = await storage.getUserByEmail(superAdminEmail);
+      if (user && (!user.isSuperAdmin || !user.isAdmin)) {
+        await storage.updateUser(user.id, { isSuperAdmin: true, isAdmin: true });
+        console.log(`[admin] Super admin synced: ${superAdminEmail}`);
+      }
+    }
+
+    if (adminEmail && adminEmail !== superAdminEmail) {
+      const user = await storage.getUserByEmail(adminEmail);
+      if (user && !user.isAdmin) {
+        await storage.updateUser(user.id, { isAdmin: true });
+        console.log(`[admin] Admin synced: ${adminEmail}`);
+      }
+    }
+  } catch (err) {
+    console.error("[admin] syncAdminFlags error:", err);
+  }
+}
+
 // Hash password with bcrypt
 async function hashPassword(password: string): Promise<string> {
   return await bcrypt.hash(password, 10);
@@ -81,6 +135,9 @@ async function verifyPassword(
 }
 
 export function registerRoutes(app: Express) {
+  // Sync admin flags from env vars on startup
+  syncAdminFlags();
+
   // ========== AUTH ROUTES ==========
 
   // Teacher/Parent signup
@@ -525,6 +582,8 @@ export function registerRoutes(app: Express) {
           interests: user.interests,
           favoriteSubject: user.favoriteSubject,
           learningGoals: user.learningGoals,
+          isAdmin: (user as any).isAdmin ?? false,
+          isSuperAdmin: (user as any).isSuperAdmin ?? false,
         },
         profile,
       });
@@ -3534,4 +3593,85 @@ export function registerRoutes(app: Express) {
       }
     });
   }
+
+  // ========== ADMIN ROUTES ==========
+
+  // GET /api/admin/users — list all users (admin + super admin)
+  app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const sanitized = users.map((u: any) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        profilePicture: u.profilePicture ?? null,
+        isEmailVerified: u.isEmailVerified,
+        googleId: u.googleId ?? null,
+        isAdmin: u.isAdmin ?? false,
+        isSuperAdmin: u.isSuperAdmin ?? false,
+        createdAt: u.createdAt ?? null,
+      }));
+      res.json(sanitized);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/admin/users/:id/role — change role (super admin only)
+  app.patch("/api/admin/users/:id/role", requireSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { role } = req.body;
+      if (!["teacher", "parent", "student"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+      const updated = await storage.updateUser(id, { role });
+      res.json({ success: true, id: updated.id, role: (updated as any).role });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/admin/users/:id/admin — toggle isAdmin (super admin only)
+  app.patch("/api/admin/users/:id/admin", requireSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { isAdmin } = req.body;
+      if (typeof isAdmin !== "boolean") {
+        return res.status(400).json({ error: "isAdmin must be boolean" });
+      }
+      // Cannot remove isAdmin from isSuperAdmin users via this endpoint
+      const target = await storage.getUserById(id);
+      if (!target) return res.status(404).json({ error: "User not found" });
+      if ((target as any).isSuperAdmin && !isAdmin) {
+        return res.status(400).json({ error: "Cannot remove admin from a super admin user" });
+      }
+      const updated = await storage.updateUser(id, { isAdmin } as any);
+      res.json({ success: true, id: updated.id, isAdmin: (updated as any).isAdmin });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/admin/users/:id/super-admin — toggle isSuperAdmin (super admin only)
+  app.patch("/api/admin/users/:id/super-admin", requireSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { isSuperAdmin } = req.body;
+      if (typeof isSuperAdmin !== "boolean") {
+        return res.status(400).json({ error: "isSuperAdmin must be boolean" });
+      }
+      // Prevent self-demotion
+      if (req.session.userId === id && !isSuperAdmin) {
+        return res.status(400).json({ error: "Cannot remove your own super admin status" });
+      }
+      const updateData: any = { isSuperAdmin };
+      if (isSuperAdmin) updateData.isAdmin = true;
+      const updated = await storage.updateUser(id, updateData);
+      res.json({ success: true, id: updated.id, isSuperAdmin: (updated as any).isSuperAdmin, isAdmin: (updated as any).isAdmin });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 }
