@@ -138,6 +138,7 @@ export default function MessageThread({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       setText("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
     },
