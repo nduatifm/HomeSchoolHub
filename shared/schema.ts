@@ -28,6 +28,8 @@ export const userSchema = z.object({
   // Admin flags
   isAdmin: z.boolean(),
   isSuperAdmin: z.boolean(),
+  // Timestamps
+  createdAt: z.string().nullable(),
   // Student-specific fields
   interests: z.array(z.string()),
   favoriteSubject: z.string().nullable(),
@@ -41,6 +43,7 @@ export const insertUserSchema = userSchema.omit({
   emailVerifyExpires: true,
   isAdmin: true,
   isSuperAdmin: true,
+  createdAt: true,
 });
 export type User = z.infer<typeof userSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;

@@ -252,31 +252,31 @@ export interface IStorage {
 
 class PrismaStorage implements IStorage {
   async createUser(user: Prisma.UserCreateInput): Promise<User> {
-    return (await prisma.user.create({ data: user })) as User;
+    return (await prisma.user.create({ data: user })) as unknown as User;
   }
 
   async getUserById(id: number): Promise<User | null> {
-    return (await prisma.user.findUnique({ where: { id } })) as User | null;
+    return (await prisma.user.findUnique({ where: { id } })) as unknown as User | null;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
-    return (await prisma.user.findUnique({ where: { email } })) as User | null;
+    return (await prisma.user.findUnique({ where: { email } })) as unknown as User | null;
   }
 
   async getUserByEmailVerifyToken(token: string): Promise<User | null> {
     return (await prisma.user.findUnique({
       where: { emailVerifyToken: token },
-    })) as User | null;
+    })) as unknown as User | null;
   }
 
   async getUserByGoogleId(googleId: string): Promise<User | null> {
     return (await prisma.user.findUnique({
       where: { googleId },
-    })) as User | null;
+    })) as unknown as User | null;
   }
 
   async updateUser(id: number, user: Prisma.UserUpdateInput): Promise<User> {
-    return (await prisma.user.update({ where: { id }, data: user })) as User;
+    return (await prisma.user.update({ where: { id }, data: user })) as unknown as User;
   }
 
   async createStudent(student: InsertStudent): Promise<Student> {
@@ -1199,9 +1199,12 @@ class PrismaStorage implements IStorage {
         isEmailVerified: true,
         googleId: true,
         profilePicture: true,
+        isAdmin: true,
+        isSuperAdmin: true,
+        createdAt: true,
         // Exclude password and emailVerifyToken for security
       },
-    })) as User[];
+    })) as unknown as User[];
   }
 
   // System Settings methods

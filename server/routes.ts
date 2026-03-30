@@ -3614,6 +3614,7 @@ export function registerRoutes(app: Express) {
         googleId: u.googleId ?? null,
         isAdmin: u.isAdmin ?? false,
         isSuperAdmin: u.isSuperAdmin ?? false,
+        createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
       }));
       res.json(sanitized);
     } catch (error: any) {
@@ -3621,13 +3622,19 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/admin/users/:id/role — change role (super admin only, teacher/parent only)
+  // PATCH /api/admin/users/:id/role — change role (super admin only, teacher/parent only, not students)
   app.patch("/api/admin/users/:id/role", requireSuperAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { role } = req.body;
       if (!["teacher", "parent"].includes(role)) {
         return res.status(400).json({ error: "Role must be teacher or parent" });
+      }
+      // Prevent reassigning students server-side
+      const target = await storage.getUserById(id);
+      if (!target) return res.status(404).json({ error: "User not found" });
+      if (target.role === "student") {
+        return res.status(400).json({ error: "Cannot change the role of a student account" });
       }
       const updated = await storage.updateUser(id, { role });
       res.json({ success: true, id: updated.id, role: updated.role });

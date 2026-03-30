@@ -34,6 +34,9 @@ model User {
   isAdmin            Boolean   @default(false)
   isSuperAdmin       Boolean   @default(false)
 
+  // Timestamps
+  createdAt          DateTime  @default(now())
+
   // Student-specific fields (via Student model relation)
   interests          String[]
   favoriteSubject    String?
