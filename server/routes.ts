@@ -3614,7 +3614,7 @@ export function registerRoutes(app: Express) {
         googleId: u.googleId ?? null,
         isAdmin: u.isAdmin ?? false,
         isSuperAdmin: u.isSuperAdmin ?? false,
-        createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
+        createdAt: u.createdAt ? (u.createdAt as unknown as Date).toISOString() : null,
       }));
       res.json(sanitized);
     } catch (error: any) {
@@ -3651,18 +3651,38 @@ export function registerRoutes(app: Express) {
       if (typeof isAdmin !== "boolean") {
         return res.status(400).json({ error: "isAdmin must be boolean" });
       }
-      // Prevent self-modification
       if (req.session.userId === id) {
         return res.status(400).json({ error: "Cannot change your own admin status" });
       }
-      // Prevent modifying super-admin users via this endpoint
       const target = await storage.getUserById(id);
       if (!target) return res.status(404).json({ error: "User not found" });
       if (target.isSuperAdmin) {
-        return res.status(400).json({ error: "Cannot change admin status of a super admin (managed by environment config)" });
+        return res.status(400).json({ error: "Cannot change admin status of a super admin" });
       }
       const updated = await storage.updateUser(id, { isAdmin });
       res.json({ success: true, id: updated.id, isAdmin: updated.isAdmin });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/admin/users/:id/super-admin — toggle isSuperAdmin (super admin only; self-demotion guarded)
+  app.patch("/api/admin/users/:id/super-admin", requireSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { isSuperAdmin } = req.body;
+      if (typeof isSuperAdmin !== "boolean") {
+        return res.status(400).json({ error: "isSuperAdmin must be boolean" });
+      }
+      if (req.session.userId === id && !isSuperAdmin) {
+        return res.status(400).json({ error: "Cannot remove your own super admin status" });
+      }
+      const updatePayload: Prisma.UserUpdateInput = {
+        isSuperAdmin,
+        ...(isSuperAdmin ? { isAdmin: true } : {}),
+      };
+      const updated = await storage.updateUser(id, updatePayload);
+      res.json({ success: true, id: updated.id, isSuperAdmin: updated.isSuperAdmin, isAdmin: updated.isAdmin });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
