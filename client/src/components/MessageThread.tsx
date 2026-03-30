@@ -4,6 +4,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Send, ArrowLeft, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface ThreadMessage {
   id: number;
   senderId: number;
@@ -22,6 +24,8 @@ interface MessageThreadProps {
   onBack?: () => void;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function formatSmartTimestamp(ts: string): string {
   const date = new Date(ts);
   const now = new Date();
@@ -31,13 +35,13 @@ function formatSmartTimestamp(ts: string): string {
   const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   if (msgDay.getTime() === today.getTime()) return time;
-  if (msgDay.getTime() === yesterday.getTime()) return `Yesterday ${time}`;
-  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+  if (msgDay.getTime() === yesterday.getTime()) return `Yesterday · ${time}`;
+  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })} · ${time}`;
 }
 
 function getDayKey(ts: string): string {
-  const date = new Date(ts);
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 function getDayLabel(ts: string): string {
@@ -49,7 +53,12 @@ function getDayLabel(ts: string): string {
   const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   if (msgDay.getTime() === today.getTime()) return "Today";
   if (msgDay.getTime() === yesterday.getTime()) return "Yesterday";
-  return date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  return date.toLocaleDateString([], { month: "long", day: "numeric" });
+}
+
+function getInitials(name?: string): string {
+  if (!name) return "?";
+  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
 type Group = {
@@ -60,15 +69,34 @@ type Group = {
   messages: ThreadMessage[];
 };
 
-function getInitials(name?: string): string {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+// ─── Bubble radius helper ─────────────────────────────────────────────────────
+// Gives a grouped "stack" feel: full radius on outer corners,
+// tighter on the inner (sender-side) corners for mid-group bubbles.
+
+function bubbleRadius(isMe: boolean, isFirst: boolean, isLast: boolean, isSingle: boolean): string {
+  const R = 18; // outer corner
+  const r = 5;  // inner corner (grouped edge)
+
+  if (isSingle) return `${R}px`;
+
+  if (isMe) {
+    // Sent: tail is bottom-right
+    const tl = R;
+    const tr = isFirst ? R : r;
+    const br = isLast  ? R : r;
+    const bl = R;
+    return `${tl}px ${tr}px ${br}px ${bl}px`;
+  } else {
+    // Received: tail is bottom-left
+    const tl = isFirst ? R : r;
+    const tr = R;
+    const br = R;
+    const bl = isLast  ? R : r;
+    return `${tl}px ${tr}px ${br}px ${bl}px`;
+  }
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MessageThread({
   teacherId,
@@ -123,7 +151,7 @@ export default function MessageThread({
     sendMutation.mutate();
   };
 
-  // Group messages by sender + day
+  // Build groups: consecutive messages from same sender on same day
   const groups: Group[] = [];
   for (const msg of messages) {
     const isMe = msg.senderId === myUserId;
@@ -136,233 +164,257 @@ export default function MessageThread({
     }
   }
 
+  // ── Tokens ──────────────────────────────────────────────────────────────────
+  const SENT_BG    = "#2563eb";
+  const SENT_TEXT  = "#ffffff";
+  const RECV_BG    = "#f1f5f9";   // cool slate, not flat gray
+  const RECV_TEXT  = "#0f172a";
+  const META_TEXT  = "#94a3b8";
+  const BORDER     = "#e2e8f0";
+  const PAGE_BG    = "#ffffff";
+
   return (
     <div
       className="flex flex-col"
-      style={{
-        minHeight: 400,
-        maxHeight: 620,
-        fontFamily: "'DM Sans', 'Inter', sans-serif",
-      }}
+      style={{ minHeight: 400, maxHeight: 620, fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
-      {/* Header */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       {(onBack || title) && (
         <div
-          className="flex items-center gap-2.5 px-4 py-3 border-b"
-          style={{ borderColor: "#f0f2f5", background: "#fff" }}
+          className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0"
+          style={{ borderColor: BORDER, background: PAGE_BG }}
         >
           {onBack && (
             <button
               onClick={onBack}
-              className="flex items-center justify-center w-8 h-8 rounded-full transition-colors"
-              style={{ color: "#6b7280" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f7fa")}
+              className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors shrink-0"
+              style={{ color: META_TEXT }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = RECV_BG)}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
           )}
           {title && (
-            <span className="font-semibold text-sm" style={{ color: "#111827", letterSpacing: "-0.01em" }}>
+            <span
+              className="text-sm font-semibold truncate"
+              style={{ color: RECV_TEXT, letterSpacing: "-0.015em" }}
+            >
               {title}
             </span>
           )}
         </div>
       )}
 
-      {/* Message list */}
+      {/* ── Message list ────────────────────────────────────────────────────── */}
       <div
-        className="flex-1 overflow-y-auto px-4 py-4 min-h-0"
-        style={{ background: "#ffffff" }}
+        className="flex-1 overflow-y-auto min-h-0 px-4 py-3"
+        style={{ background: PAGE_BG }}
       >
-        {isLoading ? (
-          <div className="flex flex-col gap-3 pt-2">
-            {[{ w: 140, align: "start" }, { w: 200, align: "end" }, { w: 110, align: "start" }].map((s, i) => (
-              <div key={i} className={`flex ${s.align === "end" ? "justify-end" : "justify-start"}`}>
+        {/* Loading skeletons */}
+        {isLoading && (
+          <div className="flex flex-col gap-4 pt-1">
+            {([
+              { w: 160, isMe: false },
+              { w: 220, isMe: true  },
+              { w: 130, isMe: false },
+            ] as const).map(({ w, isMe }, i) => (
+              <div key={i} className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
                 <div
-                  className="animate-pulse rounded-2xl"
-                  style={{
-                    width: s.w,
-                    height: 36,
-                    background: s.align === "end" ? "#dbeafe" : "#e5e7eb",
-                    borderRadius: s.align === "end" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                  }}
+                  className="w-7 h-7 rounded-full shrink-0 animate-pulse"
+                  style={{ background: RECV_BG }}
                 />
+                <div className="flex flex-col gap-1.5" style={{ alignItems: isMe ? "flex-end" : "flex-start" }}>
+                  <div
+                    className="h-2.5 w-16 rounded animate-pulse"
+                    style={{ background: RECV_BG }}
+                  />
+                  <div
+                    className="h-9 rounded-2xl animate-pulse"
+                    style={{ width: w, background: isMe ? "#dbeafe" : RECV_BG }}
+                  />
+                </div>
               </div>
             ))}
           </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full py-16 gap-3">
+        )}
+
+        {/* Empty state */}
+        {!isLoading && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
             <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center"
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: "#eff6ff" }}
             >
-              <MessageSquare className="w-5 h-5" style={{ color: "#2563eb" }} />
+              <MessageSquare className="w-4.5 h-4.5" style={{ color: SENT_BG }} />
             </div>
-            <p className="text-sm font-medium" style={{ color: "#9ca3af" }}>
-              No messages yet — say hello!
+            <p className="text-xs font-medium" style={{ color: META_TEXT }}>
+              No messages yet
             </p>
           </div>
-        ) : (
-          (() => {
-            const elements: React.ReactNode[] = [];
-            const shownDayKeys = new Set<string>();
+        )}
 
-            for (let gi = 0; gi < groups.length; gi++) {
-              const group = groups[gi];
+        {/* Message groups */}
+        {!isLoading && messages.length > 0 && (() => {
+          const els: React.ReactNode[] = [];
+          const seenDays = new Set<string>();
 
-              // Day divider
-              if (!shownDayKeys.has(group.dayKey)) {
-                shownDayKeys.add(group.dayKey);
-                elements.push(
-                  <div key={`day-${group.dayKey}`} className="flex items-center gap-3 my-5">
-                    <div className="flex-1 h-px" style={{ background: "#e5e7eb" }} />
-                    <span
-                      className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: "#6b7280", background: "#f0f2f5", letterSpacing: "0.02em" }}
-                    >
-                      {getDayLabel(group.messages[0].timestamp)}
-                    </span>
-                    <div className="flex-1 h-px" style={{ background: "#e5e7eb" }} />
-                  </div>
-                );
-              }
+          for (let gi = 0; gi < groups.length; gi++) {
+            const group = groups[gi];
 
-              elements.push(
-                <div
-                  key={`group-${gi}`}
-                  className={`flex gap-3 mb-4 ${group.isMe ? "flex-row-reverse" : ""}`}
-                >
-                  {/* Avatar */}
-                  <div className="shrink-0 pt-0.5" style={{ width: 32 }}>
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold"
-                      style={{
-                        background: group.isMe ? "hsl(158 64% 36%)" : "#f3f4f6",
-                        color: group.isMe ? "#ffffff" : "#374151",
-                      }}
-                    >
-                      {getInitials(group.senderName)}
-                    </div>
-                  </div>
-
-                  {/* Content column */}
-                  <div className={`flex flex-col gap-1 min-w-0 flex-1 ${group.isMe ? "items-end" : ""}`}>
-                    {/* Name + timestamp */}
-                    <div className={`flex items-baseline gap-2 ${group.isMe ? "justify-end" : ""}`}>
-                      <span
-                        className="text-[13px] font-semibold leading-none"
-                        style={{ color: "#111827" }}
-                      >
-                        {group.isMe ? "You" : (group.senderName || `User #${group.senderId}`)}
-                      </span>
-                      <span className="text-[11px]" style={{ color: "#9ca3af" }}>
-                        {formatSmartTimestamp(group.messages[0].timestamp)}
-                      </span>
-                    </div>
-
-                    {/* Bubbles */}
-                    {group.messages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className="text-sm leading-relaxed"
-                        style={{
-                          display: "inline-block",
-                          maxWidth: "85%",
-                          padding: "8px 14px",
-                          borderRadius: 16,
-                          background: group.isMe ? "hsl(158 64% 36%)" : "#f3f4f6",
-                          color: group.isMe ? "#ffffff" : "#111827",
-                          wordBreak: "break-word",
-                          alignSelf: group.isMe ? "flex-end" : "flex-start",
-                        }}
-                      >
-                        {msg.message}
-                      </div>
-                    ))}
-                  </div>
+            // Day divider
+            if (!seenDays.has(group.dayKey)) {
+              seenDays.add(group.dayKey);
+              els.push(
+                <div key={`d-${group.dayKey}`} className="flex items-center gap-3 my-4">
+                  <div className="flex-1 h-px" style={{ background: BORDER }} />
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-wider px-1"
+                    style={{ color: META_TEXT }}
+                  >
+                    {getDayLabel(group.messages[0].timestamp)}
+                  </span>
+                  <div className="flex-1 h-px" style={{ background: BORDER }} />
                 </div>
               );
             }
 
-            return elements;
-          })()
-        )}
+            const total = group.messages.length;
+
+            els.push(
+              <div
+                key={`g-${gi}`}
+                className={`flex gap-2.5 mb-3 ${group.isMe ? "flex-row-reverse" : ""}`}
+              >
+                {/* Avatar — visible only, not sized differently */}
+                <div className="shrink-0 flex flex-col justify-end" style={{ width: 28 }}>
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold select-none"
+                    style={{
+                      background: group.isMe ? "#dbeafe" : RECV_BG,
+                      color: group.isMe ? SENT_BG : "#475569",
+                    }}
+                  >
+                    {getInitials(group.senderName)}
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div
+                  className="flex flex-col min-w-0 flex-1"
+                  style={{
+                    alignItems: group.isMe ? "flex-end" : "flex-start",
+                    gap: 3,
+                  }}
+                >
+                  {/* Name + time — shown once per group */}
+                  <div
+                    className={`flex items-center gap-1.5 ${group.isMe ? "flex-row-reverse" : ""}`}
+                  >
+                    <span
+                      className="text-xs font-semibold"
+                      style={{ color: RECV_TEXT }}
+                    >
+                      {group.isMe ? "You" : (group.senderName || `User #${group.senderId}`)}
+                    </span>
+                    <span className="text-[10px]" style={{ color: META_TEXT }}>
+                      {formatSmartTimestamp(group.messages[0].timestamp)}
+                    </span>
+                  </div>
+
+                  {/* Bubbles — stacked with grouped radii */}
+                  {group.messages.map((msg, mi) => {
+                    const isFirst  = mi === 0;
+                    const isLast   = mi === total - 1;
+                    const isSingle = total === 1;
+                    const radius   = bubbleRadius(group.isMe, isFirst, isLast, isSingle);
+
+                    return (
+                      <div
+                        key={msg.id}
+                        style={{
+                          maxWidth: "78%",
+                          padding: "7px 13px",
+                          borderRadius: radius,
+                          background: group.isMe ? SENT_BG : RECV_BG,
+                          color: group.isMe ? SENT_TEXT : RECV_TEXT,
+                          fontSize: 13.5,
+                          lineHeight: 1.5,
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {msg.message}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
+          return els;
+        })()}
+
         <div ref={bottomRef} />
       </div>
 
-      {/* Input bar */}
+      {/* ── Input bar ───────────────────────────────────────────────────────── */}
       <div
-        className="flex items-end gap-2.5 px-3 py-2.5 border-t"
-        style={{
-          background: "#ffffff",
-          borderColor: "#f0f2f5",
-        }}
+        className="shrink-0 flex items-end gap-2 px-3 py-2.5 border-t"
+        style={{ background: PAGE_BG, borderColor: BORDER }}
       >
-        <div
-          className="flex-1 flex items-end rounded-2xl border px-3.5 py-2 transition-all"
+        <textarea
+          ref={textareaRef}
+          placeholder="Message…"
+          value={text}
+          rows={1}
+          onChange={(e) => { setText(e.target.value); autoResize(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+          }}
+          className="flex-1 resize-none outline-none leading-6 overflow-y-auto rounded-xl border transition-colors duration-150"
           style={{
-            borderColor: "#e5e7eb",
-            background: "#f8f9fb",
+            fontSize: 13.5,
+            minHeight: 38,
+            maxHeight: 120,
+            padding: "7px 12px",
+            color: RECV_TEXT,
+            fontFamily: "inherit",
+            background: RECV_BG,
+            borderColor: BORDER,
+            display: "block",
           }}
-          onFocusCapture={(e) => {
-            e.currentTarget.style.borderColor = "#2563eb";
-            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)";
-            e.currentTarget.style.background = "#fff";
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = SENT_BG;
+            e.currentTarget.style.boxShadow   = "0 0 0 3px rgba(37,99,235,0.08)";
+            e.currentTarget.style.background   = PAGE_BG;
           }}
-          onBlurCapture={(e) => {
-            e.currentTarget.style.borderColor = "#e5e7eb";
-            e.currentTarget.style.boxShadow = "none";
-            e.currentTarget.style.background = "#f8f9fb";
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = BORDER;
+            e.currentTarget.style.boxShadow   = "none";
+            e.currentTarget.style.background   = RECV_BG;
           }}
-        >
-          <textarea
-            ref={textareaRef}
-            placeholder="Write a message…"
-            value={text}
-            rows={1}
-            onChange={(e) => {
-              setText(e.target.value);
-              autoResize();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            className="flex-1 resize-none bg-transparent text-sm outline-none leading-6 overflow-y-auto"
-            style={{
-              minHeight: 24,
-              maxHeight: 120,
-              color: "#111827",
-              fontFamily: "inherit",
-            }}
-          />
-        </div>
+        />
 
         <button
           onClick={handleSend}
           disabled={!text.trim() || sendMutation.isPending}
-          className="flex items-center justify-center rounded-2xl shrink-0 transition-all"
+          className="shrink-0 flex items-center justify-center rounded-xl transition-all duration-150"
           style={{
-            width: 40,
-            height: 40,
-            background: text.trim() && !sendMutation.isPending ? "#2563eb" : "#e5e7eb",
-            color: text.trim() && !sendMutation.isPending ? "#ffffff" : "#9ca3af",
-            cursor: text.trim() && !sendMutation.isPending ? "pointer" : "not-allowed",
-            boxShadow: text.trim() ? "0 2px 8px rgba(37,99,235,0.3)" : "none",
-            transform: "translateY(0)",
-            transition: "all 0.15s ease",
+            width: 38,
+            height: 38,
+            flexShrink: 0,
+            background: text.trim() && !sendMutation.isPending ? SENT_BG : RECV_BG,
+            color:      text.trim() && !sendMutation.isPending ? "#fff"  : META_TEXT,
+            cursor:     text.trim() && !sendMutation.isPending ? "pointer" : "default",
+            boxShadow:  text.trim() && !sendMutation.isPending
+              ? "0 1px 6px rgba(37,99,235,0.35)"
+              : "none",
           }}
-          onMouseEnter={(e) => {
-            if (text.trim()) e.currentTarget.style.transform = "scale(1.05)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
-          }}
+          onMouseEnter={(e) => { if (text.trim()) e.currentTarget.style.opacity = "0.85"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
         >
-          <Send className="h-4 w-4" style={{ transform: "translateX(1px)" }} />
+          <Send className="w-4 h-4" style={{ transform: "translateX(1px)" }} />
         </button>
       </div>
     </div>
