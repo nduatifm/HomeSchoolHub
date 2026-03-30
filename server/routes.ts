@@ -58,7 +58,7 @@ async function getSessionUserId(sessionId: string): Promise<number | null> {
   const session = await prisma.authSession.findUnique({ where: { id: sessionId } });
   if (!session) return null;
   if (session.expiresAt < new Date()) {
-    await prisma.authSession.delete({ where: { id: sessionId } });
+    await prisma.authSession.deleteMany({ where: { id: sessionId } });
     return null;
   }
   return session.userId;
@@ -81,52 +81,64 @@ function generateInviteCode(): string {
 
 // Auth middleware
 async function requireAuth(req: Request, res: Response, next: Function) {
-  const sessionId = req.headers.authorization?.replace("Bearer ", "");
-  if (!sessionId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const sessionId = req.headers.authorization?.replace("Bearer ", "");
+    if (!sessionId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const userId = await getSessionUserId(sessionId);
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    req.session = { userId };
+    next();
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
   }
-  const userId = await getSessionUserId(sessionId);
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  req.session = { userId };
-  next();
 }
 
 // Admin middleware
 async function requireAdmin(req: Request, res: Response, next: Function) {
-  const sessionId = req.headers.authorization?.replace("Bearer ", "");
-  if (!sessionId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const sessionId = req.headers.authorization?.replace("Bearer ", "");
+    if (!sessionId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const userId = await getSessionUserId(sessionId);
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    req.session = { userId };
+    const user = await storage.getUserById(userId);
+    if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    next();
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
   }
-  const userId = await getSessionUserId(sessionId);
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  req.session = { userId };
-  const user = await storage.getUserById(userId);
-  if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  next();
 }
 
 // Super admin middleware
 async function requireSuperAdmin(req: Request, res: Response, next: Function) {
-  const sessionId = req.headers.authorization?.replace("Bearer ", "");
-  if (!sessionId) {
-    return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const sessionId = req.headers.authorization?.replace("Bearer ", "");
+    if (!sessionId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const userId = await getSessionUserId(sessionId);
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    req.session = { userId };
+    const user = await storage.getUserById(userId);
+    if (!user || !user.isSuperAdmin) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    next();
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
   }
-  const userId = await getSessionUserId(sessionId);
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  req.session = { userId };
-  const user = await storage.getUserById(userId);
-  if (!user || !user.isSuperAdmin) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  next();
 }
 
 // Sync SUPER_ADMIN_EMAIL and ADMIN_EMAIL env vars to DB flags on startup.
