@@ -28,7 +28,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<"teacher" | "parent">("parent");
+  const [role, setRole] = useState<"teacher" | "parent" | "">("");
   const [isLoading, setIsLoading] = useState(false);
   const { signup, googleSignIn } = useAuth();
   const [, setLocation] = useLocation();
@@ -37,7 +37,7 @@ export default function Signup() {
 
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
-  const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
+  const [googleRole, setGoogleRole] = useState<"teacher" | "parent" | "">("");
 
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
@@ -45,9 +45,13 @@ export default function Signup() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!role) {
+      toast({ title: "Please select a role", description: "Choose whether you are a parent or a teacher.", type: "error" });
+      return;
+    }
     setIsLoading(true);
     try {
-      const response = await signup(email, password, name, role);
+      const response = await signup(email, password, name, role as "teacher" | "parent");
       toast({
         title: "Account created!",
         description: response.message || "Please check your email to verify your account.",
@@ -108,10 +112,10 @@ export default function Signup() {
   }
 
   async function handleGoogleSignupComplete() {
-    if (!googleCredential) return;
+    if (!googleCredential || !googleRole) return;
     setIsLoading(true);
     try {
-      await googleSignIn(googleCredential, googleRole);
+      await googleSignIn(googleCredential, googleRole as "teacher" | "parent");
       toast({ title: "Account created!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
@@ -183,7 +187,7 @@ export default function Signup() {
               <label htmlFor="role" className="text-sm font-medium text-foreground">I am a...</label>
               <Select value={role} onValueChange={(v) => setRole(v as "teacher" | "parent")}>
                 <SelectTrigger data-testid="select-role">
-                  <SelectValue />
+                  <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="parent">Parent</SelectItem>
@@ -191,7 +195,7 @@ export default function Signup() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-signup">
+            <Button type="submit" className="w-full" disabled={isLoading || !role} data-testid="button-signup">
               {isLoading ? "Creating account..." : "Create account"}
             </Button>
           </form>
@@ -237,14 +241,14 @@ export default function Signup() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">I am a...</label>
               <Select value={googleRole} onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}>
-                <SelectTrigger data-testid="select-google-role"><SelectValue /></SelectTrigger>
+                <SelectTrigger data-testid="select-google-role"><SelectValue placeholder="Select your role" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="parent">Parent</SelectItem>
                   <SelectItem value="teacher">Teacher</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleGoogleSignupComplete} className="w-full" disabled={isLoading} data-testid="button-complete-google-signup">
+            <Button onClick={handleGoogleSignupComplete} className="w-full" disabled={isLoading || !googleRole} data-testid="button-complete-google-signup">
               {isLoading ? "Creating account..." : "Complete signup"}
             </Button>
           </div>
