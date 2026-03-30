@@ -719,7 +719,19 @@ class PrismaStorage implements IStorage {
       include: { sender: { select: { name: true } } },
       orderBy: { timestamp: "asc" },
     });
-    return messages.map((m) => ({
+
+    // Deduplicate broadcast siblings: a group send writes one row per recipient,
+    // all sharing the same (senderId, timestamp, message). Keep only the first
+    // row per logical send so the thread renders one bubble per send event.
+    const seen = new Set<string>();
+    const deduped = messages.filter((m) => {
+      const key = `${m.senderId}|${m.timestamp}|${m.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return deduped.map((m) => ({
       id: m.id,
       senderId: m.senderId,
       receiverId: m.receiverId,
