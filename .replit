@@ -42,5 +42,7 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
-SUPER_ADMIN_EMAIL = ""
+
+[userenv.development]
+SUPER_ADMIN_EMAIL = "nduatifm@gmail.com"
 ADMIN_EMAIL = ""
