@@ -211,6 +211,7 @@ export default function ParentDashboard() {
     lastMessage: string | null;
     lastMessageTimestamp: string | null;
     unreadCount: number;
+    customName: string | null;
   };
 
   const { data: conversationSummaries = [] } = useQuery<ConversationSummary[]>({
@@ -1649,7 +1650,7 @@ export default function ParentDashboard() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-2 mb-0.5">
-                                  <p className="text-sm font-medium truncate text-foreground">{child.name}</p>
+                                  <p className="text-sm font-medium truncate text-foreground">{summary?.customName ?? child.name}</p>
                                   {summary?.lastMessageTimestamp && (
                                     <span className="text-[11px] text-muted-foreground shrink-0">
                                       {formatPreviewTime(summary.lastMessageTimestamp)}
@@ -1703,6 +1704,7 @@ export default function ParentDashboard() {
                           studentId={selectedChildForMessages.id}
                           myUserId={user!.id}
                           title={`Thread: ${selectedChildForMessages.name} & ${selectedTeacher.name}`}
+                          customName={conversationSummaries.find((c) => c.studentId === selectedChildForMessages.id)?.customName ?? null}
                         />
                       );
                     })()}

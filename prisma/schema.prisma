@@ -366,3 +366,14 @@ model TeacherStudentAssignment {
   @@index([teacherId])
   @@index([studentId])
 }
+
+model ThreadLabel {
+  id            Int    @id @default(autoincrement())
+  teacherUserId Int
+  studentId     Int
+  name          String
+
+  @@unique([teacherUserId, studentId])
+  @@index([teacherUserId])
+  @@index([studentId])
+}

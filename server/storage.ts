@@ -52,6 +52,7 @@ export type ConversationSummary = {
   lastMessage: string | null;
   lastMessageTimestamp: string | null;
   unreadCount: number;
+  customName: string | null;
 };
 
 export interface IStorage {
@@ -242,6 +243,9 @@ export interface IStorage {
   getAssignedTeachersForStudent(
     studentId: number,
   ): Promise<TeacherStudentAssignment[]>;
+
+  getThreadLabel(teacherUserId: number, studentId: number): Promise<string | null>;
+  setThreadLabel(teacherUserId: number, studentId: number, name: string | null): Promise<void>;
 }
 
 class PrismaStorage implements IStorage {
@@ -865,12 +869,18 @@ class PrismaStorage implements IStorage {
       }));
 
       const stats = await fetchThreadStats(groups, userId);
+      const threadLabels = students.length > 0 ? await prisma.threadLabel.findMany({
+        where: { teacherUserId: userId, studentId: { in: students.map((s) => s.id) } },
+        select: { studentId: true, name: true },
+      }) : [];
+      const labelMap = new Map(threadLabels.map((l) => [l.studentId, l.name]));
       return students.map((s) => ({
         studentId: s.id,
         teacherUserId: userId,
         studentName: s.name,
         teacherName: teacher.name,
         parentName: parentNameMap.get(s.parentId) ?? null,
+        customName: labelMap.get(s.id) ?? null,
         ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
       }));
     }
@@ -915,12 +925,23 @@ class PrismaStorage implements IStorage {
 
       const stats = await fetchThreadStats(groups, userId);
 
+      const assignedGroups = assignedStudents.map((s) => ({
+        teacherUserId: teacherMap.get(s.id)!.id,
+        studentId: s.id,
+      }));
+      const parentThreadLabels = assignedGroups.length > 0 ? await prisma.threadLabel.findMany({
+        where: { OR: assignedGroups },
+        select: { teacherUserId: true, studentId: true, name: true },
+      }) : [];
+      const parentLabelMap = new Map(parentThreadLabels.map((l) => [`${l.teacherUserId}:${l.studentId}`, l.name]));
+
       const summaries: ConversationSummary[] = assignedStudents.map((s) => ({
         studentId: s.id,
         teacherUserId: teacherMap.get(s.id)!.id,
         studentName: s.name,
         teacherName: teacherMap.get(s.id)!.name,
         parentName: parentUser?.name ?? null,
+        customName: parentLabelMap.get(`${teacherMap.get(s.id)!.id}:${s.id}`) ?? null,
         ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
       }));
 
@@ -931,6 +952,7 @@ class PrismaStorage implements IStorage {
           studentName: s.name,
           teacherName: "",
           parentName: parentUser?.name ?? null,
+          customName: null,
           lastMessage: null,
           lastMessageTimestamp: null,
           unreadCount: 0,
@@ -970,12 +992,17 @@ class PrismaStorage implements IStorage {
       }];
 
       const stats = await fetchThreadStats(groups, userId);
+      const studentLabel = await prisma.threadLabel.findUnique({
+        where: { teacherUserId_studentId: { teacherUserId: teacherUser.id, studentId: studentRecord.id } },
+        select: { name: true },
+      });
       return [{
         studentId: studentRecord.id,
         teacherUserId: teacherUser.id,
         studentName: studentRecord.name,
         teacherName: teacherUser.name,
         parentName: parentUser?.name ?? null,
+        customName: studentLabel?.name ?? null,
         ...(stats.get(studentRecord.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
       }];
     }
@@ -1292,6 +1319,28 @@ class PrismaStorage implements IStorage {
     return (await prisma.teacherStudentAssignment.findMany({
       where: { studentId, status: "active" },
     })) as TeacherStudentAssignment[];
+  }
+
+  async getThreadLabel(teacherUserId: number, studentId: number): Promise<string | null> {
+    const label = await prisma.threadLabel.findUnique({
+      where: { teacherUserId_studentId: { teacherUserId, studentId } },
+      select: { name: true },
+    });
+    return label?.name ?? null;
+  }
+
+  async setThreadLabel(teacherUserId: number, studentId: number, name: string | null): Promise<void> {
+    if (name === null || name.trim() === "") {
+      await prisma.threadLabel.deleteMany({
+        where: { teacherUserId, studentId },
+      });
+    } else {
+      await prisma.threadLabel.upsert({
+        where: { teacherUserId_studentId: { teacherUserId, studentId } },
+        create: { teacherUserId, studentId, name: name.trim() },
+        update: { name: name.trim() },
+      });
+    }
   }
 }
 

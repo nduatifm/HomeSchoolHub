@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Send, ArrowLeft, MessageSquare } from "lucide-react";
+import { Send, ArrowLeft, MessageSquare, Pencil, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ interface MessageThreadProps {
   studentId: number;
   myUserId: number;
   title?: string;
+  customName?: string | null;
   onBack?: () => void;
 }
 
@@ -102,12 +103,31 @@ export default function MessageThread({
   studentId,
   myUserId,
   title,
+  customName,
   onBack,
 }: MessageThreadProps) {
   const { toast } = useToast();
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [overrideName, setOverrideName] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    setOverrideName(undefined);
+    setIsEditing(false);
+  }, [teacherId, studentId]);
+
+  useEffect(() => {
+    if (isEditing) renameInputRef.current?.focus();
+  }, [isEditing]);
+
+  const displayedTitle = overrideName !== undefined
+    ? (overrideName || title || "")
+    : (customName || title || "");
 
   const { data: messages = [], isLoading } = useQuery<ThreadMessage[]>({
     queryKey: ["/api/messages/thread", teacherId, studentId],
@@ -145,6 +165,33 @@ export default function MessageThread({
     },
   });
 
+  const renameMutation = useMutation({
+    mutationFn: (name: string) =>
+      apiRequest("/api/messages/thread-label", {
+        method: "PATCH",
+        body: JSON.stringify({ teacherUserId: teacherId, studentId, name }),
+      }),
+    onSuccess: (_data, name) => {
+      const trimmed = name.trim();
+      setOverrideName(trimmed === "" ? null : trimmed);
+      setIsEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to rename thread", variant: "destructive" });
+    },
+  });
+
+  const handleRenameSubmit = () => {
+    if (renameMutation.isPending) return;
+    renameMutation.mutate(draftName);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); handleRenameSubmit(); }
+    if (e.key === "Escape") { setIsEditing(false); }
+  };
+
   const handleSend = () => {
     if (!text.trim() || sendMutation.isPending) return;
     sendMutation.mutate();
@@ -178,7 +225,7 @@ export default function MessageThread({
       style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      {(onBack || title) && (
+      {(onBack || title || displayedTitle) && (
         <div
           className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0"
           style={{ borderColor: BORDER, background: PAGE_BG }}
@@ -194,13 +241,63 @@ export default function MessageThread({
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-          {title && (
-            <span
-              className="text-sm font-semibold truncate"
-              style={{ color: RECV_TEXT, letterSpacing: "-0.015em" }}
-            >
-              {title}
-            </span>
+
+          {isEditing ? (
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <input
+                ref={renameInputRef}
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value.slice(0, 60))}
+                onKeyDown={handleRenameKeyDown}
+                placeholder={title || "Thread name…"}
+                maxLength={60}
+                className="flex-1 min-w-0 text-sm font-semibold rounded-md border px-2 py-0.5 outline-none"
+                style={{
+                  color: RECV_TEXT,
+                  borderColor: SENT_BG,
+                  boxShadow: "0 0 0 2px rgba(37,99,235,0.1)",
+                  background: PAGE_BG,
+                  letterSpacing: "-0.015em",
+                }}
+              />
+              <button
+                onClick={handleRenameSubmit}
+                disabled={renameMutation.isPending}
+                className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-colors"
+                style={{ background: SENT_BG, color: "#fff" }}
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-colors"
+                style={{ background: RECV_BG, color: META_TEXT }}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 group">
+              <span
+                className="text-sm font-semibold truncate flex-1 min-w-0"
+                style={{ color: RECV_TEXT, letterSpacing: "-0.015em" }}
+              >
+                {displayedTitle}
+              </span>
+              <button
+                onClick={() => {
+                  setDraftName(overrideName !== undefined ? (overrideName || "") : (customName || ""));
+                  setIsEditing(true);
+                }}
+                className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-all opacity-0 group-hover:opacity-100"
+                style={{ color: META_TEXT }}
+                title="Rename thread"
+                onMouseEnter={(e) => (e.currentTarget.style.background = RECV_BG)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
           )}
         </div>
       )}

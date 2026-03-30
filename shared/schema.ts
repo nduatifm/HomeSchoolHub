@@ -365,6 +365,18 @@ export const insertStudentInviteSchema = studentInviteSchema.omit({
 export type StudentInvite = z.infer<typeof studentInviteSchema>;
 export type InsertStudentInvite = z.infer<typeof insertStudentInviteSchema>;
 
+// Thread Label schema
+export const threadLabelSchema = z.object({
+  id: z.number(),
+  teacherUserId: z.number(),
+  studentId: z.number(),
+  name: z.string().max(60),
+});
+
+export const insertThreadLabelSchema = threadLabelSchema.omit({ id: true });
+export type ThreadLabel = z.infer<typeof threadLabelSchema>;
+export type InsertThreadLabel = z.infer<typeof insertThreadLabelSchema>;
+
 // System Settings schema
 export const systemSettingsSchema = z.object({
   id: z.number(),

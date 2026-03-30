@@ -142,6 +142,7 @@ export default function StudentDashboard() {
     lastMessage: string | null;
     lastMessageTimestamp: string | null;
     unreadCount: number;
+    customName: string | null;
   };
 
   const { data: conversationSummaries = [] } = useQuery<ConversationSummary[]>({
@@ -1298,7 +1299,7 @@ export default function StudentDashboard() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <p className="text-sm font-medium truncate text-foreground">{assignedTeacher.name}</p>
+                              <p className="text-sm font-medium truncate text-foreground">{teacherSummary?.customName ?? assignedTeacher.name}</p>
                               {teacherSummary?.lastMessageTimestamp && (
                                 <span className="text-[11px] text-muted-foreground shrink-0">
                                   {formatPreviewTime(teacherSummary.lastMessageTimestamp)}
@@ -1323,6 +1324,8 @@ export default function StudentDashboard() {
                         teacherId={assignedTeacher.id}
                         studentId={student!.id}
                         myUserId={user!.id}
+                        title={`Thread: ${assignedTeacher.name}`}
+                        customName={teacherSummary?.customName ?? null}
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">

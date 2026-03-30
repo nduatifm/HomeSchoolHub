@@ -2256,6 +2256,37 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.patch("/api/messages/thread-label", requireAuth, async (req, res) => {
+    try {
+      const schema = z.object({
+        teacherUserId: z.number().int().positive(),
+        studentId: z.number().int().positive(),
+        name: z.string().max(60),
+      });
+      const parse = schema.safeParse(req.body);
+      if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+
+      const { teacherUserId, studentId, name } = parse.data;
+      const callerId = req.session.userId!;
+
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const isTeacher  = callerId === teacherUserId;
+      const isStudent  = callerId === student.userId;
+      const isParent   = student.parentId !== null && callerId === student.parentId;
+      if (!isTeacher && !isStudent && !isParent) {
+        return res.status(403).json({ error: "Not a participant of this thread" });
+      }
+
+      const trimmed = name.trim();
+      await storage.setThreadLabel(teacherUserId, studentId, trimmed === "" ? null : trimmed);
+      res.json({ ok: true, name: trimmed === "" ? null : trimmed });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages/thread", requireAuth, async (req, res) => {
     try {
       const teacherId = parseInt(req.query.teacherId as string);
