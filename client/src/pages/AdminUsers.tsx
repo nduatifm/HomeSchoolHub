@@ -335,17 +335,21 @@ export default function AdminUsers() {
                                 <DropdownMenuLabel>Manage {u.name.split(" ")[0]}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
 
-                                {u.role !== "student" && (
-                                  <DropdownMenuItem
-                                    onClick={() => {
+                                <DropdownMenuItem
+                                  disabled={u.role === "student"}
+                                  onClick={() => {
+                                    if (u.role !== "student") {
                                       setSelectedUser(u);
                                       setNewRole(u.role || "");
                                       setRoleDialogOpen(true);
-                                    }}
-                                  >
-                                    Change role
-                                  </DropdownMenuItem>
-                                )}
+                                    }
+                                  }}
+                                >
+                                  Change role
+                                  {u.role === "student" && (
+                                    <span className="ml-auto text-xs text-muted-foreground">(student)</span>
+                                  )}
+                                </DropdownMenuItem>
 
                                 {!u.isSuperAdmin && (
                                   <>
