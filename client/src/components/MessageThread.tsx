@@ -225,11 +225,10 @@ export default function MessageThread({
       style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      {(onBack || title || displayedTitle) && (
-        <div
-          className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0"
-          style={{ borderColor: BORDER, background: PAGE_BG }}
-        >
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0"
+        style={{ borderColor: BORDER, background: PAGE_BG }}
+      >
           {onBack && (
             <button
               onClick={onBack}
@@ -289,7 +288,7 @@ export default function MessageThread({
                   setDraftName(overrideName !== undefined ? (overrideName || "") : (customName || ""));
                   setIsEditing(true);
                 }}
-                className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-all opacity-0 group-hover:opacity-100"
+                className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-colors"
                 style={{ color: META_TEXT }}
                 title="Rename thread"
                 onMouseEnter={(e) => (e.currentTarget.style.background = RECV_BG)}
@@ -300,7 +299,6 @@ export default function MessageThread({
             </div>
           )}
         </div>
-      )}
 
       {/* ── Message list ────────────────────────────────────────────────────── */}
       <div
