@@ -138,7 +138,6 @@ export default function MessageThread({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       setText("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
     },
@@ -176,8 +175,8 @@ export default function MessageThread({
 
   return (
     <div
-      className="flex flex-col"
-      style={{ minHeight: 400, maxHeight: 620, fontFamily: "system-ui, -apple-system, sans-serif" }}
+      className="flex flex-col h-full"
+      style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       {(onBack || title) && (
