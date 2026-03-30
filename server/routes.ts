@@ -3643,24 +3643,26 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/admin/users/:id/super-admin — toggle isSuperAdmin (super admin only)
-  app.patch("/api/admin/users/:id/super-admin", requireSuperAdmin, async (req, res) => {
+  // PATCH /api/admin/users/:id/admin — toggle isAdmin (super admin only; cannot change super admins or self)
+  app.patch("/api/admin/users/:id/admin", requireSuperAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { isSuperAdmin } = req.body;
-      if (typeof isSuperAdmin !== "boolean") {
-        return res.status(400).json({ error: "isSuperAdmin must be boolean" });
+      const { isAdmin } = req.body;
+      if (typeof isAdmin !== "boolean") {
+        return res.status(400).json({ error: "isAdmin must be boolean" });
       }
-      // Prevent self-demotion
-      if (req.session.userId === id && !isSuperAdmin) {
-        return res.status(400).json({ error: "Cannot remove your own super admin status" });
+      // Prevent self-modification
+      if (req.session.userId === id) {
+        return res.status(400).json({ error: "Cannot change your own admin status" });
       }
-      const updatePayload: Prisma.UserUpdateInput = {
-        isSuperAdmin,
-        ...(isSuperAdmin ? { isAdmin: true } : {}),
-      };
-      const updated = await storage.updateUser(id, updatePayload);
-      res.json({ success: true, id: updated.id, isSuperAdmin: updated.isSuperAdmin, isAdmin: updated.isAdmin });
+      // Prevent modifying super-admin users via this endpoint
+      const target = await storage.getUserById(id);
+      if (!target) return res.status(404).json({ error: "User not found" });
+      if (target.isSuperAdmin) {
+        return res.status(400).json({ error: "Cannot change admin status of a super admin (managed by environment config)" });
+      }
+      const updated = await storage.updateUser(id, { isAdmin });
+      res.json({ success: true, id: updated.id, isAdmin: updated.isAdmin });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -121,17 +121,17 @@ export default function AdminUsers() {
     onError: (e: any) => toast({ title: "Failed to update role", description: e.message, type: "error" }),
   });
 
-  const toggleSuperAdminMutation = useMutation({
-    mutationFn: ({ id, isSuperAdmin }: { id: number; isSuperAdmin: boolean }) =>
-      apiRequest(`/api/admin/users/${id}/super-admin`, {
+  const toggleAdminMutation = useMutation({
+    mutationFn: ({ id, isAdmin }: { id: number; isAdmin: boolean }) =>
+      apiRequest(`/api/admin/users/${id}/admin`, {
         method: "PATCH",
-        body: JSON.stringify({ isSuperAdmin }),
+        body: JSON.stringify({ isAdmin }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Super admin status updated" });
+      toast({ title: "Admin status updated" });
     },
-    onError: (e: any) => toast({ title: "Failed to update super admin", description: e.message, type: "error" }),
+    onError: (e: any) => toast({ title: "Failed to update admin status", description: e.message, type: "error" }),
   });
 
   const filtered = users.filter((u) => {
@@ -347,23 +347,26 @@ export default function AdminUsers() {
                                   </DropdownMenuItem>
                                 )}
 
-                                <DropdownMenuSeparator />
-
-                                {u.isSuperAdmin ? (
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={() => toggleSuperAdminMutation.mutate({ id: u.id, isSuperAdmin: false })}
-                                  >
-                                    <ShieldOff className="w-4 h-4 mr-2" />
-                                    Remove super admin
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem
-                                    onClick={() => toggleSuperAdminMutation.mutate({ id: u.id, isSuperAdmin: true })}
-                                  >
-                                    <Crown className="w-4 h-4 mr-2" />
-                                    Make super admin
-                                  </DropdownMenuItem>
+                                {!u.isSuperAdmin && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    {u.isAdmin ? (
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: false })}
+                                      >
+                                        <ShieldOff className="w-4 h-4 mr-2" />
+                                        Remove admin
+                                      </DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem
+                                        onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: true })}
+                                      >
+                                        <ShieldCheck className="w-4 h-4 mr-2" />
+                                        Make admin
+                                      </DropdownMenuItem>
+                                    )}
+                                  </>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
