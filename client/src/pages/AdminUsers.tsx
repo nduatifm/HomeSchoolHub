@@ -121,11 +121,11 @@ export default function AdminUsers() {
     onError: (e: any) => toast({ title: "Failed to update role", description: e.message, type: "error" }),
   });
 
-  const toggleSuperAdminMutation = useMutation({
-    mutationFn: ({ id, isSuperAdmin }: { id: number; isSuperAdmin: boolean }) =>
-      apiRequest(`/api/admin/users/${id}/super-admin`, {
+  const toggleAdminMutation = useMutation({
+    mutationFn: ({ id, isAdmin }: { id: number; isAdmin: boolean }) =>
+      apiRequest(`/api/admin/users/${id}/admin`, {
         method: "PATCH",
-        body: JSON.stringify({ isSuperAdmin }),
+        body: JSON.stringify({ isAdmin }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
@@ -353,14 +353,14 @@ export default function AdminUsers() {
                                     {u.isAdmin ? (
                                       <DropdownMenuItem
                                         className="text-destructive focus:text-destructive"
-                                        onClick={() => toggleSuperAdminMutation.mutate({ id: u.id, isSuperAdmin: false })}
+                                        onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: false })}
                                       >
                                         <ShieldOff className="w-4 h-4 mr-2" />
                                         Remove admin
                                       </DropdownMenuItem>
                                     ) : (
                                       <DropdownMenuItem
-                                        onClick={() => toggleSuperAdminMutation.mutate({ id: u.id, isSuperAdmin: true })}
+                                        onClick={() => toggleAdminMutation.mutate({ id: u.id, isAdmin: true })}
                                       >
                                         <ShieldCheck className="w-4 h-4 mr-2" />
                                         Make admin
