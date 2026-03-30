@@ -60,14 +60,20 @@ export const resendVerificationSchema = z.object({
 });
 
 export const studentSignupSchema = z.object({
-  token: z.string().uuid("Invalid invite token format"),
+  code: z.string().min(1, "Invite code is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export const studentGoogleSignupSchema = z.object({
+  code: z.string().min(1, "Invite code is required"),
+  credential: z.string().min(1, "Google credential is required"),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
 export type StudentSignupInput = z.infer<typeof studentSignupSchema>;
+export type StudentGoogleSignupInput = z.infer<typeof studentGoogleSignupSchema>;
 
 // Student schema
 export const studentSchema = z.object({
@@ -349,6 +355,7 @@ export const studentInviteSchema = z.object({
   studentName: z.string(),
   gradeLevel: z.string(),
   token: z.string(),
+  code: z.string(),
   status: z.enum(["pending", "accepted"]),
   createdDate: z.string(),
   expiresDate: z.string(),
@@ -358,6 +365,7 @@ export const insertStudentInviteSchema = studentInviteSchema.omit({
   id: true,
   parentId: true,
   token: true,
+  code: true,
   status: true,
   createdDate: true,
   expiresDate: true,

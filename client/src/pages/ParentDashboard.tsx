@@ -263,8 +263,8 @@ export default function ParentDashboard() {
   });
 
   const revokeInviteMutation = useMutation({
-    mutationFn: (token: string) =>
-      apiRequest(`/api/invites/student/${token}`, { method: "DELETE" }),
+    mutationFn: (id: number) =>
+      apiRequest(`/api/invites/student/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invites/student/parent"] });
       toast({ title: "Invite revoked", type: "success" });
@@ -648,6 +648,7 @@ export default function ParentDashboard() {
                         <TableRow>
                           <TableHead>Student Name</TableHead>
                           <TableHead>Email</TableHead>
+                          <TableHead>Invite Code</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
@@ -661,6 +662,13 @@ export default function ParentDashboard() {
                             <TableCell>{i.studentName}</TableCell>
                             <TableCell>{i.email}</TableCell>
                             <TableCell>
+                              {i.code ? (
+                                <span className="font-mono font-semibold text-sm tracking-widest text-primary">{i.code}</span>
+                              ) : (
+                                <span className="text-muted-foreground text-xs italic">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <Badge variant={i.status === "accepted" ? "default" : i.status === "pending" ? "outline" : "secondary"}>
                                 {i.status}
                               </Badge>
@@ -671,7 +679,7 @@ export default function ParentDashboard() {
                                   size="sm"
                                   variant="ghost"
                                   className="text-destructive hover:text-destructive h-7 px-2"
-                                  onClick={() => revokeInviteMutation.mutate(i.token)}
+                                  onClick={() => revokeInviteMutation.mutate(i.id)}
                                   disabled={revokeInviteMutation.isPending}
                                   data-testid={`button-revoke-invite-${i.id}`}
                                 >

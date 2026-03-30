@@ -61,20 +61,22 @@ export async function sendStudentInviteEmail(
   parentName: string
 ) {
   const baseUrl = getBaseUrl();
-  const signupUrl = `${baseUrl}/student-signup?token=${inviteCode}`;
+  const signupUrl = `${baseUrl}/student-signup`;
 
   const bodyHtml = `
     <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">You&rsquo;ve been invited, ${studentName}!</h2>
-    <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#4a5e50;">
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4a5e50;">
       <strong>${parentName}</strong> has invited you to join <strong>Lyra Preparatory</strong> as a student.
-      Click the button below to create your account — your invite is pre-filled automatically.
+      Use the invite code below to create your account.
     </p>
-    ${primaryButton('Create My Account', signupUrl)}
+    <div style="background:#f0f9f5;border:2px solid #1E8C64;border-radius:10px;padding:20px 24px;text-align:center;margin:0 0 24px;">
+      <p style="margin:0 0 6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#1E8C64;">Your invite code</p>
+      <p style="margin:0;font-size:36px;font-weight:800;letter-spacing:6px;color:#1a2e23;font-family:monospace;">${inviteCode}</p>
+    </div>
+    ${primaryButton('Go to Sign-Up Page', signupUrl)}
     <p style="margin:24px 0 0;font-size:13px;color:#9bb09f;line-height:1.6;">
+      Go to <strong>${signupUrl}</strong>, click &ldquo;Student sign-up&rdquo;, and enter the code above.
       This invite expires in <strong>7 days</strong>.
-    </p>
-    <p style="margin:12px 0 0;font-size:12px;color:#b8c8bb;word-break:break-all;">
-      Or copy and paste: ${signupUrl}
     </p>
   `;
 
@@ -83,8 +85,8 @@ export async function sendStudentInviteEmail(
       from: FROM,
       to: email,
       subject: `${parentName} invited you to Lyra Preparatory`,
-      html: buildEmailHtml(bodyHtml, { preheader: `${parentName} has invited you to join Lyra Preparatory as a student.` }),
-      text: `Hi ${studentName},\n\n${parentName} has invited you to join Lyra Preparatory as a student.\n\nCreate your account here:\n${signupUrl}\n\nThis invite expires in 7 days.\n\n© Lyra Preparatory`,
+      html: buildEmailHtml(bodyHtml, { preheader: `Your invite code: ${inviteCode}. ${parentName} has invited you to join Lyra Preparatory.` }),
+      text: `Hi ${studentName},\n\n${parentName} has invited you to join Lyra Preparatory as a student.\n\nYour invite code: ${inviteCode}\n\nGo to ${signupUrl} and enter your invite code to create your account.\n\nThis invite expires in 7 days.\n\n© Lyra Preparatory`,
     });
     return { success: true };
   } catch (error: any) {

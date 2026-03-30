@@ -203,12 +203,14 @@ export interface IStorage {
     invite: Prisma.StudentInviteCreateInput,
   ): Promise<StudentInvite>;
   getStudentInviteByToken(token: string): Promise<StudentInvite | null>;
+  getStudentInviteByCode(code: string): Promise<StudentInvite | null>;
   getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]>;
   updateStudentInvite(
     id: number,
     invite: Prisma.StudentInviteUpdateInput,
   ): Promise<StudentInvite>;
   deleteStudentInvite(token: string): Promise<void>;
+  deleteStudentInviteById(id: number): Promise<void>;
 
   getAllUsers(): Promise<User[]>;
 
@@ -1157,6 +1159,12 @@ class PrismaStorage implements IStorage {
     })) as StudentInvite | null;
   }
 
+  async getStudentInviteByCode(code: string): Promise<StudentInvite | null> {
+    return (await prisma.studentInvite.findUnique({
+      where: { code },
+    })) as StudentInvite | null;
+  }
+
   async getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]> {
     return (await prisma.studentInvite.findMany({
       where: { parentId },
@@ -1175,6 +1183,10 @@ class PrismaStorage implements IStorage {
 
   async deleteStudentInvite(token: string): Promise<void> {
     await prisma.studentInvite.delete({ where: { token } });
+  }
+
+  async deleteStudentInviteById(id: number): Promise<void> {
+    await prisma.studentInvite.delete({ where: { id } });
   }
 
   async getAllUsers(): Promise<User[]> {

@@ -37,7 +37,8 @@ interface AuthContextType {
   sessionId: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, role: string) => Promise<any>;
-  signupStudent: (token: string, password: string) => Promise<void>;
+  signupStudent: (code: string, password: string) => Promise<void>;
+  signupStudentGoogle: (code: string, credential: string) => Promise<void>;
   googleSignIn: (idToken: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -97,10 +98,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data;
   }
 
-  async function signupStudent(token: string, password: string) {
+  async function signupStudent(code: string, password: string) {
     const data = await apiRequest("/api/auth/signup/student", {
       method: "POST",
-      body: JSON.stringify({ token, password }),
+      body: JSON.stringify({ code, password }),
+    });
+    localStorage.setItem("sessionId", data.sessionId);
+    setSessionId(data.sessionId);
+    setUser(data.user);
+    setStudent(data.student);
+  }
+
+  async function signupStudentGoogle(code: string, credential: string) {
+    const data = await apiRequest("/api/auth/signup/student/google", {
+      method: "POST",
+      body: JSON.stringify({ code, credential }),
     });
     localStorage.setItem("sessionId", data.sessionId);
     setSessionId(data.sessionId);
@@ -139,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         signup,
         signupStudent,
+        signupStudentGoogle,
         googleSignIn,
         logout,
         isLoading,

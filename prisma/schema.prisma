@@ -333,6 +333,7 @@ model StudentInvite {
   studentName String
   gradeLevel  String
   token       String @unique
+  code        String @unique
   status      String @default("pending")
   createdDate String
   expiresDate String
@@ -341,6 +342,7 @@ model StudentInvite {
 
   @@index([parentId])
   @@index([token])
+  @@index([code])
 }
 
 model SystemSettings {

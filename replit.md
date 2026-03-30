@@ -28,7 +28,7 @@ Icons are provided by Lucide React. The profile management features a modern tab
 - **Backend**: Node.js with Express, TypeScript, Prisma ORM, Zod for validation, session-based authentication.
 - **Authentication**:
     - Teachers & Parents: Direct signup via email/password or Google Sign-In. Email verification is mandatory.
-    - Students: Invite-only system where parents generate unique tokens.
+    - Students: Invite-only system using a short 6-character uppercase alphanumeric code (e.g. `A3KW9F`). Parents generate invites which produce both an internal UUID token and a human-readable short code. Students always type the short code manually on the signup page — no token in URLs. Signup supports both password and Google.
     - Role-Based Access: Distinct dashboards and permissions for Teacher, Parent, and Student roles.
 - **File Upload System**:
     - **Cloudinary Integration**: All file uploads (assignments, materials, profile pictures) use Cloudinary storage

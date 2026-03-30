@@ -28,6 +28,7 @@ import {
   loginSchema,
   resendVerificationSchema,
   studentSignupSchema,
+  studentGoogleSignupSchema,
 } from "@shared/schema";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -44,6 +45,17 @@ const sessions = new Map<string, number>();
 
 // Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Generate 6-character uppercase alphanumeric invite code
+function generateInviteCode(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+  const bytes = crypto.randomBytes(6);
+  for (let i = 0; i < 6; i++) {
+    code += chars[bytes[i] % chars.length];
+  }
+  return code;
+}
 
 // Auth middleware
 function requireAuth(req: Request, res: Response, next: Function) {
@@ -192,7 +204,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Student signup via invite
+  // Student signup via invite (password)
   app.post("/api/auth/signup/student", async (req, res) => {
     try {
       // Validate input with Zod
@@ -203,16 +215,22 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const { token, password } = validation.data;
+      const { code, password } = validation.data;
 
-      const invite = await storage.getStudentInviteByToken(token);
+      const invite = await storage.getStudentInviteByCode(code.toUpperCase());
       if (!invite || invite.status === "accepted") {
-        return res.status(400).json({ error: "Invalid or expired invite" });
+        return res.status(400).json({ error: "Invalid or expired invite code" });
       }
 
       // Check if invite is expired
       if (new Date(invite.expiresDate) < new Date()) {
         return res.status(400).json({ error: "Invite has expired" });
+      }
+
+      // Check if email is already registered
+      const existingUser = await storage.getUserByEmail(invite.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "An account with this email already exists" });
       }
 
       // Create user account - mark as verified since invite code IS the verification
@@ -271,6 +289,117 @@ export function registerRoutes(app: Express) {
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Student signup via invite (Google)
+  app.post("/api/auth/signup/student/google", async (req, res) => {
+    try {
+      const validation = studentGoogleSignupSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: validation.error.errors[0].message,
+        });
+      }
+
+      const { code, credential } = validation.data;
+
+      const invite = await storage.getStudentInviteByCode(code.toUpperCase());
+      if (!invite || invite.status === "accepted") {
+        return res.status(400).json({ error: "Invalid or expired invite code" });
+      }
+
+      if (new Date(invite.expiresDate) < new Date()) {
+        return res.status(400).json({ error: "Invite has expired" });
+      }
+
+      // Verify the Google token
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload) {
+        return res.status(401).json({ error: "Invalid Google token" });
+      }
+
+      const googleId = payload.sub;
+      const googleEmail = payload.email;
+      const profilePicture = payload.picture;
+
+      // Require the Google account email to match the invited student's email
+      if (!googleEmail || googleEmail.toLowerCase() !== invite.email.toLowerCase()) {
+        return res.status(400).json({
+          error: "The Google account email must match the invited student email (" + invite.email + ")",
+        });
+      }
+
+      // Require the Google account email to be verified by Google
+      if (!payload.email_verified) {
+        return res.status(400).json({ error: "Google account email is not verified" });
+      }
+
+      // Check if email is already registered
+      const existingUser = await storage.getUserByEmail(invite.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "An account with this email already exists" });
+      }
+
+      // Create user account linked to Google
+      const user = await storage.createUser({
+        email: invite.email,
+        password: null,
+        name: invite.studentName,
+        role: "student",
+        isEmailVerified: true,
+        emailVerifyToken: null,
+        emailVerifyExpires: null,
+        googleId,
+        profilePicture: profilePicture || null,
+      });
+
+      // Create student profile
+      const student = await storage.createStudent({
+        userId: user.id,
+        parentId: invite.parentId,
+        name: invite.studentName,
+        gradeLevel: invite.gradeLevel,
+        badges: [],
+        points: 0,
+      });
+
+      // Auto-assign to teacher if not in tutor request mode
+      const tutorRequestModeSetting =
+        await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+      const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
+
+      if (!isTutorRequestMode) {
+        await storage.assignStudentToFirstAvailableTeacher(student.id);
+      }
+
+      // Mark invite as accepted
+      await storage.updateStudentInvite(invite.id, { status: "accepted" });
+
+      // Create session
+      const sessionId = crypto.randomUUID();
+      sessions.set(sessionId, user.id);
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          isEmailVerified: user.isEmailVerified,
+        },
+        student,
+        sessionId,
+        message: "Welcome! Your account has been created successfully.",
+      });
+    } catch (error: any) {
+      console.error("Student Google signup error:", error);
+      res.status(500).json({ error: "Failed to authenticate with Google" });
     }
   });
 
@@ -769,6 +898,13 @@ export function registerRoutes(app: Express) {
 
       const data = insertStudentInviteSchema.parse(req.body);
       const token = crypto.randomUUID();
+      // Generate a unique invite code with collision retry
+      let code = generateInviteCode();
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const existing = await storage.getStudentInviteByCode(code);
+        if (!existing) break;
+        code = generateInviteCode();
+      }
       const expiresDate = new Date();
       expiresDate.setDate(expiresDate.getDate() + 7); // 7 days expiry
 
@@ -778,22 +914,25 @@ export function registerRoutes(app: Express) {
         gradeLevel: data.gradeLevel,
         parent: { connect: { id: user.id } },
         token,
+        code,
         status: "pending",
         createdDate: new Date().toISOString(),
         expiresDate: expiresDate.toISOString(),
       });
 
-      // Send invite email with URL and invite code (non-blocking)
+      // Send invite email with short code and link to /student-signup (non-blocking)
       sendStudentInviteEmail(
         data.email,
         data.studentName,
-        token,
+        code,
         user.name,
       ).catch((err) =>
         console.error("Failed to send student invite email:", err),
       );
 
-      res.json(invite);
+      // Strip token from response — token is internal only
+      const { token: _tok, ...safeInvite } = invite;
+      res.json(safeInvite);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -804,38 +943,50 @@ export function registerRoutes(app: Express) {
       const invites = await storage.getStudentInvitesByParent(
         req.session.userId!,
       );
-      res.json(invites);
+      // Strip token from all invite records — token is internal only
+      const safeInvites = invites.map(({ token: _tok, ...rest }) => rest);
+      res.json(safeInvites);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/invites/student/:token", async (req, res) => {
+  app.get("/api/invites/student/code/:code", async (req, res) => {
     try {
-      const invite = await storage.getStudentInviteByToken(req.params.token);
-      if (!invite) {
-        return res.status(404).json({ error: "Invite not found" });
+      const invite = await storage.getStudentInviteByCode(req.params.code.toUpperCase());
+      if (!invite || invite.status === "accepted") {
+        return res.status(404).json({ error: "Invite not found or already used" });
       }
-      res.json(invite);
+      if (new Date(invite.expiresDate) < new Date()) {
+        return res.status(400).json({ error: "Invite has expired" });
+      }
+      // Return only safe fields (no token)
+      res.json({
+        studentName: invite.studentName,
+        gradeLevel: invite.gradeLevel,
+        email: invite.email,
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.delete("/api/invites/student/:token", requireAuth, async (req, res) => {
+  app.delete("/api/invites/student/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "parent") {
         return res.status(403).json({ error: "Only parents can revoke invites" });
       }
-      const invite = await storage.getStudentInviteByToken(req.params.token);
+      const inviteId = parseInt(req.params.id, 10);
+      if (isNaN(inviteId)) {
+        return res.status(400).json({ error: "Invalid invite id" });
+      }
+      const invites = await storage.getStudentInvitesByParent(user.id);
+      const invite = invites.find((i) => i.id === inviteId);
       if (!invite) {
         return res.status(404).json({ error: "Invite not found" });
       }
-      if (invite.parentId !== user.id) {
-        return res.status(403).json({ error: "Not your invite" });
-      }
-      await storage.deleteStudentInvite(req.params.token);
+      await storage.deleteStudentInviteById(inviteId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
