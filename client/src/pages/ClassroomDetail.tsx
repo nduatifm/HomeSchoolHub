@@ -145,6 +145,19 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
   });
 
+  // Pre-fetch submissions for all assignments to show submission counts upfront
+  const allSubResults = useQueries({
+    queries: assignments.map((a) => ({
+      queryKey: ["/api/classrooms", classroomId, "assignments", a.id, "submissions"],
+      queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments/${a.id}/submissions`) as Promise<SubmissionWithName[]>,
+      enabled: assignments.length > 0,
+    })),
+  });
+  const subCountMap: Record<number, number> = {};
+  allSubResults.forEach((q, i) => {
+    if (assignments[i]) subCountMap[assignments[i].id] = (q.data ?? []).filter((s) => s.status !== "pending").length;
+  });
+
   const { data: expandedSubs = [], isLoading: loadingSubs } = useQuery<SubmissionWithName[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments", expanded, "submissions"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments/${expanded}/submissions`),
@@ -246,7 +259,10 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
                       <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
+                      <Button variant="ghost" size="sm" className="text-xs gap-1.5" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
+                        {subCountMap[a.id] !== undefined && subCountMap[a.id] > 0 && (
+                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-white text-[10px] font-bold">{subCountMap[a.id]}</span>
+                        )}
                         {expanded === a.id ? "Collapse" : "View Submissions"}
                       </Button>
                     </td>
@@ -433,7 +449,7 @@ function TeacherGradesTab({ classroomId }: { classroomId: number }) {
 }
 
 // ── Materials tab ─────────────────────────────────────────────────────────────
-function MaterialsTab({ classroomId, isTeacher, isArchived }: { classroomId: number; isTeacher: boolean; isArchived: boolean }) {
+function MaterialsTab({ classroomId, isTeacher, isArchived, classroomSubject }: { classroomId: number; isTeacher: boolean; isArchived: boolean; classroomSubject?: string }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", url: "" });
 
@@ -501,6 +517,11 @@ function MaterialsTab({ classroomId, isTeacher, isArchived }: { classroomId: num
                 >
                   {m.title}<ExternalLink className="h-3 w-3 shrink-0" />
                 </a>
+                {classroomSubject && (
+                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
+                    {classroomSubject}
+                  </span>
+                )}
                 <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
                   {new Date(m.uploadedAt).toLocaleDateString()}
                 </span>
@@ -945,7 +966,7 @@ export default function ClassroomDetail() {
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} /></TabsContent>
               <TabsContent value="assignments"><TeacherAssignmentsTab classroomId={classroomId} isArchived={isArchived} /></TabsContent>
               <TabsContent value="grades"><TeacherGradesTab classroomId={classroomId} /></TabsContent>
-              <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} /></TabsContent>
+              <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} classroomSubject={classroom.subject} /></TabsContent>
               <TabsContent value="members"><MembersTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} /></TabsContent>
             </Tabs>
           )}
@@ -961,7 +982,7 @@ export default function ClassroomDetail() {
               <TabsContent value="assignments">
                 <StudentAssignmentsTab classroomId={classroomId} studentId={studentData?.id ?? 0} isArchived={isArchived} />
               </TabsContent>
-              <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} /></TabsContent>
+              <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} classroomSubject={classroom.subject} /></TabsContent>
             </Tabs>
           )}
 

@@ -70,7 +70,7 @@ export default function ModernSidebar() {
       ? window.location.hash.replace("#", "")
       : user?.role === "parent"
         ? "children"
-        : "assignments",
+        : "classrooms",
   );
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -81,7 +81,7 @@ export default function ModernSidebar() {
           ? window.location.hash.replace("#", "")
           : user?.role === "parent"
             ? "children"
-            : "assignments",
+            : "classrooms",
       );
     };
     window.addEventListener("hashchange", handleHashChange);
