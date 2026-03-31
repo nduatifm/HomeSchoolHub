@@ -330,7 +330,7 @@ export type InsertParentalControl = z.infer<typeof insertParentalControlSchema>;
 export const tutorRatingSchema = z.object({
   id: z.number(),
   parentId: z.number(),
-  teacherId: z.number(),
+  teacherId: z.number().nullable(),
   rating: z.number(),
   review: z.string().nullable(),
   date: z.string(),
