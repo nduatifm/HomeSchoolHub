@@ -449,6 +449,7 @@ export const classroomAssignmentSchema = z.object({
   description: z.string(),
   dueDate: z.string(),
   points: z.number(),
+  fileUrl: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true });

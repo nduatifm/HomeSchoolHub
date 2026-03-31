@@ -79,18 +79,28 @@ function generateInviteCode(): string {
   return code;
 }
 
+// Shared session extraction helper — resolves Bearer token → userId and populates req.session.
+// Returns the userId on success, or sends an error response and returns null.
+async function resolveSessionUserId(req: Request, res: Response): Promise<number | null> {
+  const sessionId = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+  const userId = await getSessionUserId(sessionId);
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+  req.session = { userId };
+  return userId;
+}
+
 // Auth middleware
 async function requireAuth(req: Request, res: Response, next: Function) {
   try {
-    const sessionId = req.headers.authorization?.replace("Bearer ", "");
-    if (!sessionId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    const userId = await getSessionUserId(sessionId);
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    req.session = { userId };
+    const userId = await resolveSessionUserId(req, res);
+    if (userId === null) return;
     next();
   } catch (err) {
     res.status(500).json({ error: "Internal server error" });
@@ -100,15 +110,8 @@ async function requireAuth(req: Request, res: Response, next: Function) {
 // Admin middleware
 async function requireAdmin(req: Request, res: Response, next: Function) {
   try {
-    const sessionId = req.headers.authorization?.replace("Bearer ", "");
-    if (!sessionId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    const userId = await getSessionUserId(sessionId);
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    req.session = { userId };
+    const userId = await resolveSessionUserId(req, res);
+    if (userId === null) return;
     const user = await storage.getUserById(userId);
     if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
       return res.status(403).json({ error: "Forbidden" });
@@ -122,15 +125,8 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
 // Super admin middleware
 async function requireSuperAdmin(req: Request, res: Response, next: Function) {
   try {
-    const sessionId = req.headers.authorization?.replace("Bearer ", "");
-    if (!sessionId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    const userId = await getSessionUserId(sessionId);
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    req.session = { userId };
+    const userId = await resolveSessionUserId(req, res);
+    if (userId === null) return;
     const user = await storage.getUserById(userId);
     if (!user || !user.isSuperAdmin) {
       return res.status(403).json({ error: "Forbidden" });
@@ -799,7 +795,14 @@ export function registerRoutes(app: Express) {
       }
 
       const { name } = validation.data;
-      const user = await storage.updateUser(req.session.userId!, { name });
+      const userId = req.session.userId!;
+
+      // Atomically update User.name and Student.name (if a student record exists)
+      const [user] = await prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({ where: { id: userId }, data: { name } });
+        await tx.student.updateMany({ where: { userId }, data: { name } });
+        return [updatedUser];
+      });
 
       res.json({
         user: {
@@ -807,7 +810,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: user.roles ?? [],
+          roles: (user as any).roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -1927,14 +1930,11 @@ export function registerRoutes(app: Express) {
           // In direct-assignment mode, any teacher can look up any student's teacher
           isAssignedTeacher = true;
         } else {
-          const teacherAssignments = await storage.getAssignedTeachersForStudent(studentId);
-          isAssignedTeacher = teacherAssignments.some((a) => a.teacherId === requestingUser.id);
-          if (!isAssignedTeacher) {
-            const approvedRequest = await prisma.tutorRequest.findFirst({
-              where: { studentId, teacherId: requestingUser.id, status: "approved" },
-            });
-            isAssignedTeacher = !!approvedRequest;
-          }
+          // In tutor-request mode, approved TutorRequest is the single source of truth
+          const approvedRequest = await prisma.tutorRequest.findFirst({
+            where: { teacherId: requestingUser.id, status: "approved", studentId },
+          });
+          isAssignedTeacher = !!approvedRequest;
         }
       }
 
@@ -3755,6 +3755,7 @@ export function registerRoutes(app: Express) {
             email: targetUser.email,
             name: targetUser.name,
             role: targetUser.role,
+            roles: (targetUser as any).roles ?? [],
             isEmailVerified: targetUser.isEmailVerified,
             profilePicture: targetUser.profilePicture,
             bio: targetUser.bio,
@@ -4019,9 +4020,15 @@ export function registerRoutes(app: Express) {
       if (!classroom) return;
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot enroll students in an archived classroom" });
       const { studentId } = z.object({ studentId: z.number() }).parse(req.body);
-      // Verify student is assigned to this teacher
-      const tsa = await storage.getTeacherStudentAssignment(req.session.userId!, studentId);
-      if (!tsa || tsa.status !== "active") return res.status(403).json({ error: "This student is not assigned to you" });
+      // Verify student is assigned to this teacher — use approved TutorRequest as the single
+      // authoritative source (TSA is a mirror kept for legacy direct-assignment mode).
+      const teacherUserId = req.session.userId!;
+      const isAssigned =
+        !!(await storage.getTeacherStudentAssignment(teacherUserId, studentId)) ||
+        !!(await prisma.tutorRequest.findFirst({
+          where: { teacherId: teacherUserId, studentId, status: "approved" },
+        }));
+      if (!isAssigned) return res.status(403).json({ error: "This student is not assigned to you" });
       const enrollment = await storage.enrollStudent(classroom.id, studentId);
       res.status(201).json(enrollment);
     } catch (error: any) {
@@ -4097,6 +4104,33 @@ export function registerRoutes(app: Express) {
         points: z.number().int().min(1).max(10000),
       }).parse(req.body);
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data });
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/assignments/with-file — teacher creates assignment with optional file
+  app.post("/api/classrooms/:classroomId/assignments/with-file", requireAuth, memoryUpload.single("file"), async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
+      const data = z.object({
+        title: z.string().min(1),
+        description: z.string().min(1),
+        dueDate: z.string().min(1),
+        points: z.preprocess((v) => parseInt(v as string, 10), z.number().int().min(1).max(10000)),
+      }).parse(req.body);
+
+      let fileUrl: string | undefined;
+      if (req.file) {
+        const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-assignments");
+        if (!uploadResult.success) return res.status(500).json({ error: uploadResult.error ?? "File upload failed" });
+        fileUrl = uploadResult.url;
+      }
+
+      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl });
       res.status(201).json(assignment);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

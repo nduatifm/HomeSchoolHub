@@ -139,6 +139,7 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
   const [gradeVal, setGradeVal] = useState("");
   const [feedbackVal, setFeedbackVal] = useState("");
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
   const { data: assignments = [], isLoading } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
@@ -165,13 +166,27 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
   });
 
   const createMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`, {
-      method: "POST",
-      body: JSON.stringify({ ...form, points: parseInt(form.points) }),
-    }),
+    mutationFn: () => {
+      const fd = new FormData();
+      fd.append("title", form.title);
+      fd.append("description", form.description);
+      fd.append("dueDate", form.dueDate);
+      fd.append("points", form.points);
+      if (attachedFile) fd.append("file", attachedFile);
+      const token = localStorage.getItem("sessionId");
+      return fetch(`/api/classrooms/${classroomId}/assignments/with-file`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      }).then(async (r) => {
+        if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? "Error"); }
+        return r.json();
+      });
+    },
     onSuccess: () => {
       setOpen(false);
       setForm({ title: "", description: "", dueDate: "", points: "100" });
+      setAttachedFile(null);
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment created", type: "success" });
     },
@@ -222,6 +237,11 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
                   <div><Label>Due Date</Label><Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></div>
                   <div><Label>Points</Label><Input type="number" min={1} value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} /></div>
                 </div>
+                <div>
+                  <Label>Attachment <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="mt-1 cursor-pointer" onChange={(e) => setAttachedFile(e.target.files?.[0] ?? null)} />
+                  {attachedFile && <p className="text-xs text-gray-500 mt-1">Selected: {attachedFile.name}</p>}
+                </div>
                 <Button className="w-full" disabled={!form.title || !form.description || !form.dueDate || createMutation.isPending} onClick={() => createMutation.mutate()}>
                   {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Create Assignment
@@ -254,6 +274,11 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800">{a.title}</p>
                       <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
+                      {a.fileUrl && (
+                        <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-0.5">
+                          <ExternalLink className="h-2.5 w-2.5" />Attachment
+                        </a>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.dueDate}</td>
                     <td className="px-4 py-3 text-center">

@@ -52,10 +52,12 @@ model User {
   tutorRequests              TutorRequest[]              @relation("TeacherRequests")
   parentStudents             Student[]                   @relation("ParentStudents")
   parentInvites              StudentInvite[]
-  parentPayments             Payment[]
+  parentPayments             Payment[]                   @relation("ParentPayments")
+  teacherPayments            Payment[]                   @relation("TeacherPayments")
   parentTutorRequests        TutorRequest[]              @relation("ParentRequests")
   parentControls             ParentalControl[]
-  parentRatings              TutorRating[]
+  parentRatings              TutorRating[]               @relation("ParentRatings")
+  teacherRatings             TutorRating[]               @relation("TeacherRatings")
   teacherEarnings            Earnings[]
   sentMessages               Message[]                   @relation("SentMessages")
   receivedMessages           Message[]                   @relation("ReceivedMessages")
@@ -226,7 +228,8 @@ model Payment {
   description      String
   subscriptionType String?
 
-  parent User @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  parent  User  @relation("ParentPayments", fields: [parentId], references: [id], onDelete: Cascade)
+  teacher User? @relation("TeacherPayments", fields: [teacherId], references: [id], onDelete: SetNull)
 
   @@index([parentId])
   @@index([teacherId])
@@ -315,12 +318,13 @@ model ParentalControl {
 model TutorRating {
   id        Int     @id @default(autoincrement())
   parentId  Int
-  teacherId Int
+  teacherId Int?
   rating    Int
   review    String?
   date      String
 
-  parent User @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  parent  User  @relation("ParentRatings", fields: [parentId], references: [id], onDelete: Cascade)
+  teacher User? @relation("TeacherRatings", fields: [teacherId], references: [id], onDelete: SetNull)
 
   @@index([parentId])
   @@index([teacherId])
@@ -458,6 +462,7 @@ model ClassroomAssignment {
   description String
   dueDate     String
   points      Int      @default(100)
+  fileUrl     String?
   createdAt   DateTime @default(now())
 
   classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
