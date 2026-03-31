@@ -1540,7 +1540,7 @@ class PrismaStorage implements IStorage {
       description: a.description,
       dueDate: a.dueDate,
       points: a.points,
-      fileUrl: (a as any).fileUrl ?? null,
+      fileUrl: a.fileUrl ?? null,
       createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
     };
   }
@@ -1557,7 +1557,7 @@ class PrismaStorage implements IStorage {
       description: a.description,
       dueDate: a.dueDate,
       points: a.points,
-      fileUrl: (a as any).fileUrl ?? null,
+      fileUrl: a.fileUrl ?? null,
       createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
     }));
   }

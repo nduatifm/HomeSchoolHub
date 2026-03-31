@@ -810,7 +810,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: (user as any).roles ?? [],
+          roles: user.roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -2583,17 +2583,15 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
+      // In tutor-request mode, approved TutorRequest is the single source of truth.
+      // In direct-assignment mode (mode OFF), all teachers can message any student.
       const tutorRequestMode = await isTutorRequestModeEnabled();
       if (tutorRequestMode) {
-        const assignments = await storage.getAssignedTeachersForStudent(studentId);
-        const isAssigned = assignments.some((a) => a.teacherId === teacherUserId);
-        if (!isAssigned) {
-          const approvedRequest = await prisma.tutorRequest.findFirst({
-            where: { studentId, teacherId: teacherUserId, status: "approved" },
-          });
-          if (!approvedRequest) {
-            return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
-          }
+        const approvedRequest = await prisma.tutorRequest.findFirst({
+          where: { studentId, teacherId: teacherUserId, status: "approved" },
+        });
+        if (!approvedRequest) {
+          return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
         }
       }
 
@@ -2695,20 +2693,15 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      // In tutor-request mode, validate the teacher is actually assigned/approved for this student.
-      // In direct-assignment mode (mode OFF), any teacher can access any student's thread
-      // since all students are visible to all teachers with no formal per-teacher assignments.
+      // In tutor-request mode, approved TutorRequest is the single source of truth.
+      // In direct-assignment mode (mode OFF), any teacher can read any student thread.
       const tutorRequestMode = await isTutorRequestModeEnabled();
       if (tutorRequestMode) {
-        const assignments = await storage.getAssignedTeachersForStudent(studentId);
-        const isAssigned = assignments.some((a) => a.teacherId === teacherId);
-        if (!isAssigned) {
-          const approvedRequest = await prisma.tutorRequest.findFirst({
-            where: { studentId, teacherId, status: "approved" },
-          });
-          if (!approvedRequest) {
-            return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
-          }
+        const approvedRequest = await prisma.tutorRequest.findFirst({
+          where: { studentId, teacherId, status: "approved" },
+        });
+        if (!approvedRequest) {
+          return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
         }
       }
 
@@ -3755,7 +3748,7 @@ export function registerRoutes(app: Express) {
             email: targetUser.email,
             name: targetUser.name,
             role: targetUser.role,
-            roles: (targetUser as any).roles ?? [],
+            roles: targetUser.roles ?? [],
             isEmailVerified: targetUser.isEmailVerified,
             profilePicture: targetUser.profilePicture,
             bio: targetUser.bio,
@@ -4020,15 +4013,14 @@ export function registerRoutes(app: Express) {
       if (!classroom) return;
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot enroll students in an archived classroom" });
       const { studentId } = z.object({ studentId: z.number() }).parse(req.body);
-      // Verify student is assigned to this teacher — use approved TutorRequest as the single
-      // authoritative source (TSA is a mirror kept for legacy direct-assignment mode).
+      // Verify student is assigned to this teacher.
+      // Approved TutorRequest is the single authoritative source for both modes:
+      // in direct-assignment mode a request is auto-approved on creation, so it exists here too.
       const teacherUserId = req.session.userId!;
-      const isAssigned =
-        !!(await storage.getTeacherStudentAssignment(teacherUserId, studentId)) ||
-        !!(await prisma.tutorRequest.findFirst({
-          where: { teacherId: teacherUserId, studentId, status: "approved" },
-        }));
-      if (!isAssigned) return res.status(403).json({ error: "This student is not assigned to you" });
+      const approvedLink = await prisma.tutorRequest.findFirst({
+        where: { teacherId: teacherUserId, studentId, status: "approved" },
+      });
+      if (!approvedLink) return res.status(403).json({ error: "This student is not assigned to you" });
       const enrollment = await storage.enrollStudent(classroom.id, studentId);
       res.status(201).json(enrollment);
     } catch (error: any) {
