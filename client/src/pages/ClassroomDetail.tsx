@@ -656,11 +656,11 @@ function StudentsTab({ classroomId, teacherId, isArchived }: { classroomId: numb
                   autoFocus
                 />
                 <div className="space-y-1 max-h-72 overflow-y-auto">
-                  {filteredSearch.length === 0 && searchQ.length > 0 && (
+                  {filteredSearch.length === 0 && searchQ.length >= 2 && (
                     <p className="text-sm text-gray-400 text-center py-4">No students found.</p>
                   )}
-                  {filteredSearch.length === 0 && searchQ.length === 0 && (
-                    <p className="text-sm text-gray-400 text-center py-4">Type a name or email to search all students.</p>
+                  {searchQ.length < 2 && (
+                    <p className="text-sm text-gray-400 text-center py-4">Type at least 2 characters to search by name or email.</p>
                   )}
                   {filteredSearch.map((s) => (
                     <div key={s.id} className="flex items-center justify-between rounded-lg border px-3 py-2">

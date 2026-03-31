@@ -1273,19 +1273,24 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/students/search?q= — platform-wide student search by name or email (teacher use)
+  // GET /api/students/search?q= — platform-wide student search by name or email (teacher only)
   app.get("/api/students/search", requireAuth, async (req, res) => {
     try {
+      // Only teachers (and admins) may access this endpoint
+      const caller = await storage.getUserById(req.session.userId!);
+      if (!caller || (!caller.roles?.includes("teacher") && !caller.isAdmin && !caller.isSuperAdmin)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       const q = String(req.query.q ?? "").trim();
+      // Require at least 2 characters to prevent broad directory dumps
+      if (q.length < 2) return res.json([]);
       const students = await prisma.student.findMany({
-        where: q
-          ? {
-              OR: [
-                { name: { contains: q, mode: "insensitive" } },
-                { user: { email: { contains: q, mode: "insensitive" } } },
-              ],
-            }
-          : undefined,
+        where: {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { user: { email: { contains: q, mode: "insensitive" } } },
+          ],
+        },
         select: {
           id: true,
           name: true,
