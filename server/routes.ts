@@ -619,6 +619,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
+          roles: (user as any).roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -953,6 +954,106 @@ export function registerRoutes(app: Express) {
         },
       });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add a new role to the user's capabilities (e.g. parent adding teacher role)
+  app.post("/api/user/add-role", requireAuth, async (req, res) => {
+    try {
+      const { newRole } = z.object({ newRole: z.enum(["teacher", "parent"]) }).parse(req.body);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const currentRoles: string[] = (user as any).roles ?? [];
+      if (currentRoles.includes(newRole)) {
+        return res.status(400).json({ error: `You already have the ${newRole} role` });
+      }
+
+      if (newRole === "teacher" && user.role === "teacher") {
+        return res.status(400).json({ error: "You are already a teacher" });
+      }
+
+      // Append new role to roles[] and switch active context to new role
+      const updatedRoles = [...currentRoles, newRole];
+      const updatedUser = await prisma.user.update({
+        where: { id: user.id },
+        data: { roles: updatedRoles, role: newRole },
+      });
+
+      res.json({
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          role: updatedUser.role,
+          roles: updatedUser.roles,
+          profilePicture: updatedUser.profilePicture,
+          isEmailVerified: updatedUser.isEmailVerified,
+          googleId: updatedUser.googleId,
+          bio: updatedUser.bio,
+          teachingSubjects: updatedUser.teachingSubjects,
+          yearsExperience: updatedUser.yearsExperience,
+          qualifications: updatedUser.qualifications,
+          specialization: updatedUser.specialization,
+          phone: updatedUser.phone,
+          preferredContact: updatedUser.preferredContact,
+          interests: updatedUser.interests,
+          favoriteSubject: updatedUser.favoriteSubject,
+          learningGoals: updatedUser.learningGoals,
+          isAdmin: updatedUser.isAdmin ?? false,
+          isSuperAdmin: updatedUser.isSuperAdmin ?? false,
+        },
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") return res.status(400).json({ error: error.errors[0].message });
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Switch active role context (for dual-role users)
+  app.post("/api/user/switch-active-role", requireAuth, async (req, res) => {
+    try {
+      const { role: targetRole } = z.object({ role: z.enum(["teacher", "parent", "student"]) }).parse(req.body);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const currentRoles: string[] = (user as any).roles ?? [];
+      if (!currentRoles.includes(targetRole)) {
+        return res.status(400).json({ error: `You do not have the ${targetRole} role` });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: user.id },
+        data: { role: targetRole },
+      });
+
+      res.json({
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          role: updatedUser.role,
+          roles: updatedUser.roles,
+          profilePicture: updatedUser.profilePicture,
+          isEmailVerified: updatedUser.isEmailVerified,
+          googleId: updatedUser.googleId,
+          bio: updatedUser.bio,
+          teachingSubjects: updatedUser.teachingSubjects,
+          yearsExperience: updatedUser.yearsExperience,
+          qualifications: updatedUser.qualifications,
+          specialization: updatedUser.specialization,
+          phone: updatedUser.phone,
+          preferredContact: updatedUser.preferredContact,
+          interests: updatedUser.interests,
+          favoriteSubject: updatedUser.favoriteSubject,
+          learningGoals: updatedUser.learningGoals,
+          isAdmin: updatedUser.isAdmin ?? false,
+          isSuperAdmin: updatedUser.isSuperAdmin ?? false,
+        },
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") return res.status(400).json({ error: error.errors[0].message });
       res.status(500).json({ error: error.message });
     }
   });
@@ -2325,6 +2426,11 @@ export function registerRoutes(app: Express) {
         responseDate: null,
       });
 
+      // Guard: cannot request yourself as a tutor
+      if (data.teacherId === user.id) {
+        return res.status(400).json({ error: "You cannot request yourself as a tutor" });
+      }
+
       // Validate that studentId (if provided) belongs to this parent
       if (data.studentId) {
         const student = await storage.getStudentById(data.studentId);
@@ -2402,13 +2508,18 @@ export function registerRoutes(app: Express) {
       }
 
       const { status } = req.body;
-      const request = await storage.updateTutorRequest(
-        parseInt(req.params.id),
-        {
-          status,
-          responseDate: new Date().toISOString(),
-        },
-      );
+      const requestId = parseInt(req.params.id);
+
+      // Guard: dual-role user cannot approve their own tutor request
+      const existingRequest = await storage.getTutorRequestById(requestId);
+      if (existingRequest && existingRequest.parentId === user.id) {
+        return res.status(400).json({ error: "You cannot approve your own tutor request" });
+      }
+
+      const request = await storage.updateTutorRequest(requestId, {
+        status,
+        responseDate: new Date().toISOString(),
+      });
 
       res.json(request);
     } catch (error: any) {

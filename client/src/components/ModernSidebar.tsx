@@ -16,9 +16,13 @@ import {
   MessageSquare,
   Send,
   ShieldCheck,
+  ArrowLeftRight,
+  Loader2,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/queryClient";
+import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Logo } from "@/components/Logo";
 import {
@@ -37,7 +41,8 @@ interface SidebarItem {
 }
 
 export default function ModernSidebar() {
-  const { user, logout } = useAuth();
+  const { user, setUser, logout } = useAuth();
+  const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
 
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -45,6 +50,22 @@ export default function ModernSidebar() {
     refetchInterval: 15000,
   });
   const unreadCount = unreadData?.count ?? 0;
+
+  const switchRoleMutation = useMutation({
+    mutationFn: async (role: string) =>
+      await apiRequest("/api/user/switch-active-role", { method: "POST", body: JSON.stringify({ role }) }),
+    onSuccess: (data) => {
+      setUser(data.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      toast({ title: "Context switched", description: `Now viewing as ${data.user.role}.`, type: "success" });
+      setTimeout(() => { window.location.href = "/dashboard"; }, 300);
+    },
+    onError: (error: any) =>
+      toast({ title: "Failed to switch", description: error.message || "Something went wrong", type: "error" }),
+  });
+
+  const otherRoles = (user?.roles ?? []).filter((r) => r !== user?.role);
 
   const [currentHash, setCurrentHash] = useState(
     window.location.hash
@@ -220,6 +241,29 @@ export default function ModernSidebar() {
                 Settings
               </Link>
             </DropdownMenuItem>
+
+            {/* Context switcher — shown only for dual-role users */}
+            {otherRoles.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                {otherRoles.map((r) => (
+                  <DropdownMenuItem
+                    key={r}
+                    disabled={switchRoleMutation.isPending}
+                    onClick={() => switchRoleMutation.mutate(r)}
+                    className="flex items-center gap-2.5 cursor-pointer capitalize"
+                  >
+                    {switchRoleMutation.isPending
+                      ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                      : <ArrowLeftRight className="w-4 h-4 text-gray-400" />
+                    }
+                    Switch to {r}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
+
+            <DropdownMenuSeparator />
 
             <DropdownMenuItem
               onClick={logout}

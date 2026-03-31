@@ -25,6 +25,8 @@ export const userSchema = z.object({
   // Parent-specific fields
   phone: z.string().nullable(),
   preferredContact: z.string().nullable(),
+  // Capabilities (all roles ever granted)
+  roles: z.array(z.string()),
   // Admin flags
   isAdmin: z.boolean(),
   isSuperAdmin: z.boolean(),

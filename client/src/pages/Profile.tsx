@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, X, Camera } from "lucide-react";
+import { Loader2, X, Camera, ArrowLeftRight, Plus } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 
 /* ──────────────────────────────────────────────
@@ -239,6 +239,32 @@ export default function Profile() {
       toast({ title: "Password change failed", description: error.message || "Failed to change password", type: "error" }),
   });
 
+  const addRoleMutation = useMutation({
+    mutationFn: async (newRole: string) =>
+      await apiRequest("/api/user/add-role", { method: "POST", body: JSON.stringify({ newRole }) }),
+    onSuccess: (data) => {
+      setUser(data.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({ title: "Role added", description: `You can now switch to the ${data.user.role} dashboard.`, type: "success" });
+    },
+    onError: (error: any) =>
+      toast({ title: "Failed to add role", description: error.message || "Something went wrong", type: "error" }),
+  });
+
+  const switchRoleMutation = useMutation({
+    mutationFn: async (role: string) =>
+      await apiRequest("/api/user/switch-active-role", { method: "POST", body: JSON.stringify({ role }) }),
+    onSuccess: (data) => {
+      setUser(data.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+      toast({ title: "Context switched", description: `Now viewing as ${data.user.role}.`, type: "success" });
+      setTimeout(() => { window.location.href = "/dashboard"; }, 500);
+    },
+    onError: (error: any) =>
+      toast({ title: "Failed to switch role", description: error.message || "Something went wrong", type: "error" }),
+  });
+
   /* Builds full details payload, merging current saved values with one override */
   const detailsPayload = (overrides: Record<string, any>) => ({
     bio: user?.bio || "",
@@ -412,18 +438,58 @@ export default function Profile() {
               editContent={null}
             />
 
-            {/* Role */}
-            <Row
-              label="Role"
-              displayValue={
-                <Badge variant="secondary" className="capitalize px-2 py-0.5">{user?.role}</Badge>
-              }
-              isEditing={false}
-              onCancel={stopEditing}
-              onSave={() => {}}
-              readOnly
-              editContent={null}
-            />
+            {/* Role / Context Switcher */}
+            <div className="px-6 py-5">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Role</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Active role badge */}
+                <Badge className="capitalize px-2.5 py-0.5 bg-green-50 text-green-800 border border-green-200 hover:bg-green-50">
+                  {user?.role}
+                </Badge>
+                {/* Other roles user already has — show switch buttons */}
+                {(user?.roles ?? [])
+                  .filter((r) => r !== user?.role)
+                  .map((r) => (
+                    <Button
+                      key={r}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={switchRoleMutation.isPending}
+                      onClick={() => switchRoleMutation.mutate(r)}
+                      className="h-8 px-3 text-xs gap-1.5 border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      {switchRoleMutation.isPending
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <ArrowLeftRight className="h-3 w-3" />
+                      }
+                      Switch to {r}
+                    </Button>
+                  ))}
+                {/* Add teacher role — only parents who don't have it yet */}
+                {user?.role === "parent" && !(user?.roles ?? []).includes("teacher") && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={addRoleMutation.isPending}
+                    onClick={() => addRoleMutation.mutate("teacher")}
+                    className="h-8 px-3 text-xs gap-1.5 border-dashed border-gray-300 text-gray-500 hover:bg-gray-50"
+                  >
+                    {addRoleMutation.isPending
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <Plus className="h-3 w-3" />
+                    }
+                    Become a teacher
+                  </Button>
+                )}
+              </div>
+              {(user?.roles ?? []).length > 1 && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Switching context redirects you to the appropriate dashboard.
+                </p>
+              )}
+            </div>
           </Section>
 
           {/* ══ Bio & Details ══ */}

@@ -6,6 +6,7 @@ interface User {
   email: string;
   name: string;
   role: "teacher" | "parent" | "student" | null;
+  roles?: string[];
   profilePicture?: string | null;
   isEmailVerified?: boolean;
   googleId?: string | null;
@@ -35,6 +36,7 @@ interface Student {
 
 interface AuthContextType {
   user: User | null;
+  setUser: (user: User | null) => void;
   student: Student | null;
   sessionId: string | null;
   login: (email: string, password: string) => Promise<void>;
@@ -148,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        setUser,
         student,
         sessionId,
         login,
