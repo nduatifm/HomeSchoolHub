@@ -1024,7 +1024,7 @@ export function registerRoutes(app: Express) {
   // Switch active role context (for dual-role users)
   app.post("/api/user/switch-active-role", requireAuth, async (req, res) => {
     try {
-      const { role: targetRole } = z.object({ role: z.enum(["teacher", "parent", "student"]) }).parse(req.body);
+      const { role: targetRole } = z.object({ role: z.string().min(1) }).parse(req.body);
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
