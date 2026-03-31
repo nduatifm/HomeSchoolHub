@@ -21,6 +21,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Logo } from "@/components/Logo";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SidebarItem {
   icon: React.ReactNode;
@@ -111,11 +118,6 @@ export default function ModernSidebar() {
   const isActive = (hash: string) =>
     currentHash === hash && location === "/dashboard";
 
-  const roleLabel =
-    user?.role === "teacher" ? "Teacher"
-    : user?.role === "parent" ? "Parent"
-    : "Student";
-
   // ── Nav item ──────────────────────────────────────────────────────────────
   const NavItem = ({ item }: { item: SidebarItem }) => {
     const active = isActive(item.hash);
@@ -187,44 +189,60 @@ export default function ModernSidebar() {
           </Link>
         )}
 
-        {/* Settings */}
-        <Link href="/profile">
-          <button
-            className={`
-              w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm
-              transition-colors duration-100
-              ${location === "/profile"
-                ? "bg-green-50 text-green-800 font-medium"
-                : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
-              }
-            `}
-            data-testid="sidebar-profile"
-          >
-            <Settings className={`w-4 h-4 ${location === "/profile" ? "text-green-700" : "text-gray-400"}`} />
-            <span className="flex-1 text-left">Settings</span>
-          </button>
-        </Link>
+        {/* User pop-up trigger */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors duration-100"
+              data-testid="sidebar-user-menu"
+            >
+              <Avatar className="w-7 h-7 shrink-0">
+                <AvatarImage src={user?.profilePicture || ""} />
+                <AvatarFallback className="bg-green-50 text-green-800 text-xs font-medium">
+                  {user?.name?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="flex-1 text-left text-sm font-medium text-gray-800 truncate">
+                {user?.name}
+              </span>
+            </button>
+          </DropdownMenuTrigger>
 
-        {/* User row — name, role, logout */}
-        <div className="flex items-center gap-2.5 px-2.5 py-2 mt-1">
-          <Avatar className="w-7 h-7 shrink-0">
-            <AvatarImage src={user?.profilePicture || ""} />
-            <AvatarFallback className="bg-green-50 text-green-800 text-xs font-medium">
-              {user?.name?.charAt(0).toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-800 truncate leading-tight">{user?.name}</p>
-            <p className="text-xs text-gray-400 leading-tight">{roleLabel}</p>
-          </div>
-          <button
-            onClick={logout}
-            className="text-gray-300 hover:text-gray-500 transition-colors shrink-0"
-            title="Log out"
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            sideOffset={8}
+            className="w-56"
           >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
+            <DropdownMenuItem asChild>
+              <Link href="/profile">
+                <span className="flex items-center gap-2.5 w-full cursor-pointer">
+                  <Settings className="w-4 h-4 text-gray-500" />
+                  Settings
+                </span>
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={logout}
+              className="text-red-500 focus:text-red-500 focus:bg-red-50"
+            >
+              <LogOut className="w-4 h-4 mr-2.5" />
+              Sign out
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <div className="flex items-center gap-3 px-2 py-1.5">
+              <Link href="/privacy">
+                <span className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">Privacy</span>
+              </Link>
+              <Link href="/terms">
+                <span className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">Terms</span>
+              </Link>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
