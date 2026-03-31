@@ -107,34 +107,34 @@ async function requireAuth(req: Request, res: Response, next: Function) {
   }
 }
 
-// Admin middleware
+// Admin middleware — composes requireAuth then checks admin flag
 async function requireAdmin(req: Request, res: Response, next: Function) {
-  try {
-    const userId = await resolveSessionUserId(req, res);
-    if (userId === null) return;
-    const user = await storage.getUserById(userId);
-    if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
-      return res.status(403).json({ error: "Forbidden" });
+  await requireAuth(req, res, async () => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      next();
+    } catch (err) {
+      res.status(500).json({ error: "Internal server error" });
     }
-    next();
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
+  });
 }
 
-// Super admin middleware
+// Super admin middleware — composes requireAuth then checks super-admin flag
 async function requireSuperAdmin(req: Request, res: Response, next: Function) {
-  try {
-    const userId = await resolveSessionUserId(req, res);
-    if (userId === null) return;
-    const user = await storage.getUserById(userId);
-    if (!user || !user.isSuperAdmin) {
-      return res.status(403).json({ error: "Forbidden" });
+  await requireAuth(req, res, async () => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || !user.isSuperAdmin) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      next();
+    } catch (err) {
+      res.status(500).json({ error: "Internal server error" });
     }
-    next();
-  } catch (err) {
-    res.status(500).json({ error: "Internal server error" });
-  }
+  });
 }
 
 // Sync SUPER_ADMIN_EMAIL and ADMIN_EMAIL env vars to DB flags on startup.
@@ -1425,16 +1425,17 @@ export function registerRoutes(app: Express) {
           );
           res.json(assignments);
         } else {
-          // When tutor request mode is OFF, show assignments from assigned teachers
+          // When tutor request mode is OFF, show assignments from approved tutors.
+          // Approved TutorRequest is the single authoritative teacher-student link.
           const student = await storage.getStudentById(studentId);
           const allAssignments = await storage.getAllAssignments();
 
-          // Get teachers assigned to this student
-          const assignedTeachers =
-            await storage.getAssignedTeachersForStudent(studentId);
-          const assignedTeacherIds = new Set(
-            assignedTeachers.map((t) => t.teacherId),
-          );
+          // Get teachers linked to this student via approved TutorRequest
+          const approvedRequests = await prisma.tutorRequest.findMany({
+            where: { studentId, status: "approved" },
+            select: { teacherId: true },
+          });
+          const assignedTeacherIds = new Set(approvedRequests.map((r) => r.teacherId));
 
           // Get any existing student assignments to show submission status
           const studentAssignments =
@@ -1942,27 +1943,18 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      if (!isTutorMode) {
-        // Direct assignment mode: look up from TeacherStudentAssignment
-        const assignments = await storage.getAssignedTeachersForStudent(studentId);
-        if (assignments.length === 0) {
-          return res.json(null);
-        }
-        const teacher = await storage.getUserById(assignments[0].teacherId);
-        return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
-      } else {
-        // Tutor request mode: find approved request for this student
-        const allRequests = await prisma.tutorRequest.findMany({
-          where: { studentId, status: "approved" },
-          orderBy: { requestDate: "desc" },
-          take: 1,
-        });
-        if (allRequests.length === 0) {
-          return res.json(null);
-        }
-        const teacher = await storage.getUserById(allRequests[0].teacherId);
-        return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
+      // Approved TutorRequest is the single authoritative source for both modes.
+      // In direct-assignment mode a request is auto-approved, so it exists here too.
+      const allRequests = await prisma.tutorRequest.findMany({
+        where: { studentId, status: "approved" },
+        orderBy: { requestDate: "desc" },
+        take: 1,
+      });
+      if (allRequests.length === 0) {
+        return res.json(null);
       }
+      const teacher = await storage.getUserById(allRequests[0].teacherId);
+      return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -2451,39 +2443,14 @@ export function registerRoutes(app: Express) {
 
       let request = await storage.createTutorRequest(data);
 
-      // When tutor-request mode is OFF, auto-approve immediately and link the teacher
+      // When tutor-request mode is OFF, auto-approve immediately.
+      // TutorRequest is the single authoritative link — no secondary TeacherStudentAssignment write needed.
       const isRequestMode = await isTutorRequestModeEnabled();
       if (!isRequestMode) {
         request = await storage.updateTutorRequest(request.id, {
           status: "approved",
           responseDate: new Date().toISOString(),
         });
-
-        // Create or reactivate the TeacherStudentAssignment
-        if (data.studentId) {
-          const studentForGuard = await storage.getStudentById(data.studentId);
-          // Guard: block assignment where the teacher is the student's own parent
-          if (studentForGuard && studentForGuard.parentId === data.teacherId) {
-            console.warn("[guard] Blocked self-TSA: teacherId === student.parentId");
-          } else {
-            const today = new Date().toISOString().split("T")[0];
-            await prisma.teacherStudentAssignment.upsert({
-              where: {
-                teacherId_studentId: {
-                  teacherId: data.teacherId,
-                  studentId: data.studentId,
-                },
-              },
-              create: {
-                teacherId: data.teacherId,
-                studentId: data.studentId,
-                assignedDate: today,
-                status: "active",
-              },
-              update: { status: "active", assignedDate: today },
-            });
-          }
-        }
       }
 
       res.json(request);
