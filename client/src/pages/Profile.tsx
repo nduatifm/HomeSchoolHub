@@ -257,7 +257,8 @@ export default function Profile() {
     onSuccess: (data) => {
       setUser(data.user);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({ title: "Teacher role added", description: "You can now switch to your teacher dashboard from the sidebar or below.", type: "success" });
+      toast({ title: "Teacher role added!", description: "Switching you to your new teacher dashboard…", type: "success" });
+      setTimeout(() => { window.location.href = "/dashboard"; }, 700);
     },
     onError: (error: any) =>
       toast({ title: "Failed to add role", description: error.message || "Something went wrong", type: "error" }),

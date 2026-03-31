@@ -307,7 +307,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: (user as any).roles ?? [],
+          roles: user.roles ?? [],
         },
         sessionId,
       });
@@ -596,7 +596,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: (user as any).roles ?? [],
+          roles: user.roles ?? [],
         },
         sessionId,
       });
@@ -807,7 +807,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: (user as any).roles ?? [],
+          roles: user.roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -849,7 +849,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: (user as any).roles ?? [],
+          roles: user.roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -946,7 +946,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: (user as any).roles ?? [],
+          roles: user.roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -3914,6 +3914,10 @@ export function registerRoutes(app: Express) {
   // POST /api/classrooms — teacher creates a classroom
   app.post("/api/classrooms", requireAuth, async (req, res) => {
     try {
+      const actor = await storage.getUserById(req.session.userId!);
+      if (!actor || !actor.roles.includes("teacher")) {
+        return res.status(403).json({ error: "Only teachers can create classrooms" });
+      }
       const data = z.object({
         name: z.string().min(1),
         subject: z.string().min(1),
