@@ -572,8 +572,13 @@ function MaterialsTab({ classroomId, isTeacher, isArchived, classroomSubject }: 
   );
 }
 
-// ── Members tab ───────────────────────────────────────────────────────────────
-function MembersTab({ classroomId, teacherId, isArchived }: { classroomId: number; teacherId: number; isArchived: boolean }) {
+// ── Students tab ──────────────────────────────────────────────────────────────
+type StudentSearchResult = { id: number; name: string; gradeLevel: string; email: string };
+
+function StudentsTab({ classroomId, teacherId, isArchived }: { classroomId: number; teacherId: number; isArchived: boolean }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+
   const { data: enrollments = [], isLoading } = useQuery<EnrollmentWithStudent[]>({
     queryKey: ["/api/classrooms", classroomId, "enrollments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/enrollments`),
@@ -585,12 +590,20 @@ function MembersTab({ classroomId, teacherId, isArchived }: { classroomId: numbe
     queryKey: ["/api/classrooms", classroomId, "assignments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
   });
+  const { data: searchResults = [] } = useQuery<StudentSearchResult[]>({
+    queryKey: ["/api/students/search", searchQ],
+    queryFn: () => apiRequest(`/api/students/search?q=${encodeURIComponent(searchQ)}`),
+    enabled: searchOpen,
+  });
 
   const enrolledIds = new Set(enrollments.map((e) => e.studentId));
-  const unenrolledStudents = myStudents.filter((s) => !enrolledIds.has(s.id));
+  // Quick-add: teacher's assigned students not yet enrolled
+  const unenrolledAssigned = myStudents.filter((s) => !enrolledIds.has(s.id));
+  // Search results filtered to exclude already-enrolled
+  const filteredSearch = searchResults.filter((s) => !enrolledIds.has(s.id));
   const totalPoints = assignments.reduce((s, a) => s + a.points, 0);
 
-  // Per-student submission data (for grade summary) — useQueries avoids hooks-in-map
+  // Per-student submission data for grade summary
   const submissionsResults = useQueries({
     queries: enrollments.map((e) => ({
       queryKey: ["/api/classrooms", classroomId, "my-submissions", e.studentId],
@@ -621,24 +634,61 @@ function MembersTab({ classroomId, teacherId, isArchived }: { classroomId: numbe
 
   return (
     <div className="space-y-4">
-      {!isArchived && unenrolledStudents.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Add Students</CardTitle></CardHeader>
-          <CardContent className="pt-0 space-y-2">
-            {unenrolledStudents.map((s) => (
-              <div key={s.id} className="flex items-center justify-between py-1">
-                <span className="text-sm text-gray-700">{s.name}</span>
-                <Button size="sm" variant="outline" onClick={() => enrollMutation.mutate(s.id)} disabled={enrollMutation.isPending}>
-                  + Enroll
-                </Button>
+      {/* ── Enrolled students ─────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">
+          Enrolled Students {enrollments.length > 0 && <span className="text-gray-400 font-normal">({enrollments.length})</span>}
+        </h3>
+        {!isArchived && (
+          <Dialog open={searchOpen} onOpenChange={(o) => { setSearchOpen(o); if (!o) setSearchQ(""); }}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5"><Plus className="h-3.5 w-3.5" />Add Students</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add Students</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <Input
+                  placeholder="Search by name or email…"
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  autoFocus
+                />
+                <div className="space-y-1 max-h-72 overflow-y-auto">
+                  {filteredSearch.length === 0 && searchQ.length > 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">No students found.</p>
+                  )}
+                  {filteredSearch.length === 0 && searchQ.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">Type a name or email to search all students.</p>
+                  )}
+                  {filteredSearch.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                        <p className="text-xs text-gray-400">{s.email} · {s.gradeLevel}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => enrollMutation.mutate(s.id)}
+                        disabled={enrollMutation.isPending}
+                      >
+                        Enroll
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
 
       {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
-      {!isLoading && enrollments.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No students enrolled yet.</div>}
+      {!isLoading && enrollments.length === 0 && (
+        <div className="text-center py-12 text-gray-400 text-sm">No students enrolled yet. Use "Add Students" to enroll students.</div>
+      )}
 
       <div className="space-y-2">
         {enrollments.map((e, i) => {
@@ -667,6 +717,23 @@ function MembersTab({ classroomId, teacherId, isArchived }: { classroomId: numbe
           );
         })}
       </div>
+
+      {/* ── Quick-add: assigned students not yet enrolled ─────────────────── */}
+      {!isArchived && unenrolledAssigned.length > 0 && (
+        <div className="pt-2 border-t">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Your students not yet enrolled</p>
+          <div className="space-y-1">
+            {unenrolledAssigned.map((s) => (
+              <div key={s.id} className="flex items-center justify-between rounded-lg border px-4 py-2">
+                <span className="text-sm text-gray-700">{s.name}</span>
+                <Button size="sm" variant="outline" onClick={() => enrollMutation.mutate(s.id)} disabled={enrollMutation.isPending}>
+                  + Enroll
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -987,13 +1054,13 @@ export default function ClassroomDetail() {
                 <TabsTrigger value="assignments" className="gap-1.5"><BookOpen className="h-3.5 w-3.5" />Assignments</TabsTrigger>
                 <TabsTrigger value="grades" className="gap-1.5"><BarChart2 className="h-3.5 w-3.5" />Grades</TabsTrigger>
                 <TabsTrigger value="materials" className="gap-1.5"><LibraryBig className="h-3.5 w-3.5" />Materials</TabsTrigger>
-                <TabsTrigger value="members" className="gap-1.5"><Users className="h-3.5 w-3.5" />Members</TabsTrigger>
+                <TabsTrigger value="students" className="gap-1.5"><Users className="h-3.5 w-3.5" />Students</TabsTrigger>
               </TabsList>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} /></TabsContent>
               <TabsContent value="assignments"><TeacherAssignmentsTab classroomId={classroomId} isArchived={isArchived} /></TabsContent>
               <TabsContent value="grades"><TeacherGradesTab classroomId={classroomId} /></TabsContent>
               <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} classroomSubject={classroom.subject} /></TabsContent>
-              <TabsContent value="members"><MembersTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} /></TabsContent>
+              <TabsContent value="students"><StudentsTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} /></TabsContent>
             </Tabs>
           )}
 

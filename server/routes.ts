@@ -1273,6 +1273,34 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/students/search?q= — platform-wide student search by name or email (teacher use)
+  app.get("/api/students/search", requireAuth, async (req, res) => {
+    try {
+      const q = String(req.query.q ?? "").trim();
+      const students = await prisma.student.findMany({
+        where: q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { user: { email: { contains: q, mode: "insensitive" } } },
+              ],
+            }
+          : undefined,
+        select: {
+          id: true,
+          name: true,
+          gradeLevel: true,
+          user: { select: { email: true } },
+        },
+        take: 30,
+        orderBy: { name: "asc" },
+      });
+      res.json(students.map((s) => ({ id: s.id, name: s.name, gradeLevel: s.gradeLevel, email: s.user.email })));
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/students/:id", requireAuth, async (req, res) => {
     try {
       const student = await storage.getStudentById(parseInt(req.params.id));
@@ -3986,20 +4014,13 @@ export function registerRoutes(app: Express) {
   });
 
   // POST /api/classrooms/:classroomId/enroll — teacher enrolls a student
+  // Only classroom ownership is required; no TutorRequest link needed (classrooms are open group workspaces).
   app.post("/api/classrooms/:classroomId/enroll", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot enroll students in an archived classroom" });
       const { studentId } = z.object({ studentId: z.number() }).parse(req.body);
-      // Verify student is assigned to this teacher.
-      // Approved TutorRequest is the single authoritative source for both modes:
-      // in direct-assignment mode a request is auto-approved on creation, so it exists here too.
-      const teacherUserId = req.session.userId!;
-      const approvedLink = await prisma.tutorRequest.findFirst({
-        where: { teacherId: teacherUserId, studentId, status: "approved" },
-      });
-      if (!approvedLink) return res.status(403).json({ error: "This student is not assigned to you" });
       const enrollment = await storage.enrollStudent(classroom.id, studentId);
       res.status(201).json(enrollment);
     } catch (error: any) {
