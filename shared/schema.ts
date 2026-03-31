@@ -406,6 +406,82 @@ export const insertSystemSettingsSchema = systemSettingsSchema.omit({
 export type SystemSettings = z.infer<typeof systemSettingsSchema>;
 export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
 
+// ─── Classroom schemas ─────────────────────────────────────────────────────
+
+export const classroomSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  subject: z.string(),
+  description: z.string().nullable(),
+  teacherId: z.number(),
+  status: z.enum(["active", "archived"]),
+  createdAt: z.string(),
+});
+export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true });
+export type Classroom = z.infer<typeof classroomSchema>;
+export type InsertClassroom = z.infer<typeof insertClassroomSchema>;
+
+export const classroomEnrollmentSchema = z.object({
+  id: z.number(),
+  classroomId: z.number(),
+  studentId: z.number(),
+  enrolledAt: z.string(),
+});
+export const insertClassroomEnrollmentSchema = classroomEnrollmentSchema.omit({ id: true, enrolledAt: true });
+export type ClassroomEnrollment = z.infer<typeof classroomEnrollmentSchema>;
+export type InsertClassroomEnrollment = z.infer<typeof insertClassroomEnrollmentSchema>;
+
+export const classroomPostSchema = z.object({
+  id: z.number(),
+  classroomId: z.number(),
+  authorId: z.number(),
+  content: z.string(),
+  createdAt: z.string(),
+});
+export const insertClassroomPostSchema = classroomPostSchema.omit({ id: true, createdAt: true });
+export type ClassroomPost = z.infer<typeof classroomPostSchema>;
+export type InsertClassroomPost = z.infer<typeof insertClassroomPostSchema>;
+
+export const classroomAssignmentSchema = z.object({
+  id: z.number(),
+  classroomId: z.number(),
+  title: z.string(),
+  description: z.string(),
+  dueDate: z.string(),
+  points: z.number(),
+  createdAt: z.string(),
+});
+export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true });
+export type ClassroomAssignment = z.infer<typeof classroomAssignmentSchema>;
+export type InsertClassroomAssignment = z.infer<typeof insertClassroomAssignmentSchema>;
+
+export const classroomSubmissionSchema = z.object({
+  id: z.number(),
+  assignmentId: z.number(),
+  studentId: z.number(),
+  content: z.string().nullable(),
+  fileUrl: z.string().nullable(),
+  status: z.enum(["pending", "submitted", "graded", "late"]),
+  submittedAt: z.string().nullable(),
+  grade: z.number().nullable(),
+  feedback: z.string().nullable(),
+});
+export const insertClassroomSubmissionSchema = classroomSubmissionSchema.omit({ id: true });
+export type ClassroomSubmission = z.infer<typeof classroomSubmissionSchema>;
+export type InsertClassroomSubmission = z.infer<typeof insertClassroomSubmissionSchema>;
+
+export const classroomMaterialSchema = z.object({
+  id: z.number(),
+  classroomId: z.number(),
+  title: z.string(),
+  description: z.string(),
+  url: z.string(),
+  uploadedAt: z.string(),
+});
+export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: true, uploadedAt: true });
+export type ClassroomMaterial = z.infer<typeof classroomMaterialSchema>;
+export type InsertClassroomMaterial = z.infer<typeof insertClassroomMaterialSchema>;
+
 // Teacher Assignment schema (for direct teacher-student assignments without request flow)
 export const teacherStudentAssignmentSchema = z.object({
   id: z.number(),

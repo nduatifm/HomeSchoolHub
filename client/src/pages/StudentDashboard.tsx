@@ -51,12 +51,15 @@ import {
   MessageSquareQuote,
   Upload,
   X,
+  School,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
-import type { Assignment, StudentAssignment, Session } from "@shared/schema";
+import type { Assignment, StudentAssignment, Session, Classroom } from "@shared/schema";
 
 type AssignmentWithStatus = Assignment & {
   studentAssignment: StudentAssignment | null;
@@ -93,7 +96,7 @@ function computeStreak(graded: AssignmentWithStatus[]): number {
   return streak;
 }
 
-const STUDENT_TABS = ["assignments", "materials", "feedback", "messages"];
+const STUDENT_TABS = ["assignments", "classrooms", "materials", "feedback", "messages"];
 
 export default function StudentDashboard() {
   const { user, student, logout } = useAuth();
@@ -172,6 +175,7 @@ export default function StudentDashboard() {
     queryKey: ["/api/attendance/student", student?.id],
     enabled: !!student,
   });
+  const { data: classrooms = [] } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
 
   const sessions = sessionsQuery.data || [];
   const schedule = scheduleQuery.data || [];
@@ -1272,6 +1276,37 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </TabsContent> */}
+
+            <TabsContent value="classrooms">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><School className="h-5 w-5 text-primary" />My Classrooms</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {classrooms.length === 0 ? (
+                    <div className="text-center py-10 text-gray-400 text-sm">You have not been enrolled in any classrooms yet.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {classrooms.map(c => (
+                        <div key={c.id} className="rounded-lg border p-4 flex flex-col gap-2 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.id}`; }}>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-semibold text-sm text-gray-900 leading-tight">{c.name}</h3>
+                            {c.status === "archived" && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">Archived</span>}
+                          </div>
+                          <p className="text-xs text-primary font-medium">{c.subject}</p>
+                          {c.description && <p className="text-xs text-gray-400 line-clamp-2">{c.description}</p>}
+                          <div className="mt-auto pt-2">
+                            <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.id}`; }}>
+                              View Classroom <ChevronRight className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="messages">
               <Card className="overflow-hidden">

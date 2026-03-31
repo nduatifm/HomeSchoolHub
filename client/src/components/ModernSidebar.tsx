@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ArrowLeftRight,
   Loader2,
+  School,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -106,6 +107,7 @@ export default function ModernSidebar() {
 
   const teacherItems: SidebarItem[] = [
     { icon: <BookOpen className="w-4 h-4" />, label: "Assignments", hash: "assignments" },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
     { icon: <ClipboardCheck className="w-4 h-4" />, label: "Grade Submissions", hash: "submissions" },
     { icon: <LibraryBig className="w-4 h-4" />, label: "Study Materials", hash: "materials" },
     { icon: <User className="w-4 h-4" />, label: "Students", hash: "students" },
@@ -115,6 +117,7 @@ export default function ModernSidebar() {
 
   const parentItems: SidebarItem[] = [
     { icon: <Users className="w-4 h-4" />, label: "My Children", hash: "children" },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
     { icon: <GraduationCap className="w-4 h-4" />, label: "Find a Tutor", hash: "tutors" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Invite Student", hash: "invites" },
     { icon: <FileText className="w-4 h-4" />, label: "Progress Reports", hash: "reports" },
@@ -123,6 +126,7 @@ export default function ModernSidebar() {
 
   const studentItems: SidebarItem[] = [
     { icon: <BookOpen className="w-4 h-4" />, label: "Assignments", hash: "assignments" },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
     { icon: <LibraryBig className="w-4 h-4" />, label: "Study Materials", hash: "materials" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },

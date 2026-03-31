@@ -3861,4 +3861,361 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // GET /api/students/me — resolve the current user's student record
+  app.get("/api/students/me", requireAuth, async (req, res) => {
+    try {
+      const student = await storage.getStudentByUserId(req.session.userId!);
+      if (!student) return res.status(404).json({ error: "No student profile for this user" });
+      res.json({ id: student.id, name: student.name, userId: student.userId });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── Classroom routes ────────────────────────────────────────────────────
+
+  // Helper: verify classroom belongs to requesting teacher
+  async function requireClassroomOwner(req: any, res: any): Promise<any | null> {
+    const classroomId = parseInt(req.params.classroomId || req.params.id);
+    const classroom = await storage.getClassroomById(classroomId);
+    if (!classroom) { res.status(404).json({ error: "Classroom not found" }); return null; }
+    if (classroom.teacherId !== req.session.userId) { res.status(403).json({ error: "Not your classroom" }); return null; }
+    return classroom;
+  }
+
+  // POST /api/classrooms — teacher creates a classroom
+  app.post("/api/classrooms", requireAuth, async (req, res) => {
+    try {
+      const data = z.object({
+        name: z.string().min(1),
+        subject: z.string().min(1),
+        description: z.string().optional(),
+      }).parse(req.body);
+      const classroom = await storage.createClassroom({
+        name: data.name,
+        subject: data.subject,
+        description: data.description ?? null,
+        teacherId: req.session.userId!,
+        status: "active",
+      });
+      res.status(201).json(classroom);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms — list classrooms for the current user's role
+  app.get("/api/classrooms", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      if (user.role === "teacher") {
+        const classrooms = await storage.getClassroomsByTeacher(user.id);
+        return res.json(classrooms);
+      }
+      if (user.role === "student") {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) return res.json([]);
+        const classrooms = await storage.getClassroomsForStudent(student.id);
+        return res.json(classrooms);
+      }
+      return res.json([]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/parent/:studentId — parent views classrooms for their child
+  app.get("/api/classrooms/parent/:studentId", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+      if (student.parentId !== req.session.userId!) return res.status(403).json({ error: "Not your child" });
+      const classrooms = await storage.getClassroomsForParent(studentId);
+      res.json(classrooms);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:id — get classroom detail
+  app.get("/api/classrooms/:id", requireAuth, async (req, res) => {
+    try {
+      const classroom = await storage.getClassroomById(parseInt(req.params.id));
+      if (!classroom) return res.status(404).json({ error: "Classroom not found" });
+      res.json(classroom);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/classrooms/:id — teacher updates classroom (name, subject, description, status)
+  app.patch("/api/classrooms/:id", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const data = z.object({
+        name: z.string().min(1).optional(),
+        subject: z.string().min(1).optional(),
+        description: z.string().nullable().optional(),
+        status: z.enum(["active", "archived"]).optional(),
+      }).parse(req.body);
+      const updated = await storage.updateClassroom(classroom.id, data);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:id — teacher deletes classroom
+  app.delete("/api/classrooms/:id", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      await storage.deleteClassroom(classroom.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/enroll — teacher enrolls a student
+  app.post("/api/classrooms/:classroomId/enroll", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot enroll students in an archived classroom" });
+      const { studentId } = z.object({ studentId: z.number() }).parse(req.body);
+      // Verify student is assigned to this teacher
+      const tsa = await storage.getTeacherStudentAssignment(req.session.userId!, studentId);
+      if (!tsa || tsa.status !== "active") return res.status(403).json({ error: "This student is not assigned to you" });
+      const enrollment = await storage.enrollStudent(classroom.id, studentId);
+      res.status(201).json(enrollment);
+    } catch (error: any) {
+      if (error.code === "P2002") return res.status(409).json({ error: "Student is already enrolled" });
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:classroomId/students/:studentId — teacher removes a student
+  app.delete("/api/classrooms/:classroomId/students/:studentId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot modify enrollment in an archived classroom" });
+      const studentId = parseInt(req.params.studentId);
+      await storage.unenrollStudent(classroom.id, studentId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:classroomId/enrollments — get enrolled students
+  app.get("/api/classrooms/:classroomId/enrollments", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      const enrollments = await storage.getEnrollments(classroomId);
+      res.json(enrollments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/posts — post to feed
+  app.post("/api/classrooms/:classroomId/posts", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      const classroom = await storage.getClassroomById(classroomId);
+      if (!classroom) return res.status(404).json({ error: "Classroom not found" });
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot post to an archived classroom" });
+      if (classroom.teacherId !== req.session.userId!) return res.status(403).json({ error: "Not your classroom" });
+      const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
+      const post = await storage.createClassroomPost({ classroomId, authorId: req.session.userId!, content });
+      res.status(201).json(post);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:classroomId/posts — get feed
+  app.get("/api/classrooms/:classroomId/posts", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      const posts = await storage.getClassroomPosts(classroomId);
+      res.json(posts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/assignments — teacher creates assignment
+  app.post("/api/classrooms/:classroomId/assignments", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
+      const data = z.object({
+        title: z.string().min(1),
+        description: z.string().min(1),
+        dueDate: z.string().min(1),
+        points: z.number().int().min(1).max(10000),
+      }).parse(req.body);
+      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data });
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:classroomId/assignments — list assignments
+  app.get("/api/classrooms/:classroomId/assignments", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      const assignments = await storage.getClassroomAssignments(classroomId);
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:classroomId/assignments/:assignmentId — teacher deletes assignment
+  app.delete("/api/classrooms/:classroomId/assignments/:assignmentId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      await storage.deleteClassroomAssignment(parseInt(req.params.assignmentId));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:classroomId/assignments/:assignmentId/submissions — teacher views submissions
+  app.get("/api/classrooms/:classroomId/assignments/:assignmentId/submissions", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const submissions = await storage.getSubmissionsForAssignment(parseInt(req.params.assignmentId));
+      res.json(submissions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:classroomId/my-submissions — student/parent views their own submissions
+  app.get("/api/classrooms/:classroomId/my-submissions", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      let studentId: number;
+      if (user.role === "student") {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) return res.json([]);
+        studentId = student.id;
+      } else if (user.role === "parent") {
+        const sid = parseInt(req.query.studentId as string);
+        if (!sid) return res.status(400).json({ error: "studentId query param required" });
+        const student = await storage.getStudentById(sid);
+        if (!student || student.parentId !== user.id) return res.status(403).json({ error: "Not your child" });
+        studentId = student.id;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const submissions = await storage.getSubmissionsForStudent(studentId, classroomId);
+      res.json(submissions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/assignments/:assignmentId/submit — student submits
+  app.post("/api/classrooms/:classroomId/assignments/:assignmentId/submit", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      const assignmentId = parseInt(req.params.assignmentId);
+      const classroom = await storage.getClassroomById(classroomId);
+      if (!classroom) return res.status(404).json({ error: "Classroom not found" });
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot submit to an archived classroom" });
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "student") return res.status(403).json({ error: "Students only" });
+      const student = await storage.getStudentByUserId(user.id);
+      if (!student) return res.status(403).json({ error: "Student profile not found" });
+      const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
+      const assignments = await storage.getClassroomAssignments(classroomId);
+      const assignment = assignments.find((a) => a.id === assignmentId);
+      if (!assignment) return res.status(404).json({ error: "Assignment not found" });
+      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate);
+      res.json(submission);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/classrooms/:classroomId/submissions/:submissionId/grade — teacher grades
+  app.patch("/api/classrooms/:classroomId/submissions/:submissionId/grade", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const { grade, feedback } = z.object({
+        grade: z.number().int().min(0),
+        feedback: z.string().nullable().optional(),
+      }).parse(req.body);
+      // Get assignment to know max points
+      const submissionId = parseInt(req.params.submissionId);
+      const sub = await prisma.classroomSubmission.findUnique({
+        where: { id: submissionId },
+        include: { assignment: { select: { points: true } } },
+      });
+      if (!sub) return res.status(404).json({ error: "Submission not found" });
+      const updated = await storage.gradeClassroomSubmission(submissionId, grade, feedback ?? null, sub.assignment.points);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/materials — teacher adds material
+  app.post("/api/classrooms/:classroomId/materials", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add materials to an archived classroom" });
+      const data = z.object({
+        title: z.string().min(1),
+        description: z.string(),
+        url: z.string().url(),
+      }).parse(req.body);
+      const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data });
+      res.status(201).json(material);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:classroomId/materials — get materials
+  app.get("/api/classrooms/:classroomId/materials", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      const materials = await storage.getClassroomMaterials(classroomId);
+      res.json(materials);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:classroomId/materials/:materialId — teacher removes material
+  app.delete("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      await storage.deleteClassroomMaterial(parseInt(req.params.materialId));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 }

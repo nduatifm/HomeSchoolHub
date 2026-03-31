@@ -59,6 +59,9 @@ import {
   Trash2,
   GraduationCap,
   ChevronRight,
+  School,
+  Plus,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -73,6 +76,7 @@ import type {
   TutorRequest,
   User,
   ProgressReport,
+  Classroom,
 } from "@shared/schema";
 
 type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
@@ -118,7 +122,7 @@ const ratingSchema = z.object({
   comment: z.string(),
 });
 
-const PARENT_TABS = ["children", "tutors", "invites", "reports", "messages"];
+const PARENT_TABS = ["children", "classrooms", "tutors", "invites", "reports", "messages"];
 
 export default function ParentDashboard() {
   const { user, logout } = useAuth();
@@ -198,6 +202,14 @@ export default function ParentDashboard() {
   const childTeacherQueries = useQueries({
     queries: students.map((child) => ({
       queryKey: ["/api/teachers/student", child.id],
+      enabled: students.length > 0,
+    })),
+  });
+
+  const childClassroomQueries = useQueries({
+    queries: students.map((child) => ({
+      queryKey: ["/api/classrooms/parent", child.id],
+      queryFn: () => apiRequest(`/api/classrooms/parent/${child.id}`) as Promise<Classroom[]>,
       enabled: students.length > 0,
     })),
   });
@@ -1623,6 +1635,47 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 */}
+
+            <TabsContent value="classrooms">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><School className="h-5 w-5 text-primary" />Classrooms</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {students.length === 0 && (
+                    <div className="text-center py-10 text-gray-400 text-sm">Add a student to see their classrooms.</div>
+                  )}
+                  {students.map((child, i) => {
+                    const childClassrooms = (childClassroomQueries[i]?.data ?? []) as Classroom[];
+                    return (
+                      <div key={child.id} className="space-y-3">
+                        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                          <GraduationCap className="h-4 w-4 text-gray-400" />{child.name}
+                        </h3>
+                        {childClassrooms.length === 0 ? (
+                          <p className="text-xs text-gray-400 pl-5">No classrooms yet for this student.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pl-5">
+                            {childClassrooms.map(c => (
+                              <div key={c.id} className="rounded-lg border p-3 flex flex-col gap-1.5 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.id}?studentId=${child.id}`; }}>
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className="font-semibold text-sm text-gray-900 leading-tight">{c.name}</h4>
+                                  {c.status === "archived" && <span className="text-[10px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded shrink-0">Archived</span>}
+                                </div>
+                                <p className="text-xs text-primary font-medium">{c.subject}</p>
+                                <Button size="sm" variant="outline" className="w-full gap-1 text-xs mt-1" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.id}?studentId=${child.id}`; }}>
+                                  View Grades <ChevronRight className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             <TabsContent value="messages">
               <Card className="overflow-hidden">

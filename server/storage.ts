@@ -41,6 +41,16 @@ import type {
   InsertSystemSettings,
   TeacherStudentAssignment,
   InsertTeacherStudentAssignment,
+  Classroom,
+  InsertClassroom,
+  ClassroomEnrollment,
+  ClassroomPost,
+  InsertClassroomPost,
+  ClassroomAssignment,
+  InsertClassroomAssignment,
+  ClassroomSubmission,
+  ClassroomMaterial,
+  InsertClassroomMaterial,
 } from "@shared/schema";
 
 export type ConversationSummary = {
@@ -248,6 +258,35 @@ export interface IStorage {
 
   getThreadLabel(teacherUserId: number, studentId: number): Promise<string | null>;
   setThreadLabel(teacherUserId: number, studentId: number, name: string | null): Promise<void>;
+
+  // ─── Classrooms ──────────────────────────────────────────────────────────
+  createClassroom(data: InsertClassroom): Promise<Classroom>;
+  getClassroomById(id: number): Promise<Classroom | null>;
+  getClassroomsByTeacher(teacherId: number): Promise<Classroom[]>;
+  getClassroomsForStudent(studentId: number): Promise<Classroom[]>;
+  getClassroomsForParent(studentId: number): Promise<Classroom[]>;
+  updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom>;
+  deleteClassroom(id: number): Promise<void>;
+
+  enrollStudent(classroomId: number, studentId: number): Promise<ClassroomEnrollment>;
+  unenrollStudent(classroomId: number, studentId: number): Promise<void>;
+  getEnrollments(classroomId: number): Promise<(ClassroomEnrollment & { student: { id: number; name: string; userId: number } })[]>;
+
+  createClassroomPost(data: InsertClassroomPost & { authorName?: string }): Promise<ClassroomPost & { authorName: string }>;
+  getClassroomPosts(classroomId: number): Promise<(ClassroomPost & { authorName: string })[]>;
+
+  createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment>;
+  getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]>;
+  deleteClassroomAssignment(id: number): Promise<void>;
+
+  getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
+  getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
+  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string): Promise<ClassroomSubmission>;
+  gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
+
+  createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
+  getClassroomMaterials(classroomId: number): Promise<ClassroomMaterial[]>;
+  deleteClassroomMaterial(id: number): Promise<void>;
 }
 
 class PrismaStorage implements IStorage {
@@ -1356,6 +1395,282 @@ class PrismaStorage implements IStorage {
         update: { name: name.trim() },
       });
     }
+  }
+
+  // ─── Classrooms ────────────────────────────────────────────────────────
+
+  private mapClassroom(c: any): Classroom {
+    return {
+      id: c.id,
+      name: c.name,
+      subject: c.subject,
+      description: c.description ?? null,
+      teacherId: c.teacherId,
+      status: c.status as "active" | "archived",
+      createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
+    };
+  }
+
+  async createClassroom(data: InsertClassroom): Promise<Classroom> {
+    const c = await prisma.classroom.create({ data });
+    return this.mapClassroom(c);
+  }
+
+  async getClassroomById(id: number): Promise<Classroom | null> {
+    const c = await prisma.classroom.findUnique({ where: { id } });
+    return c ? this.mapClassroom(c) : null;
+  }
+
+  async getClassroomsByTeacher(teacherId: number): Promise<Classroom[]> {
+    const rows = await prisma.classroom.findMany({
+      where: { teacherId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(this.mapClassroom.bind(this));
+  }
+
+  async getClassroomsForStudent(studentId: number): Promise<Classroom[]> {
+    const enrollments = await prisma.classroomEnrollment.findMany({
+      where: { studentId },
+      include: { classroom: true },
+      orderBy: { enrolledAt: "desc" },
+    });
+    return enrollments.map((e) => this.mapClassroom(e.classroom));
+  }
+
+  async getClassroomsForParent(studentId: number): Promise<Classroom[]> {
+    return this.getClassroomsForStudent(studentId);
+  }
+
+  async updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom> {
+    const c = await prisma.classroom.update({ where: { id }, data });
+    return this.mapClassroom(c);
+  }
+
+  async deleteClassroom(id: number): Promise<void> {
+    await prisma.classroom.delete({ where: { id } });
+  }
+
+  async enrollStudent(classroomId: number, studentId: number): Promise<ClassroomEnrollment> {
+    const enrollment = await prisma.classroomEnrollment.create({
+      data: { classroomId, studentId },
+    });
+    // Auto-create pending submissions for all existing assignments
+    const assignments = await prisma.classroomAssignment.findMany({ where: { classroomId } });
+    for (const a of assignments) {
+      await prisma.classroomSubmission.upsert({
+        where: { assignmentId_studentId: { assignmentId: a.id, studentId } },
+        create: { assignmentId: a.id, studentId, status: "pending" },
+        update: {},
+      });
+    }
+    return {
+      id: enrollment.id,
+      classroomId: enrollment.classroomId,
+      studentId: enrollment.studentId,
+      enrolledAt: enrollment.enrolledAt instanceof Date ? enrollment.enrolledAt.toISOString() : enrollment.enrolledAt,
+    };
+  }
+
+  async unenrollStudent(classroomId: number, studentId: number): Promise<void> {
+    await prisma.classroomEnrollment.deleteMany({ where: { classroomId, studentId } });
+  }
+
+  async getEnrollments(classroomId: number): Promise<(ClassroomEnrollment & { student: { id: number; name: string; userId: number } })[]> {
+    const rows = await prisma.classroomEnrollment.findMany({
+      where: { classroomId },
+      include: { student: { select: { id: true, name: true, userId: true } } },
+      orderBy: { enrolledAt: "asc" },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      classroomId: r.classroomId,
+      studentId: r.studentId,
+      enrolledAt: r.enrolledAt instanceof Date ? r.enrolledAt.toISOString() : r.enrolledAt,
+      student: r.student,
+    }));
+  }
+
+  async createClassroomPost(data: InsertClassroomPost & { authorName?: string }): Promise<ClassroomPost & { authorName: string }> {
+    const post = await prisma.classroomPost.create({
+      data: { classroomId: data.classroomId, authorId: data.authorId, content: data.content },
+      include: { author: { select: { name: true } } },
+    });
+    return {
+      id: post.id,
+      classroomId: post.classroomId,
+      authorId: post.authorId,
+      content: post.content,
+      createdAt: post.createdAt instanceof Date ? post.createdAt.toISOString() : post.createdAt,
+      authorName: (post as any).author?.name ?? "Unknown",
+    };
+  }
+
+  async getClassroomPosts(classroomId: number): Promise<(ClassroomPost & { authorName: string })[]> {
+    const posts = await prisma.classroomPost.findMany({
+      where: { classroomId },
+      include: { author: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return posts.map((p) => ({
+      id: p.id,
+      classroomId: p.classroomId,
+      authorId: p.authorId,
+      content: p.content,
+      createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+      authorName: (p as any).author?.name ?? "Unknown",
+    }));
+  }
+
+  async createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment> {
+    const a = await prisma.classroomAssignment.create({ data });
+    // Auto-create pending submissions for all currently enrolled students
+    const enrollments = await prisma.classroomEnrollment.findMany({ where: { classroomId: data.classroomId } });
+    for (const e of enrollments) {
+      await prisma.classroomSubmission.upsert({
+        where: { assignmentId_studentId: { assignmentId: a.id, studentId: e.studentId } },
+        create: { assignmentId: a.id, studentId: e.studentId, status: "pending" },
+        update: {},
+      });
+    }
+    return {
+      id: a.id,
+      classroomId: a.classroomId,
+      title: a.title,
+      description: a.description,
+      dueDate: a.dueDate,
+      points: a.points,
+      createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
+    };
+  }
+
+  async getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]> {
+    const rows = await prisma.classroomAssignment.findMany({
+      where: { classroomId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((a) => ({
+      id: a.id,
+      classroomId: a.classroomId,
+      title: a.title,
+      description: a.description,
+      dueDate: a.dueDate,
+      points: a.points,
+      createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
+    }));
+  }
+
+  async deleteClassroomAssignment(id: number): Promise<void> {
+    await prisma.classroomAssignment.delete({ where: { id } });
+  }
+
+  async getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]> {
+    const rows = await prisma.classroomSubmission.findMany({
+      where: { assignmentId },
+      include: { student: { select: { name: true } } },
+      orderBy: { studentId: "asc" },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      assignmentId: r.assignmentId,
+      studentId: r.studentId,
+      content: r.content ?? null,
+      fileUrl: r.fileUrl ?? null,
+      status: r.status as any,
+      submittedAt: r.submittedAt ?? null,
+      grade: r.grade ?? null,
+      feedback: r.feedback ?? null,
+      studentName: (r as any).student?.name ?? "Unknown",
+    }));
+  }
+
+  async getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]> {
+    const assignments = await prisma.classroomAssignment.findMany({ where: { classroomId }, select: { id: true } });
+    const assignmentIds = assignments.map((a) => a.id);
+    const rows = await prisma.classroomSubmission.findMany({
+      where: { studentId, assignmentId: { in: assignmentIds } },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      assignmentId: r.assignmentId,
+      studentId: r.studentId,
+      content: r.content ?? null,
+      fileUrl: r.fileUrl ?? null,
+      status: r.status as any,
+      submittedAt: r.submittedAt ?? null,
+      grade: r.grade ?? null,
+      feedback: r.feedback ?? null,
+    }));
+  }
+
+  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string): Promise<ClassroomSubmission> {
+    const now = new Date().toISOString();
+    const isLate = now > dueDate;
+    const updated = await prisma.classroomSubmission.update({
+      where: { assignmentId_studentId: { assignmentId, studentId } },
+      data: { content, status: isLate ? "late" : "submitted", submittedAt: now },
+    });
+    return {
+      id: updated.id,
+      assignmentId: updated.assignmentId,
+      studentId: updated.studentId,
+      content: updated.content ?? null,
+      fileUrl: updated.fileUrl ?? null,
+      status: updated.status as any,
+      submittedAt: updated.submittedAt ?? null,
+      grade: updated.grade ?? null,
+      feedback: updated.feedback ?? null,
+    };
+  }
+
+  async gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission> {
+    const clampedGrade = Math.max(0, Math.min(grade, maxPoints));
+    const updated = await prisma.classroomSubmission.update({
+      where: { id: submissionId },
+      data: { grade: clampedGrade, feedback, status: "graded" },
+    });
+    return {
+      id: updated.id,
+      assignmentId: updated.assignmentId,
+      studentId: updated.studentId,
+      content: updated.content ?? null,
+      fileUrl: updated.fileUrl ?? null,
+      status: updated.status as any,
+      submittedAt: updated.submittedAt ?? null,
+      grade: updated.grade ?? null,
+      feedback: updated.feedback ?? null,
+    };
+  }
+
+  async createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial> {
+    const m = await prisma.classroomMaterial.create({ data });
+    return {
+      id: m.id,
+      classroomId: m.classroomId,
+      title: m.title,
+      description: m.description,
+      url: m.url,
+      uploadedAt: m.uploadedAt instanceof Date ? m.uploadedAt.toISOString() : m.uploadedAt,
+    };
+  }
+
+  async getClassroomMaterials(classroomId: number): Promise<ClassroomMaterial[]> {
+    const rows = await prisma.classroomMaterial.findMany({
+      where: { classroomId },
+      orderBy: { uploadedAt: "desc" },
+    });
+    return rows.map((m) => ({
+      id: m.id,
+      classroomId: m.classroomId,
+      title: m.title,
+      description: m.description,
+      url: m.url,
+      uploadedAt: m.uploadedAt instanceof Date ? m.uploadedAt.toISOString() : m.uploadedAt,
+    }));
+  }
+
+  async deleteClassroomMaterial(id: number): Promise<void> {
+    await prisma.classroomMaterial.delete({ where: { id } });
   }
 }
 

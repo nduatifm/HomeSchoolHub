@@ -67,6 +67,10 @@ import {
   Link,
   ClipboardCheck,
   Eye,
+  School,
+  Plus,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +88,7 @@ import type {
   TutorRequest,
   User,
   ProgressReport,
+  Classroom,
 } from "@shared/schema";
 
 type StudentWithParent = Student & {
@@ -146,7 +151,72 @@ const sessionFormSchema = z.object({
   status: z.string(),
 });
 
-const TEACHER_TABS = ["assignments", "submissions", "materials", "students", "feedback", "messages"];
+const TEACHER_TABS = ["assignments", "classrooms", "submissions", "materials", "students", "feedback", "messages"];
+
+function TeacherClassroomsTab() {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", subject: "", description: "" });
+  const { data: classrooms = [], isLoading } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
+  const createMutation = useMutation({
+    mutationFn: () => apiRequest("/api/classrooms", { method: "POST", body: JSON.stringify(form) }),
+    onSuccess: () => {
+      setOpen(false);
+      setForm({ name: "", subject: "", description: "" });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      toast({ title: "Classroom created!" });
+    },
+    onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, variant: "destructive" }),
+  });
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <School className="h-5 w-5 text-primary" />Classrooms
+        </CardTitle>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-1.5"><Plus className="h-4 w-4" />New Classroom</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Create Classroom</DialogTitle></DialogHeader>
+            <div className="space-y-3 pt-2">
+              <div><p className="text-sm font-medium mb-1">Name</p><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Algebra II - Period 3" /></div>
+              <div><p className="text-sm font-medium mb-1">Subject</p><Input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="e.g. Mathematics" /></div>
+              <div><p className="text-sm font-medium mb-1">Description (optional)</p><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} placeholder="Brief description…" /></div>
+              <Button className="w-full" disabled={!form.name || !form.subject || createMutation.isPending} onClick={() => createMutation.mutate()}>
+                {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Create Classroom
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent>
+        {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
+        {!isLoading && classrooms.length === 0 && (
+          <div className="text-center py-10 text-gray-400 text-sm">No classrooms yet. Create your first classroom to get started.</div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {classrooms.map(c => (
+            <div key={c.id} className="rounded-lg border p-4 flex flex-col gap-2 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.id}`; }}>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-sm text-gray-900 leading-tight">{c.name}</h3>
+                {c.status === "archived" && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">Archived</span>}
+              </div>
+              <p className="text-xs text-primary font-medium">{c.subject}</p>
+              {c.description && <p className="text-xs text-gray-400 line-clamp-2">{c.description}</p>}
+              <div className="mt-auto pt-2">
+                <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.id}`; }}>
+                  Open Classroom <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
@@ -230,6 +300,7 @@ export default function TeacherDashboard() {
   const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
   const schedulesQuery = useQuery({ queryKey: ["/api/schedules/teacher"] });
   const feedbacksQuery = useQuery({ queryKey: ["/api/feedback/teacher"] });
+  const { data: classrooms = [] } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
 
   const [selectedStudentForAttendance, setSelectedStudentForAttendance] =
     useState<number | null>(null);
@@ -3676,6 +3747,10 @@ export default function TeacherDashboard() {
               </Card>
             </TabsContent>
 */}
+
+            <TabsContent value="classrooms">
+              <TeacherClassroomsTab />
+            </TabsContent>
 
             <TabsContent value="messages">
               <Card className="overflow-hidden">

@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
+import ClassroomDetail from "./pages/ClassroomDetail";
 import Landing from "./pages/Landing";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminUsers from "./pages/AdminUsers";
@@ -108,6 +109,9 @@ function AppRoutes() {
       </Route>
       <Route path="/admin">
         <AdminRoute component={AdminUsers} />
+      </Route>
+      <Route path="/classrooms/:id">
+        <ProtectedRoute component={ClassroomDetail} />
       </Route>
       <Route path="/dashboard">
         <DashboardRouter />

@@ -62,6 +62,8 @@ model User {
   teacherReports             ProgressReport[]
   teacherStudentAssignments  TeacherStudentAssignment[]
   authSessions               AuthSession[]
+  teacherClassrooms          Classroom[]                 @relation("TeacherClassrooms")
+  classroomPosts             ClassroomPost[]             @relation("ClassroomPostAuthor")
 
   @@index([email])
   @@index([googleId])
@@ -87,6 +89,8 @@ model Student {
   parentalControls           ParentalControl[]
   progressReports            ProgressReport[]
   teacherStudentAssignments  TeacherStudentAssignment[]
+  classroomEnrollments       ClassroomEnrollment[]
+  classroomSubmissions       ClassroomSubmission[]
 
   @@index([userId])
   @@index([parentId])
@@ -397,4 +401,99 @@ model AuthSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ─── Classrooms ────────────────────────────────────────────────────────────
+
+model Classroom {
+  id          Int      @id @default(autoincrement())
+  name        String
+  subject     String
+  description String?
+  teacherId   Int
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+
+  teacher     User                  @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
+  enrollments ClassroomEnrollment[]
+  posts       ClassroomPost[]
+  assignments ClassroomAssignment[]
+  materials   ClassroomMaterial[]
+
+  @@index([teacherId])
+}
+
+model ClassroomEnrollment {
+  id          Int      @id @default(autoincrement())
+  classroomId Int
+  studentId   Int
+  enrolledAt  DateTime @default(now())
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, studentId])
+  @@index([classroomId])
+  @@index([studentId])
+}
+
+model ClassroomPost {
+  id          Int      @id @default(autoincrement())
+  classroomId Int
+  authorId    Int
+  content     String
+  createdAt   DateTime @default(now())
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  author    User      @relation("ClassroomPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([classroomId])
+  @@index([authorId])
+}
+
+model ClassroomAssignment {
+  id          Int      @id @default(autoincrement())
+  classroomId Int
+  title       String
+  description String
+  dueDate     String
+  points      Int      @default(100)
+  createdAt   DateTime @default(now())
+
+  classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  submissions ClassroomSubmission[]
+
+  @@index([classroomId])
+}
+
+model ClassroomSubmission {
+  id           Int     @id @default(autoincrement())
+  assignmentId Int
+  studentId    Int
+  content      String?
+  fileUrl      String?
+  status       String  @default("pending")
+  submittedAt  String?
+  grade        Int?
+  feedback     String?
+
+  assignment ClassroomAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, studentId])
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
+model ClassroomMaterial {
+  id          Int      @id @default(autoincrement())
+  classroomId Int
+  title       String
+  description String
+  url         String
+  uploadedAt  DateTime @default(now())
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@index([classroomId])
 }
