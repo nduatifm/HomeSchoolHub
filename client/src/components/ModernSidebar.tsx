@@ -3,10 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   Settings,
   User,
-  BookOpen,
   UserPlus,
-  LibraryBig,
-  ClipboardCheck,
   LogOut,
   Menu,
   X,
@@ -106,10 +103,7 @@ export default function ModernSidebar() {
   };
 
   const teacherItems: SidebarItem[] = [
-    { icon: <BookOpen className="w-4 h-4" />, label: "Assignments", hash: "assignments" },
     { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
-    { icon: <ClipboardCheck className="w-4 h-4" />, label: "Grade Submissions", hash: "submissions" },
-    { icon: <LibraryBig className="w-4 h-4" />, label: "Study Materials", hash: "materials" },
     { icon: <User className="w-4 h-4" />, label: "Students", hash: "students" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
@@ -125,9 +119,7 @@ export default function ModernSidebar() {
   ];
 
   const studentItems: SidebarItem[] = [
-    { icon: <BookOpen className="w-4 h-4" />, label: "Assignments", hash: "assignments" },
     { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
-    { icon: <LibraryBig className="w-4 h-4" />, label: "Study Materials", hash: "materials" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
   ];
