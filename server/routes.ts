@@ -1288,6 +1288,7 @@ export function registerRoutes(app: Express) {
         where: {
           OR: [
             { name: { contains: q, mode: "insensitive" } },
+            { user: { name: { contains: q, mode: "insensitive" } } },
             { user: { email: { contains: q, mode: "insensitive" } } },
           ],
         },

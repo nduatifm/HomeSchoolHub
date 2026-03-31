@@ -650,7 +650,7 @@ function StudentsTab({ classroomId, teacherId, isArchived }: { classroomId: numb
               </DialogHeader>
               <div className="space-y-3">
                 <Input
-                  placeholder="Search by name or email…"
+                  placeholder="Search by name, username, or email…"
                   value={searchQ}
                   onChange={(e) => setSearchQ(e.target.value)}
                   autoFocus
@@ -660,7 +660,7 @@ function StudentsTab({ classroomId, teacherId, isArchived }: { classroomId: numb
                     <p className="text-sm text-gray-400 text-center py-4">No students found.</p>
                   )}
                   {searchQ.length < 2 && (
-                    <p className="text-sm text-gray-400 text-center py-4">Type at least 2 characters to search by name or email.</p>
+                    <p className="text-sm text-gray-400 text-center py-4">Type at least 2 characters to search by name, username, or email.</p>
                   )}
                   {filteredSearch.map((s) => (
                     <div key={s.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
