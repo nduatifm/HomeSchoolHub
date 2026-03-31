@@ -373,8 +373,22 @@ export function registerRoutes(app: Express) {
       const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
 
       if (!isTutorRequestMode) {
-        // Auto-assign student to the first available teacher
-        await storage.assignStudentToFirstAvailableTeacher(student.id);
+        // Auto-assign student to the first available teacher.
+        // Also create an approved TutorRequest so all authorization paths have a single
+        // source of truth (approved TutorRequest) for this teacher-student link.
+        const tsa = await storage.assignStudentToFirstAvailableTeacher(student.id);
+        if (tsa) {
+          const today = new Date().toISOString().split("T")[0];
+          await storage.createTutorRequest({
+            parentId: invite.parentId,
+            teacherId: tsa.teacherId,
+            studentId: student.id,
+            status: "approved",
+            message: "Auto-assigned on student signup",
+            requestDate: today,
+            responseDate: today,
+          });
+        }
       }
 
       // Mark invite as accepted
@@ -484,7 +498,22 @@ export function registerRoutes(app: Express) {
       const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
 
       if (!isTutorRequestMode) {
-        await storage.assignStudentToFirstAvailableTeacher(student.id);
+        // Auto-assign student to the first available teacher.
+        // Also create an approved TutorRequest so all authorization paths have a single
+        // source of truth (approved TutorRequest) for this teacher-student link.
+        const tsa = await storage.assignStudentToFirstAvailableTeacher(student.id);
+        if (tsa) {
+          const today = new Date().toISOString().split("T")[0];
+          await storage.createTutorRequest({
+            parentId: invite.parentId,
+            teacherId: tsa.teacherId,
+            studentId: student.id,
+            status: "approved",
+            message: "Auto-assigned on student signup",
+            requestDate: today,
+            responseDate: today,
+          });
+        }
       }
 
       // Mark invite as accepted
