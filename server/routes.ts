@@ -1276,9 +1276,11 @@ export function registerRoutes(app: Express) {
   // GET /api/students/search?q= — platform-wide student search by name or email (teacher only)
   app.get("/api/students/search", requireAuth, async (req, res) => {
     try {
-      // Only teachers (and admins) may access this endpoint
+      // Only teachers (and admins) may access this endpoint.
+      // Check both role (active context) and roles array for compatibility with all account types.
       const caller = await storage.getUserById(req.session.userId!);
-      if (!caller || (!caller.roles?.includes("teacher") && !caller.isAdmin && !caller.isSuperAdmin)) {
+      const isTeacher = caller?.role === "teacher" || caller?.roles?.includes("teacher");
+      if (!caller || (!isTeacher && !caller.isAdmin && !caller.isSuperAdmin)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       const q = String(req.query.q ?? "").trim();
