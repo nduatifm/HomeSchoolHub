@@ -9,44 +9,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, Camera } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 
-interface SectionProps {
-  title: string;
-  children: React.ReactNode;
-}
-
-function Section({ title, children }: SectionProps) {
-  return (
-    <div className="space-y-3">
-      <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
-      <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-        <div className="divide-y">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface ItemRowProps {
+/* ──────────────────────────────────────────────
+   Shared row component — mirrors MoneyTallyHQ layout
+   Label is UPPERCASE + tracked; Edit button is pill-shaped with border;
+   Save is dark (gray-900); Cancel is ghost; all inline in a flex row.
+─────────────────────────────────────────────── */
+interface RowProps {
   label: string;
-  value?: React.ReactNode;
+  displayValue: React.ReactNode;
   isEditing: boolean;
   onEdit?: () => void;
-  onCancel?: () => void;
-  onSave?: () => void;
+  onCancel: () => void;
+  onSave: () => void;
   isPending?: boolean;
-  editContent?: React.ReactNode;
+  editContent: React.ReactNode;
   readOnly?: boolean;
   readOnlyNote?: string;
-  customAction?: React.ReactNode;
+  hideEdit?: boolean;
 }
 
-function ItemRow({
+function Row({
   label,
-  value,
+  displayValue,
   isEditing,
   onEdit,
   onCancel,
@@ -55,342 +42,93 @@ function ItemRow({
   editContent,
   readOnly,
   readOnlyNote,
-  customAction,
-}: ItemRowProps) {
+  hideEdit,
+}: RowProps) {
   return (
-    <div className="p-5 flex flex-col gap-4">
-      {isEditing ? (
-        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div>
-            <div className="text-sm font-medium text-muted-foreground mb-3">{label}</div>
-            {editContent}
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={onCancel} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={onSave} disabled={isPending}>
-              {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save
-            </Button>
-          </div>
+    <div className="px-6 py-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+            {label}
+          </p>
+          {isEditing ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2 items-start">
+                {editContent}
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={onSave}
+                  disabled={isPending}
+                  className="h-10 px-5 bg-gray-900 hover:bg-gray-700 text-white"
+                >
+                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onCancel}
+                  disabled={isPending}
+                  className="h-10 text-gray-700 hover:bg-gray-100"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-base text-gray-900">{displayValue}</div>
+              {readOnly && readOnlyNote && (
+                <p className="text-xs text-gray-400 mt-1">{readOnlyNote}</p>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="flex justify-between items-start gap-4">
-          <div className="space-y-1 min-w-0">
-            <div className="text-sm font-medium text-muted-foreground">{label}</div>
-            <div className="text-base text-foreground font-medium">{value}</div>
-            {readOnly && readOnlyNote && (
-              <div className="text-xs text-muted-foreground mt-1">{readOnlyNote}</div>
-            )}
-          </div>
-          <div className="shrink-0">
-            {customAction ? (
-              customAction
-            ) : readOnly ? null : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onEdit}
-                className="text-primary hover:text-primary hover:bg-primary/5 font-medium"
-              >
-                Edit
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+        {!isEditing && !readOnly && !hideEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-full px-5 h-9 text-sm font-medium text-gray-700 border border-gray-300 bg-white hover:bg-gray-100 hover:border-gray-400 transition-colors flex-shrink-0"
+          >
+            Edit
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-export default function Profile() {
-  const { user, setUser } = useAuth();
-  const queryClient = useQueryClient();
-
-  const [editingField, setEditingField] = useState<string | null>(null);
-
-  const [name, setName] = useState(user?.name || "");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [uploadingImage, setUploadingImage] = useState(false);
-
-  const [bio, setBio] = useState(user?.bio || "");
-  const [teachingSubjects, setTeachingSubjects] = useState<string[]>(
-    Array.isArray(user?.teachingSubjects) ? user.teachingSubjects : []
+/* ── Section wrapper ── */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-2xl font-semibold text-gray-900 mb-6">{title}</h2>
+      <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 shadow-sm">
+        {children}
+      </div>
+    </div>
   );
-  const [subjectInput, setSubjectInput] = useState("");
-  const [yearsExperience, setYearsExperience] = useState(
-    user?.yearsExperience !== undefined && user?.yearsExperience !== null
-      ? user.yearsExperience.toString()
-      : ""
-  );
-  const [qualifications, setQualifications] = useState(user?.qualifications || "");
-  const [specialization, setSpecialization] = useState(user?.specialization || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [preferredContact, setPreferredContact] = useState(user?.preferredContact || "");
-  const [interests, setInterests] = useState<string[]>(
-    Array.isArray(user?.interests) ? user.interests : []
-  );
-  const [interestInput, setInterestInput] = useState("");
-  const [favoriteSubject, setFavoriteSubject] = useState(user?.favoriteSubject || "");
-  const [learningGoals, setLearningGoals] = useState(user?.learningGoals || "");
+}
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const addSubject = () => {
-    const trimmed = subjectInput.trim();
-    if (trimmed && !teachingSubjects.includes(trimmed)) {
-      setTeachingSubjects([...teachingSubjects, trimmed]);
-      setSubjectInput("");
-    }
-  };
-
-  const removeSubject = (index: number) => {
-    setTeachingSubjects(teachingSubjects.filter((_, i) => i !== index));
-  };
-
-  const addInterest = () => {
-    const trimmed = interestInput.trim();
-    if (trimmed && !interests.includes(trimmed)) {
-      setInterests([...interests, trimmed]);
-      setInterestInput("");
-    }
-  };
-
-  const removeInterest = (index: number) => {
-    setInterests(interests.filter((_, i) => i !== index));
-  };
-
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: { name: string }) => {
-      return await apiRequest("/api/user/profile", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: (data) => {
-      setUser(data.user);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      setEditingField(null);
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
-        type: "success",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update failed",
-        description: error.message || "Failed to update profile",
-        type: "error",
-      });
-    },
-  });
-
-  const updateDetailsMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("/api/user/profile-details", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: (data) => {
-      setUser(data.user);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      setEditingField(null);
-      toast({
-        title: "Details updated",
-        description: "Your profile details have been updated successfully.",
-        type: "success",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update failed",
-        description: error.message || "Failed to update details",
-        type: "error",
-      });
-    },
-  });
-
-  const changePasswordMutation = useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      return await apiRequest("/api/user/change-password", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: () => {
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setEditingField(null);
-      toast({
-        title: "Password changed",
-        description: "Your password has been changed successfully.",
-        type: "success",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Password change failed",
-        description: error.message || "Failed to change password",
-        type: "error",
-      });
-    },
-  });
-
-  const buildDetailsPayload = (overrides: Record<string, any>) => {
-    const base: any = {
-      bio: user?.bio || "",
-      teachingSubjects: Array.isArray(user?.teachingSubjects) ? user.teachingSubjects : [],
-      yearsExperience:
-        user?.yearsExperience !== undefined && user?.yearsExperience !== null
-          ? user.yearsExperience
-          : null,
-      qualifications: user?.qualifications || "",
-      specialization: user?.specialization || "",
-      phone: user?.phone || "",
-      preferredContact: user?.preferredContact || "",
-      interests: Array.isArray(user?.interests) ? user.interests : [],
-      favoriteSubject: user?.favoriteSubject || "",
-      learningGoals: user?.learningGoals || "",
-    };
-    return { ...base, ...overrides };
-  };
-
-  const handleNameSave = () => updateProfileMutation.mutate({ name });
-
-  const handleBioSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ bio }));
-
-  const handleSubjectsSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ teachingSubjects }));
-
-  const handleYearsExperienceSave = () => {
-    if (yearsExperience) {
-      const exp = parseInt(yearsExperience);
-      if (isNaN(exp) || exp < 0 || exp > 100) {
-        toast({
-          title: "Invalid input",
-          description: "Years of experience must be between 0 and 100",
-          type: "error",
-        });
-        return;
-      }
-      updateDetailsMutation.mutate(buildDetailsPayload({ yearsExperience: exp }));
-    } else {
-      updateDetailsMutation.mutate(buildDetailsPayload({ yearsExperience: null }));
-    }
-  };
-
-  const handleQualificationsSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ qualifications }));
-
-  const handleSpecializationSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ specialization }));
-
-  const handlePhoneSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ phone }));
-
-  const handlePreferredContactSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ preferredContact }));
-
-  const handleInterestsSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ interests }));
-
-  const handleFavoriteSubjectSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ favoriteSubject }));
-
-  const handleLearningGoalsSave = () =>
-    updateDetailsMutation.mutate(buildDetailsPayload({ learningGoals }));
-
-  const handlePasswordSave = () => {
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "New password and confirm password must match",
-        type: "error",
-      });
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 8 characters",
-        type: "error",
-      });
-      return;
-    }
-    changePasswordMutation.mutate({ currentPassword, newPassword });
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Please select an image file", type: "error" });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Image must be less than 5MB", type: "error" });
-      return;
-    }
-
-    setUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "profile-pictures");
-
-      const uploadResponse = await fetch("/api/upload", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("sessionId")}`,
-        },
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) throw new Error("Failed to upload image");
-
-      const uploadData = await uploadResponse.json();
-
-      const updateResponse = await apiRequest("/api/user/profile-picture", {
-        method: "PATCH",
-        body: JSON.stringify({ profilePicture: uploadData.url }),
-      });
-
-      setUser(updateResponse.user);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({
-        title: "Profile picture updated",
-        description: "Your profile picture has been updated successfully.",
-        type: "success",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload profile picture",
-        type: "error",
-      });
-    } finally {
-      setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const isPendingDetails = updateDetailsMutation.isPending;
-
-  const tagBadges = (items: string[], onRemove: (i: number) => void, testPrefix: string) => (
-    <div className="flex flex-wrap gap-2 mt-2">
+/* ── Tag badge list ── */
+function TagList({
+  items,
+  onRemove,
+  testPrefix,
+}: {
+  items: string[];
+  onRemove: (i: number) => void;
+  testPrefix: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
       {items.map((item, index) => (
         <Badge
           key={index}
           variant="secondary"
-          className="px-2 py-1 flex items-center gap-1"
+          className="px-2 py-1 flex items-center gap-1 text-sm"
           data-testid={`tag-${testPrefix}-${index}`}
         >
           {item}
@@ -406,33 +144,203 @@ export default function Profile() {
       ))}
     </div>
   );
+}
+
+/* ═══════════════════════════════════════════════════
+   Main page
+═══════════════════════════════════════════════════ */
+export default function Profile() {
+  const { user, setUser } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const stopEditing = () => setEditingField(null);
+
+  // Account fields
+  const [name, setName] = useState(user?.name || "");
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Security fields
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Bio & detail fields
+  const [bio, setBio] = useState(user?.bio || "");
+  const [teachingSubjects, setTeachingSubjects] = useState<string[]>(
+    Array.isArray(user?.teachingSubjects) ? user.teachingSubjects : []
+  );
+  const [subjectInput, setSubjectInput] = useState("");
+  const [yearsExperience, setYearsExperience] = useState(
+    user?.yearsExperience != null ? user.yearsExperience.toString() : ""
+  );
+  const [qualifications, setQualifications] = useState(user?.qualifications || "");
+  const [specialization, setSpecialization] = useState(user?.specialization || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [preferredContact, setPreferredContact] = useState(user?.preferredContact || "");
+  const [interests, setInterests] = useState<string[]>(
+    Array.isArray(user?.interests) ? user.interests : []
+  );
+  const [interestInput, setInterestInput] = useState("");
+  const [favoriteSubject, setFavoriteSubject] = useState(user?.favoriteSubject || "");
+  const [learningGoals, setLearningGoals] = useState(user?.learningGoals || "");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Array helpers
+  const addSubject = () => {
+    const t = subjectInput.trim();
+    if (t && !teachingSubjects.includes(t)) { setTeachingSubjects([...teachingSubjects, t]); setSubjectInput(""); }
+  };
+  const removeSubject = (i: number) => setTeachingSubjects(teachingSubjects.filter((_, j) => j !== i));
+
+  const addInterest = () => {
+    const t = interestInput.trim();
+    if (t && !interests.includes(t)) { setInterests([...interests, t]); setInterestInput(""); }
+  };
+  const removeInterest = (i: number) => setInterests(interests.filter((_, j) => j !== i));
+
+  /* ── Mutations ── */
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { name: string }) =>
+      await apiRequest("/api/user/profile", { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: (data) => {
+      setUser(data.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      stopEditing();
+      toast({ title: "Saved", description: "Your name has been updated.", type: "success" });
+    },
+    onError: (error: any) =>
+      toast({ title: "Update failed", description: error.message || "Failed to update", type: "error" }),
+  });
+
+  const updateDetailsMutation = useMutation({
+    mutationFn: async (data: any) =>
+      await apiRequest("/api/user/profile-details", { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: (data) => {
+      setUser(data.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      stopEditing();
+      toast({ title: "Saved", description: "Your details have been updated.", type: "success" });
+    },
+    onError: (error: any) =>
+      toast({ title: "Update failed", description: error.message || "Failed to update", type: "error" }),
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) =>
+      await apiRequest("/api/user/change-password", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      stopEditing();
+      toast({ title: "Password changed", description: "Your password has been updated.", type: "success" });
+    },
+    onError: (error: any) =>
+      toast({ title: "Password change failed", description: error.message || "Failed to change password", type: "error" }),
+  });
+
+  /* Builds full details payload, merging current saved values with one override */
+  const detailsPayload = (overrides: Record<string, any>) => ({
+    bio: user?.bio || "",
+    teachingSubjects: Array.isArray(user?.teachingSubjects) ? user.teachingSubjects : [],
+    yearsExperience: user?.yearsExperience ?? null,
+    qualifications: user?.qualifications || "",
+    specialization: user?.specialization || "",
+    phone: user?.phone || "",
+    preferredContact: user?.preferredContact || "",
+    interests: Array.isArray(user?.interests) ? user.interests : [],
+    favoriteSubject: user?.favoriteSubject || "",
+    learningGoals: user?.learningGoals || "",
+    ...overrides,
+  });
+
+  /* ── Save handlers ── */
+  const handleNameSave = () => updateProfileMutation.mutate({ name });
+
+  const handleBioSave = () => updateDetailsMutation.mutate(detailsPayload({ bio }));
+  const handleSubjectsSave = () => updateDetailsMutation.mutate(detailsPayload({ teachingSubjects }));
+  const handleYearsExperienceSave = () => {
+    if (yearsExperience) {
+      const n = parseInt(yearsExperience);
+      if (isNaN(n) || n < 0 || n > 100) {
+        toast({ title: "Invalid input", description: "Must be 0–100", type: "error" }); return;
+      }
+      updateDetailsMutation.mutate(detailsPayload({ yearsExperience: n }));
+    } else {
+      updateDetailsMutation.mutate(detailsPayload({ yearsExperience: null }));
+    }
+  };
+  const handleQualificationsSave = () => updateDetailsMutation.mutate(detailsPayload({ qualifications }));
+  const handleSpecializationSave = () => updateDetailsMutation.mutate(detailsPayload({ specialization }));
+  const handlePhoneSave = () => updateDetailsMutation.mutate(detailsPayload({ phone }));
+  const handlePreferredContactSave = () => updateDetailsMutation.mutate(detailsPayload({ preferredContact }));
+  const handleInterestsSave = () => updateDetailsMutation.mutate(detailsPayload({ interests }));
+  const handleFavoriteSubjectSave = () => updateDetailsMutation.mutate(detailsPayload({ favoriteSubject }));
+  const handleLearningGoalsSave = () => updateDetailsMutation.mutate(detailsPayload({ learningGoals }));
+
+  const handlePasswordSave = () => {
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Passwords don't match", description: "New password and confirm must match", type: "error" }); return;
+    }
+    if (newPassword.length < 8) {
+      toast({ title: "Password too short", description: "Must be at least 8 characters", type: "error" }); return;
+    }
+    changePasswordMutation.mutate({ currentPassword, newPassword });
+  };
+
+  /* ── Image upload ── */
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast({ title: "Invalid file", description: "Please select an image", type: "error" }); return; }
+    if (file.size > 5 * 1024 * 1024) { toast({ title: "Too large", description: "Max 5 MB", type: "error" }); return; }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "profile-pictures");
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("sessionId")}` },
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error("Failed to upload image");
+
+      const { url } = await uploadRes.json();
+      const updateRes = await apiRequest("/api/user/profile-picture", {
+        method: "PATCH",
+        body: JSON.stringify({ profilePicture: url }),
+      });
+      setUser(updateRes.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({ title: "Photo updated", description: "Your profile picture has been updated.", type: "success" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message || "Failed to upload", type: "error" });
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const isPendingDetails = updateDetailsMutation.isPending;
+
+  /* ── Placeholder display helpers ── */
+  const empty = (label: string) => <span className="text-gray-400">{label}</span>;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50">
       <ModernSidebar />
-      <div className="md:ml-[240px] p-6 pt-20 md:pt-6">
-        <div className="max-w-2xl mx-auto space-y-10">
+      <div className="md:ml-[240px] px-4 sm:px-6 py-12 pt-20 md:pt-12">
+        <div className="max-w-2xl mx-auto space-y-12">
 
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">Settings</h1>
-            <p className="text-muted-foreground text-sm">
-              Manage your account preferences and profile details.
-            </p>
-          </div>
-
-          {/* ── Account ── */}
+          {/* ══ Account ══ */}
           <Section title="Account">
-            <div className="p-5 flex justify-between items-center gap-4">
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">Profile photo</div>
-                <Avatar className="w-16 h-16 border-2 border-background shadow-sm">
-                  <AvatarImage src={user?.profilePicture || ""} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-medium">
-                    {user?.name?.charAt(0).toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              <div>
+
+            {/* Photo row */}
+            <div className="px-6 py-6">
+              <div className="flex items-center gap-5">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -441,26 +349,43 @@ export default function Profile() {
                   className="hidden"
                   data-testid="input-picture"
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImage}
-                  className="text-primary hover:text-primary hover:bg-primary/5 font-medium"
+                  className="relative group cursor-pointer"
                   data-testid="button-upload-picture"
                 >
-                  {uploadingImage ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Edit
-                </Button>
+                  <Avatar className="h-20 w-20 border-2 border-gray-100 group-hover:border-gray-200 transition-all">
+                    <AvatarImage src={user?.profilePicture || ""} alt={user?.name || "User"} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-lg font-medium">
+                      {user?.name?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  {uploadingImage ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
+                      <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 rounded-full transition-all">
+                      <Camera className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  )}
+                </button>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Profile</p>
+                  <p className="text-lg font-medium text-gray-900">{user?.name}</p>
+                </div>
               </div>
             </div>
 
-            <ItemRow
+            {/* Name */}
+            <Row
               label="Name"
-              value={user?.name}
+              displayValue={user?.name || empty("Not set")}
               isEditing={editingField === "name"}
               onEdit={() => { setEditingField("name"); setName(user?.name || ""); }}
-              onCancel={() => setEditingField(null)}
+              onCancel={stopEditing}
               onSave={handleNameSave}
               isPending={updateProfileMutation.isPending}
               editContent={
@@ -469,74 +394,77 @@ export default function Profile() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your full name"
                   data-testid="input-name"
-                  className="max-w-md"
+                  className="h-10 max-w-xs border-gray-300"
+                  autoFocus
                 />
               }
             />
 
-            <ItemRow
+            {/* Email */}
+            <Row
               label="Email"
-              value={user?.email}
+              displayValue={user?.email}
               isEditing={false}
+              onCancel={stopEditing}
+              onSave={() => {}}
               readOnly
               readOnlyNote="Cannot be changed"
+              editContent={null}
             />
 
-            <ItemRow
+            {/* Role */}
+            <Row
               label="Role"
-              value={
-                <Badge variant="secondary" className="capitalize text-sm px-2 py-0.5">
-                  {user?.role}
-                </Badge>
+              displayValue={
+                <Badge variant="secondary" className="capitalize px-2 py-0.5">{user?.role}</Badge>
               }
               isEditing={false}
+              onCancel={stopEditing}
+              onSave={() => {}}
               readOnly
+              editContent={null}
             />
           </Section>
 
-          {/* ── Bio & Details ── */}
-          <Section title="Bio & Details">
-            <ItemRow
+          {/* ══ Bio & Details ══ */}
+          <Section title="Bio &amp; Details">
+            {/* Bio */}
+            <Row
               label="Bio"
-              value={
-                <span className="text-muted-foreground font-normal text-sm line-clamp-2">
-                  {user?.bio || "No bio added yet."}
-                </span>
-              }
+              displayValue={user?.bio || empty("No bio yet.")}
               isEditing={editingField === "bio"}
               onEdit={() => { setEditingField("bio"); setBio(user?.bio || ""); }}
-              onCancel={() => setEditingField(null)}
+              onCancel={stopEditing}
               onSave={handleBioSave}
               isPending={isPendingDetails}
               editContent={
-                <div className="space-y-2 max-w-md">
+                <div className="w-full space-y-1">
                   <Textarea
                     data-testid="input-bio"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     placeholder="Tell us about yourself..."
-                    className="min-h-[100px] resize-none"
+                    className="min-h-[90px] resize-none border-gray-300"
                     maxLength={500}
                   />
-                  <p className="text-xs text-muted-foreground">{bio.length}/500 characters</p>
+                  <p className="text-xs text-gray-400">{bio.length}/500</p>
                 </div>
               }
             />
 
+            {/* Teacher fields */}
             {user?.role === "teacher" && (
               <>
-                <ItemRow
+                <Row
                   label="Teaching Subjects"
-                  value={
+                  displayValue={
                     user?.teachingSubjects && (user.teachingSubjects as string[]).length > 0 ? (
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {(user.teachingSubjects as string[]).map((s, i) => (
                           <Badge key={i} variant="secondary" className="text-xs">{s}</Badge>
                         ))}
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">None added yet.</span>
-                    )
+                    ) : empty("None added yet.")
                   }
                   isEditing={editingField === "teachingSubjects"}
                   onEdit={() => {
@@ -544,77 +472,63 @@ export default function Profile() {
                     setTeachingSubjects(Array.isArray(user?.teachingSubjects) ? [...user.teachingSubjects] : []);
                     setSubjectInput("");
                   }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handleSubjectsSave}
                   isPending={isPendingDetails}
                   editContent={
-                    <div className="space-y-2 max-w-md">
+                    <div className="w-full space-y-2">
                       <div className="flex gap-2">
                         <Input
                           data-testid="input-subject"
                           value={subjectInput}
                           onChange={(e) => setSubjectInput(e.target.value)}
-                          placeholder="Add a subject (e.g., Mathematics)"
-                          onKeyPress={(e) => {
-                            if (e.key === "Enter") { e.preventDefault(); addSubject(); }
-                          }}
+                          onKeyPress={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubject(); } }}
+                          placeholder="e.g. Mathematics"
+                          className="h-10 border-gray-300 max-w-xs"
                         />
-                        <Button type="button" onClick={addSubject} data-testid="button-add-subject" variant="secondary">
+                        <Button type="button" variant="outline" onClick={addSubject} data-testid="button-add-subject" className="h-10">
                           Add
                         </Button>
                       </div>
-                      {teachingSubjects.length > 0 && tagBadges(teachingSubjects, removeSubject, "subject")}
+                      <TagList items={teachingSubjects} onRemove={removeSubject} testPrefix="subject" />
                     </div>
                   }
                 />
 
-                <ItemRow
+                <Row
                   label="Years of Experience"
-                  value={
-                    user?.yearsExperience !== undefined && user?.yearsExperience !== null ? (
-                      <span>{user.yearsExperience} {user.yearsExperience === 1 ? "year" : "years"}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">Not specified.</span>
-                    )
+                  displayValue={
+                    user?.yearsExperience != null
+                      ? `${user.yearsExperience} ${user.yearsExperience === 1 ? "year" : "years"}`
+                      : empty("Not specified.")
                   }
                   isEditing={editingField === "yearsExperience"}
                   onEdit={() => {
                     setEditingField("yearsExperience");
-                    setYearsExperience(
-                      user?.yearsExperience !== undefined && user?.yearsExperience !== null
-                        ? user.yearsExperience.toString()
-                        : ""
-                    );
+                    setYearsExperience(user?.yearsExperience != null ? user.yearsExperience.toString() : "");
                   }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handleYearsExperienceSave}
                   isPending={isPendingDetails}
                   editContent={
                     <Input
                       data-testid="input-years-experience"
-                      type="number"
-                      min="0"
-                      max="100"
+                      type="number" min="0" max="100"
                       value={yearsExperience}
                       onChange={(e) => setYearsExperience(e.target.value)}
-                      placeholder="e.g., 5"
-                      className="max-w-[160px]"
+                      placeholder="e.g. 5"
+                      className="h-10 w-32 border-gray-300"
+                      autoFocus
                     />
                   }
                 />
 
-                <ItemRow
+                <Row
                   label="Qualifications"
-                  value={
-                    user?.qualifications ? (
-                      <span>{user.qualifications}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">Not specified.</span>
-                    )
-                  }
+                  displayValue={user?.qualifications || empty("Not specified.")}
                   isEditing={editingField === "qualifications"}
                   onEdit={() => { setEditingField("qualifications"); setQualifications(user?.qualifications || ""); }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handleQualificationsSave}
                   isPending={isPendingDetails}
                   editContent={
@@ -622,24 +536,19 @@ export default function Profile() {
                       data-testid="input-qualifications"
                       value={qualifications}
                       onChange={(e) => setQualifications(e.target.value)}
-                      placeholder="e.g., Bachelor's in Education"
-                      className="max-w-md"
+                      placeholder="e.g. Bachelor's in Education"
+                      className="h-10 max-w-xs border-gray-300"
+                      autoFocus
                     />
                   }
                 />
 
-                <ItemRow
+                <Row
                   label="Specialization"
-                  value={
-                    user?.specialization ? (
-                      <span>{user.specialization}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">Not specified.</span>
-                    )
-                  }
+                  displayValue={user?.specialization || empty("Not specified.")}
                   isEditing={editingField === "specialization"}
                   onEdit={() => { setEditingField("specialization"); setSpecialization(user?.specialization || ""); }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handleSpecializationSave}
                   isPending={isPendingDetails}
                   editContent={
@@ -647,28 +556,24 @@ export default function Profile() {
                       data-testid="input-specialization"
                       value={specialization}
                       onChange={(e) => setSpecialization(e.target.value)}
-                      placeholder="e.g., STEM Education"
-                      className="max-w-md"
+                      placeholder="e.g. STEM Education"
+                      className="h-10 max-w-xs border-gray-300"
+                      autoFocus
                     />
                   }
                 />
               </>
             )}
 
+            {/* Parent fields */}
             {user?.role === "parent" && (
               <>
-                <ItemRow
+                <Row
                   label="Phone Number"
-                  value={
-                    user?.phone ? (
-                      <span>{user.phone}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">Not specified.</span>
-                    )
-                  }
+                  displayValue={user?.phone || empty("Not specified.")}
                   isEditing={editingField === "phone"}
                   onEdit={() => { setEditingField("phone"); setPhone(user?.phone || ""); }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handlePhoneSave}
                   isPending={isPendingDetails}
                   editContent={
@@ -677,24 +582,19 @@ export default function Profile() {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g., +1 234 567 8900"
-                      className="max-w-md"
+                      placeholder="+1 234 567 8900"
+                      className="h-10 max-w-xs border-gray-300"
+                      autoFocus
                     />
                   }
                 />
 
-                <ItemRow
+                <Row
                   label="Preferred Contact Method"
-                  value={
-                    user?.preferredContact ? (
-                      <span>{user.preferredContact}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">Not specified.</span>
-                    )
-                  }
+                  displayValue={user?.preferredContact || empty("Not specified.")}
                   isEditing={editingField === "preferredContact"}
                   onEdit={() => { setEditingField("preferredContact"); setPreferredContact(user?.preferredContact || ""); }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handlePreferredContactSave}
                   isPending={isPendingDetails}
                   editContent={
@@ -702,28 +602,28 @@ export default function Profile() {
                       data-testid="input-preferred-contact"
                       value={preferredContact}
                       onChange={(e) => setPreferredContact(e.target.value)}
-                      placeholder="e.g., Email, Phone, App Messaging"
-                      className="max-w-md"
+                      placeholder="e.g. Email, Phone, App Messaging"
+                      className="h-10 max-w-xs border-gray-300"
+                      autoFocus
                     />
                   }
                 />
               </>
             )}
 
+            {/* Student fields */}
             {user?.role === "student" && (
               <>
-                <ItemRow
-                  label="Interests & Hobbies"
-                  value={
+                <Row
+                  label="Interests &amp; Hobbies"
+                  displayValue={
                     user?.interests && (user.interests as string[]).length > 0 ? (
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {(user.interests as string[]).map((s, i) => (
                           <Badge key={i} variant="secondary" className="text-xs">{s}</Badge>
                         ))}
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">None added yet.</span>
-                    )
+                    ) : empty("None added yet.")
                   }
                   isEditing={editingField === "interests"}
                   onEdit={() => {
@@ -731,42 +631,35 @@ export default function Profile() {
                     setInterests(Array.isArray(user?.interests) ? [...user.interests] : []);
                     setInterestInput("");
                   }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handleInterestsSave}
                   isPending={isPendingDetails}
                   editContent={
-                    <div className="space-y-2 max-w-md">
+                    <div className="w-full space-y-2">
                       <div className="flex gap-2">
                         <Input
                           data-testid="input-interest"
                           value={interestInput}
                           onChange={(e) => setInterestInput(e.target.value)}
-                          placeholder="Add an interest (e.g., Reading)"
-                          onKeyPress={(e) => {
-                            if (e.key === "Enter") { e.preventDefault(); addInterest(); }
-                          }}
+                          onKeyPress={(e) => { if (e.key === "Enter") { e.preventDefault(); addInterest(); } }}
+                          placeholder="e.g. Reading"
+                          className="h-10 border-gray-300 max-w-xs"
                         />
-                        <Button type="button" onClick={addInterest} data-testid="button-add-interest" variant="secondary">
+                        <Button type="button" variant="outline" onClick={addInterest} data-testid="button-add-interest" className="h-10">
                           Add
                         </Button>
                       </div>
-                      {interests.length > 0 && tagBadges(interests, removeInterest, "interest")}
+                      <TagList items={interests} onRemove={removeInterest} testPrefix="interest" />
                     </div>
                   }
                 />
 
-                <ItemRow
+                <Row
                   label="Favorite Subject"
-                  value={
-                    user?.favoriteSubject ? (
-                      <span>{user.favoriteSubject}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">Not specified.</span>
-                    )
-                  }
+                  displayValue={user?.favoriteSubject || empty("Not specified.")}
                   isEditing={editingField === "favoriteSubject"}
                   onEdit={() => { setEditingField("favoriteSubject"); setFavoriteSubject(user?.favoriteSubject || ""); }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handleFavoriteSubjectSave}
                   isPending={isPendingDetails}
                   editContent={
@@ -774,24 +667,23 @@ export default function Profile() {
                       data-testid="input-favorite-subject"
                       value={favoriteSubject}
                       onChange={(e) => setFavoriteSubject(e.target.value)}
-                      placeholder="e.g., Science"
-                      className="max-w-md"
+                      placeholder="e.g. Science"
+                      className="h-10 max-w-xs border-gray-300"
+                      autoFocus
                     />
                   }
                 />
 
-                <ItemRow
+                <Row
                   label="Learning Goals"
-                  value={
-                    user?.learningGoals ? (
-                      <span className="text-sm font-normal line-clamp-2">{user.learningGoals}</span>
-                    ) : (
-                      <span className="text-muted-foreground font-normal text-sm">Not specified.</span>
-                    )
+                  displayValue={
+                    user?.learningGoals
+                      ? <span className="text-sm">{user.learningGoals}</span>
+                      : empty("Not specified.")
                   }
                   isEditing={editingField === "learningGoals"}
                   onEdit={() => { setEditingField("learningGoals"); setLearningGoals(user?.learningGoals || ""); }}
-                  onCancel={() => setEditingField(null)}
+                  onCancel={stopEditing}
                   onSave={handleLearningGoalsSave}
                   isPending={isPendingDetails}
                   editContent={
@@ -800,7 +692,7 @@ export default function Profile() {
                       value={learningGoals}
                       onChange={(e) => setLearningGoals(e.target.value)}
                       placeholder="What do you want to achieve?"
-                      className="min-h-[100px] resize-none max-w-md"
+                      className="min-h-[90px] resize-none border-gray-300 w-full max-w-sm"
                     />
                   }
                 />
@@ -808,55 +700,34 @@ export default function Profile() {
             )}
           </Section>
 
-          {/* ── Security ── */}
+          {/* ══ Security ══ */}
           <Section title="Security">
-            <ItemRow
+            <Row
               label="Password"
-              value={user?.googleId ? "Managed by Google" : "••••••••"}
+              displayValue={user?.googleId ? "Managed by Google" : "••••••••"}
               isEditing={editingField === "password"}
               onEdit={() => {
                 setEditingField("password");
-                setCurrentPassword("");
-                setNewPassword("");
-                setConfirmPassword("");
+                setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
               }}
-              onCancel={() => setEditingField(null)}
+              onCancel={stopEditing}
               onSave={handlePasswordSave}
               isPending={changePasswordMutation.isPending}
               readOnly={!!user?.googleId}
-              readOnlyNote={
-                user?.googleId
-                  ? "You signed in with Google — password change is not available"
-                  : undefined
-              }
+              readOnlyNote={user?.googleId ? "You signed in with Google — password change is not available" : undefined}
               editContent={
-                <div className="space-y-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label htmlFor="current-password">Current Password</Label>
-                    <Input
-                      id="current-password"
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                    />
+                <div className="w-full space-y-3 max-w-sm">
+                  <div className="space-y-1">
+                    <Label htmlFor="current-password" className="text-xs text-gray-500 uppercase tracking-wider">Current Password</Label>
+                    <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-10 border-gray-300" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                    />
+                  <div className="space-y-1">
+                    <Label htmlFor="new-password" className="text-xs text-gray-500 uppercase tracking-wider">New Password</Label>
+                    <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-10 border-gray-300" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm New Password</Label>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
+                  <div className="space-y-1">
+                    <Label htmlFor="confirm-password" className="text-xs text-gray-500 uppercase tracking-wider">Confirm New Password</Label>
+                    <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-10 border-gray-300" />
                   </div>
                 </div>
               }
