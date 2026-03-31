@@ -373,15 +373,14 @@ export function registerRoutes(app: Express) {
       const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
 
       if (!isTutorRequestMode) {
-        // Auto-assign student to the first available teacher.
-        // Also create an approved TutorRequest so all authorization paths have a single
-        // source of truth (approved TutorRequest) for this teacher-student link.
-        const tsa = await storage.assignStudentToFirstAvailableTeacher(student.id);
-        if (tsa) {
+        // Select a teacher by load-balancing approved TutorRequest counts, then create
+        // only an approved TutorRequest (single source of truth — no TSA write).
+        const teacherId = await storage.findFirstAvailableTeacherId(student.id);
+        if (teacherId !== null) {
           const today = new Date().toISOString().split("T")[0];
           await storage.createTutorRequest({
             parentId: invite.parentId,
-            teacherId: tsa.teacherId,
+            teacherId,
             studentId: student.id,
             status: "approved",
             message: "Auto-assigned on student signup",
@@ -498,15 +497,14 @@ export function registerRoutes(app: Express) {
       const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
 
       if (!isTutorRequestMode) {
-        // Auto-assign student to the first available teacher.
-        // Also create an approved TutorRequest so all authorization paths have a single
-        // source of truth (approved TutorRequest) for this teacher-student link.
-        const tsa = await storage.assignStudentToFirstAvailableTeacher(student.id);
-        if (tsa) {
+        // Select a teacher by load-balancing approved TutorRequest counts, then create
+        // only an approved TutorRequest (single source of truth — no TSA write).
+        const teacherId = await storage.findFirstAvailableTeacherId(student.id);
+        if (teacherId !== null) {
           const today = new Date().toISOString().split("T")[0];
           await storage.createTutorRequest({
             parentId: invite.parentId,
-            teacherId: tsa.teacherId,
+            teacherId,
             studentId: student.id,
             status: "approved",
             message: "Auto-assigned on student signup",
@@ -3399,16 +3397,7 @@ export function registerRoutes(app: Express) {
             });
           }
 
-          // Teacher-student assignment (direct)
-          const existingTSA = await storage.getTeacherStudentAssignment(teacher.id, studentRecord.id);
-          if (!existingTSA) {
-            await storage.createTeacherStudentAssignment({
-              teacherId: teacher.id,
-              studentId: studentRecord.id,
-              assignedDate: today,
-              status: "active",
-            });
-          }
+          // TutorRequest is the single source of truth — no TSA write needed in seed
 
           // Progress reports
           await storage.createProgressReport({
@@ -3559,10 +3548,7 @@ export function registerRoutes(app: Express) {
               responseDate: new Date(Date.now() - 23 * 86400000).toISOString().split("T")[0],
             });
           }
-          const existingTSA2 = await storage.getTeacherStudentAssignment(teacher2.id, studentRecord2.id);
-          if (!existingTSA2) {
-            await storage.createTeacherStudentAssignment({ teacherId: teacher2.id, studentId: studentRecord2.id, assignedDate: today, status: "active" });
-          }
+          // TutorRequest is the single source of truth — no TSA write needed in seed
 
           await storage.createProgressReport({
             studentId: studentRecord2.id, teacherId: teacher2.id,
@@ -3689,10 +3675,7 @@ export function registerRoutes(app: Express) {
               responseDate: new Date(Date.now() - 28 * 86400000).toISOString().split("T")[0],
             });
           }
-          const existingTSA3 = await storage.getTeacherStudentAssignment(teacher3.id, studentRecord3.id);
-          if (!existingTSA3) {
-            await storage.createTeacherStudentAssignment({ teacherId: teacher3.id, studentId: studentRecord3.id, assignedDate: today, status: "active" });
-          }
+          // TutorRequest is the single source of truth — no TSA write needed in seed
 
           await storage.createProgressReport({
             studentId: studentRecord3.id, teacherId: teacher3.id,

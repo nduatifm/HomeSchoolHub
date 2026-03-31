@@ -248,6 +248,7 @@ export interface IStorage {
   assignStudentToFirstAvailableTeacher(
     studentId: number,
   ): Promise<TeacherStudentAssignment | null>;
+  findFirstAvailableTeacherId(studentId: number): Promise<number | null>;
   removeTeacherStudentAssignment(
     teacherId: number,
     studentId: number,
@@ -885,9 +886,30 @@ class PrismaStorage implements IStorage {
           }
         }
       } else {
-        students = await prisma.student.findMany({
-          select: { id: true, name: true, userId: true, parentId: true },
+        // Direct-assignment mode: use approved TutorRequest as single source of truth
+        const directRequests = await prisma.tutorRequest.findMany({
+          where: { teacherId: userId, status: "approved" },
+          include: {
+            parent: {
+              include: {
+                parentStudents: { select: { id: true, name: true, userId: true, parentId: true } },
+              },
+            },
+          },
         });
+        const seen = new Set<number>();
+        students = [];
+        for (const r of directRequests) {
+          const candidates = r.studentId
+            ? r.parent.parentStudents.filter((s) => s.id === r.studentId)
+            : r.parent.parentStudents;
+          for (const s of candidates) {
+            if (!seen.has(s.id)) {
+              seen.add(s.id);
+              students.push({ id: s.id, name: s.name, userId: s.userId, parentId: s.parentId });
+            }
+          }
+        }
       }
 
       if (students.length === 0) return [];
@@ -928,16 +950,12 @@ class PrismaStorage implements IStorage {
 
     if (role === "parent") {
       type TeacherRef = { id: number; name: string };
-      const [parentStudents, parentUser, directAssignments, tutorRequests] = await Promise.all([
+      const [parentStudents, parentUser, tutorRequests] = await Promise.all([
         prisma.student.findMany({
           where: { parentId: userId },
           select: { id: true, name: true, userId: true, parentId: true },
         }),
         prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
-        prisma.teacherStudentAssignment.findMany({
-          where: { student: { parentId: userId }, status: "active" },
-          select: { studentId: true, teacher: { select: { id: true, name: true } } },
-        }),
         prisma.tutorRequest.findMany({
           where: { parentId: userId, status: "approved", studentId: { not: null } },
           select: { studentId: true, teacher: { select: { id: true, name: true } } },
@@ -949,9 +967,6 @@ class PrismaStorage implements IStorage {
       const teacherMap = new Map<number, TeacherRef>();
       for (const r of tutorRequests) {
         if (r.studentId != null && !teacherMap.has(r.studentId)) teacherMap.set(r.studentId, r.teacher);
-      }
-      for (const a of directAssignments) {
-        teacherMap.set(a.studentId, a.teacher);
       }
 
       const assignedStudents = parentStudents.filter((s) => teacherMap.has(s.id));
@@ -1010,11 +1025,7 @@ class PrismaStorage implements IStorage {
       });
       if (!studentRecord) return [];
 
-      const [directAssignment, tutorRequest, parentUser] = await Promise.all([
-        prisma.teacherStudentAssignment.findFirst({
-          where: { studentId: studentRecord.id, status: "active" },
-          select: { teacher: { select: { id: true, name: true } } },
-        }),
+      const [tutorRequest, parentUser] = await Promise.all([
         prisma.tutorRequest.findFirst({
           where: { studentId: studentRecord.id, status: "approved" },
           select: { teacher: { select: { id: true, name: true } } },
@@ -1022,7 +1033,7 @@ class PrismaStorage implements IStorage {
         prisma.user.findUnique({ where: { id: studentRecord.parentId }, select: { name: true } }),
       ]);
 
-      const teacherUser = directAssignment?.teacher ?? tutorRequest?.teacher ?? null;
+      const teacherUser = tutorRequest?.teacher ?? null;
       if (!teacherUser) return [];
 
       const groups: ConvGroup[] = [{
@@ -1356,6 +1367,26 @@ class PrismaStorage implements IStorage {
         status: "active",
       },
     })) as TeacherStudentAssignment;
+  }
+
+  // Selects the teacher with fewest approved TutorRequests (load-balancing) and
+  // returns their userId. Does NOT write any records — callers create TutorRequest.
+  async findFirstAvailableTeacherId(studentId: number): Promise<number | null> {
+    const teachers = await prisma.user.findMany({
+      where: { role: "teacher" },
+      select: {
+        id: true,
+        _count: { select: { tutorRequests: { where: { status: "approved" } } } },
+      },
+    });
+    if (teachers.length === 0) return null;
+    // Exclude teachers already linked to this student via approved TutorRequest
+    const existing = await prisma.tutorRequest.findFirst({
+      where: { studentId, status: "approved" },
+    });
+    if (existing) return existing.teacherId;
+    teachers.sort((a, b) => a._count.tutorRequests - b._count.tutorRequests);
+    return teachers[0].id;
   }
 
   async removeTeacherStudentAssignment(
