@@ -182,6 +182,7 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
     mutationFn: (assignmentId: number) =>
       apiRequest(`/api/classrooms/${classroomId}/assignments/${assignmentId}`, { method: "DELETE" }),
     onSuccess: () => {
+      setExpanded(null);
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment deleted", type: "success" });
     },
