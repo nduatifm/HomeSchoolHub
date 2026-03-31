@@ -825,7 +825,6 @@ export default function Profile() {
               This will give you access to a full teacher dashboard alongside your parent account.
               You can switch between your parent and teacher views at any time from the sidebar —
               your family's data and your tutoring profile stay completely separate.
-              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

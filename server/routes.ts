@@ -307,6 +307,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
+          roles: (user as any).roles ?? [],
         },
         sessionId,
       });
@@ -595,6 +596,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
+          roles: (user as any).roles ?? [],
         },
         sessionId,
       });
@@ -805,6 +807,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
+          roles: (user as any).roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -846,6 +849,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
+          roles: (user as any).roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -942,6 +946,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
+          roles: (user as any).roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -3884,6 +3889,28 @@ export function registerRoutes(app: Express) {
     return classroom;
   }
 
+  async function requireClassroomMember(req: any, res: any): Promise<any | null> {
+    const classroomId = parseInt(req.params.classroomId || req.params.id);
+    if (isNaN(classroomId)) { res.status(400).json({ error: "Invalid classroom id" }); return null; }
+    const classroom = await storage.getClassroomById(classroomId);
+    if (!classroom) { res.status(404).json({ error: "Classroom not found" }); return null; }
+    const userId = req.session.userId as number;
+    if (classroom.teacherId === userId) return classroom;
+    const user = await storage.getUserById(userId);
+    if (!user) { res.status(401).json({ error: "Unauthorized" }); return null; }
+    const enrollments = await storage.getEnrollments(classroomId);
+    if (user.role === "student") {
+      const student = await storage.getStudentByUserId(userId);
+      if (student && enrollments.some((e: any) => e.studentId === student.id)) return classroom;
+    } else if (user.role === "parent") {
+      const children = await storage.getStudentsByParent(userId);
+      const enrolledIds = new Set(enrollments.map((e: any) => e.studentId));
+      if (children.some((c: any) => enrolledIds.has(c.id))) return classroom;
+    }
+    res.status(403).json({ error: "You are not a member of this classroom" });
+    return null;
+  }
+
   // POST /api/classrooms — teacher creates a classroom
   app.post("/api/classrooms", requireAuth, async (req, res) => {
     try {
@@ -3940,11 +3967,11 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/classrooms/:id — get classroom detail
+  // GET /api/classrooms/:id — get classroom detail (teacher or enrolled member only)
   app.get("/api/classrooms/:id", requireAuth, async (req, res) => {
     try {
-      const classroom = await storage.getClassroomById(parseInt(req.params.id));
-      if (!classroom) return res.status(404).json({ error: "Classroom not found" });
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
       res.json(classroom);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4013,11 +4040,12 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/classrooms/:classroomId/enrollments — get enrolled students
+  // GET /api/classrooms/:classroomId/enrollments — get enrolled students (teacher only)
   app.get("/api/classrooms/:classroomId/enrollments", requireAuth, async (req, res) => {
     try {
-      const classroomId = parseInt(req.params.classroomId);
-      const enrollments = await storage.getEnrollments(classroomId);
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const enrollments = await storage.getEnrollments(classroom.id);
       res.json(enrollments);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4040,11 +4068,12 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/classrooms/:classroomId/posts — get feed
+  // GET /api/classrooms/:classroomId/posts — get feed (classroom members only)
   app.get("/api/classrooms/:classroomId/posts", requireAuth, async (req, res) => {
     try {
-      const classroomId = parseInt(req.params.classroomId);
-      const posts = await storage.getClassroomPosts(classroomId);
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+      const posts = await storage.getClassroomPosts(classroom.id);
       res.json(posts);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4070,11 +4099,12 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/classrooms/:classroomId/assignments — list assignments
+  // GET /api/classrooms/:classroomId/assignments — list assignments (classroom members only)
   app.get("/api/classrooms/:classroomId/assignments", requireAuth, async (req, res) => {
     try {
-      const classroomId = parseInt(req.params.classroomId);
-      const assignments = await storage.getClassroomAssignments(classroomId);
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+      const assignments = await storage.getClassroomAssignments(classroom.id);
       res.json(assignments);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4196,11 +4226,12 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/classrooms/:classroomId/materials — get materials
+  // GET /api/classrooms/:classroomId/materials — get materials (classroom members only)
   app.get("/api/classrooms/:classroomId/materials", requireAuth, async (req, res) => {
     try {
-      const classroomId = parseInt(req.params.classroomId);
-      const materials = await storage.getClassroomMaterials(classroomId);
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+      const materials = await storage.getClassroomMaterials(classroom.id);
       res.json(materials);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
