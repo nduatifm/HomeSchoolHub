@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -6,17 +6,107 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Upload, User, Settings, Camera, FileText, X } from "lucide-react";
+import { Loader2, X, Upload } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
+
+interface SectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+function Section({ title, children }: SectionProps) {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
+      <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+        <div className="divide-y">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ItemRowProps {
+  label: string;
+  value?: React.ReactNode;
+  isEditing: boolean;
+  onEdit?: () => void;
+  onCancel?: () => void;
+  onSave?: () => void;
+  isPending?: boolean;
+  editContent?: React.ReactNode;
+  readOnly?: boolean;
+  readOnlyNote?: string;
+  customAction?: React.ReactNode;
+}
+
+function ItemRow({ 
+  label, 
+  value, 
+  isEditing, 
+  onEdit, 
+  onCancel, 
+  onSave, 
+  isPending, 
+  editContent,
+  readOnly,
+  readOnlyNote,
+  customAction
+}: ItemRowProps) {
+  return (
+    <div className="p-5 flex flex-col gap-4">
+      {isEditing ? (
+        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div>
+            <div className="text-sm font-medium text-muted-foreground mb-4">{label}</div>
+            {editContent}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={onCancel} disabled={isPending}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={onSave} disabled={isPending}>
+              {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex justify-between items-start gap-4">
+          <div className="space-y-1">
+            <div className="text-sm font-medium text-muted-foreground">{label}</div>
+            <div className="text-base text-foreground font-medium">{value}</div>
+            {readOnly && readOnlyNote && (
+              <div className="text-xs text-muted-foreground mt-1">{readOnlyNote}</div>
+            )}
+          </div>
+          <div>
+            {customAction ? (
+              customAction
+            ) : readOnly ? null : (
+              <Button variant="ghost" size="sm" onClick={onEdit} className="text-primary hover:text-primary hover:bg-primary/5 font-medium">
+                Edit
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Profile() {
   const { user, setUser } = useAuth();
   const queryClient = useQueryClient();
 
+  // Editing states
+  const [editingField, setEditingField] = useState<string | null>(null);
+
+  // Values
   const [name, setName] = useState(user?.name || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -37,7 +127,9 @@ export default function Profile() {
   const [favoriteSubject, setFavoriteSubject] = useState(user?.favoriteSubject || "");
   const [learningGoals, setLearningGoals] = useState(user?.learningGoals || "");
 
-  // Helper functions for array management
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Array helpers
   const addSubject = () => {
     const trimmed = subjectInput.trim();
     if (trimmed && !teachingSubjects.includes(trimmed)) {
@@ -62,6 +154,7 @@ export default function Profile() {
     setInterests(interests.filter((_, i) => i !== index));
   };
 
+  // Mutations
   const updateProfileMutation = useMutation({
     mutationFn: async (data: { name: string }) => {
       return await apiRequest("/api/user/profile", {
@@ -72,6 +165,7 @@ export default function Profile() {
     onSuccess: (data) => {
       setUser(data.user);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setEditingField(null);
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -82,6 +176,32 @@ export default function Profile() {
       toast({
         title: "Update failed",
         description: error.message || "Failed to update profile",
+        type: "error",
+      });
+    },
+  });
+
+  const updateDetailsMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("/api/user/profile-details", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (data) => {
+      setUser(data.user);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setEditingField(null);
+      toast({
+        title: "Details updated",
+        description: "Your profile details have been updated successfully.",
+        type: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update details",
         type: "error",
       });
     },
@@ -98,6 +218,7 @@ export default function Profile() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setEditingField(null);
       toast({
         title: "Password changed",
         description: "Your password has been changed successfully.",
@@ -113,40 +234,12 @@ export default function Profile() {
     },
   });
 
-  const updateDetailsMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await apiRequest("/api/user/profile-details", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: (data) => {
-      setUser(data.user);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({
-        title: "Details updated",
-        description: "Your profile details have been updated successfully.",
-        type: "success",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update failed",
-        description: error.message || "Failed to update details",
-        type: "error",
-      });
-    },
-  });
-
-  const handleProfileSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handlers
+  const handleNameSave = () => {
     updateProfileMutation.mutate({ name });
   };
 
-  const handleDetailsSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Client-side validation for teacher experience
+  const handleDetailsSave = () => {
     if (user?.role === "teacher" && yearsExperience) {
       const experience = parseInt(yearsExperience);
       if (isNaN(experience) || experience < 0 || experience > 100) {
@@ -159,11 +252,8 @@ export default function Profile() {
       }
     }
     
-    const detailsData: any = { 
-      bio: bio
-    };
+    const detailsData: any = { bio };
     
-    // Always send all role-specific fields (including empty values) to allow deletion
     if (user?.role === "teacher") {
       detailsData.teachingSubjects = teachingSubjects;
       detailsData.yearsExperience = yearsExperience ? parseInt(yearsExperience) : null;
@@ -181,9 +271,7 @@ export default function Profile() {
     updateDetailsMutation.mutate(detailsData);
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handlePasswordSave = () => {
     if (newPassword !== confirmPassword) {
       toast({
         title: "Passwords don't match",
@@ -269,125 +357,107 @@ export default function Profile() {
       });
     } finally {
       setUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
   };
 
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
-      
       <div className="md:ml-[240px] p-6 pt-20 md:pt-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground mb-1">
-              Profile Settings
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Manage your account settings and preferences
-            </p>
+        <div className="max-w-2xl mx-auto space-y-10">
+          
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">Settings</h1>
+            <p className="text-muted-foreground text-sm">Manage your account preferences and profile details.</p>
           </div>
 
-          <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="profile" data-testid="tab-profile">
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="details" data-testid="tab-details">
-              <FileText className="h-4 w-4 mr-2" />
-              Bio & Details
-            </TabsTrigger>
-            <TabsTrigger value="picture" data-testid="tab-picture">
-              <Camera className="h-4 w-4 mr-2" />
-              Picture
-            </TabsTrigger>
-            <TabsTrigger value="security" data-testid="tab-security">
-              <Settings className="h-4 w-4 mr-2" />
-              Security
-            </TabsTrigger>
-          </TabsList>
+          <Section title="Account">
+            <div className="p-5 flex justify-between items-center gap-4">
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-muted-foreground">Profile photo</div>
+                <Avatar className="w-16 h-16 border-2 border-background shadow-sm">
+                  <AvatarImage src={user?.profilePicture || ""} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-xl font-medium">
+                    {user?.name?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/*"
+                  className="hidden"
+                  data-testid="input-picture"
+                />
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={uploadingImage}
+                  className="text-primary hover:text-primary hover:bg-primary/5 font-medium"
+                  data-testid="button-upload-picture"
+                >
+                  {uploadingImage ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Edit
+                </Button>
+              </div>
+            </div>
 
-          <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>
-                  Update your personal details and information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleProfileSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      data-testid="input-name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Enter your full name"
-                    />
-                  </div>
+            <ItemRow 
+              label="Name" 
+              value={user?.name}
+              isEditing={editingField === "name"}
+              onEdit={() => { setEditingField("name"); setName(user?.name || ""); }}
+              onCancel={() => setEditingField(null)}
+              onSave={handleNameSave}
+              isPending={updateProfileMutation.isPending}
+              editContent={
+                <Input 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  placeholder="Your full name"
+                  data-testid="input-name"
+                  className="max-w-md"
+                />
+              }
+            />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      data-testid="input-email"
-                      value={user?.email || ""}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-sm text-muted-foreground">Email cannot be changed</p>
-                  </div>
+            <ItemRow 
+              label="Email" 
+              value={user?.email}
+              isEditing={false}
+              readOnly
+              readOnlyNote="Cannot be changed"
+            />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
-                    <Input
-                      id="role"
-                      data-testid="input-role"
-                      value={user?.role || ""}
-                      disabled
-                      className="bg-muted capitalize"
-                    />
-                  </div>
+            <ItemRow 
+              label="Role" 
+              value={
+                <Badge variant="secondary" className="capitalize text-sm px-2 py-0.5">
+                  {user?.role}
+                </Badge>
+              }
+              isEditing={false}
+              readOnly
+            />
+          </Section>
 
-                  <Button
-                    type="submit"
-                    data-testid="button-save-profile"
-                    disabled={updateProfileMutation.isPending}
-                  >
-                    {updateProfileMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Save Changes
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="details">
-            <Card>
-              <CardHeader>
-                <CardTitle>Bio & Additional Details</CardTitle>
-                <CardDescription>
-                  {user?.role === "teacher" ? "Share your teaching experience and expertise" :
-                   user?.role === "parent" ? "Add contact information and preferences" :
-                   "Tell us about your interests and goals"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleDetailsSubmit} className="space-y-6">
-                  {/* Bio - Common for all roles */}
+          <Section title="Bio & Details">
+            <ItemRow 
+              label="Profile Details" 
+              value={<div className="line-clamp-2 text-muted-foreground text-sm max-w-[80%]">{user?.bio || "No bio added yet."}</div>}
+              isEditing={editingField === "details"}
+              onEdit={() => setEditingField("details")}
+              onCancel={() => setEditingField(null)}
+              onSave={handleDetailsSave}
+              isPending={updateDetailsMutation.isPending}
+              editContent={
+                <div className="space-y-6 animate-in fade-in">
                   <div className="space-y-2">
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea
@@ -396,60 +466,43 @@ export default function Profile() {
                       value={bio}
                       onChange={(e) => setBio(e.target.value)}
                       placeholder="Tell us about yourself..."
-                      className="min-h-[100px]"
+                      className="min-h-[100px] resize-none"
                       maxLength={500}
                     />
                     <p className="text-xs text-muted-foreground">{bio.length}/500 characters</p>
                   </div>
 
-                  {/* Teacher-specific fields */}
                   {user?.role === "teacher" && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="teaching-subjects">Teaching Subjects</Label>
-                        <div className="space-y-2">
-                          <div className="flex gap-2">
-                            <Input
-                              id="teaching-subjects"
-                              data-testid="input-subject"
-                              value={subjectInput}
-                              onChange={(e) => setSubjectInput(e.target.value)}
-                              placeholder="Add a subject (e.g., Mathematics)"
-                              onKeyPress={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  addSubject();
-                                }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              onClick={addSubject}
-                              data-testid="button-add-subject"
-                            >
-                              Add
-                            </Button>
-                          </div>
-                          {teachingSubjects.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {teachingSubjects.map((subject, index) => (
-                                <div key={index} className="flex items-center gap-1 bg-muted px-3 py-1 rounded-full" data-testid={`tag-subject-${index}`}>
-                                  <span className="text-sm">{subject}</span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-4 w-4 p-0 hover:bg-transparent"
-                                    onClick={() => removeSubject(index)}
-                                    data-testid={`button-remove-subject-${index}`}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        <Label>Teaching Subjects</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            data-testid="input-subject"
+                            value={subjectInput}
+                            onChange={(e) => setSubjectInput(e.target.value)}
+                            placeholder="Add a subject (e.g., Mathematics)"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addSubject();
+                              }
+                            }}
+                          />
+                          <Button type="button" onClick={addSubject} data-testid="button-add-subject" variant="secondary">Add</Button>
                         </div>
+                        {teachingSubjects.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {teachingSubjects.map((subject, index) => (
+                              <Badge key={index} variant="secondary" className="px-2 py-1 flex items-center gap-1" data-testid={`tag-subject-${index}`}>
+                                {subject}
+                                <button type="button" onClick={() => removeSubject(index)} className="hover:text-destructive transition-colors ml-1" data-testid={`button-remove-subject-${index}`}>
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -474,7 +527,6 @@ export default function Profile() {
                           value={qualifications}
                           onChange={(e) => setQualifications(e.target.value)}
                           placeholder="e.g., Bachelor's in Education"
-                          maxLength={200}
                         />
                       </div>
 
@@ -486,13 +538,11 @@ export default function Profile() {
                           value={specialization}
                           onChange={(e) => setSpecialization(e.target.value)}
                           placeholder="e.g., STEM Education"
-                          maxLength={100}
                         />
                       </div>
                     </>
                   )}
 
-                  {/* Parent-specific fields */}
                   {user?.role === "parent" && (
                     <>
                       <div className="space-y-2">
@@ -504,7 +554,6 @@ export default function Profile() {
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="e.g., +1 234 567 8900"
-                          maxLength={20}
                         />
                       </div>
 
@@ -516,60 +565,42 @@ export default function Profile() {
                           value={preferredContact}
                           onChange={(e) => setPreferredContact(e.target.value)}
                           placeholder="e.g., Email, Phone, App Messaging"
-                          maxLength={50}
                         />
                       </div>
                     </>
                   )}
 
-                  {/* Student-specific fields */}
                   {user?.role === "student" && (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="interests">Interests & Hobbies</Label>
-                        <div className="space-y-2">
-                          <div className="flex gap-2">
-                            <Input
-                              id="interests"
-                              data-testid="input-interest"
-                              value={interestInput}
-                              onChange={(e) => setInterestInput(e.target.value)}
-                              placeholder="Add an interest (e.g., Reading)"
-                              onKeyPress={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  addInterest();
-                                }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              onClick={addInterest}
-                              data-testid="button-add-interest"
-                            >
-                              Add
-                            </Button>
-                          </div>
-                          {interests.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {interests.map((interest, index) => (
-                                <div key={index} className="flex items-center gap-1 bg-muted px-3 py-1 rounded-full" data-testid={`tag-interest-${index}`}>
-                                  <span className="text-sm">{interest}</span>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-4 w-4 p-0 hover:bg-transparent"
-                                    onClick={() => removeInterest(index)}
-                                    data-testid={`button-remove-interest-${index}`}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                        <Label>Interests & Hobbies</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            data-testid="input-interest"
+                            value={interestInput}
+                            onChange={(e) => setInterestInput(e.target.value)}
+                            placeholder="Add an interest (e.g., Reading)"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addInterest();
+                              }
+                            }}
+                          />
+                          <Button type="button" onClick={addInterest} data-testid="button-add-interest" variant="secondary">Add</Button>
                         </div>
+                        {interests.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {interests.map((interest, index) => (
+                              <Badge key={index} variant="secondary" className="px-2 py-1 flex items-center gap-1" data-testid={`tag-interest-${index}`}>
+                                {interest}
+                                <button type="button" onClick={() => removeInterest(index)} className="hover:text-destructive transition-colors ml-1" data-testid={`button-remove-interest-${index}`}>
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -580,7 +611,6 @@ export default function Profile() {
                           value={favoriteSubject}
                           onChange={(e) => setFavoriteSubject(e.target.value)}
                           placeholder="e.g., Science"
-                          maxLength={100}
                         />
                       </div>
 
@@ -592,146 +622,68 @@ export default function Profile() {
                           value={learningGoals}
                           onChange={(e) => setLearningGoals(e.target.value)}
                           placeholder="What do you want to achieve?"
-                          className="min-h-[100px]"
-                          maxLength={500}
+                          className="min-h-[100px] resize-none"
                         />
                       </div>
                     </>
                   )}
+                </div>
+              }
+            />
+          </Section>
 
-                  <Button
-                    type="submit"
-                    data-testid="button-save-details"
-                    disabled={updateDetailsMutation.isPending}
-                  >
-                    {updateDetailsMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Save Details
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="picture">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Picture</CardTitle>
-                <CardDescription>
-                  Upload a profile picture to personalize your account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center space-y-6">
-                  <Avatar className="h-32 w-32">
-                    <AvatarImage src={user?.profilePicture || undefined} alt={user?.name} />
-                    <AvatarFallback className="text-2xl">
-                      {user?.name ? getInitials(user.name) : "U"}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className="w-full max-w-sm">
-                    <Label
-                      htmlFor="profile-picture"
-                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        {uploadingImage ? (
-                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
-                        ) : (
-                          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                        )}
-                        <p className="text-sm text-muted-foreground">
-                          {uploadingImage ? "Uploading..." : "Click to upload profile picture"}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 5MB</p>
-                      </div>
-                      <Input
-                        id="profile-picture"
-                        data-testid="input-profile-picture"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={uploadingImage}
-                      />
-                    </Label>
+          <Section title="Security">
+            <ItemRow 
+              label="Password" 
+              value={user?.googleId ? "Managed by Google" : "••••••••"}
+              isEditing={editingField === "password"}
+              onEdit={() => {
+                setEditingField("password");
+                setCurrentPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+              }}
+              onCancel={() => setEditingField(null)}
+              onSave={handlePasswordSave}
+              isPending={changePasswordMutation.isPending}
+              readOnly={!!user?.googleId}
+              readOnlyNote={user?.googleId ? "You signed in with Google — password change is not available" : undefined}
+              editContent={
+                <div className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password">Current Password</Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              }
+            />
+          </Section>
 
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-                <CardDescription>
-                  Update your password to keep your account secure
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {user?.googleId ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      You signed in with Google. Password change is not available.
-                    </p>
-                  </div>
-                ) : (
-                  <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="current-password">Current Password</Label>
-                      <Input
-                        id="current-password"
-                        data-testid="input-current-password"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password">New Password</Label>
-                      <Input
-                        id="new-password"
-                        data-testid="input-new-password"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Enter new password"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password">Confirm New Password</Label>
-                      <Input
-                        id="confirm-password"
-                        data-testid="input-confirm-password"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                      />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      data-testid="button-change-password"
-                      disabled={changePasswordMutation.isPending}
-                    >
-                      {changePasswordMutation.isPending && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Change Password
-                    </Button>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          {/* Bottom spacing */}
+          <div className="h-10" />
         </div>
       </div>
     </div>

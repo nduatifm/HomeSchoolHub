@@ -103,7 +103,7 @@ function AppRoutes() {
       <Route path="/verify-email">
         <VerifyEmail />
       </Route>
-      <Route path="/profile">
+      <Route path="/settings">
         <ProtectedRoute component={Profile} />
       </Route>
       <Route path="/admin">

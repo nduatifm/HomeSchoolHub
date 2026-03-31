@@ -215,7 +215,7 @@ export default function ModernSidebar() {
             className="w-56"
           >
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex items-center gap-2.5 w-full cursor-pointer">
+              <Link href="/settings" className="flex items-center gap-2.5 w-full cursor-pointer">
                 <Settings className="w-4 h-4 text-gray-500" />
                 Settings
               </Link>
