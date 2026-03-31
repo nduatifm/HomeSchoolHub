@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -165,6 +165,16 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
     onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (assignmentId: number) =>
+      apiRequest(`/api/classrooms/${classroomId}/assignments/${assignmentId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
+      toast({ title: "Assignment deleted", type: "success" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
+  });
+
   const gradeMutation = useMutation({
     mutationFn: ({ submissionId }: { submissionId: number }) =>
       apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/grade`, {
@@ -211,62 +221,130 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
       {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
       {!isLoading && assignments.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No assignments yet.</div>}
 
-      {assignments.map((a) => (
-        <Card key={a.id} className="overflow-hidden">
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-base">{a.title}</CardTitle>
-                <p className="text-xs text-gray-500 mt-0.5">Due {a.dueDate} · {a.points} pts</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
-                {expanded === a.id ? "Collapse" : "View Submissions"}
-              </Button>
-            </div>
-            <p className="text-sm text-gray-600">{a.description}</p>
-          </CardHeader>
-
-          {expanded === a.id && (
-            <CardContent className="pt-0">
-              <div className="border-t pt-3 space-y-2">
-                {loadingSubs && <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-gray-400" /></div>}
-                {expandedSubs.map((sub) => (
-                  <div key={sub.id} className="rounded-lg border p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{sub.studentName}</span>
-                      <StatusBadge status={sub.status} />
-                    </div>
-                    {sub.content && <p className="text-sm text-gray-600 bg-gray-50 rounded p-2">{sub.content}</p>}
-                    {sub.grade !== null && (
-                      <p className="text-xs text-green-700 font-medium">Grade: {sub.grade}/{a.points}</p>
-                    )}
-                    {sub.feedback && <p className="text-xs text-gray-500 italic">"{sub.feedback}"</p>}
-                    {(sub.status === "submitted" || sub.status === "late") && gradingId !== sub.id && (
-                      <Button size="sm" variant="outline" onClick={() => { setGradingId(sub.id); setGradeVal(""); setFeedbackVal(""); }}>
-                        Grade
+      <div className="overflow-x-auto rounded-lg border">
+        {assignments.length > 0 && (
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Assignment</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Due Date</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Points</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Submissions</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {assignments.map((a) => (
+                <React.Fragment key={a.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">{a.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.dueDate}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Button variant="ghost" size="sm" className="text-xs" onClick={() => setExpanded(expanded === a.id ? null : a.id)}>
+                        {expanded === a.id ? "Collapse" : "View Submissions"}
                       </Button>
-                    )}
-                    {gradingId === sub.id && (
-                      <div className="space-y-2 border-t pt-2">
-                        <div className="flex gap-2">
-                          <Input type="number" min={0} max={a.points} placeholder={`0–${a.points}`} value={gradeVal} onChange={(e) => setGradeVal(e.target.value)} className="w-24" />
-                          <Input placeholder="Feedback (optional)" value={feedbackVal} onChange={(e) => setFeedbackVal(e.target.value)} />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" disabled={gradeVal === "" || gradeMutation.isPending} onClick={() => gradeMutation.mutate({ submissionId: sub.id })}>
-                            {gradeMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save Grade"}
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setGradingId(null)}>Cancel</Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      ))}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {!isArchived && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-400 hover:text-red-600"
+                          onClick={() => {
+                            if (confirm("Delete this assignment and all its submissions?")) {
+                              deleteMutation.mutate(a.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                  {expanded === a.id && (
+                    <tr key={`${a.id}-subs`}>
+                      <td colSpan={5} className="px-4 pb-4 pt-1 bg-gray-50">
+                        {loadingSubs && <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-gray-400" /></div>}
+                        {!loadingSubs && expandedSubs.length === 0 && (
+                          <p className="text-xs text-gray-400 text-center py-3">No submissions yet.</p>
+                        )}
+                        {expandedSubs.length > 0 && (
+                          <div className="rounded-md border overflow-hidden mt-1">
+                            <table className="min-w-full text-xs">
+                              <thead className="bg-white border-b">
+                                <tr>
+                                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Student</th>
+                                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Status</th>
+                                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Answer</th>
+                                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Grade</th>
+                                  <th className="px-3 py-2"></th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 bg-white">
+                                {expandedSubs.map((sub) => (
+                                  <tr key={sub.id}>
+                                    <td className="px-3 py-2 font-medium text-gray-700">{sub.studentName}</td>
+                                    <td className="px-3 py-2"><StatusBadge status={sub.status} /></td>
+                                    <td className="px-3 py-2 max-w-[200px]">
+                                      {sub.content ? (
+                                        <span className="text-gray-600 truncate block">{sub.content}</span>
+                                      ) : (
+                                        <span className="text-gray-300">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      {sub.grade !== null && sub.grade !== undefined ? (
+                                        <span className="font-semibold text-green-700">{sub.grade}/{a.points}</span>
+                                      ) : (
+                                        <span className="text-gray-300">—</span>
+                                      )}
+                                      {sub.feedback && (
+                                        <p className="text-gray-400 italic mt-0.5">"{sub.feedback}"</p>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      {(sub.status === "submitted" || sub.status === "late") && gradingId !== sub.id && (
+                                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setGradingId(sub.id); setGradeVal(""); setFeedbackVal(""); }}>
+                                          Grade
+                                        </Button>
+                                      )}
+                                      {gradingId === sub.id && (
+                                        <div className="space-y-1.5 min-w-[220px]">
+                                          <div className="flex gap-1.5">
+                                            <Input type="number" min={0} max={a.points} placeholder={`0–${a.points}`} value={gradeVal} onChange={(e) => setGradeVal(e.target.value)} className="w-20 h-7 text-xs" />
+                                            <Input placeholder="Feedback" value={feedbackVal} onChange={(e) => setFeedbackVal(e.target.value)} className="h-7 text-xs" />
+                                          </div>
+                                          <div className="flex gap-1.5">
+                                            <Button size="sm" className="h-7 text-xs" disabled={gradeVal === "" || gradeMutation.isPending} onClick={() => gradeMutation.mutate({ submissionId: sub.id })}>
+                                              {gradeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setGradingId(null)}>Cancel</Button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
@@ -410,24 +488,37 @@ function MaterialsTab({ classroomId, isTeacher, isArchived }: { classroomId: num
       {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
       {!isLoading && materials.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No materials yet.</div>}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {materials.map((m) => (
-          <Card key={m.id}>
-            <CardContent className="pt-4 flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <a href={m.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1.5 text-sm">
+          <div key={m.id} className="flex items-start gap-3 rounded-lg border px-4 py-3 hover:border-primary/30 transition-colors">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={m.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary hover:underline flex items-center gap-1.5 text-sm"
+                >
                   {m.title}<ExternalLink className="h-3 w-3 shrink-0" />
                 </a>
-                {m.description && <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>}
-                <p className="text-xs text-gray-400 mt-1">{new Date(m.uploadedAt).toLocaleDateString()}</p>
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
+                  {new Date(m.uploadedAt).toLocaleDateString()}
+                </span>
               </div>
-              {isTeacher && (
-                <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 shrink-0" onClick={() => deleteMutation.mutate(m.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+              {m.description && <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>}
+            </div>
+            {isTeacher && !isArchived && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-400 hover:text-red-600 shrink-0"
+                onClick={() => deleteMutation.mutate(m.id)}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         ))}
       </div>
     </div>
@@ -535,7 +626,7 @@ function MembersTab({ classroomId, teacherId, isArchived }: { classroomId: numbe
 
 // ── Student Assignments tab ───────────────────────────────────────────────────
 function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classroomId: number; studentId: number; isArchived: boolean }) {
-  const [submitting, setSubmitting] = useState<number | null>(null);
+  const [submitOpen, setSubmitOpen] = useState<number | null>(null);
   const [submissionText, setSubmissionText] = useState("");
 
   const { data: assignments = [], isLoading: loadingA } = useQuery<ClassroomAssignment[]>({
@@ -555,7 +646,7 @@ function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classro
         body: JSON.stringify({ content: submissionText }),
       }),
     onSuccess: () => {
-      setSubmitting(null);
+      setSubmitOpen(null);
       setSubmissionText("");
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       toast({ title: "Submitted!", type: "success" });
@@ -574,56 +665,105 @@ function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classro
       {totalPoints > 0 && (
         <div className="bg-green-50 border border-green-100 rounded-lg px-4 py-3 flex items-center gap-3">
           <BarChart2 className="h-4 w-4 text-green-600" />
-          <span className="text-sm font-medium text-green-800">Your total: {earned} / {totalPoints} pts ({Math.round((earned / totalPoints) * 100)}%)</span>
+          <span className="text-sm font-medium text-green-800">
+            Your total: {earned} / {totalPoints} pts ({Math.round((earned / totalPoints) * 100)}%)
+          </span>
         </div>
       )}
 
       {assignments.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No assignments yet.</div>}
 
-      {assignments.map((a) => {
-        const sub = subMap[a.id];
-        return (
-          <Card key={a.id}>
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">{a.title}</CardTitle>
-                {sub && <StatusBadge status={sub.status} />}
-              </div>
-              <p className="text-xs text-gray-500">Due {a.dueDate} · {a.points} pts</p>
-              <p className="text-sm text-gray-600">{a.description}</p>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-2">
-              {sub?.grade !== null && sub?.grade !== undefined && (
-                <div className="bg-green-50 rounded-lg p-3 space-y-1">
-                  <p className="text-sm font-semibold text-green-800">Grade: {sub.grade} / {a.points}</p>
-                  {sub.feedback && <p className="text-sm text-green-700 italic">"{sub.feedback}"</p>}
-                </div>
-              )}
-              {sub?.content && sub.status !== "pending" && (
-                <div className="bg-gray-50 rounded p-2 text-sm text-gray-600">
-                  <span className="text-xs font-medium text-gray-400 block mb-1">Your submission:</span>
-                  {sub.content}
-                </div>
-              )}
-              {(!sub || sub.status === "pending") && !isArchived && (
-                submitting === a.id ? (
-                  <div className="space-y-2">
-                    <Textarea placeholder="Write your answer or paste a link…" value={submissionText} onChange={(e) => setSubmissionText(e.target.value)} rows={3} />
-                    <div className="flex gap-2">
-                      <Button size="sm" disabled={!submissionText.trim() || submitMutation.isPending} onClick={() => submitMutation.mutate(a.id)}>
-                        {submitMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Submit"}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setSubmitting(null); setSubmissionText(""); }}>Cancel</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => setSubmitting(a.id)}>Submit Work</Button>
-                )
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+      {assignments.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Assignment</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Due Date</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Points</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Grade</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {assignments.map((a) => {
+                const sub = subMap[a.id];
+                return (
+                  <tr key={a.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">{a.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.dueDate}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <StatusBadge status={sub?.status ?? "pending"} />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {sub?.grade !== null && sub?.grade !== undefined ? (
+                        <div>
+                          <span className="font-semibold text-green-700">{sub.grade}/{a.points}</span>
+                          {sub.feedback && (
+                            <p className="text-xs text-gray-400 italic mt-0.5 max-w-[120px] truncate" title={sub.feedback}>"{sub.feedback}"</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {(!sub || sub.status === "pending") && !isArchived && (
+                        <Dialog
+                          open={submitOpen === a.id}
+                          onOpenChange={(v) => {
+                            setSubmitOpen(v ? a.id : null);
+                            if (!v) setSubmissionText("");
+                          }}
+                        >
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="text-xs">Submit Work</Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Submit: {a.title}</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-3 pt-2">
+                              <p className="text-xs text-gray-500">Due {a.dueDate} · {a.points} pts</p>
+                              <div>
+                                <Label>Your answer or link</Label>
+                                <Textarea
+                                  placeholder="Write your answer or paste a link…"
+                                  value={submissionText}
+                                  onChange={(e) => setSubmissionText(e.target.value)}
+                                  rows={4}
+                                />
+                              </div>
+                              <Button
+                                className="w-full"
+                                disabled={!submissionText.trim() || submitMutation.isPending}
+                                onClick={() => submitMutation.mutate(a.id)}
+                              >
+                                {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                Submit
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                      {sub && sub.status !== "pending" && (
+                        <span className="text-xs text-gray-400">Submitted</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
