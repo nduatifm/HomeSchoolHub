@@ -13,7 +13,7 @@ model User {
   password           String?
   name               String
   role               String?
-  roles              String[]
+  roles              String[]  @default([])
   isEmailVerified    Boolean   @default(false)
   emailVerifyToken   String?   @unique
   emailVerifyExpires DateTime?

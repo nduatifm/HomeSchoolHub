@@ -466,8 +466,8 @@ export default function Profile() {
                       Switch to {r}
                     </Button>
                   ))}
-                {/* Add teacher role — only parents who don't have it yet */}
-                {user?.role === "parent" && !(user?.roles ?? []).includes("teacher") && (
+                {/* Add teacher role — only users who have parent capability but not teacher yet */}
+                {(user?.roles ?? []).includes("parent") && !(user?.roles ?? []).includes("teacher") && (
                   <Button
                     type="button"
                     size="sm"
@@ -518,8 +518,8 @@ export default function Profile() {
               }
             />
 
-            {/* Teacher fields */}
-            {user?.role === "teacher" && (
+            {/* Teacher fields — shown whenever user has the teacher capability */}
+            {(user?.roles ?? []).includes("teacher") && (
               <>
                 <Row
                   label="Teaching Subjects"
@@ -631,8 +631,8 @@ export default function Profile() {
               </>
             )}
 
-            {/* Parent fields */}
-            {user?.role === "parent" && (
+            {/* Parent fields — shown whenever user has the parent capability */}
+            {(user?.roles ?? []).includes("parent") && (
               <>
                 <Row
                   label="Phone Number"
@@ -677,8 +677,8 @@ export default function Profile() {
               </>
             )}
 
-            {/* Student fields */}
-            {user?.role === "student" && (
+            {/* Student fields — shown whenever user has the student capability */}
+            {(user?.roles ?? []).includes("student") && (
               <>
                 <Row
                   label="Interests &amp; Hobbies"

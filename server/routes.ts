@@ -231,6 +231,7 @@ export function registerRoutes(app: Express) {
         password: hashedPassword,
         name,
         role,
+        roles: [role],
         isEmailVerified: false,
         emailVerifyToken,
         emailVerifyExpires: emailVerifyExpires.toISOString(),
@@ -351,6 +352,7 @@ export function registerRoutes(app: Express) {
         password: hashedPassword,
         name: invite.studentName,
         role: "student",
+        roles: ["student"],
         isEmailVerified: true, // Verified via invite code
         emailVerifyToken: null,
         emailVerifyExpires: null,
@@ -461,6 +463,7 @@ export function registerRoutes(app: Express) {
         password: null,
         name: invite.studentName,
         role: "student",
+        roles: ["student"],
         isEmailVerified: true,
         emailVerifyToken: null,
         emailVerifyExpires: null,
@@ -574,6 +577,7 @@ export function registerRoutes(app: Express) {
           password: null, // No password for Google users
           name,
           role,
+          roles: [role],
           isEmailVerified: true, // Google already verified email
           emailVerifyToken: null,
           emailVerifyExpires: null,
@@ -961,17 +965,18 @@ export function registerRoutes(app: Express) {
   // Add a new role to the user's capabilities (e.g. parent adding teacher role)
   app.post("/api/user/add-role", requireAuth, async (req, res) => {
     try {
-      const { newRole } = z.object({ newRole: z.enum(["teacher", "parent"]) }).parse(req.body);
+      const { newRole } = z.object({ newRole: z.enum(["teacher"]) }).parse(req.body);
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      // Only parents can add the teacher role
       const currentRoles: string[] = (user as any).roles ?? [];
-      if (currentRoles.includes(newRole)) {
-        return res.status(400).json({ error: `You already have the ${newRole} role` });
+      if (!currentRoles.includes("parent")) {
+        return res.status(403).json({ error: "Only parents can add the teacher role" });
       }
 
-      if (newRole === "teacher" && user.role === "teacher") {
-        return res.status(400).json({ error: "You are already a teacher" });
+      if (currentRoles.includes(newRole)) {
+        return res.status(400).json({ error: `You already have the ${newRole} role` });
       }
 
       // Append new role to roles[] and switch active context to new role
@@ -2451,22 +2456,28 @@ export function registerRoutes(app: Express) {
 
         // Create or reactivate the TeacherStudentAssignment
         if (data.studentId) {
-          const today = new Date().toISOString().split("T")[0];
-          await prisma.teacherStudentAssignment.upsert({
-            where: {
-              teacherId_studentId: {
+          const studentForGuard = await storage.getStudentById(data.studentId);
+          // Guard: block assignment where the teacher is the student's own parent
+          if (studentForGuard && studentForGuard.parentId === data.teacherId) {
+            console.warn("[guard] Blocked self-TSA: teacherId === student.parentId");
+          } else {
+            const today = new Date().toISOString().split("T")[0];
+            await prisma.teacherStudentAssignment.upsert({
+              where: {
+                teacherId_studentId: {
+                  teacherId: data.teacherId,
+                  studentId: data.studentId,
+                },
+              },
+              create: {
                 teacherId: data.teacherId,
                 studentId: data.studentId,
+                assignedDate: today,
+                status: "active",
               },
-            },
-            create: {
-              teacherId: data.teacherId,
-              studentId: data.studentId,
-              assignedDate: today,
-              status: "active",
-            },
-            update: { status: "active", assignedDate: today },
-          });
+              update: { status: "active", assignedDate: today },
+            });
+          }
         }
       }
 
@@ -3089,6 +3100,7 @@ export function registerRoutes(app: Express) {
             password: hash,
             name: "Dr. Sarah Chen",
             role: "teacher",
+            roles: ["teacher"],
             isEmailVerified: true,
             bio: "Experienced educator specialising in Mathematics, Physics, and SAT Prep. Passionate about making complex topics accessible.",
             teachingSubjects: ["Mathematics", "Physics", "SAT Prep"],
@@ -3105,6 +3117,7 @@ export function registerRoutes(app: Express) {
             password: hash,
             name: "Mr. Marcus Johnson",
             role: "teacher",
+            roles: ["teacher"],
             isEmailVerified: true,
             bio: "English Literature and History specialist with a talent for bringing texts and events to life. Experienced with middle and high school learners.",
             teachingSubjects: ["English", "History", "Essay Writing"],
@@ -3121,6 +3134,7 @@ export function registerRoutes(app: Express) {
             password: hash,
             name: "Ms. Aisha Patel",
             role: "teacher",
+            roles: ["teacher"],
             isEmailVerified: true,
             bio: "Biology and Chemistry tutor focused on AP and IB level science. Loves helping students connect lab work to real-world applications.",
             teachingSubjects: ["Biology", "Chemistry", "AP Science"],
@@ -3138,6 +3152,7 @@ export function registerRoutes(app: Express) {
             password: hash,
             name: "James Wilson",
             role: "parent",
+            roles: ["parent"],
             isEmailVerified: true,
             phone: "+1 555-0192",
             preferredContact: "email",
@@ -3153,6 +3168,7 @@ export function registerRoutes(app: Express) {
             password: hash,
             name: "Emily Wilson",
             role: "student",
+            roles: ["student"],
             isEmailVerified: true,
             favoriteSubject: "Mathematics",
             learningGoals: "Improve SAT score, master calculus, get into a top university",
@@ -3179,6 +3195,7 @@ export function registerRoutes(app: Express) {
             password: hash,
             name: "Liam Wilson",
             role: "student",
+            roles: ["student"],
             isEmailVerified: true,
             favoriteSubject: "History",
             learningGoals: "Improve reading comprehension, write stronger essays, learn more about world history",
@@ -3205,6 +3222,7 @@ export function registerRoutes(app: Express) {
             password: hash,
             name: "Sophie Wilson",
             role: "student",
+            roles: ["student"],
             isEmailVerified: true,
             favoriteSubject: "Biology",
             learningGoals: "Score 5 on AP Biology and AP Chemistry, apply to pre-med programs",
