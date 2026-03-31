@@ -8,6 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, X, Camera, ArrowLeftRight, Plus } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -239,13 +249,15 @@ export default function Profile() {
       toast({ title: "Password change failed", description: error.message || "Failed to change password", type: "error" }),
   });
 
+  const [showAddRoleConfirm, setShowAddRoleConfirm] = useState(false);
+
   const addRoleMutation = useMutation({
-    mutationFn: async (newRole: string) =>
-      await apiRequest("/api/user/add-role", { method: "POST", body: JSON.stringify({ newRole }) }),
+    mutationFn: async (role: string) =>
+      await apiRequest("/api/user/add-role", { method: "POST", body: JSON.stringify({ role }) }),
     onSuccess: (data) => {
       setUser(data.user);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      toast({ title: "Role added", description: `You can now switch to the ${data.user.role} dashboard.`, type: "success" });
+      toast({ title: "Teacher role added", description: "You can now switch to your teacher dashboard from the sidebar or below.", type: "success" });
     },
     onError: (error: any) =>
       toast({ title: "Failed to add role", description: error.message || "Something went wrong", type: "error" }),
@@ -473,7 +485,7 @@ export default function Profile() {
                     size="sm"
                     variant="outline"
                     disabled={addRoleMutation.isPending}
-                    onClick={() => addRoleMutation.mutate("teacher")}
+                    onClick={() => setShowAddRoleConfirm(true)}
                     className="h-8 px-3 text-xs gap-1.5 border-dashed border-gray-300 text-gray-500 hover:bg-gray-50"
                   >
                     {addRoleMutation.isPending
@@ -803,6 +815,30 @@ export default function Profile() {
           <div className="h-10" />
         </div>
       </div>
+
+      {/* Confirm "Become a teacher" */}
+      <AlertDialog open={showAddRoleConfirm} onOpenChange={setShowAddRoleConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add a teacher role to your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will give you access to a full teacher dashboard alongside your parent account.
+              You can switch between your parent and teacher views at any time from the sidebar —
+              your family's data and your tutoring profile stay completely separate.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => addRoleMutation.mutate("teacher")}
+              className="bg-primary text-white hover:bg-primary/90"
+            >
+              Yes, make me a teacher
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -623,7 +623,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: (user as any).roles ?? [],
+          roles: user.roles ?? [],
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -965,12 +965,12 @@ export function registerRoutes(app: Express) {
   // Add a new role to the user's capabilities (e.g. parent adding teacher role)
   app.post("/api/user/add-role", requireAuth, async (req, res) => {
     try {
-      const { newRole } = z.object({ newRole: z.enum(["teacher"]) }).parse(req.body);
+      const { role: newRole } = z.object({ role: z.enum(["teacher"]) }).parse(req.body);
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
       // Only parents can add the teacher role
-      const currentRoles: string[] = (user as any).roles ?? [];
+      const currentRoles: string[] = user.roles ?? [];
       if (!currentRoles.includes("parent")) {
         return res.status(403).json({ error: "Only parents can add the teacher role" });
       }
@@ -1023,7 +1023,7 @@ export function registerRoutes(app: Express) {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      const currentRoles: string[] = (user as any).roles ?? [];
+      const currentRoles: string[] = user.roles ?? [];
       if (!currentRoles.includes(targetRole)) {
         return res.status(400).json({ error: `You do not have the ${targetRole} role` });
       }
