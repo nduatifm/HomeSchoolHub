@@ -896,13 +896,13 @@ export default function ParentDashboard() {
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pl-5">
                             {childClassrooms.map(c => (
-                              <div key={c.id} className="rounded-lg border p-3 flex flex-col gap-1.5 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.id}?studentId=${child.id}`; }}>
+                              <div key={c.id} className="rounded-lg border p-3 flex flex-col gap-1.5 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.slug ?? c.id}?studentId=${child.id}`; }}>
                                 <div className="flex items-start justify-between gap-2">
                                   <h4 className="font-semibold text-sm text-gray-900 leading-tight">{c.name}</h4>
                                   {c.status === "archived" && <span className="text-[10px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded shrink-0">Archived</span>}
                                 </div>
                                 <p className="text-xs text-primary font-medium">{c.subject}</p>
-                                <Button size="sm" variant="outline" className="w-full gap-1 text-xs mt-1" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.id}?studentId=${child.id}`; }}>
+                                <Button size="sm" variant="outline" className="w-full gap-1 text-xs mt-1" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}?studentId=${child.id}`; }}>
                                   View Grades <ChevronRight className="h-3 w-3" />
                                 </Button>
                               </div>

@@ -970,20 +970,22 @@ function ParentGradesTab({ classroomId, studentId }: { classroomId: number; stud
 
 // ── Main ClassroomDetail page ─────────────────────────────────────────────────
 export default function ClassroomDetail() {
-  const [, params] = useRoute("/classrooms/:id");
+  const [, params] = useRoute("/classrooms/:slug");
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const classroomId = parseInt(params?.id ?? "0");
+  const slugParam = params?.slug ?? "";
 
   // Parent: studentId from query string
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
 
   const { data: classroom, isLoading } = useQuery<Classroom>({
-    queryKey: ["/api/classrooms", classroomId],
-    queryFn: () => apiRequest(`/api/classrooms/${classroomId}`),
-    enabled: !!classroomId,
+    queryKey: ["/api/classrooms", slugParam],
+    queryFn: () => apiRequest(`/api/classrooms/${slugParam}`),
+    enabled: !!slugParam,
   });
+
+  const classroomId = classroom?.id ?? 0;
 
   // Student: resolve own studentId
   const { data: studentData } = useQuery<{ id: number }>({
@@ -996,7 +998,7 @@ export default function ClassroomDetail() {
     mutationFn: (status: "active" | "archived") =>
       apiRequest(`/api/classrooms/${classroomId}`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", slugParam] });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       toast({ title: classroom?.status === "active" ? "Classroom archived" : "Classroom reactivated", type: "success" });
     },

@@ -35,6 +35,7 @@ model User {
   // Admin flags
   isAdmin            Boolean   @default(false)
   isSuperAdmin       Boolean   @default(false)
+  slug               String?   @unique
 
   // Timestamps
   createdAt          DateTime  @default(now())
@@ -110,6 +111,7 @@ model Assignment {
   gradeLevel  String
   points      Int     @default(100)
   fileUrl     String?
+  slug        String? @unique
 
   teacher            User                @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   studentAssignments StudentAssignment[]
@@ -147,6 +149,7 @@ model Material {
   teacherId   Int
   uploadDate  String
   gradeLevel  String
+  slug        String? @unique
 
   teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
@@ -418,6 +421,7 @@ model Classroom {
   description String?
   teacherId   Int
   status      String   @default("active")
+  slug        String?  @unique
   createdAt   DateTime @default(now())
 
   teacher     User                  @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
@@ -427,6 +431,7 @@ model Classroom {
   materials   ClassroomMaterial[]
 
   @@index([teacherId])
+  @@index([slug])
 }
 
 model ClassroomEnrollment {
@@ -465,11 +470,13 @@ model ClassroomAssignment {
   dueDate     String
   points      Int      @default(100)
   fileUrl     String?
+  slug        String?
   createdAt   DateTime @default(now())
 
   classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   submissions ClassroomSubmission[]
 
+  @@unique([classroomId, slug])
   @@index([classroomId])
 }
 
@@ -498,10 +505,12 @@ model ClassroomMaterial {
   title       String
   description String
   url         String
+  slug        String?
   uploadedAt  DateTime @default(now())
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
+  @@unique([classroomId, slug])
   @@index([classroomId])
 }
 

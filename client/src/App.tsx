@@ -12,6 +12,7 @@ import TeacherDashboard from "./pages/TeacherDashboard";
 import ParentDashboard from "./pages/ParentDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import ClassroomDetail from "./pages/ClassroomDetail";
+import ClassworkDetail from "./pages/ClassworkDetail";
 import Landing from "./pages/Landing";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminUsers from "./pages/AdminUsers";
@@ -114,7 +115,10 @@ function AppRoutes() {
       <Route path="/notifications">
         <ProtectedRoute component={NotificationsPage} />
       </Route>
-      <Route path="/classrooms/:id">
+      <Route path="/classrooms/:slug/classwork/:classworkSlug">
+        <ProtectedRoute component={ClassworkDetail} />
+      </Route>
+      <Route path="/classrooms/:slug">
         <ProtectedRoute component={ClassroomDetail} />
       </Route>
       <Route path="/dashboard">

@@ -91,6 +91,16 @@ Icons are provided by Lucide React. The profile management features a modern tab
   - Classroom submission graded → notify student
 - **Sidebar bell**: "Notifications" nav item in `ModernSidebar` with unread badge; clicking opens a floating panel showing the last 50 notifications with timestamps, unread dot indicators, and "Mark all read" button
 
+### Slug System
+- **`shared/slugify.ts`**: `slugify(text, id)` generates URL-safe slugs in format `<sanitized-title>-<id>` (e.g. `biology-101-3`). The ID suffix guarantees global uniqueness without any retry loop.
+- **DB fields**: `slug` column added to `User`, `Assignment`, `Material`, `Classroom` (`@unique`), and scoped `@@unique([classroomId, slug])` on `ClassroomAssignment` and `ClassroomMaterial`.
+- **Auto-generation**: Every `create*` method in `storage.ts` for the six affected models runs a two-step create+update to generate and save the slug immediately.
+- **Storage helpers**: `getClassroomBySlug(slug)` and `getClassroomAssignmentBySlug(classroomId, slug)` added for routing needs.
+- **Routes**: `resolveClassroom(param)` helper accepts either a numeric ID or a slug string. `requireClassroomOwner` and `requireClassroomMember` use it, so all nested classroom routes transparently accept both.
+- **Frontend routes**: `/classrooms/:id` changed to `/classrooms/:slug` and `/classrooms/:slug/classwork/:classworkSlug` added (renders `ClassworkDetail.tsx`).
+- **Dashboard links**: All "Open Classroom" / "View Classroom" links use `c.slug ?? c.id` — old classrooms without slugs fall back to numeric ID (backward compatible).
+- **`ClassworkDetail.tsx`**: Assignment detail page showing grading form (teacher), submission form (student), or read-only view (parent). Reached via classroom slug + assignment slug URL.
+
 ## External Dependencies
 - **Database**: PostgreSQL (Neon-hosted)
 - **Cloud Storage**: Cloudinary (for profile picture uploads)

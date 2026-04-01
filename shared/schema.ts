@@ -35,6 +35,7 @@ export const userSchema = z.object({
   interests: z.array(z.string()),
   favoriteSubject: z.string().nullable(),
   learningGoals: z.string().nullable(),
+  slug: z.string().nullable().optional(),
 });
 
 export const insertUserSchema = userSchema.omit({
@@ -109,6 +110,7 @@ export const assignmentSchema = z.object({
   gradeLevel: z.string(),
   points: z.number().optional().default(0),
   fileUrl: z.string().nullable(),
+  slug: z.string().nullable().optional(),
 });
 
 export const insertAssignmentSchema = assignmentSchema.omit({ id: true });
@@ -151,6 +153,7 @@ export const materialSchema = z.object({
   teacherId: z.number(),
   uploadDate: z.string(),
   gradeLevel: z.string(),
+  slug: z.string().nullable().optional(),
 });
 
 export const insertMaterialSchema = materialSchema.omit({ id: true });
@@ -427,6 +430,7 @@ export const classroomSchema = z.object({
   teacherId: z.number(),
   status: z.enum(["active", "archived"]),
   createdAt: z.string(),
+  slug: z.string().nullable().optional(),
 });
 export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true });
 export type Classroom = z.infer<typeof classroomSchema>;
@@ -461,6 +465,7 @@ export const classroomAssignmentSchema = z.object({
   dueDate: z.string(),
   points: z.number(),
   fileUrl: z.string().nullable().optional(),
+  slug: z.string().nullable().optional(),
   createdAt: z.string(),
 });
 export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true });
@@ -488,6 +493,7 @@ export const classroomMaterialSchema = z.object({
   title: z.string(),
   description: z.string(),
   url: z.string(),
+  slug: z.string().nullable().optional(),
   uploadedAt: z.string(),
 });
 export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: true, uploadedAt: true });

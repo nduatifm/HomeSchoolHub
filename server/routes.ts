@@ -4096,24 +4096,29 @@ export function registerRoutes(app: Express) {
   // ─── Classroom routes ────────────────────────────────────────────────────
 
   // Helper: verify classroom belongs to requesting teacher
+  async function resolveClassroom(param: string): Promise<any | null> {
+    const numeric = parseInt(param);
+    if (!isNaN(numeric)) return storage.getClassroomById(numeric);
+    return storage.getClassroomBySlug(param);
+  }
+
   async function requireClassroomOwner(req: any, res: any): Promise<any | null> {
-    const classroomId = parseInt(req.params.classroomId || req.params.id);
-    const classroom = await storage.getClassroomById(classroomId);
+    const param = req.params.classroomId || req.params.id;
+    const classroom = await resolveClassroom(param);
     if (!classroom) { res.status(404).json({ error: "Classroom not found" }); return null; }
     if (classroom.teacherId !== req.session.userId) { res.status(403).json({ error: "Not your classroom" }); return null; }
     return classroom;
   }
 
   async function requireClassroomMember(req: any, res: any): Promise<any | null> {
-    const classroomId = parseInt(req.params.classroomId || req.params.id);
-    if (isNaN(classroomId)) { res.status(400).json({ error: "Invalid classroom id" }); return null; }
-    const classroom = await storage.getClassroomById(classroomId);
+    const param = req.params.classroomId || req.params.id;
+    const classroom = await resolveClassroom(param);
     if (!classroom) { res.status(404).json({ error: "Classroom not found" }); return null; }
     const userId = req.session.userId as number;
     if (classroom.teacherId === userId) return classroom;
     const user = await storage.getUserById(userId);
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return null; }
-    const enrollments = await storage.getEnrollments(classroomId);
+    const enrollments = await storage.getEnrollments(classroom.id);
     if (user.role === "student") {
       const student = await storage.getStudentByUserId(userId);
       if (student && enrollments.some((e: any) => e.studentId === student.id)) return classroom;

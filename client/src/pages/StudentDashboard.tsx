@@ -839,7 +839,7 @@ export default function StudentDashboard() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {classrooms.map(c => (
-                        <div key={c.id} className="rounded-lg border p-4 flex flex-col gap-2 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.id}`; }}>
+                        <div key={c.id} className="rounded-lg border p-4 flex flex-col gap-2 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.slug ?? c.id}`; }}>
                           <div className="flex items-start justify-between gap-2">
                             <h3 className="font-semibold text-sm text-gray-900 leading-tight">{c.name}</h3>
                             {c.status === "archived" && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">Archived</span>}
@@ -847,7 +847,7 @@ export default function StudentDashboard() {
                           <p className="text-xs text-primary font-medium">{c.subject}</p>
                           {c.description && <p className="text-xs text-gray-400 line-clamp-2">{c.description}</p>}
                           <div className="mt-auto pt-2">
-                            <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.id}`; }}>
+                            <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}`; }}>
                               View Classroom <ChevronRight className="h-3 w-3" />
                             </Button>
                           </div>

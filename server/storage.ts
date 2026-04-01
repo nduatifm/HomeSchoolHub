@@ -1,5 +1,6 @@
 import prisma from "./db";
 import { Prisma } from "@prisma/client";
+import { slugify } from "../shared/slugify";
 import type {
   User,
   InsertUser,
@@ -264,6 +265,7 @@ export interface IStorage {
   // ─── Classrooms ──────────────────────────────────────────────────────────
   createClassroom(data: InsertClassroom): Promise<Classroom>;
   getClassroomById(id: number): Promise<Classroom | null>;
+  getClassroomBySlug(slug: string): Promise<Classroom | null>;
   getClassroomsByTeacher(teacherId: number): Promise<Classroom[]>;
   getClassroomsForStudent(studentId: number): Promise<Classroom[]>;
   getClassroomsForParent(studentId: number): Promise<Classroom[]>;
@@ -279,6 +281,7 @@ export interface IStorage {
 
   createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment>;
   getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]>;
+  getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null>;
   deleteClassroomAssignment(id: number): Promise<void>;
 
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
@@ -300,7 +303,9 @@ export interface IStorage {
 
 class PrismaStorage implements IStorage {
   async createUser(user: Prisma.UserCreateInput): Promise<User> {
-    return (await prisma.user.create({ data: user })) as User;
+    const created = await prisma.user.create({ data: user });
+    const slug = slugify(created.name, created.id);
+    return (await prisma.user.update({ where: { id: created.id }, data: { slug } })) as User;
   }
 
   async getUserById(id: number): Promise<User | null> {
@@ -409,7 +414,9 @@ class PrismaStorage implements IStorage {
   }
 
   async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
-    return (await prisma.assignment.create({ data: assignment })) as Assignment;
+    const created = await prisma.assignment.create({ data: assignment });
+    const slug = slugify(created.title, created.id);
+    return (await prisma.assignment.update({ where: { id: created.id }, data: { slug } })) as Assignment;
   }
 
   async getAssignmentById(id: number): Promise<Assignment | null> {
@@ -491,7 +498,9 @@ class PrismaStorage implements IStorage {
   }
 
   async createMaterial(material: InsertMaterial): Promise<Material> {
-    return (await prisma.material.create({ data: material })) as Material;
+    const created = await prisma.material.create({ data: material });
+    const slug = slugify(created.title, created.id);
+    return (await prisma.material.update({ where: { id: created.id }, data: { slug } })) as Material;
   }
 
   async getMaterialById(id: number): Promise<Material | null> {
@@ -1478,12 +1487,20 @@ class PrismaStorage implements IStorage {
       teacherId: c.teacherId,
       status: c.status as "active" | "archived",
       createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
+      slug: c.slug ?? null,
     };
   }
 
   async createClassroom(data: InsertClassroom): Promise<Classroom> {
     const c = await prisma.classroom.create({ data });
-    return this.mapClassroom(c);
+    const slug = slugify(c.name, c.id);
+    const updated = await prisma.classroom.update({ where: { id: c.id }, data: { slug } });
+    return this.mapClassroom(updated);
+  }
+
+  async getClassroomBySlug(slug: string): Promise<Classroom | null> {
+    const c = await prisma.classroom.findUnique({ where: { slug } });
+    return c ? this.mapClassroom(c) : null;
   }
 
   async getClassroomById(id: number): Promise<Classroom | null> {
@@ -1592,8 +1609,24 @@ class PrismaStorage implements IStorage {
     }));
   }
 
+  private mapClassroomAssignment(a: any): ClassroomAssignment {
+    return {
+      id: a.id,
+      classroomId: a.classroomId,
+      title: a.title,
+      description: a.description,
+      dueDate: a.dueDate,
+      points: a.points,
+      fileUrl: a.fileUrl ?? null,
+      slug: a.slug ?? null,
+      createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
+    };
+  }
+
   async createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment> {
     const a = await prisma.classroomAssignment.create({ data });
+    const slug = slugify(a.title, a.id);
+    const updated = await prisma.classroomAssignment.update({ where: { id: a.id }, data: { slug } });
     // Auto-create pending submissions for all currently enrolled students
     const enrollments = await prisma.classroomEnrollment.findMany({ where: { classroomId: data.classroomId } });
     for (const e of enrollments) {
@@ -1603,16 +1636,7 @@ class PrismaStorage implements IStorage {
         update: {},
       });
     }
-    return {
-      id: a.id,
-      classroomId: a.classroomId,
-      title: a.title,
-      description: a.description,
-      dueDate: a.dueDate,
-      points: a.points,
-      fileUrl: a.fileUrl ?? null,
-      createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
-    };
+    return this.mapClassroomAssignment(updated);
   }
 
   async getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]> {
@@ -1620,16 +1644,12 @@ class PrismaStorage implements IStorage {
       where: { classroomId },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map((a) => ({
-      id: a.id,
-      classroomId: a.classroomId,
-      title: a.title,
-      description: a.description,
-      dueDate: a.dueDate,
-      points: a.points,
-      fileUrl: a.fileUrl ?? null,
-      createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
-    }));
+    return rows.map((a) => this.mapClassroomAssignment(a));
+  }
+
+  async getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null> {
+    const a = await prisma.classroomAssignment.findFirst({ where: { classroomId, slug } });
+    return a ? this.mapClassroomAssignment(a) : null;
   }
 
   async deleteClassroomAssignment(id: number): Promise<void> {
@@ -1714,16 +1734,23 @@ class PrismaStorage implements IStorage {
     };
   }
 
-  async createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial> {
-    const m = await prisma.classroomMaterial.create({ data });
+  private mapClassroomMaterial(m: any): ClassroomMaterial {
     return {
       id: m.id,
       classroomId: m.classroomId,
       title: m.title,
       description: m.description,
       url: m.url,
+      slug: m.slug ?? null,
       uploadedAt: m.uploadedAt instanceof Date ? m.uploadedAt.toISOString() : m.uploadedAt,
     };
+  }
+
+  async createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial> {
+    const m = await prisma.classroomMaterial.create({ data });
+    const slug = slugify(m.title, m.id);
+    const updated = await prisma.classroomMaterial.update({ where: { id: m.id }, data: { slug } });
+    return this.mapClassroomMaterial(updated);
   }
 
   async getClassroomMaterials(classroomId: number): Promise<ClassroomMaterial[]> {
@@ -1731,14 +1758,7 @@ class PrismaStorage implements IStorage {
       where: { classroomId },
       orderBy: { uploadedAt: "desc" },
     });
-    return rows.map((m) => ({
-      id: m.id,
-      classroomId: m.classroomId,
-      title: m.title,
-      description: m.description,
-      url: m.url,
-      uploadedAt: m.uploadedAt instanceof Date ? m.uploadedAt.toISOString() : m.uploadedAt,
-    }));
+    return rows.map((m) => this.mapClassroomMaterial(m));
   }
 
   async deleteClassroomMaterial(id: number): Promise<void> {
