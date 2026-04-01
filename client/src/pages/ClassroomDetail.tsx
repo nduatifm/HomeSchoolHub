@@ -808,7 +808,12 @@ function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classro
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800">{a.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
+                      {a.description && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>}
+                      {a.fileUrl && (
+                        <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-1">
+                          📎 View assignment file
+                        </a>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.dueDate}</td>
                     <td className="px-4 py-3 text-center">
