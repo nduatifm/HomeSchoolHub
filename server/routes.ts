@@ -4605,16 +4605,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // POST /api/classrooms/:classroomId/materials — teacher adds material
+  // POST /api/classrooms/:classroomId/materials — teacher adds classwork (JSON body)
   app.post("/api/classrooms/:classroomId/materials", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add materials to an archived classroom" });
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add classwork to an archived classroom" });
       const data = z.object({
         title: z.string().min(1),
-        description: z.string(),
-        url: z.string().url(),
+        description: z.string().default(""),
+        url: z.string().url().optional().nullable(),
+        assignmentId: z.number().int().positive().optional().nullable(),
       }).parse(req.body);
       const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data });
       res.status(201).json(material);
@@ -4623,7 +4624,38 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/classrooms/:classroomId/materials — get materials (classroom members only)
+  // POST /api/classrooms/:classroomId/materials/with-file — teacher adds classwork with file upload
+  app.post(
+    "/api/classrooms/:classroomId/materials/with-file",
+    requireAuth,
+    memoryUpload.single("file"),
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add classwork to an archived classroom" });
+        const data = z.object({
+          title: z.string().min(1),
+          description: z.string().default(""),
+          assignmentId: z.preprocess((v) => (v ? Number(v) : undefined), z.number().int().positive().optional().nullable()),
+        }).parse(req.body);
+        let url: string | null = null;
+        if (req.file) {
+          const uploadResult: any = await uploadBufferToCloudinary(req.file.buffer, req.file.mimetype, { folder: "classwork" });
+          if (!uploadResult.success || !uploadResult.url) {
+            return res.status(500).json({ error: uploadResult.error || "File upload failed" });
+          }
+          url = uploadResult.url;
+        }
+        const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data, url });
+        res.status(201).json(material);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    }
+  );
+
+  // GET /api/classrooms/:classroomId/materials — get classwork (classroom members only)
   app.get("/api/classrooms/:classroomId/materials", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomMember(req, res);
@@ -4635,7 +4667,61 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // DELETE /api/classrooms/:classroomId/materials/:materialId — teacher removes material
+  // PATCH /api/classrooms/:classroomId/materials/:materialId — teacher edits classwork (JSON)
+  app.patch("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit classwork in an archived classroom" });
+      const data = z.object({
+        title: z.string().min(1).optional(),
+        description: z.string().optional(),
+        url: z.string().url().optional().nullable(),
+        assignmentId: z.number().int().positive().optional().nullable(),
+      }).parse(req.body);
+      const updated = await storage.updateClassroomMaterial(parseInt(req.params.materialId), data);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/classrooms/:classroomId/materials/:materialId/with-file — teacher edits classwork with new file
+  app.patch(
+    "/api/classrooms/:classroomId/materials/:materialId/with-file",
+    requireAuth,
+    memoryUpload.single("file"),
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit classwork in an archived classroom" });
+        const data = z.object({
+          title: z.string().min(1).optional(),
+          description: z.string().optional(),
+          assignmentId: z.preprocess((v) => (v !== undefined && v !== "" ? Number(v) : undefined), z.number().int().positive().optional().nullable()),
+          clearUrl: z.string().optional(),
+        }).parse(req.body);
+        const { clearUrl, ...rest } = data;
+        let url: string | null | undefined = undefined;
+        if (req.file) {
+          const uploadResult: any = await uploadBufferToCloudinary(req.file.buffer, req.file.mimetype, { folder: "classwork" });
+          if (!uploadResult.success || !uploadResult.url) {
+            return res.status(500).json({ error: uploadResult.error || "File upload failed" });
+          }
+          url = uploadResult.url;
+        } else if (clearUrl === "true") {
+          url = null;
+        }
+        const updated = await storage.updateClassroomMaterial(parseInt(req.params.materialId), { ...rest, ...(url !== undefined ? { url } : {}) });
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    }
+  );
+
+  // DELETE /api/classrooms/:classroomId/materials/:materialId — teacher removes classwork
   app.delete("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomOwner(req, res);

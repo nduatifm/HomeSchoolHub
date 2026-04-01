@@ -292,6 +292,7 @@ export interface IStorage {
 
   createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
   getClassroomMaterials(classroomId: number): Promise<ClassroomMaterial[]>;
+  updateClassroomMaterial(id: number, data: Partial<InsertClassroomMaterial>): Promise<ClassroomMaterial>;
   deleteClassroomMaterial(id: number): Promise<void>;
 
   // ─── Notifications ────────────────────────────────────────────────────────
@@ -1746,16 +1747,20 @@ class PrismaStorage implements IStorage {
       classroomId: m.classroomId,
       title: m.title,
       description: m.description,
-      url: m.url,
+      url: m.url ?? null,
+      assignmentId: m.assignmentId ?? null,
       slug: m.slug ?? null,
       uploadedAt: m.uploadedAt instanceof Date ? m.uploadedAt.toISOString() : m.uploadedAt,
+      linkedAssignment: m.assignment
+        ? { id: m.assignment.id, title: m.assignment.title, slug: m.assignment.slug ?? null }
+        : null,
     };
   }
 
   async createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial> {
-    const m = await prisma.classroomMaterial.create({ data });
+    const m = await prisma.classroomMaterial.create({ data, include: { assignment: { select: { id: true, title: true, slug: true } } } });
     const slug = slugify(m.title, m.id);
-    const updated = await prisma.classroomMaterial.update({ where: { id: m.id }, data: { slug } });
+    const updated = await prisma.classroomMaterial.update({ where: { id: m.id }, data: { slug }, include: { assignment: { select: { id: true, title: true, slug: true } } } });
     return this.mapClassroomMaterial(updated);
   }
 
@@ -1763,8 +1768,18 @@ class PrismaStorage implements IStorage {
     const rows = await prisma.classroomMaterial.findMany({
       where: { classroomId },
       orderBy: { uploadedAt: "desc" },
+      include: { assignment: { select: { id: true, title: true, slug: true } } },
     });
     return rows.map((m) => this.mapClassroomMaterial(m));
+  }
+
+  async updateClassroomMaterial(id: number, data: Partial<InsertClassroomMaterial>): Promise<ClassroomMaterial> {
+    const updated = await prisma.classroomMaterial.update({
+      where: { id },
+      data,
+      include: { assignment: { select: { id: true, title: true, slug: true } } },
+    });
+    return this.mapClassroomMaterial(updated);
   }
 
   async deleteClassroomMaterial(id: number): Promise<void> {

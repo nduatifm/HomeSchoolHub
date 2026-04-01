@@ -492,11 +492,13 @@ export const classroomMaterialSchema = z.object({
   classroomId: z.number(),
   title: z.string(),
   description: z.string(),
-  url: z.string(),
+  url: z.string().nullable().optional(),
+  assignmentId: z.number().nullable().optional(),
   slug: z.string().nullable().optional(),
   uploadedAt: z.string(),
+  linkedAssignment: z.object({ id: z.number(), title: z.string(), slug: z.string().nullable().optional() }).nullable().optional(),
 });
-export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: true, uploadedAt: true });
+export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: true, uploadedAt: true, linkedAssignment: true });
 export type ClassroomMaterial = z.infer<typeof classroomMaterialSchema>;
 export type InsertClassroomMaterial = z.infer<typeof insertClassroomMaterialSchema>;
 

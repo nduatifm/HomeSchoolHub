@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -10,6 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -29,9 +36,16 @@ import {
   Trash2,
   ExternalLink,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Archive,
   ArchiveRestore,
   Send,
+  Pencil,
+  Link2,
+  FileUp,
+  Paperclip,
+  ArrowRight,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import type {
@@ -488,98 +502,362 @@ function TeacherGradesTab({ classroomId }: { classroomId: number }) {
   );
 }
 
-// ── Materials tab ─────────────────────────────────────────────────────────────
-function MaterialsTab({ classroomId, isTeacher, isArchived, classroomSubject }: { classroomId: number; isTeacher: boolean; isArchived: boolean; classroomSubject?: string }) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", url: "" });
+// ── Classwork tab ─────────────────────────────────────────────────────────────
+type AttachType = "url" | "file";
+type DialogMode = "create" | "edit";
 
-  const { data: materials = [], isLoading } = useQuery<ClassroomMaterial[]>({
+function ClassworkDialog({
+  mode,
+  initial,
+  classroomId,
+  assignments,
+  isArchived,
+  onSuccess,
+  trigger,
+}: {
+  mode: DialogMode;
+  initial?: ClassroomMaterial;
+  classroomId: number;
+  assignments: ClassroomAssignment[];
+  isArchived: boolean;
+  onSuccess: () => void;
+  trigger: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    title: initial?.title ?? "",
+    description: initial?.description ?? "",
+    attachType: (initial?.url ? "url" : "file") as AttachType,
+    url: initial?.url ?? "",
+    assignmentId: initial?.assignmentId ? String(initial.assignmentId) : "",
+  });
+  const [file, setFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "materials"] });
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const hasFile = form.attachType === "file" && file;
+      const token = localStorage.getItem("sessionId");
+      const method = mode === "create" ? "POST" : "PATCH";
+
+      if (hasFile) {
+        const endpoint = mode === "create"
+          ? `/api/classrooms/${classroomId}/materials/with-file`
+          : `/api/classrooms/${classroomId}/materials/${initial!.id}/with-file`;
+        const fd = new FormData();
+        fd.append("file", file!);
+        fd.append("title", form.title);
+        fd.append("description", form.description);
+        if (form.assignmentId) fd.append("assignmentId", form.assignmentId);
+        return fetch(endpoint, {
+          method,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: fd,
+        }).then(async (r) => {
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error ?? "Upload failed");
+          return data;
+        });
+      }
+      const endpoint = mode === "create"
+        ? `/api/classrooms/${classroomId}/materials`
+        : `/api/classrooms/${classroomId}/materials/${initial!.id}`;
+      return apiRequest(endpoint, {
+        method,
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          url: form.url || null,
+          assignmentId: form.assignmentId ? Number(form.assignmentId) : null,
+        }),
+      });
+    },
+    onSuccess: () => {
+      setOpen(false);
+      invalidate();
+      toast({ title: mode === "create" ? "Classwork added" : "Classwork updated", type: "success" });
+      onSuccess();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
+  });
+
+  const canSubmit = form.title.trim().length > 0 && !submitMutation.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => {
+      setOpen(v);
+      if (!v) {
+        setFile(null);
+        setForm({
+          title: initial?.title ?? "",
+          description: initial?.description ?? "",
+          attachType: (initial?.url ? "url" : "file") as AttachType,
+          url: initial?.url ?? "",
+          assignmentId: initial?.assignmentId ? String(initial.assignmentId) : "",
+        });
+      }
+    }}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{mode === "create" ? "Add Classwork" : "Edit Classwork"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <div>
+            <Label>Title <span className="text-red-400">*</span></Label>
+            <Input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="e.g. Reading Chapter 5"
+            />
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={3}
+              placeholder="Optional notes for students…"
+            />
+          </div>
+
+          {/* Attachment — toggle URL / File */}
+          <div>
+            <Label>Attachment <span className="text-xs text-gray-400 ml-1">(optional)</span></Label>
+            <div className="flex gap-2 mt-1 mb-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={form.attachType === "url" ? "default" : "outline"}
+                className="gap-1.5"
+                onClick={() => setForm({ ...form, attachType: "url" })}
+              >
+                <Link2 className="h-3.5 w-3.5" />URL
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={form.attachType === "file" ? "default" : "outline"}
+                className="gap-1.5"
+                onClick={() => setForm({ ...form, attachType: "file" })}
+              >
+                <FileUp className="h-3.5 w-3.5" />Upload file
+              </Button>
+            </div>
+            {form.attachType === "url" ? (
+              <Input
+                type="url"
+                placeholder="https://…"
+                value={form.url}
+                onChange={(e) => setForm({ ...form, url: e.target.value })}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <input ref={fileRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}>
+                  <Paperclip className="h-3.5 w-3.5" />{file ? file.name : "Choose file"}
+                </Button>
+                {file && <span className="text-xs text-gray-500 truncate max-w-[180px]">{file.name}</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Link assignment */}
+          {assignments.length > 0 && (
+            <div>
+              <Label>Link to assignment <span className="text-xs text-gray-400 ml-1">(optional)</span></Label>
+              <Select
+                value={form.assignmentId || "none"}
+                onValueChange={(v) => setForm({ ...form, assignmentId: v === "none" ? "" : v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="No linked assignment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No linked assignment</SelectItem>
+                  {assignments.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <Button className="w-full" disabled={!canSubmit} onClick={() => submitMutation.mutate()}>
+            {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            {mode === "create" ? "Add Classwork" : "Save Changes"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ClassworkCard({
+  item,
+  classroomId,
+  classroomSlug,
+  isTeacher,
+  isArchived,
+  assignments,
+}: {
+  item: ClassroomMaterial;
+  classroomId: number;
+  classroomSlug: string | number;
+  isTeacher: boolean;
+  isArchived: boolean;
+  assignments: ClassroomAssignment[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [, navigate] = useLocation();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/classrooms/${classroomId}/materials/${item.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "materials"] });
+      toast({ title: "Classwork removed", type: "success" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
+  });
+
+  const assignmentHref = item.linkedAssignment
+    ? `/classrooms/${classroomSlug}/classwork/${item.linkedAssignment.slug ?? item.linkedAssignment.id}`
+    : null;
+
+  return (
+    <div className="rounded-lg border bg-white hover:border-primary/30 transition-colors">
+      {/* Collapsed header */}
+      <button
+        type="button"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm text-gray-900">{item.title}</span>
+            {item.url && <span title="Has attachment"><Paperclip className="h-3 w-3 text-gray-400 shrink-0" /></span>}
+            {item.linkedAssignment && <span title="Linked to assignment"><Link2 className="h-3 w-3 text-primary shrink-0" /></span>}
+          </div>
+          <span className="text-[11px] text-gray-400">{new Date(item.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {isTeacher && !isArchived && (
+            <>
+              <ClassworkDialog
+                mode="edit"
+                initial={item}
+                classroomId={classroomId}
+                assignments={assignments}
+                isArchived={isArchived}
+                onSuccess={() => {}}
+                trigger={
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-primary hover:bg-gray-100 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                }
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(); }}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              </Button>
+            </>
+          )}
+          {expanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+        </div>
+      </button>
+
+      {/* Expanded body */}
+      {expanded && (
+        <div className="px-4 pb-4 border-t pt-3 space-y-3">
+          {item.description && (
+            <p className="text-sm text-gray-600 leading-relaxed">{item.description}</p>
+          )}
+          {item.url && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+            >
+              <Paperclip className="h-3.5 w-3.5" />View attachment<ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {assignmentHref && (
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              onClick={() => navigate(assignmentHref)}
+            >
+              <ArrowRight className="h-3.5 w-3.5" />Go to assignment: {item.linkedAssignment!.title}
+            </button>
+          )}
+          {!item.description && !item.url && !assignmentHref && (
+            <p className="text-sm text-gray-400 italic">No additional details.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClassworkTab({ classroomId, classroomSlug, isTeacher, isArchived }: { classroomId: number; classroomSlug: string | number; isTeacher: boolean; isArchived: boolean }) {
+  const { data: classwork = [], isLoading } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
   });
 
-  const addMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`, { method: "POST", body: JSON.stringify(form) }),
-    onSuccess: () => {
-      setOpen(false);
-      setForm({ title: "", description: "", url: "" });
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "materials"] });
-      toast({ title: "Material added", type: "success" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/classrooms/${classroomId}/materials/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "materials"] });
-      toast({ title: "Removed", type: "success" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
+  const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
+    queryKey: ["/api/classrooms", classroomId, "assignments"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
+    enabled: isTeacher,
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {isTeacher && !isArchived && (
         <div className="flex justify-end">
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5"><Plus className="h-3.5 w-3.5" />Add Resource</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Add Study Resource</DialogTitle></DialogHeader>
-              <div className="space-y-3 pt-2">
-                <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-                <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></div>
-                <div><Label>URL</Label><Input type="url" placeholder="https://…" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} /></div>
-                <Button className="w-full" disabled={!form.title || !form.url || addMutation.isPending} onClick={() => addMutation.mutate()}>
-                  {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Resource
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <ClassworkDialog
+            mode="create"
+            classroomId={classroomId}
+            assignments={assignments}
+            isArchived={isArchived}
+            onSuccess={() => {}}
+            trigger={
+              <Button size="sm" className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />Add Classwork
+              </Button>
+            }
+          />
         </div>
       )}
 
       {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>}
-      {!isLoading && materials.length === 0 && <div className="text-center py-12 text-gray-400 text-sm">No materials yet.</div>}
+      {!isLoading && classwork.length === 0 && (
+        <div className="text-center py-12 text-gray-400 text-sm">No classwork yet.</div>
+      )}
 
       <div className="space-y-2">
-        {materials.map((m) => (
-          <div key={m.id} className="flex items-start gap-3 rounded-lg border px-4 py-3 hover:border-primary/30 transition-colors">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <a
-                  href={m.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-primary hover:underline flex items-center gap-1.5 text-sm"
-                >
-                  {m.title}<ExternalLink className="h-3 w-3 shrink-0" />
-                </a>
-                {classroomSubject && (
-                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">
-                    {classroomSubject}
-                  </span>
-                )}
-                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
-                  {new Date(m.uploadedAt).toLocaleDateString()}
-                </span>
-              </div>
-              {m.description && <p className="text-xs text-gray-500 mt-0.5">{m.description}</p>}
-            </div>
-            {isTeacher && !isArchived && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-red-400 hover:text-red-600 shrink-0"
-                onClick={() => deleteMutation.mutate(m.id)}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
+        {classwork.map((item) => (
+          <ClassworkCard
+            key={item.id}
+            item={item}
+            classroomId={classroomId}
+            classroomSlug={classroomSlug}
+            isTeacher={isTeacher}
+            isArchived={isArchived}
+            assignments={assignments}
+          />
         ))}
       </div>
     </div>
@@ -1100,14 +1378,14 @@ export default function ClassroomDetail() {
                   <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
                   <TabsTrigger value="assignments" className="gap-1.5 whitespace-nowrap"><BookOpen className="h-3.5 w-3.5" />Assignments</TabsTrigger>
                   <TabsTrigger value="grades" className="gap-1.5 whitespace-nowrap"><BarChart2 className="h-3.5 w-3.5" />Grades</TabsTrigger>
-                  <TabsTrigger value="materials" className="gap-1.5 whitespace-nowrap"><LibraryBig className="h-3.5 w-3.5" />Materials</TabsTrigger>
+                  <TabsTrigger value="classwork" className="gap-1.5 whitespace-nowrap"><LibraryBig className="h-3.5 w-3.5" />Classwork</TabsTrigger>
                   <TabsTrigger value="students" className="gap-1.5 whitespace-nowrap"><Users className="h-3.5 w-3.5" />Students</TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} /></TabsContent>
               <TabsContent value="assignments"><TeacherAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isArchived={isArchived} /></TabsContent>
               <TabsContent value="grades"><TeacherGradesTab classroomId={classroomId} /></TabsContent>
-              <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} classroomSubject={classroom.subject} /></TabsContent>
+              <TabsContent value="classwork"><ClassworkTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isTeacher={true} isArchived={isArchived} /></TabsContent>
               <TabsContent value="students"><StudentsTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} /></TabsContent>
             </Tabs>
           )}
@@ -1118,14 +1396,14 @@ export default function ClassroomDetail() {
                 <TabsList className="w-max min-w-full">
                   <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
                   <TabsTrigger value="assignments" className="gap-1.5 whitespace-nowrap"><BookOpen className="h-3.5 w-3.5" />Assignments</TabsTrigger>
-                  <TabsTrigger value="materials" className="gap-1.5 whitespace-nowrap"><LibraryBig className="h-3.5 w-3.5" />Materials</TabsTrigger>
+                  <TabsTrigger value="classwork" className="gap-1.5 whitespace-nowrap"><LibraryBig className="h-3.5 w-3.5" />Classwork</TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} /></TabsContent>
               <TabsContent value="assignments">
                 <StudentAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} studentId={studentData?.id ?? 0} isArchived={isArchived} />
               </TabsContent>
-              <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} classroomSubject={classroom.subject} /></TabsContent>
+              <TabsContent value="classwork"><ClassworkTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isTeacher={false} isArchived={isArchived} /></TabsContent>
             </Tabs>
           )}
 

@@ -475,6 +475,7 @@ model ClassroomAssignment {
 
   classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   submissions ClassroomSubmission[]
+  materials   ClassroomMaterial[]
 
   @@unique([classroomId, slug])
   @@index([classroomId])
@@ -500,18 +501,21 @@ model ClassroomSubmission {
 }
 
 model ClassroomMaterial {
-  id          Int      @id @default(autoincrement())
-  classroomId Int
-  title       String
-  description String
-  url         String
-  slug        String?
-  uploadedAt  DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  classroomId  Int
+  title        String
+  description  String
+  url          String?
+  assignmentId Int?
+  slug         String?
+  uploadedAt   DateTime @default(now())
 
-  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  classroom  Classroom            @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  assignment ClassroomAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
 
   @@unique([classroomId, slug])
   @@index([classroomId])
+  @@index([assignmentId])
 }
 
 // ─── Notifications ─────────────────────────────────────────────────────────
