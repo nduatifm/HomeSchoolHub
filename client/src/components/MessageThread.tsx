@@ -159,7 +159,7 @@ export default function MessageThread({
         queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
       });
     }
-  }, [messages, myUserId]);
+  }, [messages, myUserId, teacherId, studentId]);
 
   const autoResize = () => {
     const el = textareaRef.current;
