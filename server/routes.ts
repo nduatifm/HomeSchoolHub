@@ -2877,6 +2877,37 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Mark ALL messages in a thread as read for the current viewer (works on raw rows, not deduped)
+  // Must come before /:id/read to avoid route conflicts
+  app.patch("/api/messages/thread-read", requireAuth, async (req, res) => {
+    try {
+      const teacherId = parseInt(req.query.teacherId as string);
+      const studentId = parseInt(req.query.studentId as string);
+      if (!teacherId || !studentId) {
+        return res.status(400).json({ error: "teacherId and studentId are required" });
+      }
+
+      const student = await prisma.student.findUnique({ where: { id: studentId } });
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const participantIds = [teacherId, student.userId, student.parentId].filter(Boolean) as number[];
+      const viewerId = req.session.userId!;
+
+      // Mark every raw DB row in this thread where the current user is the receiver as read
+      await prisma.message.updateMany({
+        where: {
+          receiverId: viewerId,
+          isRead: false,
+          senderId: { in: participantIds },
+        },
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.patch("/api/messages/:id/read", requireAuth, async (req, res) => {
     try {
       const message = await storage.markMessageAsRead(parseInt(req.params.id));

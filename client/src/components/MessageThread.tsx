@@ -141,25 +141,21 @@ export default function MessageThread({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Mark unread messages as read when thread is opened
+  // Mark ALL raw DB rows for this viewer as read when thread is opened.
+  // Uses the /thread-read endpoint (not per-message PATCH) so broadcast duplicates
+  // (e.g. the parent's copy of a teacher→student message) also get cleared.
   useEffect(() => {
-    const unreadMessages = messages.filter(
-      (msg) => msg.senderId !== myUserId && !msg.isRead
-    );
-
-    if (unreadMessages.length > 0) {
-      Promise.all(
-        unreadMessages.map((msg) =>
-          apiRequest(`/api/messages/${msg.id}/read`, { method: "PATCH" }).catch(
-            (err) => console.error("Failed to mark message as read:", err)
-          )
-        )
-      ).then(() => {
+    if (!teacherId || !studentId) return;
+    apiRequest(
+      `/api/messages/thread-read?teacherId=${teacherId}&studentId=${studentId}`,
+      { method: "PATCH" }
+    )
+      .then(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
         queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
-      });
-    }
-  }, [messages, myUserId, teacherId, studentId]);
+      })
+      .catch(console.error);
+  }, [teacherId, studentId]);
 
   const autoResize = () => {
     const el = textareaRef.current;
