@@ -75,7 +75,6 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
-import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
 import type {
@@ -956,15 +955,6 @@ export default function TeacherDashboard() {
 
       <div className="md:ml-[240px] flex">
         <main className="flex-1 p-6 pt-20 md:pt-6">
-          <WelcomeCard
-            name={user?.name || "Teacher"}
-            message="Ready to inspire and educate! Let's help your students reach their full potential."
-            buttonText="My Classrooms"
-            onButtonClick={() => {
-              setActiveTab("classrooms");
-              window.location.hash = "classrooms";
-            }}
-          />
 
           {(() => {
             const todayStr = new Date().toISOString().split("T")[0];

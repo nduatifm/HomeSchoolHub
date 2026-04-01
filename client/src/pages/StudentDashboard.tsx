@@ -57,7 +57,6 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
-import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import type { Assignment, StudentAssignment, Session, Classroom } from "@shared/schema";
 
@@ -307,15 +306,6 @@ export default function StudentDashboard() {
 
       <div className="md:ml-[240px] flex">
         <main className="flex-1 p-6 pt-20 md:pt-6">
-          <WelcomeCard
-            name={user?.name || "Student"}
-            message="Let's start the day by learning something new. Don't forget to check your classrooms."
-            buttonText="My Classrooms"
-            onButtonClick={() => {
-              setActiveTab("classrooms");
-              window.location.hash = "classrooms";
-            }}
-          />
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6">
             <ColorfulStatCard

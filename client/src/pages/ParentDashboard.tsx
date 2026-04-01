@@ -59,7 +59,6 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
-import WelcomeCard from "@/components/WelcomeCard";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
 import type {
@@ -423,15 +422,6 @@ export default function ParentDashboard() {
 
       <div className="md:ml-[240px] flex">
         <main className="flex-1 p-6 pt-20 md:pt-6">
-          <WelcomeCard
-            name={user?.name || "Parent"}
-            message="Stay connected with your child's learning journey. Monitor progress and support their growth."
-            buttonText="View Children"
-            onButtonClick={() => {
-              setActiveTab("children");
-              window.location.hash = "children";
-            }}
-          />
 
           {childStats.length > 0 && (
             <div className="my-6">
