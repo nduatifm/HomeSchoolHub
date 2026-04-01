@@ -179,8 +179,9 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       }).then(async (r) => {
-        if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? "Error"); }
-        return r.json();
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error ?? "Upload failed");
+        return data;
       });
     },
     onSuccess: () => {
