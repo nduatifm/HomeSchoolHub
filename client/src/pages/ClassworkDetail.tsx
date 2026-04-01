@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -169,16 +169,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
       const formData = new FormData();
       formData.append("content", text);
       if (file) formData.append("file", file);
-      const res = await fetch(`/api/classrooms/${classroomId}/assignments/${assignment.id}/submit`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Submit failed");
-      }
-      return res.json();
+      return apiUpload(`/api/classrooms/${classroomId}/assignments/${assignment.id}/submit`, formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });

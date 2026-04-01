@@ -287,7 +287,7 @@ export interface IStorage {
 
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
   getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
-  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string): Promise<ClassroomSubmission>;
+  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string): Promise<ClassroomSubmission>;
   gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
 
   createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
@@ -1705,9 +1705,11 @@ class PrismaStorage implements IStorage {
   async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string): Promise<ClassroomSubmission> {
     const now = new Date().toISOString();
     const isLate = now > dueDate;
-    const updated = await prisma.classroomSubmission.update({
+    const submitData = { content, fileUrl: fileUrl ?? null, status: isLate ? "late" : "submitted", submittedAt: now };
+    const updated = await prisma.classroomSubmission.upsert({
       where: { assignmentId_studentId: { assignmentId, studentId } },
-      data: { content, fileUrl: fileUrl || undefined, status: isLate ? "late" : "submitted", submittedAt: now },
+      update: submitData,
+      create: { assignmentId, studentId, grade: null, feedback: null, ...submitData },
     });
     return {
       id: updated.id,
