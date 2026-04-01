@@ -55,6 +55,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
@@ -353,6 +354,19 @@ export default function StudentDashboard() {
       <div className="md:ml-[228px] flex">
         <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
 
+          {/* GREETING */}
+          {(() => {
+            const hour = new Date().getHours();
+            const g = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+            const firstName = user?.name?.split(" ")[0] || "there";
+            return (
+              <div className="mb-5">
+                <h1 className="text-xl font-semibold text-foreground">{g}, {firstName} 👋</h1>
+                <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+              </div>
+            );
+          })()}
+
           {/* START HERE — hero card */}
           <Card className="mb-6">
             <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5">
@@ -381,36 +395,58 @@ export default function StudentDashboard() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <ColorfulStatCard
-              title="You Finished 🎉"
-              value={gradedAssignments.length}
-              icon={CheckCircle}
-              accent="green"
-              subtitle={`${assignments.length} total`}
-            />
-            <ColorfulStatCard
-              title="Points"
-              value={student?.points || 0}
-              icon={Trophy}
-              accent="amber"
-              subtitle="Keep going!"
-            />
-            <ColorfulStatCard
-              title="Streak 🔥"
-              value={streak}
-              icon={Flame}
-              accent="purple"
-              subtitle={streak === 1 ? "day" : "days"}
-            />
-            <ColorfulStatCard
-              title="To Do"
-              value={pendingAssignments.length}
-              icon={BookOpen}
-              accent="rose"
-              subtitle="Tasks left"
-            />
-          </div>
+          {(() => {
+            const allPendingCount = pendingAssignments.length + pendingClassworkItems.length;
+            const allDoneCount = gradedAssignments.length;
+            const allTotal = assignments.length + classrooms.reduce((sum, _, i) => {
+              const cw = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];
+              return sum + cw.length;
+            }, 0);
+            const statsLoading = classroomAssignmentQueries.some(q => q.isLoading);
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                {statsLoading ? (
+                  <>
+                    <Skeleton className="h-20 rounded-xl" />
+                    <Skeleton className="h-20 rounded-xl" />
+                    <Skeleton className="h-20 rounded-xl" />
+                    <Skeleton className="h-20 rounded-xl" />
+                  </>
+                ) : (
+                  <>
+                    <ColorfulStatCard
+                      title="You Finished 🎉"
+                      value={allDoneCount}
+                      icon={CheckCircle}
+                      accent="green"
+                      subtitle={allTotal > 0 ? `${allTotal} total` : "assignments"}
+                    />
+                    <ColorfulStatCard
+                      title="Points"
+                      value={student?.points || 0}
+                      icon={Trophy}
+                      accent="amber"
+                      subtitle="Keep going!"
+                    />
+                    <ColorfulStatCard
+                      title="Streak 🔥"
+                      value={streak}
+                      icon={Flame}
+                      accent="purple"
+                      subtitle={streak === 1 ? "day" : "days"}
+                    />
+                    <ColorfulStatCard
+                      title="To Do"
+                      value={allPendingCount}
+                      icon={BookOpen}
+                      accent="rose"
+                      subtitle="Tasks left"
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* TODAY'S TASKS */}
           <Card className="mb-6">
@@ -418,13 +454,13 @@ export default function StudentDashboard() {
               <CardTitle className="text-base">Today's Tasks</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {pendingClassworkItems.length === 0 ? (
+              {pendingClassworkItems.length === 0 && pendingAssignments.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-2">You're all caught up 🎉</p>
               ) : (
                 <>
                   {pendingClassworkItems.slice(0, 3).map((a) => (
                     <div
-                      key={a.id}
+                      key={`cw-${a.id}`}
                       className="flex items-center justify-between p-3 border rounded-lg gap-3"
                     >
                       <div className="min-w-0">
@@ -442,9 +478,39 @@ export default function StudentDashboard() {
                       </Button>
                     </div>
                   ))}
-                  {pendingClassworkItems.length > 3 && (
+                  {pendingAssignments.length > 0 && pendingClassworkItems.length < 3 &&
+                    pendingAssignments.slice(0, 3 - pendingClassworkItems.length).map((a) => (
+                      <div
+                        key={`legacy-${a.id}`}
+                        className="flex items-center justify-between p-3 border rounded-lg gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{a.title}</p>
+                          <p className="text-xs text-muted-foreground">{a.subject} · Due {a.dueDate}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 h-11 px-4"
+                          onClick={() => {
+                            setSubmitDialogAssignmentId(a.id);
+                            setSubmissionForm({
+                              assignmentId: a.id,
+                              studentAssignmentId: a.studentAssignment?.id ?? 0,
+                              submission: "",
+                              notes: "",
+                              hasStudentAssignment: !!a.studentAssignment,
+                            });
+                          }}
+                        >
+                          Submit
+                        </Button>
+                      </div>
+                    ))
+                  }
+                  {(pendingClassworkItems.length + pendingAssignments.length) > 3 && (
                     <p className="text-xs text-muted-foreground text-center pt-1">
-                      +{pendingClassworkItems.length - 3} more tasks
+                      +{pendingClassworkItems.length + pendingAssignments.length - 3} more tasks
                     </p>
                   )}
                 </>

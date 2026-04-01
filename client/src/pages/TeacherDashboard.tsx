@@ -73,6 +73,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
@@ -957,44 +958,69 @@ export default function TeacherDashboard() {
         <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
 
           {(() => {
-            const todayStr = new Date().toISOString().split("T")[0];
-            const todaysSessions = sessions.filter(
-              (s) => s.sessionDate === todayStr
-            );
-            const pendingSubmissions = studentSubmissions.filter(
-              (s) => s.status === "submitted"
-            );
+            const hour = new Date().getHours();
+            const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+            const firstName = user?.name?.split(" ")[0] || "there";
+            const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+            const pendingSubmissions = studentSubmissions.filter(s => s.status === "submitted");
+            const statsLoading = submissionsLoading;
             return (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
-                <ColorfulStatCard
-                  title="Sessions Today"
-                  value={todaysSessions.length}
-                  icon={Presentation}
-                  accent="rose"
-                  subtitle={`${sessions.length} total`}
-                />
-                <ColorfulStatCard
-                  title="To Grade"
-                  value={pendingSubmissions.length}
-                  icon={ClipboardCheck}
-                  accent="amber"
-                  subtitle="Submissions waiting"
-                />
-                <ColorfulStatCard
-                  title="Students"
-                  value={students.length}
-                  icon={Users}
-                  accent="purple"
-                  subtitle="Under your care"
-                />
-                <ColorfulStatCard
-                  title="Materials"
-                  value={materials.length}
-                  icon={LibraryBig}
-                  accent="blue"
-                  subtitle="Study resources"
-                />
-              </div>
+              <>
+                <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <h1 className="text-xl font-semibold text-foreground">{greeting}, {firstName} 👋</h1>
+                    <p className="text-sm text-muted-foreground">{dateLabel}</p>
+                  </div>
+                  {totalEarnings > 0 && (
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full w-fit">
+                      <DollarSign className="w-3.5 h-3.5 text-green-600" />
+                      <span className="font-semibold text-green-700">${totalEarnings.toLocaleString()}</span>
+                      <span>total earnings</span>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {statsLoading ? (
+                    <>
+                      <Skeleton className="h-20 rounded-xl" />
+                      <Skeleton className="h-20 rounded-xl" />
+                      <Skeleton className="h-20 rounded-xl" />
+                      <Skeleton className="h-20 rounded-xl" />
+                    </>
+                  ) : (
+                    <>
+                      <ColorfulStatCard
+                        title="Assignments"
+                        value={assignments.length}
+                        icon={FileText}
+                        accent="rose"
+                        subtitle="Created"
+                      />
+                      <ColorfulStatCard
+                        title="To Grade"
+                        value={pendingSubmissions.length}
+                        icon={ClipboardCheck}
+                        accent="amber"
+                        subtitle="Submissions waiting"
+                      />
+                      <ColorfulStatCard
+                        title="Students"
+                        value={students.length}
+                        icon={Users}
+                        accent="purple"
+                        subtitle="Under your care"
+                      />
+                      <ColorfulStatCard
+                        title="Materials"
+                        value={materials.length}
+                        icon={LibraryBig}
+                        accent="blue"
+                        subtitle="Study resources"
+                      />
+                    </>
+                  )}
+                </div>
+              </>
             );
           })()}
 

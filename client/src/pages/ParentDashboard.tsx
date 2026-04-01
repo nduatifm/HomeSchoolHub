@@ -57,6 +57,7 @@ import {
   Plus,
   Loader2,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
@@ -225,14 +226,15 @@ export default function ParentDashboard() {
     staleTime: 30000,
   });
 
-  const childStats: ChildStat[] = students.map((child, index) => {
+  const childStats: (ChildStat & { classroomCount: number })[] = students.map((child, index) => {
     const data = (childAssignmentQueries[index]?.data as AssignmentWithStatus[]) || [];
     const completed = data.filter(
       (a) => a.studentAssignment?.status === "graded",
     ).length;
     const total = data.length;
     const pct = total > 0 ? Math.round((completed / total) * 100) : null;
-    return { ...child, pct, completed, total };
+    const classroomCount = ((childClassroomQueries[index]?.data as Classroom[]) || []).length;
+    return { ...child, pct, completed, total, classroomCount };
   });
 
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
@@ -423,6 +425,18 @@ export default function ParentDashboard() {
       <div className="md:ml-[228px] flex">
         <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
 
+          {/* GREETING */}
+          {(() => {
+            const hour = new Date().getHours();
+            const g = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+            const firstName = user?.name?.split(" ")[0] || "there";
+            return (
+              <div className="mb-5">
+                <h1 className="text-xl font-semibold text-foreground">{g}, {firstName} 👋</h1>
+                <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+              </div>
+            );
+          })()}
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="children">
@@ -482,10 +496,16 @@ export default function ParentDashboard() {
                             )}
                           </div>
 
+                          {child.classroomCount > 0 && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+                              <School className="w-3 h-3" />
+                              <span>{child.classroomCount} {child.classroomCount === 1 ? "classroom" : "classrooms"}</span>
+                            </div>
+                          )}
                           {child.pct !== null ? (
                             <div>
                               <div className="flex items-center justify-between text-xs mb-1">
-                                <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
+                                <span className="text-muted-foreground">{child.completed}/{child.total} assignments done</span>
                                 <span className="font-medium text-foreground">{child.pct}%</span>
                               </div>
                               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -505,22 +525,29 @@ export default function ParentDashboard() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <ColorfulStatCard
-                  title="Children"
-                  value={students.length}
-                  icon={Users}
-                  accent="blue"
-                  subtitle="Registered"
-                />
-                <ColorfulStatCard
-                  title="Invites"
-                  value={invites.length}
-                  icon={UserPlus}
-                  accent="green"
-                  subtitle="Pending invites"
-                />
-              </div>
+              {childAssignmentQueries.some(q => q.isLoading) ? (
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <Skeleton className="h-20 rounded-xl" />
+                  <Skeleton className="h-20 rounded-xl" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <ColorfulStatCard
+                    title="Children"
+                    value={students.length}
+                    icon={Users}
+                    accent="blue"
+                    subtitle="Registered"
+                  />
+                  <ColorfulStatCard
+                    title="Invites"
+                    value={invites.length}
+                    icon={UserPlus}
+                    accent="green"
+                    subtitle="Pending invites"
+                  />
+                </div>
+              )}
 
               <Card>
                 <CardHeader>
