@@ -15,6 +15,7 @@ import ClassroomDetail from "./pages/ClassroomDetail";
 import Landing from "./pages/Landing";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminUsers from "./pages/AdminUsers";
+import NotificationsPage from "./pages/Notifications";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -109,6 +110,9 @@ function AppRoutes() {
       </Route>
       <Route path="/admin">
         <AdminRoute component={AdminUsers} />
+      </Route>
+      <Route path="/notifications">
+        <ProtectedRoute component={NotificationsPage} />
       </Route>
       <Route path="/classrooms/:id">
         <ProtectedRoute component={ClassroomDetail} />

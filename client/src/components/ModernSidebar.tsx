@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Settings,
@@ -18,11 +18,6 @@ import {
   School,
   Trash2,
   Bell,
-  CheckCheck,
-  Star,
-  BookOpen,
-  ClipboardCheck,
-  LayoutList,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,23 +40,10 @@ interface SidebarItem {
   badge?: number;
 }
 
-interface Notification {
-  id: number;
-  userId: number;
-  type: string;
-  title: string;
-  body: string;
-  link?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
 export default function ModernSidebar() {
   const { user, setUser, logout } = useAuth();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/messages/unread-count"],
@@ -74,49 +56,6 @@ export default function ModernSidebar() {
     refetchInterval: 15000,
   });
   const unreadNotifCount = notifCount?.count ?? 0;
-
-  const { data: notifications = [] } = useQuery<Notification[]>({
-    queryKey: ["/api/notifications"],
-    enabled: notifOpen,
-  });
-
-  const markReadMutation = useMutation({
-    mutationFn: async (id: number) =>
-      await apiRequest(`/api/notifications/${id}/read`, { method: "PATCH" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-    },
-  });
-
-  const handleNotificationClick = useCallback((n: Notification) => {
-    if (!n.isRead) markReadMutation.mutate(n.id);
-    if (n.link) {
-      setNotifOpen(false);
-      window.location.href = n.link;
-    }
-  }, [markReadMutation]);
-
-  const markAllReadMutation = useMutation({
-    mutationFn: async () =>
-      await apiRequest("/api/notifications/read-all", { method: "PATCH" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-    },
-  });
-
-  // Close notif panel on outside click
-  useEffect(() => {
-    if (!notifOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [notifOpen]);
 
   const switchRoleMutation = useMutation({
     mutationFn: async (role: string) =>
@@ -205,36 +144,6 @@ export default function ModernSidebar() {
   const isActive = (hash: string) =>
     currentHash === hash && location === "/dashboard";
 
-  function timeAgo(dateStr: string) {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
-  }
-
-  function isToday(dateStr: string) {
-    const d = new Date(dateStr);
-    const now = new Date();
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-  }
-
-  function notifIcon(type: string) {
-    switch (type) {
-      case "new_assignment": return <FileText className="w-3.5 h-3.5 text-blue-500" />;
-      case "assignment_graded": return <Star className="w-3.5 h-3.5 text-amber-500" />;
-      case "assignment_submitted": return <ClipboardCheck className="w-3.5 h-3.5 text-green-600" />;
-      case "tutor_request_update": return <UserPlus className="w-3.5 h-3.5 text-violet-500" />;
-      case "new_tutor_request": return <UserPlus className="w-3.5 h-3.5 text-violet-500" />;
-      case "progress_report": return <BookOpen className="w-3.5 h-3.5 text-teal-500" />;
-      case "new_post": return <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />;
-      case "new_clarification": return <MessageSquare className="w-3.5 h-3.5 text-orange-400" />;
-      default: return <LayoutList className="w-3.5 h-3.5 text-gray-400" />;
-    }
-  }
-
   // ── Nav item ──────────────────────────────────────────────────────────────
   const NavItem = ({ item }: { item: SidebarItem }) => {
     const active = isActive(item.hash);
@@ -264,16 +173,24 @@ export default function ModernSidebar() {
     );
   };
 
-  // ── Notification Bell ─────────────────────────────────────────────────────
-  const NotificationBell = () => (
-    <div className="relative" ref={notifRef}>
+  // ── Notification Bell — navigates to /notifications page ──────────────────
+  const NotificationBell = () => {
+    const isNotifActive = location === "/notifications";
+    return (
       <button
-        onClick={() => setNotifOpen((v) => !v)}
-        className="relative w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors duration-100"
+        onClick={() => setLocation("/notifications")}
+        className={`
+          w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm
+          transition-colors duration-100
+          ${isNotifActive
+            ? "bg-green-50 text-green-800 font-medium"
+            : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+          }
+        `}
         aria-label="Notifications"
         data-testid="sidebar-notifications"
       >
-        <Bell className="w-4 h-4 text-gray-400 shrink-0" />
+        <Bell className={`w-4 h-4 shrink-0 ${isNotifActive ? "text-green-700" : "text-gray-400"}`} />
         <span className="flex-1 text-left">Notifications</span>
         {unreadNotifCount > 0 && (
           <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-green-700 text-white text-[10px] font-semibold flex items-center justify-center leading-none">
@@ -281,118 +198,8 @@ export default function ModernSidebar() {
           </span>
         )}
       </button>
-
-      {notifOpen && (
-        <div className="fixed top-16 right-4 w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-[200] overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <span className="text-sm font-semibold text-gray-800">Notifications</span>
-            <div className="flex items-center gap-2">
-              {unreadNotifCount > 0 && (
-                <button
-                  onClick={() => markAllReadMutation.mutate()}
-                  disabled={markAllReadMutation.isPending}
-                  className="flex items-center gap-1 text-xs text-green-700 hover:text-green-800 font-medium"
-                  title="Mark all as read"
-                >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  Mark all read
-                </button>
-              )}
-              <button
-                onClick={() => setNotifOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* List with time + type grouping */}
-          <div className="max-h-[400px] overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
-                No notifications yet
-              </div>
-            ) : (() => {
-              const todayItems = notifications.filter((n) => isToday(n.createdAt));
-              const earlierItems = notifications.filter((n) => !isToday(n.createdAt));
-
-              const typeLabel: Record<string, string> = {
-                new_assignment: "Assignments",
-                assignment_graded: "Grades",
-                assignment_submitted: "Submissions",
-                new_tutor_request: "Tutor Requests",
-                tutor_request_update: "Tutor Requests",
-                progress_report: "Progress Reports",
-                new_post: "Classroom Posts",
-                new_clarification: "Questions",
-              };
-
-              const groupByType = (items: Notification[]) => {
-                const groups: Record<string, Notification[]> = {};
-                for (const n of items) {
-                  const key = typeLabel[n.type] ?? "Other";
-                  if (!groups[key]) groups[key] = [];
-                  groups[key].push(n);
-                }
-                return groups;
-              };
-
-              const renderItem = (n: Notification) => (
-                <div
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n)}
-                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 ${
-                    n.isRead ? "opacity-60" : ""
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-0.5 shrink-0 w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-                      {notifIcon(n.type)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-green-600 shrink-0" />}
-                        <p className="text-xs font-semibold text-gray-800 truncate">{n.title}</p>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
-                      <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-
-              const renderGrouped = (items: Notification[], bucketLabel: string) => {
-                if (items.length === 0) return null;
-                const groups = groupByType(items);
-                return (
-                  <>
-                    <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">{bucketLabel}</div>
-                    {Object.entries(groups).map(([groupName, groupItems]) => (
-                      <div key={groupName}>
-                        {Object.keys(groups).length > 1 && (
-                          <div className="px-4 pt-2 pb-0.5 text-[10px] font-medium text-gray-400">{groupName}</div>
-                        )}
-                        {groupItems.map(renderItem)}
-                      </div>
-                    ))}
-                  </>
-                );
-              };
-
-              return (
-                <>
-                  {renderGrouped(todayItems, "Today")}
-                  {renderGrouped(earlierItems, "Earlier")}
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
   // ── Sidebar shell ─────────────────────────────────────────────────────────
   const SidebarContent = () => (

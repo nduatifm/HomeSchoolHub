@@ -148,13 +148,16 @@ export default function MessageThread({
     );
 
     if (unreadMessages.length > 0) {
-      unreadMessages.forEach((msg) => {
-        apiRequest(`/api/messages/${msg.id}/read`, { method: "PATCH" }).catch(
-          (err) => console.error("Failed to mark message as read:", err)
-        );
+      Promise.all(
+        unreadMessages.map((msg) =>
+          apiRequest(`/api/messages/${msg.id}/read`, { method: "PATCH" }).catch(
+            (err) => console.error("Failed to mark message as read:", err)
+          )
+        )
+      ).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
       });
-      // Invalidate unread count to remove notification badge
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
     }
   }, [messages, myUserId]);
 
