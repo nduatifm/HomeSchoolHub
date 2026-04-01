@@ -236,6 +236,7 @@ export default function ModernSidebar() {
       case "new_tutor_request": return <UserPlus className="w-3.5 h-3.5 text-violet-500" />;
       case "progress_report": return <BookOpen className="w-3.5 h-3.5 text-teal-500" />;
       case "new_post": return <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />;
+      case "new_clarification": return <MessageSquare className="w-3.5 h-3.5 text-orange-400" />;
       default: return <LayoutList className="w-3.5 h-3.5 text-gray-400" />;
     }
   }

@@ -3005,6 +3005,21 @@ export function registerRoutes(app: Express) {
       });
 
       const clarification = await storage.createClarification(data);
+
+      // Notify the assignment's teacher about the clarification question
+      if (data.assignmentId) {
+        const clarificationAssignment = await storage.getAssignmentById(data.assignmentId as number);
+        if (clarificationAssignment?.teacherId) {
+          storage.createNotification({
+            userId: clarificationAssignment.teacherId,
+            type: "new_clarification",
+            title: "New Clarification Question",
+            body: `${student.name} asked a clarification question on assignment "${clarificationAssignment.title}".`,
+            link: "/dashboard#students",
+          }).catch(console.error);
+        }
+      }
+
       res.json(clarification);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
