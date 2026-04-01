@@ -650,13 +650,24 @@ export function registerRoutes(app: Express) {
         profile = await storage.getStudentByUserId(user.id);
       }
 
+      // Ensure roles array is valid: if empty or missing current role, rebuild it
+      let roles = user.roles ?? [];
+      if (user.role && !roles.includes(user.role)) {
+        roles = [...new Set([...roles, user.role])];
+        // Update in database
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { roles },
+        });
+      }
+
       res.json({
         user: {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: user.roles ?? [],
+          roles: roles,
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
           googleId: user.googleId,
@@ -1066,14 +1077,19 @@ export function registerRoutes(app: Express) {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      const currentRoles: string[] = user.roles ?? [];
+      let currentRoles: string[] = user.roles ?? [];
+      // Ensure current role is always in the roles array
+      if (!currentRoles.includes(user.role ?? "")) {
+        currentRoles = [...new Set([...currentRoles, user.role ?? ""])];
+      }
+      
       if (!currentRoles.includes(targetRole)) {
         return res.status(400).json({ error: `You do not have the ${targetRole} role` });
       }
 
       const updatedUser = await prisma.user.update({
         where: { id: user.id },
-        data: { role: targetRole },
+        data: { role: targetRole, roles: currentRoles },
       });
 
       res.json({
