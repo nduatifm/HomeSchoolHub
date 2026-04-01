@@ -93,15 +93,9 @@ export default function ModernSidebar() {
     if (!n.isRead) markReadMutation.mutate(n.id);
     if (n.link) {
       setNotifOpen(false);
-      const [path, hash] = n.link.split("#");
-      if (location !== path) {
-        setLocation(path);
-        if (hash) setTimeout(() => { window.location.hash = hash; }, 50);
-      } else {
-        if (hash) window.location.hash = hash;
-      }
+      window.location.href = n.link;
     }
-  }, [markReadMutation, location, setLocation]);
+  }, [markReadMutation]);
 
   const markAllReadMutation = useMutation({
     mutationFn: async () =>
