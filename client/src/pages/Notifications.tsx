@@ -90,7 +90,7 @@ function groupByType(items: Notification[]): Record<string, Notification[]> {
 }
 
 export default function NotificationsPage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
@@ -121,10 +121,21 @@ export default function NotificationsPage() {
     },
   });
 
-  const handleNotificationClick = (n: Notification) => {
-    if (!n.isRead) markReadMutation.mutate(n.id);
+  const handleNotificationClick = async (n: Notification) => {
+    if (!n.isRead) {
+      await markReadMutation.mutateAsync(n.id).catch(console.error);
+    }
     if (n.link) {
-      window.location.href = n.link;
+      const [path, hash] = n.link.split("#");
+      const isSpaPath = ["/dashboard", "/notifications", "/settings", "/admin"].some(
+        (p) => path === p || path.startsWith("/classrooms/")
+      );
+      if (isSpaPath) {
+        setLocation(path);
+        if (hash) setTimeout(() => { window.location.hash = hash; }, 50);
+      } else {
+        window.location.href = n.link;
+      }
     }
   };
 
