@@ -632,7 +632,7 @@ function ClassworkDialog({
                 size="sm"
                 variant={form.attachType === "url" ? "default" : "outline"}
                 className="gap-1.5"
-                onClick={() => setForm({ ...form, attachType: "url" })}
+                onClick={() => setForm({ ...form, attachType: "url", file: undefined })}
               >
                 <Link2 className="h-3.5 w-3.5" />URL
               </Button>
@@ -641,7 +641,7 @@ function ClassworkDialog({
                 size="sm"
                 variant={form.attachType === "file" ? "default" : "outline"}
                 className="gap-1.5"
-                onClick={() => setForm({ ...form, attachType: "file" })}
+                onClick={() => setForm({ ...form, attachType: "file", url: "" })}
               >
                 <FileUp className="h-3.5 w-3.5" />Upload file
               </Button>
@@ -685,7 +685,7 @@ function ClassworkDialog({
             </div>
           )}
 
-          <Button className="w-full" disabled={!canSubmit} onClick={() => submitMutation.mutate()}>
+          <Button className="w-full" disabled={!canSubmit || isArchived} onClick={() => submitMutation.mutate()}>
             {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             {mode === "create" ? "Add Classwork" : "Save Changes"}
           </Button>
