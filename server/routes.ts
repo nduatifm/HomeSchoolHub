@@ -1806,6 +1806,17 @@ export function registerRoutes(app: Express) {
           });
         }
 
+        // Build notification links — tutor-based Assignment has no classroomId field,
+        // so we fall back to generic dashboard links. If a classroomId were ever
+        // present (e.g. after a schema change), the specific classroom page is used.
+        const tutorClassroomId = (assignment as any).classroomId as number | undefined;
+        const studentGradeLink = tutorClassroomId
+          ? `/classrooms/${tutorClassroomId}`
+          : "/dashboard#classrooms";
+        const parentGradeLink = tutorClassroomId
+          ? `/classrooms/${tutorClassroomId}`
+          : "/dashboard#children";
+
         // Notify the student their work was graded
         if (student?.userId) {
           storage.createNotification({
@@ -1813,7 +1824,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
-            link: "/dashboard#classrooms",
+            link: studentGradeLink,
           }).catch(console.error);
         }
 
@@ -1824,7 +1835,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
-            link: "/dashboard#children",
+            link: parentGradeLink,
           }).catch(console.error);
         }
 
