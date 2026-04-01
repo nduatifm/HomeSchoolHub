@@ -45,17 +45,11 @@ import {
 import {
   Users,
   FileText,
-  Calendar,
   UserPlus,
-  LogOut,
   MessageSquare,
-  Send,
-  BarChart,
   Download,
   DollarSign,
   Star,
-  ClipboardCheck,
-  Unlink2,
   Trash2,
   GraduationCap,
   ChevronRight,
@@ -126,7 +120,7 @@ const ratingSchema = z.object({
 const PARENT_TABS = ["children", "classrooms", "tutors", "invites", "reports", "messages"];
 
 export default function ParentDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash.replace("#", "");
@@ -536,39 +530,6 @@ export default function ParentDashboard() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {/* <TabsList className="mb-4">
-              <TabsTrigger value="children" data-testid="tab-children">
-                My Children
-              </TabsTrigger>
-              <TabsTrigger value="invites" data-testid="tab-invites">
-                Invite Student
-              </TabsTrigger>
-              <TabsTrigger value="progress" data-testid="tab-progress">
-                Track Progress
-              </TabsTrigger>
-              <TabsTrigger value="payments" data-testid="tab-payments">
-                Payments
-              </TabsTrigger>
-              <TabsTrigger value="rate-tutor" data-testid="tab-rate-tutor">
-                Rate Tutor
-              </TabsTrigger>
-              <TabsTrigger value="attendance" data-testid="tab-attendance">
-                Attendance
-              </TabsTrigger>
-              <TabsTrigger value="tutors" data-testid="tab-tutors">
-                Tutor Requests
-              </TabsTrigger>
-              <TabsTrigger value="reports" data-testid="tab-reports">
-                Progress Reports
-              </TabsTrigger>
-              <TabsTrigger value="controls" data-testid="tab-controls">
-                Parental Controls
-              </TabsTrigger>
-              <TabsTrigger value="messages" data-testid="tab-messages">
-                Messages
-              </TabsTrigger>
-            </TabsList> */}
-
             <TabsContent value="children">
               <Card>
                 <CardHeader>
