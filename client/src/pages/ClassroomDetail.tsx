@@ -1413,10 +1413,12 @@ export default function ClassroomDetail() {
                 <TabsList className="w-max min-w-full">
                   <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
                   <TabsTrigger value="grades" className="gap-1.5 whitespace-nowrap"><BarChart2 className="h-3.5 w-3.5" />Grades</TabsTrigger>
+                  <TabsTrigger value="classwork" className="gap-1.5 whitespace-nowrap"><LibraryBig className="h-3.5 w-3.5" />Classwork</TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} /></TabsContent>
               <TabsContent value="grades"><ParentGradesTab classroomId={classroomId} studentId={parentStudentId} /></TabsContent>
+              <TabsContent value="classwork"><ClassworkTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isTeacher={false} isArchived={isArchived} /></TabsContent>
             </Tabs>
           )}
         </div>
