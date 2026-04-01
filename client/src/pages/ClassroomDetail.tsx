@@ -233,7 +233,7 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
               <DialogHeader><DialogTitle>Create Assignment</DialogTitle></DialogHeader>
               <div className="space-y-3 pt-2">
                 <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-                <div><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></div>
+                <div><Label>Description <span className="text-gray-400 font-normal">(optional)</span></Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label>Due Date</Label><Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></div>
                   <div><Label>Points</Label><Input type="number" min={1} value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} /></div>
@@ -243,7 +243,7 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
                   <Input type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="mt-1 cursor-pointer" onChange={(e) => setAttachedFile(e.target.files?.[0] ?? null)} />
                   {attachedFile && <p className="text-xs text-gray-500 mt-1">Selected: {attachedFile.name}</p>}
                 </div>
-                <Button className="w-full" disabled={!form.title || !form.description || !form.dueDate || createMutation.isPending} onClick={() => createMutation.mutate()}>
+                <Button className="w-full" disabled={!form.title || !form.dueDate || createMutation.isPending} onClick={() => createMutation.mutate()}>
                   {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Create Assignment
                 </Button>

@@ -4185,7 +4185,7 @@ export function registerRoutes(app: Express) {
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
       const data = z.object({
         title: z.string().min(1),
-        description: z.string().min(1),
+        description: z.string(),
         dueDate: z.string().min(1),
         points: z.preprocess((v) => parseInt(v as string, 10), z.number().int().min(1).max(10000)),
       }).parse(req.body);
