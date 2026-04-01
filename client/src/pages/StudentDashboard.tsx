@@ -347,6 +347,41 @@ export default function StudentDashboard() {
   );
   const streak = computeStreak(gradedAssignments);
 
+  type PendingTask = {
+    key: string;
+    title: string;
+    subtitle: string;
+    dueDate: string;
+    type: "classwork" | "legacy";
+    classroomSlug?: string;
+    assignmentSlug?: string;
+    assignmentId?: number;
+    studentAssignmentId?: number;
+    hasStudentAssignment?: boolean;
+  };
+
+  const allPendingItems: PendingTask[] = [
+    ...pendingClassworkItems.map(a => ({
+      key: `cw-${a.id}`,
+      title: a.title,
+      subtitle: `${a.classroomName} · Due ${a.dueDate}`,
+      dueDate: a.dueDate,
+      type: "classwork" as const,
+      classroomSlug: a.classroomSlug,
+      assignmentSlug: a.slug,
+    })),
+    ...pendingAssignments.map(a => ({
+      key: `legacy-${a.id}`,
+      title: a.title,
+      subtitle: `${a.subject} · Due ${a.dueDate}`,
+      dueDate: a.dueDate,
+      type: "legacy" as const,
+      assignmentId: a.id,
+      studentAssignmentId: a.studentAssignment?.id ?? 0,
+      hasStudentAssignment: !!a.studentAssignment,
+    })),
+  ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
@@ -396,13 +431,13 @@ export default function StudentDashboard() {
           </Card>
 
           {(() => {
-            const allPendingCount = pendingAssignments.length + pendingClassworkItems.length;
             const allDoneCount = gradedAssignments.length;
             const allTotal = assignments.length + classrooms.reduce((sum, _, i) => {
               const cw = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];
               return sum + cw.length;
             }, 0);
-            const statsLoading = classroomAssignmentQueries.some(q => q.isLoading);
+            const statsLoading = classroomAssignmentQueries.some(q => q.isLoading)
+              || classroomSubmissionQueries.some(q => q.isLoading);
             return (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                 {statsLoading ? (
@@ -437,7 +472,7 @@ export default function StudentDashboard() {
                     />
                     <ColorfulStatCard
                       title="To Do"
-                      value={allPendingCount}
+                      value={allPendingItems.length}
                       icon={BookOpen}
                       accent="rose"
                       subtitle="Tasks left"
@@ -454,63 +489,53 @@ export default function StudentDashboard() {
               <CardTitle className="text-base">Today's Tasks</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {pendingClassworkItems.length === 0 && pendingAssignments.length === 0 ? (
+              {allPendingItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-2">You're all caught up 🎉</p>
               ) : (
                 <>
-                  {pendingClassworkItems.slice(0, 3).map((a) => (
+                  {allPendingItems.slice(0, 3).map((task) => (
                     <div
-                      key={`cw-${a.id}`}
+                      key={task.key}
                       className="flex items-center justify-between p-3 border rounded-lg gap-3"
                     >
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{a.title}</p>
-                        <p className="text-xs text-muted-foreground">{a.classroomName} · Due {a.dueDate}</p>
+                        <p className="font-medium text-sm truncate">{task.title}</p>
+                        <p className="text-xs text-muted-foreground">{task.subtitle}</p>
                       </div>
-                      <Button
-                        size="sm"
-                        className="shrink-0 h-11 px-4"
-                        onClick={() => {
-                          window.location.href = `/classrooms/${a.classroomSlug}/classwork/${a.slug}`;
-                        }}
-                      >
-                        Continue
-                      </Button>
-                    </div>
-                  ))}
-                  {pendingAssignments.length > 0 && pendingClassworkItems.length < 3 &&
-                    pendingAssignments.slice(0, 3 - pendingClassworkItems.length).map((a) => (
-                      <div
-                        key={`legacy-${a.id}`}
-                        className="flex items-center justify-between p-3 border rounded-lg gap-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{a.title}</p>
-                          <p className="text-xs text-muted-foreground">{a.subject} · Due {a.dueDate}</p>
-                        </div>
+                      {task.type === "classwork" ? (
+                        <Button
+                          size="sm"
+                          className="shrink-0 h-11 px-4"
+                          onClick={() => {
+                            window.location.href = `/classrooms/${task.classroomSlug}/classwork/${task.assignmentSlug}`;
+                          }}
+                        >
+                          Continue
+                        </Button>
+                      ) : (
                         <Button
                           size="sm"
                           variant="outline"
                           className="shrink-0 h-11 px-4"
                           onClick={() => {
-                            setSubmitDialogAssignmentId(a.id);
+                            setSubmitDialogAssignmentId(task.assignmentId!);
                             setSubmissionForm({
-                              assignmentId: a.id,
-                              studentAssignmentId: a.studentAssignment?.id ?? 0,
+                              assignmentId: task.assignmentId!,
+                              studentAssignmentId: task.studentAssignmentId!,
                               submission: "",
                               notes: "",
-                              hasStudentAssignment: !!a.studentAssignment,
+                              hasStudentAssignment: task.hasStudentAssignment!,
                             });
                           }}
                         >
                           Submit
                         </Button>
-                      </div>
-                    ))
-                  }
-                  {(pendingClassworkItems.length + pendingAssignments.length) > 3 && (
+                      )}
+                    </div>
+                  ))}
+                  {allPendingItems.length > 3 && (
                     <p className="text-xs text-muted-foreground text-center pt-1">
-                      +{pendingClassworkItems.length + pendingAssignments.length - 3} more tasks
+                      +{allPendingItems.length - 3} more tasks
                     </p>
                   )}
                 </>

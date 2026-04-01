@@ -279,7 +279,7 @@ export default function TeacherDashboard() {
     staleTime: 30000,
   });
 
-  const { data: assignments = [] } = useQuery<Assignment[]>({
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments/teacher"],
   });
   const { data: materials = [] } = useQuery<Material[]>({
@@ -963,7 +963,7 @@ export default function TeacherDashboard() {
             const firstName = user?.name?.split(" ")[0] || "there";
             const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
             const pendingSubmissions = studentSubmissions.filter(s => s.status === "submitted");
-            const statsLoading = submissionsLoading;
+            const statsLoading = submissionsLoading || assignmentsLoading;
             return (
               <>
                 <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

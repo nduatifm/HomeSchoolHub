@@ -72,6 +72,8 @@ import type {
   User,
   ProgressReport,
   Classroom,
+  ClassroomAssignment,
+  ClassroomSubmission,
 } from "@shared/schema";
 
 type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
@@ -209,6 +211,30 @@ export default function ParentDashboard() {
     })),
   });
 
+  // Flat (child, classroom) pairs — recalculated each render as classrooms load
+  const childClassroomPairs = students.flatMap((child, ci) => {
+    const childClassrooms = (childClassroomQueries[ci]?.data as Classroom[]) ?? [];
+    return childClassrooms.map(c => ({ child, classroom: c }));
+  });
+
+  // Per-child per-classroom submission queries (parents use ?studentId= param)
+  const childClassworkSubmissionQueries = useQueries({
+    queries: childClassroomPairs.map(({ child, classroom }) => ({
+      queryKey: ["/api/classrooms", classroom.id, "my-submissions", child.id],
+      queryFn: () => apiRequest(`/api/classrooms/${classroom.id}/my-submissions?studentId=${child.id}`),
+      enabled: childClassroomPairs.length > 0,
+    })),
+  });
+
+  // Per-child per-classroom assignment queries (to know the total count)
+  const childClassroomAssignmentQueries = useQueries({
+    queries: childClassroomPairs.map(({ classroom }) => ({
+      queryKey: ["/api/classrooms", classroom.id, "assignments"],
+      queryFn: () => apiRequest(`/api/classrooms/${classroom.id}/assignments`),
+      enabled: childClassroomPairs.length > 0,
+    })),
+  });
+
   type ConversationSummary = {
     studentId: number;
     teacherUserId: number;
@@ -226,14 +252,33 @@ export default function ParentDashboard() {
     staleTime: 30000,
   });
 
-  const childStats: (ChildStat & { classroomCount: number })[] = students.map((child, index) => {
-    const data = (childAssignmentQueries[index]?.data as AssignmentWithStatus[]) || [];
-    const completed = data.filter(
-      (a) => a.studentAssignment?.status === "graded",
-    ).length;
-    const total = data.length;
+  const childStats: (ChildStat & { classroomCount: number })[] = students.map((child, ci) => {
+    // Legacy assignment stats
+    const legacyData = (childAssignmentQueries[ci]?.data as AssignmentWithStatus[]) || [];
+    const legacyCompleted = legacyData.filter(a => a.studentAssignment?.status === "graded").length;
+    const legacyTotal = legacyData.length;
+
+    // Compute offset into flat arrays for this child
+    let offset = 0;
+    for (let j = 0; j < ci; j++) {
+      offset += ((childClassroomQueries[j]?.data as Classroom[]) ?? []).length;
+    }
+    const childClassrooms = (childClassroomQueries[ci]?.data as Classroom[]) ?? [];
+    const classroomCount = childClassrooms.length;
+
+    // Classwork stats from per-classroom queries
+    const classworkCompleted = childClassrooms.reduce((sum, _, ki) => {
+      const subs = (childClassworkSubmissionQueries[offset + ki]?.data as ClassroomSubmission[]) ?? [];
+      return sum + subs.filter(s => s.status === "graded" || s.status === "submitted").length;
+    }, 0);
+    const classworkTotal = childClassrooms.reduce((sum, _, ki) => {
+      const assigns = (childClassroomAssignmentQueries[offset + ki]?.data as ClassroomAssignment[]) ?? [];
+      return sum + assigns.length;
+    }, 0);
+
+    const completed = legacyCompleted + classworkCompleted;
+    const total = legacyTotal + classworkTotal;
     const pct = total > 0 ? Math.round((completed / total) * 100) : null;
-    const classroomCount = ((childClassroomQueries[index]?.data as Classroom[]) || []).length;
     return { ...child, pct, completed, total, classroomCount };
   });
 
@@ -525,7 +570,7 @@ export default function ParentDashboard() {
                 </div>
               )}
 
-              {childAssignmentQueries.some(q => q.isLoading) ? (
+              {(childAssignmentQueries.some(q => q.isLoading) || childClassroomQueries.some(q => q.isLoading)) ? (
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <Skeleton className="h-20 rounded-xl" />
                   <Skeleton className="h-20 rounded-xl" />
