@@ -1,0 +1,86 @@
+Redesign Student Dashboard (Kid-First UX)
+
+Redesign the student dashboard to create a simple, engaging, and intuitive experience for kids.
+
+The goal is to reduce cognitive load, guide students clearly, and make learning feel motivating and easy to follow.
+
+1. Core UX Goals
+Show one clear primary action at a time
+Make it obvious: “What should I do next?”
+Reduce clutter and avoid overwhelming the student
+Prioritize learning flow over system features
+2. New Dashboard Structure
+
+Replace the current layout with:
+
+A. Top Section (Primary Action)
+
+Display a prominent CTA:
+“Start Today’s Work” or “Continue Learning”
+If progress exists:
+“Continue: [Last Lesson Name]”
+
+B. Progress Section
+
+Add a visual progress bar:
+Overall class progress
+Daily/weekly progress
+Include simple indicators:
+“2 tasks left today”
+Completion checkmarks
+
+C. Classwork Section
+
+Show current classwork as cards
+Each card includes:
+Title
+Short description
+“Start” or “Continue” button
+Stack vertically on mobile
+
+D. Minimal Navigation
+
+Simplify student navigation to:
+Home
+Classwork
+Progress
+Hide teacher/admin features
+3. UI / Visual Design
+Use a clean, calm, and friendly design
+Increase:
+Button size
+Spacing between elements
+Add:
+Icons alongside text
+Subtle color hierarchy (not overwhelming)
+Avoid:
+Dense text blocks
+Overly complex layouts
+4. Gamification Elements
+Add:
+Progress bars
+Completion checkmarks
+“Lesson Complete 🎉” feedback
+Optional:
+Streak indicator (e.g., “3 days in a row”)
+5. Interaction & Feedback
+Ensure:
+Immediate feedback on actions (e.g., “Saved!”, “Nice work!”)
+Smooth transitions between states
+Add loading states (no blank screens)
+6. Responsiveness (Critical)
+Optimize for:
+Mobile-first design
+Ensure:
+Cards stack properly
+Buttons are touch-friendly (min ~44px height)
+No horizontal scrolling
+7. Code Requirements
+Reuse existing components where possible (cards, buttons, layout)
+Maintain design consistency with the rest of the platform
+Do not break existing classroom, classwork, or assignment functionality
+8. Output
+Implement the redesigned dashboard directly in the code
+Briefly explain:
+What components were updated or created
+How the new layout improves student experience

@@ -1,0 +1,110 @@
+Replit AI Prompt: Transform Classrooms Page into Student Home
+
+Redesign the /classrooms page to function as the student’s main home dashboard, focusing on “what to do next” instead of listing classrooms first.
+
+The goal is to reduce decision-making and guide students (kids) directly into learning actions.
+
+1. Replace “My Classrooms” as Primary Focus
+
+Current issue:
+
+“My Classrooms” is the main section → forces navigation step
+
+Update:
+
+Move “My Classrooms” to a secondary section (bottom of page)
+Reduce its visual weight
+2. Add “Start Here” Section (Top Priority)
+New Top Section (Hero Card)
+Title:
+“Start Here” or “Continue Learning”
+Show:
+Last active assignment OR next due assignment
+Button:
+“Continue” (primary CTA)
+
+Behavior:
+
+Clicking goes directly to:
+/classrooms/:slug/classwork/:slug
+3. Add “Today’s Tasks” Section
+
+Place directly under the hero:
+
+Show 2–4 tasks max
+Across all classrooms
+Sorted by:
+Due soon
+In progress
+
+Each item:
+
+Assignment title (bold)
+Classroom name (small)
+Due date
+Status badge
+CTA: “Start” / “Continue”
+4. Keep Stats Row (But Simplify Meaning)
+
+Your current stats:
+
+Completed
+Points
+Streak
+Pending
+Improve:
+Add labels kids understand:
+“You finished 2 assignments 🎉”
+“1 task left today”
+Reduce emphasis on abstract metrics like “points” unless gamified further
+5. Move “My Classrooms” to Bottom
+
+Redesign classroom cards:
+
+Card:
+
+Title: “Biology 101”
+Button: “Go to Class”
+Optional:
+Progress bar per class
+
+Keep it:
+
+Simple
+Secondary
+6. Reduce Cognitive Load
+Limit visible items:
+Max 5 tasks on screen
+Add:
+“View All” if needed
+Avoid showing everything at once
+7. Mobile Optimization
+Stack sections vertically
+Hero CTA = full width
+Task cards = full width
+Buttons ≥ 44px height
+8. Keep Existing Routing (Important)
+Do NOT change current structure:
+/classrooms/:slug
+/classrooms/:slug/classwork/:slug
+Only improve how users get there
+9. Output
+Update /classrooms layout and components
+Reuse existing UI components where possible
+Explain:
+How tasks are selected (due soon, in progress, etc.)
+What components were added or changed
+🧠 Why this is a big upgrade
+
+Before:
+
+“Pick a classroom → find work → start”
+
+After:
+
+“Start immediately → no thinking → no friction”
+🔥 One Insight You Should Keep
+
+If a kid logs in and can’t start within 3 seconds, you lose engagement.
+
+This redesign fixes that.
