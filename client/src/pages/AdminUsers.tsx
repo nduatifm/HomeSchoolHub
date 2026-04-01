@@ -153,7 +153,7 @@ export default function AdminUsers() {
       <ModernSidebar />
 
       <div className="md:ml-[228px] flex">
-        <main className="flex-1 p-6 pt-20 md:pt-6">
+        <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
           {/* Header */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-1">

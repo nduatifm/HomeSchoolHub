@@ -954,7 +954,7 @@ export default function TeacherDashboard() {
       <ModernSidebar />
 
       <div className="md:ml-[228px] flex">
-        <main className="flex-1 p-6 pt-20 md:pt-6">
+        <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
 
           {(() => {
             const todayStr = new Date().toISOString().split("T")[0];

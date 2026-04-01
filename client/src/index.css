@@ -153,7 +153,7 @@
 
   /* Clean stat card */
   .stat-card {
-    @apply bg-white rounded-xl border p-5 flex items-center gap-4;
+    @apply bg-white rounded-xl border p-3 sm:p-5 flex items-center gap-3 sm:gap-4;
   }
 
   /* Page header */

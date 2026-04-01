@@ -55,7 +55,7 @@ function Row({
   hideEdit,
 }: RowProps) {
   return (
-    <div className="px-6 py-5">
+    <div className="px-4 sm:px-6 py-4 sm:py-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
@@ -378,7 +378,7 @@ export default function Profile() {
           <Section title="Account">
 
             {/* Photo row */}
-            <div className="px-6 py-6">
+            <div className="px-4 sm:px-6 py-5 sm:py-6">
               <div className="flex items-center gap-5">
                 <input
                   type="file"
@@ -452,7 +452,7 @@ export default function Profile() {
             />
 
             {/* Role / Context Switcher */}
-            <div className="px-6 py-5">
+            <div className="px-4 sm:px-6 py-4 sm:py-5">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Role</p>
               <div className="flex flex-wrap items-center gap-2">
                 {/* Active role badge */}

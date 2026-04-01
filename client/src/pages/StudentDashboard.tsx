@@ -305,7 +305,7 @@ export default function StudentDashboard() {
       <ModernSidebar />
 
       <div className="md:ml-[228px] flex">
-        <main className="flex-1 p-6 pt-20 md:pt-6">
+        <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6">
             <ColorfulStatCard
