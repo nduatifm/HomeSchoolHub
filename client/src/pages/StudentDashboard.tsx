@@ -438,7 +438,7 @@ export default function StudentDashboard() {
                           window.location.href = `/classrooms/${a.classroomSlug}/classwork/${a.slug}`;
                         }}
                       >
-                        Start
+                        Continue
                       </Button>
                     </div>
                   ))}
