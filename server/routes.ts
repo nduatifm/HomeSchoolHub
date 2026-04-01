@@ -2900,6 +2900,7 @@ export function registerRoutes(app: Express) {
           isRead: false,
           senderId: { in: participantIds },
         },
+        data: { isRead: true },
       });
 
       res.json({ success: true });
