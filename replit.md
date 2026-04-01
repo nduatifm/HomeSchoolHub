@@ -73,6 +73,24 @@ Icons are provided by Lucide React. The profile management features a modern tab
 - **Sidebar**: `ModernSidebar` shows "Admin Panel" link (with shield icon) for users with `isAdmin` or `isSuperAdmin`; shows "Super" badge for super admins
 - **AuthContext**: User type includes `isAdmin?: boolean` and `isSuperAdmin?: boolean`
 
+### In-App Notification System
+- **Notification model**: `Notification` table in PostgreSQL with fields `id`, `userId`, `type`, `title`, `body`, `isRead`, `createdAt`
+- **Storage methods**: `createNotification`, `getNotificationsForUser` (last 50), `getUnreadNotificationCount`, `markNotificationRead`, `markAllNotificationsRead`
+- **API routes**:
+  - `GET /api/notifications` — list notifications for current user
+  - `GET /api/notifications/count` — unread count (polled every 30s)
+  - `PATCH /api/notifications/read-all` — mark all as read
+  - `PATCH /api/notifications/:id/read` — mark one as read
+- **Trigger hooks** (fire-and-forget, never block the response):
+  - New assignment posted → notify each assigned student
+  - Regular assignment graded → notify student
+  - Tutor request approved/rejected → notify parent
+  - Progress report created → notify student + parent
+  - Classroom assignment created (both routes) → notify all enrolled students
+  - Student submits classroom assignment → notify teacher
+  - Classroom submission graded → notify student
+- **Sidebar bell**: "Notifications" nav item in `ModernSidebar` with unread badge; clicking opens a floating panel showing the last 50 notifications with timestamps, unread dot indicators, and "Mark all read" button
+
 ## External Dependencies
 - **Database**: PostgreSQL (Neon-hosted)
 - **Cloud Storage**: Cloudinary (for profile picture uploads)

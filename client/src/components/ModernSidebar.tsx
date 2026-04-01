@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Settings,
@@ -17,6 +17,8 @@ import {
   Loader2,
   School,
   Trash2,
+  Bell,
+  CheckCheck,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,16 +41,69 @@ interface SidebarItem {
   badge?: number;
 }
 
+interface Notification {
+  id: number;
+  userId: number;
+  type: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export default function ModernSidebar() {
   const { user, setUser, logout } = useAuth();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/messages/unread-count"],
     refetchInterval: 15000,
   });
   const unreadCount = unreadData?.count ?? 0;
+
+  const { data: notifCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/count"],
+    refetchInterval: 30000,
+  });
+  const unreadNotifCount = notifCount?.count ?? 0;
+
+  const { data: notifications = [] } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    enabled: notifOpen,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: async (id: number) =>
+      await apiRequest(`/api/notifications/${id}/read`, { method: "PATCH" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: async () =>
+      await apiRequest("/api/notifications/read-all", { method: "PATCH" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
+  // Close notif panel on outside click
+  useEffect(() => {
+    if (!notifOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [notifOpen]);
 
   const switchRoleMutation = useMutation({
     mutationFn: async (role: string) =>
@@ -137,6 +192,16 @@ export default function ModernSidebar() {
   const isActive = (hash: string) =>
     currentHash === hash && location === "/dashboard";
 
+  function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
   // ── Nav item ──────────────────────────────────────────────────────────────
   const NavItem = ({ item }: { item: SidebarItem }) => {
     const active = isActive(item.hash);
@@ -166,6 +231,87 @@ export default function ModernSidebar() {
     );
   };
 
+  // ── Notification Bell ─────────────────────────────────────────────────────
+  const NotificationBell = () => (
+    <div className="relative" ref={notifRef}>
+      <button
+        onClick={() => setNotifOpen((v) => !v)}
+        className="relative w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors duration-100"
+        aria-label="Notifications"
+        data-testid="sidebar-notifications"
+      >
+        <Bell className="w-4 h-4 text-gray-400 shrink-0" />
+        <span className="flex-1 text-left">Notifications</span>
+        {unreadNotifCount > 0 && (
+          <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-green-700 text-white text-[10px] font-semibold flex items-center justify-center leading-none">
+            {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
+          </span>
+        )}
+      </button>
+
+      {notifOpen && (
+        <div className="absolute left-full top-0 ml-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-[200] overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <span className="text-sm font-semibold text-gray-800">Notifications</span>
+            <div className="flex items-center gap-2">
+              {unreadNotifCount > 0 && (
+                <button
+                  onClick={() => markAllReadMutation.mutate()}
+                  disabled={markAllReadMutation.isPending}
+                  className="flex items-center gap-1 text-xs text-green-700 hover:text-green-800 font-medium"
+                  title="Mark all as read"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  Mark all read
+                </button>
+              )}
+              <button
+                onClick={() => setNotifOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-50">
+            {notifications.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-gray-400">
+                No notifications yet
+              </div>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  onClick={() => {
+                    if (!n.isRead) markReadMutation.mutate(n.id);
+                  }}
+                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    n.isRead ? "opacity-60" : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {!n.isRead && (
+                      <span className="mt-1.5 w-2 h-2 rounded-full bg-green-600 shrink-0" />
+                    )}
+                    {n.isRead && <span className="mt-1.5 w-2 h-2 shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // ── Sidebar shell ─────────────────────────────────────────────────────────
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -180,6 +326,7 @@ export default function ModernSidebar() {
         {items.map((item) => (
           <NavItem key={item.hash} item={item} />
         ))}
+        <NotificationBell />
       </nav>
 
       {/* Footer */}

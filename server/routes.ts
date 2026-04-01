@@ -1391,6 +1391,15 @@ export function registerRoutes(app: Express) {
           status: "pending",
           submittedAt: null,
         });
+        // Notify the student
+        if (student.userId) {
+          storage.createNotification({
+            userId: student.userId,
+            type: "new_assignment",
+            title: "New Assignment",
+            body: `You have a new assignment: "${assignment.title}"`,
+          }).catch(() => {});
+        }
       }
 
       res.json(assignment);
@@ -1794,6 +1803,16 @@ export function registerRoutes(app: Express) {
           await storage.updateStudent(student.id, {
             points: student.points + assignment.points,
           });
+        }
+
+        // Notify the student their work was graded
+        if (student?.userId) {
+          storage.createNotification({
+            userId: student.userId,
+            type: "assignment_graded",
+            title: "Assignment Graded",
+            body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
+          }).catch(() => {});
         }
 
         res.json(sa);
@@ -2608,6 +2627,17 @@ export function registerRoutes(app: Express) {
         responseDate: new Date().toISOString(),
       });
 
+      // Notify the parent of approval or rejection
+      if (existingRequest && (status === "approved" || status === "rejected")) {
+        const statusText = status === "approved" ? "approved" : "declined";
+        storage.createNotification({
+          userId: existingRequest.parentId,
+          type: "tutor_request_update",
+          title: `Tutor Request ${status === "approved" ? "Approved" : "Declined"}`,
+          body: `Your tutor request has been ${statusText} by ${user!.name}.`,
+        }).catch(() => {});
+      }
+
       res.json(request);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -2867,6 +2897,24 @@ export function registerRoutes(app: Express) {
       });
 
       const report = await storage.createProgressReport(data);
+
+      // Notify student and parent about the new progress report
+      const reportStudent = await storage.getStudentById(data.studentId as number);
+      if (reportStudent) {
+        storage.createNotification({
+          userId: reportStudent.userId,
+          type: "progress_report",
+          title: "New Progress Report",
+          body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+        }).catch(() => {});
+        storage.createNotification({
+          userId: reportStudent.parentId,
+          type: "progress_report",
+          title: "New Progress Report",
+          body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+        }).catch(() => {});
+      }
+
       res.json(report);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4187,6 +4235,21 @@ export function registerRoutes(app: Express) {
         points: z.number().int().min(1).max(10000),
       }).parse(req.body);
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data });
+
+      // Notify all enrolled students
+      const enrollments = await storage.getEnrollments(classroom.id);
+      for (const enrollment of enrollments) {
+        const studentUser = await storage.getStudentById(enrollment.student.id);
+        if (studentUser?.userId) {
+          storage.createNotification({
+            userId: studentUser.userId,
+            type: "new_assignment",
+            title: "New Classroom Assignment",
+            body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
+          }).catch(() => {});
+        }
+      }
+
       res.status(201).json(assignment);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4214,6 +4277,21 @@ export function registerRoutes(app: Express) {
       }
 
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl });
+
+      // Notify all enrolled students
+      const enrollments2 = await storage.getEnrollments(classroom.id);
+      for (const enrollment of enrollments2) {
+        const studentUser = await storage.getStudentById(enrollment.student.id);
+        if (studentUser?.userId) {
+          storage.createNotification({
+            userId: studentUser.userId,
+            type: "new_assignment",
+            title: "New Classroom Assignment",
+            body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
+          }).catch(() => {});
+        }
+      }
+
       res.status(201).json(assignment);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4307,6 +4385,15 @@ export function registerRoutes(app: Express) {
       }
       
       const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl);
+
+      // Notify the teacher that a student submitted
+      storage.createNotification({
+        userId: classroom.teacherId,
+        type: "assignment_submitted",
+        title: "Assignment Submitted",
+        body: `${user.name} submitted "${assignment.title}" in "${classroom.name}".`,
+      }).catch(() => {});
+
       res.json(submission);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4330,6 +4417,20 @@ export function registerRoutes(app: Express) {
       });
       if (!sub) return res.status(404).json({ error: "Submission not found" });
       const updated = await storage.gradeClassroomSubmission(submissionId, grade, feedback ?? null, sub.assignment.points);
+
+      // Notify the student their submission was graded
+      const gradedStudent = await storage.getStudentById(sub.studentId);
+      if (gradedStudent?.userId) {
+        const classroomData = await storage.getClassroomById(parseInt(req.params.classroomId));
+        const assignmentData = await prisma.classroomAssignment.findUnique({ where: { id: sub.assignmentId }, select: { title: true } });
+        storage.createNotification({
+          userId: gradedStudent.userId,
+          type: "assignment_graded",
+          title: "Assignment Graded",
+          body: `Your submission for "${assignmentData?.title ?? "assignment"}" in "${classroomData?.name ?? "classroom"}" has been graded: ${grade}/${sub.assignment.points}`,
+        }).catch(() => {});
+      }
+
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4372,6 +4473,48 @@ export function registerRoutes(app: Express) {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
       await storage.deleteClassroomMaterial(parseInt(req.params.materialId));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== NOTIFICATION ROUTES ==========
+
+  // GET /api/notifications — list notifications for current user
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    try {
+      const notifications = await storage.getNotificationsForUser(req.session.userId!);
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/notifications/count — unread count for current user
+  app.get("/api/notifications/count", requireAuth, async (req, res) => {
+    try {
+      const count = await storage.getUnreadNotificationCount(req.session.userId!);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/notifications/read-all — mark all notifications as read (must be before /:id/read)
+  app.patch("/api/notifications/read-all", requireAuth, async (req, res) => {
+    try {
+      await storage.markAllNotificationsRead(req.session.userId!);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/notifications/:id/read — mark a single notification as read
+  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      await storage.markNotificationRead(parseInt(req.params.id), req.session.userId!);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

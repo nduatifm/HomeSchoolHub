@@ -289,6 +289,13 @@ export interface IStorage {
   createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
   getClassroomMaterials(classroomId: number): Promise<ClassroomMaterial[]>;
   deleteClassroomMaterial(id: number): Promise<void>;
+
+  // ─── Notifications ────────────────────────────────────────────────────────
+  createNotification(data: { userId: number; type: string; title: string; body: string }): Promise<any>;
+  getNotificationsForUser(userId: number): Promise<any[]>;
+  getUnreadNotificationCount(userId: number): Promise<number>;
+  markNotificationRead(id: number, userId: number): Promise<any>;
+  markAllNotificationsRead(userId: number): Promise<void>;
 }
 
 class PrismaStorage implements IStorage {
@@ -1736,6 +1743,38 @@ class PrismaStorage implements IStorage {
 
   async deleteClassroomMaterial(id: number): Promise<void> {
     await prisma.classroomMaterial.delete({ where: { id } });
+  }
+
+  // ─── Notifications ────────────────────────────────────────────────────────
+
+  async createNotification(data: { userId: number; type: string; title: string; body: string }): Promise<any> {
+    return prisma.notification.create({ data });
+  }
+
+  async getNotificationsForUser(userId: number): Promise<any[]> {
+    return prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+  }
+
+  async getUnreadNotificationCount(userId: number): Promise<number> {
+    return prisma.notification.count({ where: { userId, isRead: false } });
+  }
+
+  async markNotificationRead(id: number, userId: number): Promise<any> {
+    return prisma.notification.updateMany({
+      where: { id, userId },
+      data: { isRead: true },
+    });
+  }
+
+  async markAllNotificationsRead(userId: number): Promise<void> {
+    await prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true },
+    });
   }
 }
 
