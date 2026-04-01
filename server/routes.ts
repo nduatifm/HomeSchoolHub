@@ -4673,13 +4673,16 @@ export function registerRoutes(app: Express) {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit classwork in an archived classroom" });
+      const materialId = parseInt(req.params.materialId);
+      const existing = await prisma.classroomMaterial.findUnique({ where: { id: materialId }, select: { classroomId: true } });
+      if (!existing || existing.classroomId !== classroom.id) return res.status(404).json({ error: "Classwork not found" });
       const data = z.object({
         title: z.string().min(1).optional(),
         description: z.string().optional(),
         url: z.string().url().optional().nullable(),
         assignmentId: z.number().int().positive().optional().nullable(),
       }).parse(req.body);
-      const updated = await storage.updateClassroomMaterial(parseInt(req.params.materialId), data);
+      const updated = await storage.updateClassroomMaterial(materialId, data);
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4696,6 +4699,9 @@ export function registerRoutes(app: Express) {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
         if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit classwork in an archived classroom" });
+        const materialId = parseInt(req.params.materialId);
+        const existing = await prisma.classroomMaterial.findUnique({ where: { id: materialId }, select: { classroomId: true } });
+        if (!existing || existing.classroomId !== classroom.id) return res.status(404).json({ error: "Classwork not found" });
         const data = z.object({
           title: z.string().min(1).optional(),
           description: z.string().optional(),
@@ -4713,7 +4719,7 @@ export function registerRoutes(app: Express) {
         } else if (clearUrl === "true") {
           url = null;
         }
-        const updated = await storage.updateClassroomMaterial(parseInt(req.params.materialId), { ...rest, ...(url !== undefined ? { url } : {}) });
+        const updated = await storage.updateClassroomMaterial(materialId, { ...rest, ...(url !== undefined ? { url } : {}) });
         res.json(updated);
       } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -4726,7 +4732,10 @@ export function registerRoutes(app: Express) {
     try {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
-      await storage.deleteClassroomMaterial(parseInt(req.params.materialId));
+      const materialId = parseInt(req.params.materialId);
+      const existing = await prisma.classroomMaterial.findUnique({ where: { id: materialId }, select: { classroomId: true } });
+      if (!existing || existing.classroomId !== classroom.id) return res.status(404).json({ error: "Classwork not found" });
+      await storage.deleteClassroomMaterial(materialId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

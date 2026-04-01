@@ -511,7 +511,7 @@ model ClassroomMaterial {
   uploadedAt   DateTime @default(now())
 
   classroom  Classroom            @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  assignment ClassroomAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  assignment ClassroomAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
   @@unique([classroomId, slug])
   @@index([classroomId])
