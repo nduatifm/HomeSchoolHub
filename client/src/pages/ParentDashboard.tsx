@@ -433,104 +433,104 @@ export default function ParentDashboard() {
             }}
           />
 
+          {childStats.length > 0 && (
+            <div className="my-6">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {childStats.map((child, index) => {
+                  const assignedTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
+                  return (
+                    <div
+                      key={child.id}
+                      className="p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-sm font-semibold text-primary">
+                            {child.name?.charAt(0).toUpperCase() || "?"}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-foreground text-sm truncate">{child.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
+                          className="text-muted-foreground hover:text-primary shrink-0"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Assigned teacher */}
+                      <div className="flex items-center justify-between mb-3 py-2 border-y border-border/50">
+                        <div className="flex items-center gap-1.5">
+                          <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {assignedTeacher
+                              ? <span className="text-foreground font-medium">{assignedTeacher.name}</span>
+                              : <span className="italic">No teacher assigned yet</span>
+                            }
+                          </span>
+                        </div>
+                        {assignedTeacher && (
+                          <button
+                            onClick={() => {
+                              setMessageForm({ receiverId: assignedTeacher.id, content: "" });
+                              setSendMessageOpen(true);
+                            }}
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            Message
+                          </button>
+                        )}
+                      </div>
+
+                      {child.pct !== null ? (
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
+                            <span className="font-medium text-foreground">{child.pct}%</span>
+                          </div>
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${child.pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">No assignments yet</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 my-6">
+            <ColorfulStatCard
+              title="Children"
+              value={students.length}
+              icon={Users}
+              accent="blue"
+              subtitle="Registered"
+            />
+            <ColorfulStatCard
+              title="Invites"
+              value={invites.length}
+              icon={UserPlus}
+              accent="green"
+              subtitle="Pending invites"
+            />
+          </div>
+
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="children">
-              {childStats.length > 0 && (
-                <div className="mb-6">
-                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {childStats.map((child, index) => {
-                      const assignedTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
-                      return (
-                        <div
-                          key={child.id}
-                          className="p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
-                        >
-                          <div className="flex items-start gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-sm font-semibold text-primary">
-                                {child.name?.charAt(0).toUpperCase() || "?"}
-                              </span>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-foreground text-sm truncate">{child.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
-                              className="text-muted-foreground hover:text-primary shrink-0"
-                            >
-                              <ChevronRight className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          {/* Assigned teacher */}
-                          <div className="flex items-center justify-between mb-3 py-2 border-y border-border/50">
-                            <div className="flex items-center gap-1.5">
-                              <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
-                              <span className="text-xs text-muted-foreground">
-                                {assignedTeacher
-                                  ? <span className="text-foreground font-medium">{assignedTeacher.name}</span>
-                                  : <span className="italic">No teacher assigned yet</span>
-                                }
-                              </span>
-                            </div>
-                            {assignedTeacher && (
-                              <button
-                                onClick={() => {
-                                  setMessageForm({ receiverId: assignedTeacher.id, content: "" });
-                                  setSendMessageOpen(true);
-                                }}
-                                className="text-xs text-primary hover:underline flex items-center gap-1"
-                              >
-                                <MessageSquare className="w-3 h-3" />
-                                Message
-                              </button>
-                            )}
-                          </div>
-
-                          {child.pct !== null ? (
-                            <div>
-                              <div className="flex items-center justify-between text-xs mb-1">
-                                <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
-                                <span className="font-medium text-foreground">{child.pct}%</span>
-                              </div>
-                              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-primary rounded-full transition-all"
-                                  style={{ width: `${child.pct}%` }}
-                                />
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">No assignments yet</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <ColorfulStatCard
-                  title="Children"
-                  value={students.length}
-                  icon={Users}
-                  accent="blue"
-                  subtitle="Registered"
-                />
-                <ColorfulStatCard
-                  title="Invites"
-                  value={invites.length}
-                  icon={UserPlus}
-                  accent="green"
-                  subtitle="Pending invites"
-                />
-              </div>
-
               <Card>
                 <CardHeader>
                   <CardTitle>My Students</CardTitle>
