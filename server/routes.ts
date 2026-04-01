@@ -1806,36 +1806,17 @@ export function registerRoutes(app: Express) {
           });
         }
 
-        // Find an associated classroom for deep-linking: look for a classroom owned by
-        // this teacher where the student is enrolled and there is a matching assignment title.
-        // Falls back to generic dashboard links when no classroom association exists.
-        const linkedEnrollment = student && assignment
-          ? await prisma.classroomEnrollment.findFirst({
-              where: {
-                studentId: student.id,
-                classroom: {
-                  teacherId: assignment.teacherId,
-                  assignments: { some: { title: assignment.title } },
-                },
-              },
-              select: { classroomId: true },
-            })
-          : null;
-        const studentGradeLink = linkedEnrollment
-          ? `/classrooms/${linkedEnrollment.classroomId}`
-          : "/dashboard#classrooms";
-        const parentGradeLink = linkedEnrollment
-          ? `/classrooms/${linkedEnrollment.classroomId}`
-          : "/dashboard#children";
-
-        // Notify the student their work was graded
+        // Notify the student their work was graded.
+        // The tutor-based Assignment model has no classroomId field (unlike ClassroomAssignment),
+        // so there is no explicit classroom association to deep-link to. Dashboard links are
+        // the correct fallback here — classroom grading uses /classrooms/{id} instead.
         if (student?.userId) {
           storage.createNotification({
             userId: student.userId,
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
-            link: studentGradeLink,
+            link: "/dashboard#classrooms",
           }).catch(console.error);
         }
 
@@ -1846,7 +1827,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
-            link: parentGradeLink,
+            link: "/dashboard#children",
           }).catch(console.error);
         }
 
