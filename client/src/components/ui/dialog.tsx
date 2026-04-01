@@ -77,7 +77,7 @@ export function DialogContent({
         className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md"
         onClick={() => context.setOpen(false)}
       />
-      <div className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
+      <div className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 bg-white p-6 shadow-2xl duration-200 rounded-lg border-0">
         <div className={cn("relative", className)}>
           <button
             className="absolute right-0 top-0 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
