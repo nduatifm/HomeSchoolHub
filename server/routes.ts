@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import prisma from "./db";
+import { slugify } from "../shared/slugify";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
@@ -187,6 +188,30 @@ export function registerRoutes(app: Express) {
   prisma.authSession.deleteMany({ where: { expiresAt: { lt: new Date() } } })
     .then((r) => { if (r.count > 0) console.log(`[sessions] Deleted ${r.count} expired sessions`); })
     .catch((err) => console.error("[sessions] Failed to clean expired sessions:", err));
+
+  // Backfill null slugs for pre-migration records
+  (async () => {
+    try {
+      const [classrooms, assignments] = await Promise.all([
+        prisma.classroom.findMany({ where: { slug: null }, select: { id: true, name: true } }),
+        prisma.classroomAssignment.findMany({ where: { slug: null }, select: { id: true, title: true } }),
+      ]);
+      if (classrooms.length > 0) {
+        await Promise.all(classrooms.map((c) =>
+          prisma.classroom.update({ where: { id: c.id }, data: { slug: slugify(c.name, c.id) } })
+        ));
+        console.log(`[slugs] Backfilled ${classrooms.length} classroom slug(s)`);
+      }
+      if (assignments.length > 0) {
+        await Promise.all(assignments.map((a) =>
+          prisma.classroomAssignment.update({ where: { id: a.id }, data: { slug: slugify(a.title, a.id) } })
+        ));
+        console.log(`[slugs] Backfilled ${assignments.length} assignment slug(s)`);
+      }
+    } catch (err) {
+      console.error("[slugs] Backfill failed:", err);
+    }
+  })();
 
   // Ensure TUTOR_REQUEST_MODE is ON by default (requests require teacher approval)
   storage.getSystemSetting("TUTOR_REQUEST_MODE").then(async (s) => {
@@ -4407,12 +4432,15 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/classrooms/:classroomId/assignments/slug/:assignmentSlug — fetch single assignment by slug
+  // GET /api/classrooms/:classroomId/assignments/slug/:assignmentSlug — fetch single assignment by slug or numeric ID
   app.get("/api/classrooms/:classroomId/assignments/slug/:assignmentSlug", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomMember(req, res);
       if (!classroom) return;
-      const assignment = await storage.getClassroomAssignmentBySlug(classroom.id, req.params.assignmentSlug);
+      const param = req.params.assignmentSlug;
+      const assignment = /^\d+$/.test(param)
+        ? await storage.getClassroomAssignmentById(classroom.id, parseInt(param, 10))
+        : await storage.getClassroomAssignmentBySlug(classroom.id, param);
       if (!assignment) return res.status(404).json({ error: "Assignment not found" });
       res.json(assignment);
     } catch (error: any) {

@@ -282,6 +282,7 @@ export interface IStorage {
   createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment>;
   getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]>;
   getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null>;
+  getClassroomAssignmentById(classroomId: number, id: number): Promise<ClassroomAssignment | null>;
   deleteClassroomAssignment(id: number): Promise<void>;
 
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
@@ -1649,6 +1650,11 @@ class PrismaStorage implements IStorage {
 
   async getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null> {
     const a = await prisma.classroomAssignment.findFirst({ where: { classroomId, slug } });
+    return a ? this.mapClassroomAssignment(a) : null;
+  }
+
+  async getClassroomAssignmentById(classroomId: number, id: number): Promise<ClassroomAssignment | null> {
+    const a = await prisma.classroomAssignment.findFirst({ where: { classroomId, id } });
     return a ? this.mapClassroomAssignment(a) : null;
   }
 
