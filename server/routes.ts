@@ -4649,7 +4649,7 @@ export function registerRoutes(app: Express) {
         }
         let url: string | null = null;
         if (req.file) {
-          const uploadResult: any = await uploadBufferToCloudinary(req.file.buffer, req.file.mimetype, { folder: "classwork" });
+          const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classwork");
           if (!uploadResult.success || !uploadResult.url) {
             return res.status(500).json({ error: uploadResult.error || "File upload failed" });
           }
@@ -4727,7 +4727,7 @@ export function registerRoutes(app: Express) {
         const { clearUrl, ...rest } = data;
         let url: string | null | undefined = undefined;
         if (req.file) {
-          const uploadResult: any = await uploadBufferToCloudinary(req.file.buffer, req.file.mimetype, { folder: "classwork" });
+          const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classwork");
           if (!uploadResult.success || !uploadResult.url) {
             return res.status(500).json({ error: uploadResult.error || "File upload failed" });
           }
