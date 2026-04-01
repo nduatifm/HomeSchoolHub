@@ -4097,8 +4097,7 @@ export function registerRoutes(app: Express) {
 
   // Helper: verify classroom belongs to requesting teacher
   async function resolveClassroom(param: string): Promise<any | null> {
-    const numeric = parseInt(param);
-    if (!isNaN(numeric)) return storage.getClassroomById(numeric);
+    if (/^\d+$/.test(param)) return storage.getClassroomById(parseInt(param, 10));
     return storage.getClassroomBySlug(param);
   }
 
