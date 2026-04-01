@@ -4337,7 +4337,7 @@ export function registerRoutes(app: Express) {
             type: "new_post",
             title: "New Classroom Post",
             body: `New post in "${classroom.name}": ${content.slice(0, 80)}${content.length > 80 ? "…" : ""}`,
-            link: `/classrooms/${classroomId}`,
+            link: `/classrooms/${classroom.slug ?? classroomId}`,
           }).catch(console.error);
         }
       }
@@ -4384,7 +4384,7 @@ export function registerRoutes(app: Express) {
             type: "new_assignment",
             title: "New Classroom Assignment",
             body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
-            link: `/classrooms/${classroom.id}`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
           }).catch(console.error);
         }
       }
@@ -4427,7 +4427,7 @@ export function registerRoutes(app: Express) {
             type: "new_assignment",
             title: "New Classroom Assignment",
             body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
-            link: `/classrooms/${classroom.id}`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
           }).catch(console.error);
         }
       }
@@ -4548,7 +4548,7 @@ export function registerRoutes(app: Express) {
         type: "assignment_submitted",
         title: "Assignment Submitted",
         body: `${user.name} submitted "${assignment.title}" in "${classroom.name}".`,
-        link: `/classrooms/${classroom.id}`,
+        link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
       }).catch(console.error);
 
       res.json(submission);
@@ -4585,7 +4585,7 @@ export function registerRoutes(app: Express) {
           type: "assignment_graded",
           title: "Assignment Graded",
           body: `Your submission for "${assignmentData?.title ?? "assignment"}" in "${classroomData?.name ?? "classroom"}" has been graded: ${grade}/${sub.assignment.points}`,
-          link: `/classrooms/${classroom.id}`,
+          link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
         }).catch(console.error);
         // Also notify the parent
         if (gradedStudent.parentId) {
@@ -4594,7 +4594,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `${gradedStudent.name}'s submission for "${assignmentData?.title ?? "assignment"}" was graded: ${grade}/${sub.assignment.points}`,
-            link: `/classrooms/${classroom.id}`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=grades`,
           }).catch(console.error);
         }
       }
@@ -4622,6 +4622,22 @@ export function registerRoutes(app: Express) {
         if (!assignment || assignment.classroomId !== classroom.id) return res.status(400).json({ error: "Assignment does not belong to this classroom" });
       }
       const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data });
+
+      // Notify all enrolled students about the new material
+      const materialEnrollments = await storage.getEnrollments(classroom.id);
+      for (const enrollment of materialEnrollments) {
+        const materialStudent = await storage.getStudentById(enrollment.student.id);
+        if (materialStudent?.userId) {
+          storage.createNotification({
+            userId: materialStudent.userId,
+            type: "new_classwork",
+            title: "New Classwork Material",
+            body: `New material in "${classroom.name}": "${material.title}"`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=classwork`,
+          }).catch(console.error);
+        }
+      }
+
       res.status(201).json(material);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4656,6 +4672,22 @@ export function registerRoutes(app: Express) {
           url = uploadResult.url;
         }
         const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data, url });
+
+        // Notify all enrolled students about the new material
+        const materialEnrollments2 = await storage.getEnrollments(classroom.id);
+        for (const enrollment of materialEnrollments2) {
+          const materialStudent = await storage.getStudentById(enrollment.student.id);
+          if (materialStudent?.userId) {
+            storage.createNotification({
+              userId: materialStudent.userId,
+              type: "new_classwork",
+              title: "New Classwork Material",
+              body: `New material in "${classroom.name}": "${material.title}"`,
+              link: `/classrooms/${classroom.slug ?? classroom.id}?tab=classwork`,
+            }).catch(console.error);
+          }
+        }
+
         res.status(201).json(material);
       } catch (error: any) {
         res.status(400).json({ error: error.message });

@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   UserPlus,
   BookOpen,
+  LibraryBig,
   MessageSquare,
   LayoutList,
   ArrowLeft,
@@ -63,6 +64,8 @@ function notifIcon(type: string) {
       return <MessageSquare className="w-4 h-4 text-indigo-500" />;
     case "new_clarification":
       return <MessageSquare className="w-4 h-4 text-orange-400" />;
+    case "new_classwork":
+      return <LibraryBig className="w-4 h-4 text-teal-600" />;
     default:
       return <LayoutList className="w-4 h-4 text-gray-400" />;
   }
@@ -77,6 +80,7 @@ const typeLabel: Record<string, string> = {
   progress_report: "Progress Reports",
   new_post: "Classroom Posts",
   new_clarification: "Questions",
+  new_classwork: "Classwork",
 };
 
 function groupByType(items: Notification[]): Record<string, Notification[]> {

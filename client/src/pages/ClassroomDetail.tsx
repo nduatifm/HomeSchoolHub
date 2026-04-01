@@ -1293,9 +1293,12 @@ export default function ClassroomDetail() {
   const { user } = useAuth();
   const slugParam = params?.slug ?? "";
 
-  // Parent: studentId from query string
+  // Read query params once on mount (search includes ?tab= and ?studentId=)
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
+
+  // Tab state — initialized from ?tab= query param, falls back to "feed"
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") ?? "feed");
 
   const { data: classroom, isLoading } = useQuery<Classroom>({
     queryKey: ["/api/classrooms", slugParam],
@@ -1393,9 +1396,9 @@ export default function ClassroomDetail() {
             </div>
           </div>
 
-          {/* Tabs — role-adaptive */}
+          {/* Tabs — role-adaptive, tab driven by ?tab= URL param */}
           {isTeacher && (
-            <Tabs defaultValue="feed">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div className="overflow-x-auto -mx-1 px-1 mb-4">
                 <TabsList className="w-max min-w-full">
                   <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
@@ -1414,7 +1417,7 @@ export default function ClassroomDetail() {
           )}
 
           {isStudent && (
-            <Tabs defaultValue="feed">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div className="overflow-x-auto -mx-1 px-1 mb-4">
                 <TabsList className="w-max min-w-full">
                   <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
@@ -1431,7 +1434,7 @@ export default function ClassroomDetail() {
           )}
 
           {isParent && (
-            <Tabs defaultValue="feed">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div className="overflow-x-auto -mx-1 px-1 mb-4">
                 <TabsList className="w-max min-w-full">
                   <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
