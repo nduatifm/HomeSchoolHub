@@ -13,6 +13,7 @@ interface ThreadMessage {
   message: string;
   timestamp: string;
   senderName?: string;
+  isRead?: boolean;
 }
 
 interface MessageThreadProps {
@@ -139,6 +140,23 @@ export default function MessageThread({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  // Mark unread messages as read when thread is opened
+  useEffect(() => {
+    const unreadMessages = messages.filter(
+      (msg) => msg.senderId !== myUserId && !msg.isRead
+    );
+
+    if (unreadMessages.length > 0) {
+      unreadMessages.forEach((msg) => {
+        apiRequest(`/api/messages/${msg.id}/read`, { method: "PATCH" }).catch(
+          (err) => console.error("Failed to mark message as read:", err)
+        );
+      });
+      // Invalidate unread count to remove notification badge
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+    }
+  }, [messages, myUserId]);
 
   const autoResize = () => {
     const el = textareaRef.current;
