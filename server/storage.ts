@@ -23,6 +23,7 @@ import type {
   InsertPayment,
   TutorRequest,
   InsertTutorRequest,
+  EnrichedTutorRequest,
   Message,
   InsertMessage,
   ProgressReport,
@@ -162,8 +163,8 @@ export interface IStorage {
 
   createTutorRequest(request: InsertTutorRequest): Promise<TutorRequest>;
   getTutorRequestById(id: number): Promise<TutorRequest | null>;
-  getTutorRequestsByParent(parentId: number): Promise<TutorRequest[]>;
-  getTutorRequestsByTeacher(teacherId: number): Promise<TutorRequest[]>;
+  getTutorRequestsByParent(parentId: number): Promise<EnrichedTutorRequest[]>;
+  getTutorRequestsByTeacher(teacherId: number): Promise<EnrichedTutorRequest[]>;
   updateTutorRequest(
     id: number,
     request: Prisma.TutorRequestUpdateInput,
@@ -695,16 +696,47 @@ class PrismaStorage implements IStorage {
     })) as TutorRequest | null;
   }
 
-  async getTutorRequestsByParent(parentId: number): Promise<TutorRequest[]> {
-    return (await prisma.tutorRequest.findMany({
+  async getTutorRequestsByParent(parentId: number): Promise<EnrichedTutorRequest[]> {
+    const requests = await prisma.tutorRequest.findMany({
       where: { parentId },
-    })) as TutorRequest[];
+      include: {
+        teacher: { select: { id: true, name: true, email: true } },
+        parent: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { id: "desc" },
+    });
+    return this._enrichWithStudent(requests);
   }
 
-  async getTutorRequestsByTeacher(teacherId: number): Promise<TutorRequest[]> {
-    return (await prisma.tutorRequest.findMany({
+  async getTutorRequestsByTeacher(teacherId: number): Promise<EnrichedTutorRequest[]> {
+    const requests = await prisma.tutorRequest.findMany({
       where: { teacherId },
-    })) as TutorRequest[];
+      include: {
+        teacher: { select: { id: true, name: true, email: true } },
+        parent: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { id: "desc" },
+    });
+    return this._enrichWithStudent(requests);
+  }
+
+  private async _enrichWithStudent(
+    requests: (Omit<TutorRequest, "status"> & { status: string; teacher: { name: string; email: string }; parent: { name: string } })[],
+  ): Promise<EnrichedTutorRequest[]> {
+    const studentIds = Array.from(new Set(requests.map(r => r.studentId).filter(Boolean) as number[]));
+    const students = studentIds.length > 0
+      ? await prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, name: true, gradeLevel: true } })
+      : [];
+    const studentMap = new Map(students.map(s => [s.id, s]));
+    return requests.map(r => ({
+      ...r,
+      status: r.status as TutorRequest["status"],
+      teacherName: r.teacher.name,
+      teacherEmail: r.teacher.email,
+      parentName: r.parent.name,
+      studentName: r.studentId ? (studentMap.get(r.studentId)?.name ?? null) : null,
+      studentGrade: r.studentId ? (studentMap.get(r.studentId)?.gradeLevel ?? null) : null,
+    })) as EnrichedTutorRequest[];
   }
 
   async updateTutorRequest(

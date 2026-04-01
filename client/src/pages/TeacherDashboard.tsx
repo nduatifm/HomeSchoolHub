@@ -86,6 +86,7 @@ import type {
   Material,
   Earnings,
   TutorRequest,
+  EnrichedTutorRequest,
   User,
   ProgressReport,
   Classroom,
@@ -287,9 +288,8 @@ export default function TeacherDashboard() {
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["/api/sessions/teacher"],
   });
-  const { data: tutorRequests = [] } = useQuery<TutorRequest[]>({
+  const { data: tutorRequests = [] } = useQuery<EnrichedTutorRequest[]>({
     queryKey: ["/api/tutor-requests/teacher"],
-    enabled: isTutorRequestModeEnabled, // Only fetch when tutor request mode is ON
   });
   const { data: earnings = [] } = useQuery<Earnings[]>({
     queryKey: ["/api/earnings/teacher"],
@@ -1010,38 +1010,23 @@ export default function TeacherDashboard() {
 
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {/* <TabsList className="mb-4">
-              <TabsTrigger value="assignments" data-testid="tab-assignments">
-                Assignments
-              </TabsTrigger>
-              <TabsTrigger value="materials" data-testid="tab-materials">
-                Materials
-              </TabsTrigger>
+            <TabsList className="mb-4">
               <TabsTrigger value="students" data-testid="tab-students">
                 Students
-              </TabsTrigger>
-              <TabsTrigger value="sessions" data-testid="tab-sessions">
-                Sessions
-              </TabsTrigger>
-              <TabsTrigger value="schedule" data-testid="tab-schedule">
-                Schedule
-              </TabsTrigger>
-              <TabsTrigger value="feedback" data-testid="tab-feedback">
-                Feedback
-              </TabsTrigger>
-              <TabsTrigger value="attendance" data-testid="tab-attendance">
-                Attendance
               </TabsTrigger>
               <TabsTrigger value="requests" data-testid="tab-requests">
                 Tutor Requests
               </TabsTrigger>
-              <TabsTrigger value="reports" data-testid="tab-reports">
-                Progress Reports
+              <TabsTrigger value="feedback" data-testid="tab-feedback">
+                Feedback
+              </TabsTrigger>
+              <TabsTrigger value="classrooms" data-testid="tab-classrooms">
+                Classrooms
               </TabsTrigger>
               <TabsTrigger value="messages" data-testid="tab-messages">
                 Messages
               </TabsTrigger>
-            </TabsList> */}
+            </TabsList>
 
             <TabsContent value="students">
               <Card>
@@ -2394,49 +2379,63 @@ export default function TeacherDashboard() {
             </TabsContent>
 */}
 
-            {/* {isTutorRequestModeEnabled && (
-              <TabsContent value="requests">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Tutor Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {tutorRequests.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          No tutor requests pending.
-                        </p>
-                      ) : (
-                        tutorRequests.map((r: any) => (
+            <TabsContent value="requests">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tutor Requests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {tutorRequests.length === 0 ? (
+                      <div className="text-center py-10">
+                        <p className="text-sm text-muted-foreground">No tutor requests yet. When a parent sends you a request, it will appear here.</p>
+                      </div>
+                    ) : (
+                      [...tutorRequests]
+                        .sort((a: any, b: any) => {
+                          if (a.status === "pending" && b.status !== "pending") return -1;
+                          if (a.status !== "pending" && b.status === "pending") return 1;
+                          return 0;
+                        })
+                        .map((r: any) => (
                           <div
                             key={r.id}
                             className="p-4 border rounded-lg"
                             data-testid={`card-request-${r.id}`}
                           >
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p
-                                  className="font-medium"
-                                  data-testid={`text-request-message-${r.id}`}
-                                >
-                                  {r.message}
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm">
+                                  {r.parentName || "A parent"} is requesting tutoring
+                                  {r.studentName ? ` for ${r.studentName}` : ""}
+                                  {r.studentGrade ? ` (${r.studentGrade})` : ""}
                                 </p>
-                                <p className="text-sm text-muted-foreground">
-                                  Requested:{" "}
+                                {r.message && (
+                                  <p
+                                    className="text-sm text-muted-foreground mt-1 line-clamp-2"
+                                    data-testid={`text-request-message-${r.id}`}
+                                  >
+                                    "{r.message}"
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
                                   {new Date(r.requestDate).toLocaleDateString()}
                                 </p>
                                 <Badge
+                                  className="mt-1"
                                   variant={
                                     r.status === "approved"
                                       ? "default"
-                                      : "outline"
+                                      : r.status === "rejected"
+                                      ? "outline"
+                                      : "secondary"
                                   }
                                 >
                                   {r.status}
                                 </Badge>
                               </div>
                               {r.status === "pending" && (
-                                <div className="space-x-2">
+                                <div className="flex gap-2 shrink-0">
                                   <Button
                                     size="sm"
                                     onClick={() =>
@@ -2445,6 +2444,7 @@ export default function TeacherDashboard() {
                                         status: "approved",
                                       })
                                     }
+                                    disabled={approveTutorRequestMutation.isPending}
                                     data-testid={`button-approve-${r.id}`}
                                   >
                                     Approve
@@ -2458,6 +2458,7 @@ export default function TeacherDashboard() {
                                         status: "rejected",
                                       })
                                     }
+                                    disabled={approveTutorRequestMutation.isPending}
                                     data-testid={`button-reject-${r.id}`}
                                   >
                                     Reject
@@ -2467,12 +2468,11 @@ export default function TeacherDashboard() {
                             </div>
                           </div>
                         ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )} */}
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
 {/*
             <TabsContent value="reports">

@@ -188,6 +188,14 @@ export function registerRoutes(app: Express) {
     .then((r) => { if (r.count > 0) console.log(`[sessions] Deleted ${r.count} expired sessions`); })
     .catch((err) => console.error("[sessions] Failed to clean expired sessions:", err));
 
+  // Ensure TUTOR_REQUEST_MODE is ON by default (requests require teacher approval)
+  storage.getSystemSetting("TUTOR_REQUEST_MODE").then(async (s) => {
+    if (!s) {
+      await storage.setSystemSetting("TUTOR_REQUEST_MODE", "true", "Requires teacher to approve/reject parent tutor requests (set false to auto-approve)");
+      console.log("[settings] TUTOR_REQUEST_MODE defaulted to true");
+    }
+  }).catch((err) => console.error("[settings] Failed to init TUTOR_REQUEST_MODE:", err));
+
   // ========== AUTH ROUTES ==========
 
   // Teacher/Parent signup
@@ -2504,6 +2512,23 @@ export function registerRoutes(app: Express) {
         }
       }
 
+      // Guard: prevent duplicate active requests for the same teacher + student pair
+      if (data.studentId) {
+        const existingRequest = await prisma.tutorRequest.findFirst({
+          where: {
+            teacherId: data.teacherId,
+            studentId: data.studentId,
+            status: { in: ["pending", "approved"] },
+          },
+        });
+        if (existingRequest) {
+          const label = existingRequest.status === "approved"
+            ? "already connected to this teacher"
+            : "already has a pending request for this teacher";
+          return res.status(409).json({ error: `This student is ${label}. Please wait for a response before sending another.` });
+        }
+      }
+
       let request = await storage.createTutorRequest(data);
 
       // When tutor-request mode is OFF, auto-approve immediately.
@@ -3781,6 +3806,48 @@ export function registerRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error("Dev become error:", error);
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // POST /api/dev/reset-db — wipe all user data and reset seed flag for fresh testing
+    app.post("/api/dev/reset-db", async (_req, res) => {
+      try {
+        // Delete in FK-safe order (children before parents)
+        await prisma.$transaction([
+          prisma.classroomSubmission.deleteMany(),
+          prisma.classroomMaterial.deleteMany(),
+          prisma.classroomAssignment.deleteMany(),
+          prisma.classroomPost.deleteMany(),
+          prisma.classroomEnrollment.deleteMany(),
+          prisma.classroom.deleteMany(),
+          prisma.tutorRating.deleteMany(),
+          prisma.payment.deleteMany(),
+          prisma.earnings.deleteMany(),
+          prisma.attendance.deleteMany(),
+          prisma.session.deleteMany(),
+          prisma.feedback.deleteMany(),
+          prisma.schedule.deleteMany(),
+          prisma.clarification.deleteMany(),
+          prisma.studentAssignment.deleteMany(),
+          prisma.assignment.deleteMany(),
+          prisma.material.deleteMany(),
+          prisma.progressReport.deleteMany(),
+          prisma.parentalControl.deleteMany(),
+          prisma.teacherStudentAssignment.deleteMany(),
+          prisma.tutorRequest.deleteMany(),
+          prisma.studentInvite.deleteMany(),
+          prisma.threadLabel.deleteMany(),
+          prisma.message.deleteMany(),
+          prisma.authSession.deleteMany(),
+          prisma.student.deleteMany(),
+          prisma.user.deleteMany(),
+          prisma.systemSettings.deleteMany(),
+        ]);
+        console.log("[dev] Database reset complete — all data wiped");
+        res.json({ cleared: true });
+      } catch (error: any) {
+        console.error("[dev] reset-db error:", error);
         res.status(500).json({ error: error.message });
       }
     });

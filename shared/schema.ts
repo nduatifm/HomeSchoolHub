@@ -260,6 +260,16 @@ export const insertTutorRequestSchema = tutorRequestSchema.omit({ id: true });
 export type TutorRequest = z.infer<typeof tutorRequestSchema>;
 export type InsertTutorRequest = z.infer<typeof insertTutorRequestSchema>;
 
+// Enriched TutorRequest — returned by GET /api/tutor-requests/parent and /teacher
+export const enrichedTutorRequestSchema = tutorRequestSchema.extend({
+  teacherName: z.string(),
+  teacherEmail: z.string(),
+  parentName: z.string(),
+  studentName: z.string().nullable(),
+  studentGrade: z.string().nullable(),
+});
+export type EnrichedTutorRequest = z.infer<typeof enrichedTutorRequestSchema>;
+
 // Message schema
 export const messageSchema = z.object({
   id: z.number(),

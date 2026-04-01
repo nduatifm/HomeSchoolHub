@@ -304,11 +304,15 @@ export default function ParentDashboard() {
         title: approved ? "Teacher assigned!" : "Request sent!",
         description: approved
           ? "Your child has been linked to the selected teacher."
-          : "Your request is pending teacher approval.",
+          : "Your request has been sent. The teacher will review and approve it shortly.",
         type: "success",
       });
       setTutorRequestForm({ teacherId: 0, message: "", studentId: null });
       setRequestTutorOpen(false);
+    },
+    onError: (err: any) => {
+      const message = err?.message || "Failed to send request. Please try again.";
+      toast({ title: "Could not send request", description: message, type: "error" });
     },
   });
 
@@ -1358,23 +1362,34 @@ export default function ParentDashboard() {
                             className="p-4 border rounded-lg"
                             data-testid={`card-tutor-request-${r.id}`}
                           >
-                            <p
-                              className="font-medium"
-                              data-testid={`text-tutor-request-message-${r.id}`}
-                            >
-                              {r.message}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Requested:{" "}
-                              {new Date(r.requestDate).toLocaleDateString()}
-                            </p>
-                            <Badge
-                              variant={
-                                r.status === "approved" ? "default" : "outline"
-                              }
-                            >
-                              {r.status}
-                            </Badge>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm">
+                                  {r.studentName || "Your child"} → {r.teacherName || "Teacher"}
+                                </p>
+                                {r.studentGrade && (
+                                  <p className="text-xs text-muted-foreground">{r.studentGrade}</p>
+                                )}
+                                {r.message ? (
+                                  <p
+                                    className="text-sm text-muted-foreground mt-1 line-clamp-2"
+                                    data-testid={`text-tutor-request-message-${r.id}`}
+                                  >
+                                    "{r.message}"
+                                  </p>
+                                ) : null}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Requested: {new Date(r.requestDate).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={
+                                  r.status === "approved" ? "default" : r.status === "rejected" ? "outline" : "secondary"
+                                }
+                              >
+                                {r.status}
+                              </Badge>
+                            </div>
                           </div>
                         ))
                       )}
