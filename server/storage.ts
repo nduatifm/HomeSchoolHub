@@ -291,8 +291,8 @@ export interface IStorage {
   deleteClassroomMaterial(id: number): Promise<void>;
 
   // ─── Notifications ────────────────────────────────────────────────────────
-  createNotification(data: { userId: number; type: string; title: string; body: string }): Promise<any>;
-  getNotificationsForUser(userId: number): Promise<any[]>;
+  createNotification(data: { userId: number; type: string; title: string; body: string; link?: string }): Promise<any>;
+  getNotificationsForUser(userId: number, limit?: number): Promise<any[]>;
   getUnreadNotificationCount(userId: number): Promise<number>;
   markNotificationRead(id: number, userId: number): Promise<any>;
   markAllNotificationsRead(userId: number): Promise<void>;
@@ -1747,15 +1747,26 @@ class PrismaStorage implements IStorage {
 
   // ─── Notifications ────────────────────────────────────────────────────────
 
-  async createNotification(data: { userId: number; type: string; title: string; body: string }): Promise<any> {
+  async createNotification(data: { userId: number; type: string; title: string; body: string; link?: string }): Promise<any> {
+    // Dedup guard: skip if an identical unread notification was created in the last 60 seconds
+    const recent = await prisma.notification.findFirst({
+      where: {
+        userId: data.userId,
+        type: data.type,
+        body: data.body,
+        isRead: false,
+        createdAt: { gte: new Date(Date.now() - 60_000) },
+      },
+    });
+    if (recent) return recent;
     return prisma.notification.create({ data });
   }
 
-  async getNotificationsForUser(userId: number): Promise<any[]> {
+  async getNotificationsForUser(userId: number, limit = 20): Promise<any[]> {
     return prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take: limit,
     });
   }
 

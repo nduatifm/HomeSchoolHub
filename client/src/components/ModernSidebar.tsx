@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Settings,
@@ -83,6 +83,20 @@ export default function ModernSidebar() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
   });
+
+  const handleNotificationClick = useCallback((n: Notification) => {
+    if (!n.isRead) markReadMutation.mutate(n.id);
+    if (n.link) {
+      setNotifOpen(false);
+      const [path, hash] = n.link.split("#");
+      if (location !== path) {
+        setLocation(path);
+        if (hash) setTimeout(() => { window.location.hash = hash; }, 50);
+      } else {
+        if (hash) window.location.hash = hash;
+      }
+    }
+  }, [markReadMutation, location, setLocation]);
 
   const markAllReadMutation = useMutation({
     mutationFn: async () =>
@@ -285,9 +299,7 @@ export default function ModernSidebar() {
               notifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => {
-                    if (!n.isRead) markReadMutation.mutate(n.id);
-                  }}
+                  onClick={() => handleNotificationClick(n)}
                   className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
                     n.isRead ? "opacity-60" : ""
                   }`}
