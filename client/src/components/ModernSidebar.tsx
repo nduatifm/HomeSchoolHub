@@ -106,6 +106,7 @@ export default function ModernSidebar() {
   const teacherItems: SidebarItem[] = [
     { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
     { icon: <User className="w-4 h-4" />, label: "Students", hash: "students" },
+    { icon: <UserPlus className="w-4 h-4" />, label: "Tutor Requests", hash: "requests" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
   ];

@@ -1010,24 +1010,6 @@ export default function TeacherDashboard() {
 
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="students" data-testid="tab-students">
-                Students
-              </TabsTrigger>
-              <TabsTrigger value="requests" data-testid="tab-requests">
-                Tutor Requests
-              </TabsTrigger>
-              <TabsTrigger value="feedback" data-testid="tab-feedback">
-                Feedback
-              </TabsTrigger>
-              <TabsTrigger value="classrooms" data-testid="tab-classrooms">
-                Classrooms
-              </TabsTrigger>
-              <TabsTrigger value="messages" data-testid="tab-messages">
-                Messages
-              </TabsTrigger>
-            </TabsList>
-
             <TabsContent value="students">
               <Card>
                 <CardHeader>
