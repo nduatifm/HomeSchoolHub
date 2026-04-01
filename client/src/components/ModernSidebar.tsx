@@ -71,7 +71,7 @@ export default function ModernSidebar() {
 
   const { data: notifCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/count"],
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
   const unreadNotifCount = notifCount?.count ?? 0;
 
@@ -314,7 +314,7 @@ export default function ModernSidebar() {
             </div>
           </div>
 
-          {/* List with time grouping */}
+          {/* List with time + type grouping */}
           <div className="max-h-[400px] overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">
@@ -323,6 +323,28 @@ export default function ModernSidebar() {
             ) : (() => {
               const todayItems = notifications.filter((n) => isToday(n.createdAt));
               const earlierItems = notifications.filter((n) => !isToday(n.createdAt));
+
+              const typeLabel: Record<string, string> = {
+                new_assignment: "Assignments",
+                assignment_graded: "Grades",
+                assignment_submitted: "Submissions",
+                new_tutor_request: "Tutor Requests",
+                tutor_request_update: "Tutor Requests",
+                progress_report: "Progress Reports",
+                new_post: "Classroom Posts",
+                new_clarification: "Questions",
+              };
+
+              const groupByType = (items: Notification[]) => {
+                const groups: Record<string, Notification[]> = {};
+                for (const n of items) {
+                  const key = typeLabel[n.type] ?? "Other";
+                  if (!groups[key]) groups[key] = [];
+                  groups[key].push(n);
+                }
+                return groups;
+              };
+
               const renderItem = (n: Notification) => (
                 <div
                   key={n.id}
@@ -346,20 +368,29 @@ export default function ModernSidebar() {
                   </div>
                 </div>
               );
+
+              const renderGrouped = (items: Notification[], bucketLabel: string) => {
+                if (items.length === 0) return null;
+                const groups = groupByType(items);
+                return (
+                  <>
+                    <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">{bucketLabel}</div>
+                    {Object.entries(groups).map(([groupName, groupItems]) => (
+                      <div key={groupName}>
+                        {Object.keys(groups).length > 1 && (
+                          <div className="px-4 pt-2 pb-0.5 text-[10px] font-medium text-gray-400">{groupName}</div>
+                        )}
+                        {groupItems.map(renderItem)}
+                      </div>
+                    ))}
+                  </>
+                );
+              };
+
               return (
                 <>
-                  {todayItems.length > 0 && (
-                    <>
-                      <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">Today</div>
-                      {todayItems.map(renderItem)}
-                    </>
-                  )}
-                  {earlierItems.length > 0 && (
-                    <>
-                      <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">Earlier</div>
-                      {earlierItems.map(renderItem)}
-                    </>
-                  )}
+                  {renderGrouped(todayItems, "Today")}
+                  {renderGrouped(earlierItems, "Earlier")}
                 </>
               );
             })()}
