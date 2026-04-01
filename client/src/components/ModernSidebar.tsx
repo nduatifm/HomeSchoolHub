@@ -19,6 +19,10 @@ import {
   Trash2,
   Bell,
   CheckCheck,
+  Star,
+  BookOpen,
+  ClipboardCheck,
+  LayoutList,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,6 +51,7 @@ interface Notification {
   type: string;
   title: string;
   body: string;
+  link?: string;
   isRead: boolean;
   createdAt: string;
 }
@@ -216,6 +221,25 @@ export default function ModernSidebar() {
     return `${Math.floor(hrs / 24)}d ago`;
   }
 
+  function isToday(dateStr: string) {
+    const d = new Date(dateStr);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  }
+
+  function notifIcon(type: string) {
+    switch (type) {
+      case "new_assignment": return <FileText className="w-3.5 h-3.5 text-blue-500" />;
+      case "assignment_graded": return <Star className="w-3.5 h-3.5 text-amber-500" />;
+      case "assignment_submitted": return <ClipboardCheck className="w-3.5 h-3.5 text-green-600" />;
+      case "tutor_request_update": return <UserPlus className="w-3.5 h-3.5 text-violet-500" />;
+      case "new_tutor_request": return <UserPlus className="w-3.5 h-3.5 text-violet-500" />;
+      case "progress_report": return <BookOpen className="w-3.5 h-3.5 text-teal-500" />;
+      case "new_post": return <MessageSquare className="w-3.5 h-3.5 text-indigo-500" />;
+      default: return <LayoutList className="w-3.5 h-3.5 text-gray-400" />;
+    }
+  }
+
   // ── Nav item ──────────────────────────────────────────────────────────────
   const NavItem = ({ item }: { item: SidebarItem }) => {
     const active = isActive(item.hash);
@@ -289,35 +313,55 @@ export default function ModernSidebar() {
             </div>
           </div>
 
-          {/* List */}
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-50">
+          {/* List with time grouping */}
+          <div className="max-h-[400px] overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-400">
                 No notifications yet
               </div>
-            ) : (
-              notifications.map((n) => (
+            ) : (() => {
+              const todayItems = notifications.filter((n) => isToday(n.createdAt));
+              const earlierItems = notifications.filter((n) => !isToday(n.createdAt));
+              const renderItem = (n: Notification) => (
                 <div
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 ${
                     n.isRead ? "opacity-60" : ""
                   }`}
                 >
-                  <div className="flex items-start gap-2">
-                    {!n.isRead && (
-                      <span className="mt-1.5 w-2 h-2 rounded-full bg-green-600 shrink-0" />
-                    )}
-                    {n.isRead && <span className="mt-1.5 w-2 h-2 shrink-0" />}
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 shrink-0 w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                      {notifIcon(n.type)}
+                    </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-gray-800 truncate">{n.title}</p>
+                      <div className="flex items-center gap-1.5">
+                        {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-green-600 shrink-0" />}
+                        <p className="text-xs font-semibold text-gray-800 truncate">{n.title}</p>
+                      </div>
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
                       <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
                     </div>
                   </div>
                 </div>
-              ))
-            )}
+              );
+              return (
+                <>
+                  {todayItems.length > 0 && (
+                    <>
+                      <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">Today</div>
+                      {todayItems.map(renderItem)}
+                    </>
+                  )}
+                  {earlierItems.length > 0 && (
+                    <>
+                      <div className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide bg-gray-50">Earlier</div>
+                      {earlierItems.map(renderItem)}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

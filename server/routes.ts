@@ -1399,7 +1399,7 @@ export function registerRoutes(app: Express) {
             title: "New Assignment",
             body: `You have a new assignment: "${assignment.title}"`,
             link: "/dashboard#classrooms",
-          }).catch(() => {});
+          }).catch(console.error);
         }
       }
 
@@ -1814,7 +1814,7 @@ export function registerRoutes(app: Express) {
             title: "Assignment Graded",
             body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
             link: "/dashboard#classrooms",
-          }).catch(() => {});
+          }).catch(console.error);
         }
 
         // Also notify the parent when a child's assignment is graded
@@ -1825,7 +1825,7 @@ export function registerRoutes(app: Express) {
             title: "Assignment Graded",
             body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
             link: "/dashboard#children",
-          }).catch(() => {});
+          }).catch(console.error);
         }
 
         res.json(sa);
@@ -2595,7 +2595,7 @@ export function registerRoutes(app: Express) {
           title: "New Tutor Request",
           body: `${user!.name} has sent you a tutor request.`,
           link: "/dashboard#requests",
-        }).catch(() => {});
+        }).catch(console.error);
       }
 
       res.json(request);
@@ -2658,7 +2658,7 @@ export function registerRoutes(app: Express) {
           title: `Tutor Request ${status === "approved" ? "Approved" : "Declined"}`,
           body: `Your tutor request has been ${statusText} by ${user!.name}.`,
           link: "/dashboard#children",
-        }).catch(() => {});
+        }).catch(console.error);
       }
 
       res.json(request);
@@ -2930,14 +2930,14 @@ export function registerRoutes(app: Express) {
           title: "New Progress Report",
           body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
           link: "/dashboard#classrooms",
-        }).catch(() => {});
+        }).catch(console.error);
         storage.createNotification({
           userId: reportStudent.parentId,
           type: "progress_report",
           title: "New Progress Report",
           body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
           link: "/dashboard#reports",
-        }).catch(() => {});
+        }).catch(console.error);
       }
 
       res.json(report);
@@ -4241,7 +4241,7 @@ export function registerRoutes(app: Express) {
             title: "New Classroom Post",
             body: `New post in "${classroom.name}": ${content.slice(0, 80)}${content.length > 80 ? "…" : ""}`,
             link: "/dashboard#classrooms",
-          }).catch(() => {});
+          }).catch(console.error);
         }
       }
 
@@ -4288,7 +4288,7 @@ export function registerRoutes(app: Express) {
             title: "New Classroom Assignment",
             body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
             link: "/dashboard#classrooms",
-          }).catch(() => {});
+          }).catch(console.error);
         }
       }
 
@@ -4331,7 +4331,7 @@ export function registerRoutes(app: Express) {
             title: "New Classroom Assignment",
             body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
             link: "/dashboard#classrooms",
-          }).catch(() => {});
+          }).catch(console.error);
         }
       }
 
@@ -4436,7 +4436,7 @@ export function registerRoutes(app: Express) {
         title: "Assignment Submitted",
         body: `${user.name} submitted "${assignment.title}" in "${classroom.name}".`,
         link: "/dashboard#students",
-      }).catch(() => {});
+      }).catch(console.error);
 
       res.json(submission);
     } catch (error: any) {
@@ -4473,7 +4473,7 @@ export function registerRoutes(app: Express) {
           title: "Assignment Graded",
           body: `Your submission for "${assignmentData?.title ?? "assignment"}" in "${classroomData?.name ?? "classroom"}" has been graded: ${grade}/${sub.assignment.points}`,
           link: "/dashboard#classrooms",
-        }).catch(() => {});
+        }).catch(console.error);
         // Also notify the parent
         if (gradedStudent.parentId) {
           storage.createNotification({
@@ -4482,7 +4482,7 @@ export function registerRoutes(app: Express) {
             title: "Assignment Graded",
             body: `${gradedStudent.name}'s submission for "${assignmentData?.title ?? "assignment"}" was graded: ${grade}/${sub.assignment.points}`,
             link: "/dashboard#children",
-          }).catch(() => {});
+          }).catch(console.error);
         }
       }
 
