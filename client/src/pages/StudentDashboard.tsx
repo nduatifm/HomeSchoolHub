@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -58,10 +58,20 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
-import type { Assignment, StudentAssignment, Session, Classroom } from "@shared/schema";
+import type { Assignment, StudentAssignment, Session, Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 
 type AssignmentWithStatus = Assignment & {
   studentAssignment: StudentAssignment | null;
+};
+
+type ClassworkItem = {
+  id: number;
+  title: string;
+  slug: string;
+  classroomName: string;
+  classroomSlug: string;
+  dueDate: string;
+  status: "pending" | "submitted" | "graded" | "late";
 };
 
 function formatPreviewTime(ts: string): string {
@@ -175,6 +185,42 @@ export default function StudentDashboard() {
     enabled: !!student,
   });
   const { data: classrooms = [] } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
+
+  const classroomAssignmentQueries = useQueries({
+    queries: classrooms.map(c => ({
+      queryKey: ["/api/classrooms", c.id, "assignments"],
+      queryFn: () => apiRequest(`/api/classrooms/${c.id}/assignments`),
+      enabled: classrooms.length > 0,
+    })),
+  });
+
+  const classroomSubmissionQueries = useQueries({
+    queries: classrooms.map(c => ({
+      queryKey: ["/api/classrooms", c.id, "my-submissions"],
+      queryFn: () => apiRequest(`/api/classrooms/${c.id}/my-submissions`),
+      enabled: classrooms.length > 0,
+    })),
+  });
+
+  const pendingClassworkItems: ClassworkItem[] = classrooms.flatMap((c, i) => {
+    const cwAssignments: ClassroomAssignment[] = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];
+    const cwSubmissions: ClassroomSubmission[] = (classroomSubmissionQueries[i]?.data as ClassroomSubmission[]) ?? [];
+    return cwAssignments
+      .map(a => {
+        const sub = cwSubmissions.find(s => s.assignmentId === a.id);
+        const status = sub?.status ?? "pending";
+        return {
+          id: a.id,
+          title: a.title,
+          slug: a.slug ?? String(a.id),
+          classroomName: c.name,
+          classroomSlug: c.slug ?? String(c.id),
+          dueDate: a.dueDate,
+          status,
+        };
+      })
+      .filter(item => item.status === "pending");
+  }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
   const sessions = sessionsQuery.data || [];
   const schedule = scheduleQuery.data || [];
@@ -307,36 +353,104 @@ export default function StudentDashboard() {
       <div className="md:ml-[228px] flex">
         <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 my-6">
+          {/* START HERE — hero card */}
+          <Card className="mb-6">
+            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5">
+              <div>
+                <p className="text-sm text-muted-foreground">Start here</p>
+                <h2 className="text-lg font-semibold">
+                  {pendingClassworkItems[0]
+                    ? `Continue: ${pendingClassworkItems[0].title}`
+                    : "You're all caught up 🎉"}
+                </h2>
+                {pendingClassworkItems[0] && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{pendingClassworkItems[0].classroomName} · Due {pendingClassworkItems[0].dueDate}</p>
+                )}
+              </div>
+              {pendingClassworkItems[0] && (
+                <Button
+                  size="lg"
+                  className="h-12 px-6 text-base w-full sm:w-auto"
+                  onClick={() => {
+                    window.location.href = `/classrooms/${pendingClassworkItems[0].classroomSlug}/classwork/${pendingClassworkItems[0].slug}`;
+                  }}
+                >
+                  Continue
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             <ColorfulStatCard
-              title="Completed"
+              title="You Finished 🎉"
               value={gradedAssignments.length}
               icon={CheckCircle}
               accent="green"
-              subtitle={`${assignments.length} total assignments`}
+              subtitle={`${assignments.length} total`}
             />
             <ColorfulStatCard
-              title="Points Earned"
+              title="Points"
               value={student?.points || 0}
               icon={Trophy}
               accent="amber"
-              subtitle="Keep learning!"
+              subtitle="Keep going!"
             />
             <ColorfulStatCard
-              title="Day Streak"
+              title="Streak 🔥"
               value={streak}
               icon={Flame}
               accent="purple"
-              subtitle={streak === 1 ? "day in a row" : "days in a row"}
+              subtitle={streak === 1 ? "day" : "days"}
             />
             <ColorfulStatCard
-              title="Pending"
+              title="To Do"
               value={pendingAssignments.length}
               icon={BookOpen}
               accent="rose"
-              subtitle="Need to submit"
+              subtitle="Tasks left"
             />
           </div>
+
+          {/* TODAY'S TASKS */}
+          <Card className="mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Today's Tasks</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pendingClassworkItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">You're all caught up 🎉</p>
+              ) : (
+                <>
+                  {pendingClassworkItems.slice(0, 3).map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between p-3 border rounded-lg gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{a.title}</p>
+                        <p className="text-xs text-muted-foreground">{a.classroomName} · Due {a.dueDate}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="shrink-0 h-11 px-4"
+                        onClick={() => {
+                          window.location.href = `/classrooms/${a.classroomSlug}/classwork/${a.slug}`;
+                        }}
+                      >
+                        Start
+                      </Button>
+                    </div>
+                  ))}
+                  {pendingClassworkItems.length > 3 && (
+                    <p className="text-xs text-muted-foreground text-center pt-1">
+                      +{pendingClassworkItems.length - 3} more tasks
+                    </p>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
 
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -831,7 +945,7 @@ export default function StudentDashboard() {
             <TabsContent value="classrooms">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><School className="h-5 w-5 text-primary" />My Classrooms</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><School className="h-5 w-5 text-primary" />All Classes</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {classrooms.length === 0 ? (
@@ -847,8 +961,8 @@ export default function StudentDashboard() {
                           <p className="text-xs text-primary font-medium">{c.subject}</p>
                           {c.description && <p className="text-xs text-gray-400 line-clamp-2">{c.description}</p>}
                           <div className="mt-auto pt-2">
-                            <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}`; }}>
-                              View Classroom <ChevronRight className="h-3 w-3" />
+                            <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs h-11" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}`; }}>
+                              Go to Class <ChevronRight className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
