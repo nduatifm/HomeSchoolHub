@@ -4287,7 +4287,7 @@ export function registerRoutes(app: Express) {
             type: "new_post",
             title: "New Classroom Post",
             body: `New post in "${classroom.name}": ${content.slice(0, 80)}${content.length > 80 ? "…" : ""}`,
-            link: "/dashboard#classrooms",
+            link: `/classrooms/${classroomId}`,
           }).catch(console.error);
         }
       }
@@ -4334,7 +4334,7 @@ export function registerRoutes(app: Express) {
             type: "new_assignment",
             title: "New Classroom Assignment",
             body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
-            link: "/dashboard#classrooms",
+            link: `/classrooms/${classroom.id}`,
           }).catch(console.error);
         }
       }
@@ -4377,7 +4377,7 @@ export function registerRoutes(app: Express) {
             type: "new_assignment",
             title: "New Classroom Assignment",
             body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
-            link: "/dashboard#classrooms",
+            link: `/classrooms/${classroom.id}`,
           }).catch(console.error);
         }
       }
@@ -4482,7 +4482,7 @@ export function registerRoutes(app: Express) {
         type: "assignment_submitted",
         title: "Assignment Submitted",
         body: `${user.name} submitted "${assignment.title}" in "${classroom.name}".`,
-        link: "/dashboard#students",
+        link: `/classrooms/${classroom.id}`,
       }).catch(console.error);
 
       res.json(submission);
@@ -4519,7 +4519,7 @@ export function registerRoutes(app: Express) {
           type: "assignment_graded",
           title: "Assignment Graded",
           body: `Your submission for "${assignmentData?.title ?? "assignment"}" in "${classroomData?.name ?? "classroom"}" has been graded: ${grade}/${sub.assignment.points}`,
-          link: "/dashboard#classrooms",
+          link: `/classrooms/${classroom.id}`,
         }).catch(console.error);
         // Also notify the parent
         if (gradedStudent.parentId) {
@@ -4528,7 +4528,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `${gradedStudent.name}'s submission for "${assignmentData?.title ?? "assignment"}" was graded: ${grade}/${sub.assignment.points}`,
-            link: "/dashboard#children",
+            link: `/classrooms/${classroom.id}`,
           }).catch(console.error);
         }
       }
