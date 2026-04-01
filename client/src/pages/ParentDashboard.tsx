@@ -146,7 +146,7 @@ export default function ParentDashboard() {
   const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
 
   // Fetch data
-  const { data: students = [] } = useQuery<Student[]>({
+  const { data: students = [], isLoading: studentsLoading } = useQuery<Student[]>({
     queryKey: ["/api/students/parent"],
   });
 
@@ -164,7 +164,7 @@ export default function ParentDashboard() {
   }, [students]);
 
   const [rateTutorOpen, setRateTutorOpen] = useState(false);
-  const { data: invites = [] } = useQuery<StudentInvite[]>({
+  const { data: invites = [], isLoading: invitesLoading } = useQuery<StudentInvite[]>({
     queryKey: ["/api/invites/student/parent"],
   });
   const { data: tutorRequests = [] } = useQuery<EnrichedTutorRequest[]>({
@@ -269,7 +269,7 @@ export default function ParentDashboard() {
     // Classwork stats from per-classroom queries
     const classworkCompleted = childClassrooms.reduce((sum, _, ki) => {
       const subs = (childClassworkSubmissionQueries[offset + ki]?.data as ClassroomSubmission[]) ?? [];
-      return sum + subs.filter(s => s.status === "graded" || s.status === "submitted").length;
+      return sum + subs.filter(s => s.status === "graded").length;
     }, 0);
     const classworkTotal = childClassrooms.reduce((sum, _, ki) => {
       const assigns = (childClassroomAssignmentQueries[offset + ki]?.data as ClassroomAssignment[]) ?? [];
@@ -570,7 +570,7 @@ export default function ParentDashboard() {
                 </div>
               )}
 
-              {(childAssignmentQueries.some(q => q.isLoading) || childClassroomQueries.some(q => q.isLoading)) ? (
+              {(studentsLoading || invitesLoading || childAssignmentQueries.some(q => q.isLoading) || childClassroomQueries.some(q => q.isLoading)) ? (
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <Skeleton className="h-20 rounded-xl" />
                   <Skeleton className="h-20 rounded-xl" />

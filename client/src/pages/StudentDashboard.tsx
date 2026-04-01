@@ -133,7 +133,7 @@ export default function StudentDashboard() {
   const [requestClarificationOpen, setRequestClarificationOpen] =
     useState(false);
   // Fetch data
-  const { data: assignments = [] } = useQuery<AssignmentWithStatus[]>({
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<AssignmentWithStatus[]>({
     queryKey: ["/api/assignments/student", student?.id],
     enabled: !!student,
   });
@@ -436,7 +436,8 @@ export default function StudentDashboard() {
               const cw = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];
               return sum + cw.length;
             }, 0);
-            const statsLoading = classroomAssignmentQueries.some(q => q.isLoading)
+            const statsLoading = assignmentsLoading
+              || classroomAssignmentQueries.some(q => q.isLoading)
               || classroomSubmissionQueries.some(q => q.isLoading);
             return (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

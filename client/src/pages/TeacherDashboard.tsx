@@ -258,7 +258,7 @@ export default function TeacherDashboard() {
   const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
 
   // Fetch data
-  const { data: students = [] } = useQuery<StudentWithParent[]>({
+  const { data: students = [], isLoading: studentsLoading } = useQuery<StudentWithParent[]>({
     queryKey: ["/api/students/teacher"],
   });
 
@@ -282,7 +282,7 @@ export default function TeacherDashboard() {
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments/teacher"],
   });
-  const { data: materials = [] } = useQuery<Material[]>({
+  const { data: materials = [], isLoading: materialsLoading } = useQuery<Material[]>({
     queryKey: ["/api/materials/teacher"],
   });
   const { data: sessions = [] } = useQuery<Session[]>({
@@ -963,7 +963,7 @@ export default function TeacherDashboard() {
             const firstName = user?.name?.split(" ")[0] || "there";
             const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
             const pendingSubmissions = studentSubmissions.filter(s => s.status === "submitted");
-            const statsLoading = submissionsLoading || assignmentsLoading;
+            const statsLoading = submissionsLoading || assignmentsLoading || studentsLoading || materialsLoading;
             return (
               <>
                 <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -971,13 +971,11 @@ export default function TeacherDashboard() {
                     <h1 className="text-xl font-semibold text-foreground">{greeting}, {firstName} 👋</h1>
                     <p className="text-sm text-muted-foreground">{dateLabel}</p>
                   </div>
-                  {totalEarnings > 0 && (
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full w-fit">
-                      <DollarSign className="w-3.5 h-3.5 text-green-600" />
-                      <span className="font-semibold text-green-700">${totalEarnings.toLocaleString()}</span>
-                      <span>total earnings</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full w-fit">
+                    <DollarSign className="w-3.5 h-3.5 text-green-600" />
+                    <span className="font-semibold text-green-700">${totalEarnings.toLocaleString()}</span>
+                    <span>total earnings</span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   {statsLoading ? (
