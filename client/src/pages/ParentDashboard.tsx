@@ -74,6 +74,7 @@ import type {
   StudentAssignment,
   StudentInvite,
   TutorRequest,
+  EnrichedTutorRequest,
   User,
   ProgressReport,
   Classroom,
@@ -170,7 +171,7 @@ export default function ParentDashboard() {
   const { data: invites = [] } = useQuery<StudentInvite[]>({
     queryKey: ["/api/invites/student/parent"],
   });
-  const { data: tutorRequests = [] } = useQuery<TutorRequest[]>({
+  const { data: tutorRequests = [] } = useQuery<EnrichedTutorRequest[]>({
     queryKey: ["/api/tutor-requests/parent"],
   });
   const paymentsQuery = useQuery({ queryKey: ["/api/payments/parent"] });

@@ -152,7 +152,7 @@ const sessionFormSchema = z.object({
   status: z.string(),
 });
 
-const TEACHER_TABS = ["classrooms", "students", "feedback", "messages"];
+const TEACHER_TABS = ["classrooms", "students", "requests", "feedback", "messages"];
 
 function TeacherClassroomsTab() {
   const { toast } = useToast();
@@ -2392,12 +2392,12 @@ export default function TeacherDashboard() {
                       </div>
                     ) : (
                       [...tutorRequests]
-                        .sort((a: any, b: any) => {
+                        .sort((a: EnrichedTutorRequest, b: EnrichedTutorRequest) => {
                           if (a.status === "pending" && b.status !== "pending") return -1;
                           if (a.status !== "pending" && b.status === "pending") return 1;
                           return 0;
                         })
-                        .map((r: any) => (
+                        .map((r: EnrichedTutorRequest) => (
                           <div
                             key={r.id}
                             className="p-4 border rounded-lg"
