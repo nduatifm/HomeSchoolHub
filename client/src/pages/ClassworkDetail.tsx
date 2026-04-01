@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
-import type { Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
+import type { Classroom, ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
 
 type SubmissionWithName = ClassroomSubmission & { studentName: string };
 
@@ -329,6 +329,12 @@ export default function ClassworkDetail() {
     enabled: !!classroomId && !!classworkSlug,
   });
 
+  const { data: classworkMaterials = [] } = useQuery<ClassroomMaterial[]>({
+    queryKey: ["/api/classrooms", classroomId, "materials"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
+    enabled: !!classroomId && !!assignment?.id,
+  });
+
   const { data: studentData } = useQuery<{ id: number }>({
     queryKey: ["/api/students/me"],
     queryFn: () => apiRequest("/api/students/me"),
@@ -365,6 +371,8 @@ export default function ClassworkDetail() {
   const isTeacher = user?.role === "teacher" && classroom.teacherId === user.id;
   const isStudent = user?.role === "student";
   const isParent = user?.role === "parent";
+
+  const linkedMaterials = classworkMaterials.filter((m) => m.assignmentId === assignment?.id);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -411,6 +419,38 @@ export default function ClassworkDetail() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Linked Classwork Materials */}
+          {linkedMaterials.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-gray-800">Classwork Materials</h2>
+              {linkedMaterials.map((material) => (
+                <Card key={material.id}>
+                  <CardContent className="px-4 py-4 space-y-2">
+                    <div>
+                      <h3 className="font-medium text-sm text-gray-900">{material.title}</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(material.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+                    </div>
+                    {material.description && (
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{material.description}</p>
+                    )}
+                    {material.url && (
+                      <a
+                        href={material.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                      >
+                        <FileText className="h-3.5 w-3.5" />View attachment
+                      </a>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
 
           {/* Role panel */}
