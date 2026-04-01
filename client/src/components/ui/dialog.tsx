@@ -74,7 +74,7 @@ export function DialogContent({
   return (
     <>
       <div 
-        className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md"
         onClick={() => context.setOpen(false)}
       />
       <div className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg">
