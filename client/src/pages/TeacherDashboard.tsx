@@ -953,7 +953,7 @@ export default function TeacherDashboard() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
 
-      <div className="md:ml-[240px] flex">
+      <div className="md:ml-[228px] flex">
         <main className="flex-1 p-6 pt-20 md:pt-6">
 
           {(() => {
@@ -2692,9 +2692,9 @@ export default function TeacherDashboard() {
 
             <TabsContent value="messages">
               <Card className="overflow-hidden">
-                <div className="flex h-[620px]">
+                <div className="flex flex-col md:flex-row h-auto md:h-[620px]">
                   {/* Left conversation sidebar */}
-                  <div className="w-72 border-r flex flex-col shrink-0 bg-muted/20">
+                  <div className="w-full md:w-72 border-b md:border-b-0 md:border-r flex flex-col shrink-0 bg-muted/20 max-h-60 md:max-h-none">
                     <div className="px-4 py-3 border-b bg-background">
                       <p className="text-sm font-semibold text-foreground">Conversations</p>
                     </div>
@@ -2750,7 +2750,7 @@ export default function TeacherDashboard() {
                   </div>
 
                   {/* Right thread panel */}
-                  <div className="flex-1 min-w-0 flex flex-col">
+                  <div className="flex-1 min-w-0 flex flex-col min-h-[360px] md:min-h-0">
                     {selectedStudentForMessages ? (
                       <MessageThread
                         teacherId={user!.id}

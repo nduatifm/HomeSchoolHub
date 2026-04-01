@@ -1007,7 +1007,7 @@ export default function ClassroomDetail() {
     return (
       <div className="flex min-h-screen">
         <ModernSidebar />
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 md:ml-[228px] flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>
       </div>
@@ -1018,7 +1018,7 @@ export default function ClassroomDetail() {
     return (
       <div className="flex min-h-screen">
         <ModernSidebar />
-        <div className="flex-1 flex items-center justify-center text-gray-400">Classroom not found.</div>
+        <div className="flex-1 md:ml-[228px] flex items-center justify-center text-gray-400">Classroom not found.</div>
       </div>
     );
   }
@@ -1031,8 +1031,8 @@ export default function ClassroomDetail() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <ModernSidebar />
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+      <div className="flex-1 md:ml-[228px] overflow-auto">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-20 pb-8 md:pt-8 space-y-6">
           {/* Header */}
           <div>
             <button
@@ -1076,13 +1076,15 @@ export default function ClassroomDetail() {
           {/* Tabs — role-adaptive */}
           {isTeacher && (
             <Tabs defaultValue="feed">
-              <TabsList className="mb-4">
-                <TabsTrigger value="feed" className="gap-1.5"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
-                <TabsTrigger value="assignments" className="gap-1.5"><BookOpen className="h-3.5 w-3.5" />Assignments</TabsTrigger>
-                <TabsTrigger value="grades" className="gap-1.5"><BarChart2 className="h-3.5 w-3.5" />Grades</TabsTrigger>
-                <TabsTrigger value="materials" className="gap-1.5"><LibraryBig className="h-3.5 w-3.5" />Materials</TabsTrigger>
-                <TabsTrigger value="students" className="gap-1.5"><Users className="h-3.5 w-3.5" />Students</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-1 px-1 mb-4">
+                <TabsList className="w-max min-w-full">
+                  <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
+                  <TabsTrigger value="assignments" className="gap-1.5 whitespace-nowrap"><BookOpen className="h-3.5 w-3.5" />Assignments</TabsTrigger>
+                  <TabsTrigger value="grades" className="gap-1.5 whitespace-nowrap"><BarChart2 className="h-3.5 w-3.5" />Grades</TabsTrigger>
+                  <TabsTrigger value="materials" className="gap-1.5 whitespace-nowrap"><LibraryBig className="h-3.5 w-3.5" />Materials</TabsTrigger>
+                  <TabsTrigger value="students" className="gap-1.5 whitespace-nowrap"><Users className="h-3.5 w-3.5" />Students</TabsTrigger>
+                </TabsList>
+              </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} /></TabsContent>
               <TabsContent value="assignments"><TeacherAssignmentsTab classroomId={classroomId} isArchived={isArchived} /></TabsContent>
               <TabsContent value="grades"><TeacherGradesTab classroomId={classroomId} /></TabsContent>
@@ -1093,11 +1095,13 @@ export default function ClassroomDetail() {
 
           {isStudent && (
             <Tabs defaultValue="feed">
-              <TabsList className="mb-4">
-                <TabsTrigger value="feed" className="gap-1.5"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
-                <TabsTrigger value="assignments" className="gap-1.5"><BookOpen className="h-3.5 w-3.5" />Assignments</TabsTrigger>
-                <TabsTrigger value="materials" className="gap-1.5"><LibraryBig className="h-3.5 w-3.5" />Materials</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-1 px-1 mb-4">
+                <TabsList className="w-max min-w-full">
+                  <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
+                  <TabsTrigger value="assignments" className="gap-1.5 whitespace-nowrap"><BookOpen className="h-3.5 w-3.5" />Assignments</TabsTrigger>
+                  <TabsTrigger value="materials" className="gap-1.5 whitespace-nowrap"><LibraryBig className="h-3.5 w-3.5" />Materials</TabsTrigger>
+                </TabsList>
+              </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} /></TabsContent>
               <TabsContent value="assignments">
                 <StudentAssignmentsTab classroomId={classroomId} studentId={studentData?.id ?? 0} isArchived={isArchived} />
@@ -1108,10 +1112,12 @@ export default function ClassroomDetail() {
 
           {isParent && (
             <Tabs defaultValue="feed">
-              <TabsList className="mb-4">
-                <TabsTrigger value="feed" className="gap-1.5"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
-                <TabsTrigger value="grades" className="gap-1.5"><BarChart2 className="h-3.5 w-3.5" />Grades</TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-1 px-1 mb-4">
+                <TabsList className="w-max min-w-full">
+                  <TabsTrigger value="feed" className="gap-1.5 whitespace-nowrap"><Megaphone className="h-3.5 w-3.5" />Feed</TabsTrigger>
+                  <TabsTrigger value="grades" className="gap-1.5 whitespace-nowrap"><BarChart2 className="h-3.5 w-3.5" />Grades</TabsTrigger>
+                </TabsList>
+              </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} /></TabsContent>
               <TabsContent value="grades"><ParentGradesTab classroomId={classroomId} studentId={parentStudentId} /></TabsContent>
             </Tabs>

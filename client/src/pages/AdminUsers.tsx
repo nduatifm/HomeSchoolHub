@@ -152,7 +152,7 @@ export default function AdminUsers() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
 
-      <div className="md:ml-[240px] flex">
+      <div className="md:ml-[228px] flex">
         <main className="flex-1 p-6 pt-20 md:pt-6">
           {/* Header */}
           <div className="mb-6">
@@ -210,7 +210,7 @@ export default function AdminUsers() {
           </div>
 
           {/* Table */}
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="bg-card border border-border rounded-lg overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">

@@ -199,7 +199,7 @@ export default function NotificationsPage() {
       <ModernSidebar />
 
       <main className="flex-1 md:ml-[228px] min-h-screen">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-20 pb-8 md:pt-8">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">

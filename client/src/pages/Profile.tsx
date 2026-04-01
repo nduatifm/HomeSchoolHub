@@ -371,7 +371,7 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-gray-50">
       <ModernSidebar />
-      <div className="md:ml-[240px] px-4 sm:px-6 py-12 pt-20 md:pt-12">
+      <div className="md:ml-[228px] px-4 sm:px-6 py-12 pt-20 md:pt-12">
         <div className="max-w-2xl mx-auto space-y-12">
 
           {/* ══ Account ══ */}

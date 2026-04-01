@@ -144,7 +144,7 @@ export default function Landing() {
                   alt="Teacher helping a student learn at a desk"
                   className="relative w-full h-[340px] sm:h-[380px] object-cover rounded-2xl shadow-lg border border-border"
                 />
-                <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-md border border-border px-4 py-2.5 flex items-center gap-3">
+                <div className="hidden sm:flex absolute -bottom-4 -left-4 bg-white rounded-xl shadow-md border border-border px-4 py-2.5 items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <TrendingUp className="w-4 h-4 text-primary" />
                   </div>
