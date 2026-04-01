@@ -654,13 +654,29 @@ function ClassworkDialog({
                 onChange={(e) => setForm({ ...form, url: e.target.value })}
               />
             ) : (
-              <div className="flex items-center gap-2">
-                <input ref={fileRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-                <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}>
-                  <Paperclip className="h-3.5 w-3.5" />{file ? file.name : "Choose file"}
-                </Button>
-                {file && <span className="text-xs text-gray-500 truncate max-w-[180px]">{file.name}</span>}
-              </div>
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      if (f && f.size > 10 * 1024 * 1024) {
+                        toast({ title: "File too large", description: "Maximum file size is 10 MB.", type: "error" });
+                        if (fileRef.current) fileRef.current.value = "";
+                        return;
+                      }
+                      setFile(f);
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => fileRef.current?.click()}>
+                    <Paperclip className="h-3.5 w-3.5" />{file ? file.name : "Choose file"}
+                  </Button>
+                  {file && <span className="text-xs text-gray-500 truncate max-w-[180px]">{(file.size / (1024 * 1024)).toFixed(1)} MB</span>}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">Max 10 MB</p>
+              </>
             )}
           </div>
 

@@ -2,6 +2,11 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { createServer } from "http";
+import { execSync } from "child_process";
+
+try {
+  execSync("npx prisma generate --silent", { stdio: "pipe" });
+} catch {}
 
 const app = express();
 app.use(express.json());
