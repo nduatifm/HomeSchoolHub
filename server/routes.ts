@@ -189,25 +189,43 @@ export function registerRoutes(app: Express) {
     .then((r) => { if (r.count > 0) console.log(`[sessions] Deleted ${r.count} expired sessions`); })
     .catch((err) => console.error("[sessions] Failed to clean expired sessions:", err));
 
-  // Backfill null slugs for pre-migration records
+  // Backfill null slugs for all pre-migration records across all slugged models
   (async () => {
     try {
-      const [classrooms, assignments] = await Promise.all([
+      const [classrooms, classroomAssignments, classroomMaterials, users, assignments, materials] = await Promise.all([
         prisma.classroom.findMany({ where: { slug: null }, select: { id: true, name: true } }),
         prisma.classroomAssignment.findMany({ where: { slug: null }, select: { id: true, title: true } }),
+        prisma.classroomMaterial.findMany({ where: { slug: null }, select: { id: true, title: true } }),
+        prisma.user.findMany({ where: { slug: null }, select: { id: true, name: true } }),
+        prisma.assignment.findMany({ where: { slug: null }, select: { id: true, title: true } }),
+        prisma.material.findMany({ where: { slug: null }, select: { id: true, title: true } }),
       ]);
+      const work: Promise<unknown>[] = [];
       if (classrooms.length > 0) {
-        await Promise.all(classrooms.map((c) =>
-          prisma.classroom.update({ where: { id: c.id }, data: { slug: slugify(c.name, c.id) } })
-        ));
-        console.log(`[slugs] Backfilled ${classrooms.length} classroom slug(s)`);
+        work.push(...classrooms.map((r) => prisma.classroom.update({ where: { id: r.id }, data: { slug: slugify(r.name, r.id) } })));
+        console.log(`[slugs] Backfilling ${classrooms.length} classroom slug(s)`);
+      }
+      if (classroomAssignments.length > 0) {
+        work.push(...classroomAssignments.map((r) => prisma.classroomAssignment.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
+        console.log(`[slugs] Backfilling ${classroomAssignments.length} classroomAssignment slug(s)`);
+      }
+      if (classroomMaterials.length > 0) {
+        work.push(...classroomMaterials.map((r) => prisma.classroomMaterial.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
+        console.log(`[slugs] Backfilling ${classroomMaterials.length} classroomMaterial slug(s)`);
+      }
+      if (users.length > 0) {
+        work.push(...users.map((r) => prisma.user.update({ where: { id: r.id }, data: { slug: slugify(r.name, r.id) } })));
+        console.log(`[slugs] Backfilling ${users.length} user slug(s)`);
       }
       if (assignments.length > 0) {
-        await Promise.all(assignments.map((a) =>
-          prisma.classroomAssignment.update({ where: { id: a.id }, data: { slug: slugify(a.title, a.id) } })
-        ));
-        console.log(`[slugs] Backfilled ${assignments.length} assignment slug(s)`);
+        work.push(...assignments.map((r) => prisma.assignment.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
+        console.log(`[slugs] Backfilling ${assignments.length} assignment slug(s)`);
       }
+      if (materials.length > 0) {
+        work.push(...materials.map((r) => prisma.material.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
+        console.log(`[slugs] Backfilling ${materials.length} material slug(s)`);
+      }
+      if (work.length > 0) await Promise.all(work);
     } catch (err) {
       console.error("[slugs] Backfill failed:", err);
     }

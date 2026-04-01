@@ -374,7 +374,7 @@ export default function ClassworkDetail() {
           {/* Breadcrumb */}
           <div className="space-y-1">
             <button
-              onClick={() => navigate(`/classrooms/${classroom.slug ?? classroom.id}`)}
+              onClick={() => navigate(`/classrooms/${classroom.slug ?? classroom.id}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`)}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
             >
               <ChevronLeft className="h-3.5 w-3.5" />Back to {classroom.name}
