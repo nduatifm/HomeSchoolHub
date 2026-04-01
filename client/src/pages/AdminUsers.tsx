@@ -174,7 +174,7 @@ export default function AdminUsers() {
           </div>
 
           {/* Stat cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
               { label: "Total Users", value: totalUsers, icon: <Users className="w-4 h-4" />, color: "text-blue-600 bg-blue-50" },
               { label: "Admins", value: adminCount, icon: <Shield className="w-4 h-4" />, color: "text-primary bg-primary/10" },
