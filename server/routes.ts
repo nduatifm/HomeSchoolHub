@@ -1806,16 +1806,36 @@ export function registerRoutes(app: Express) {
           });
         }
 
-        // Notify the student their work was graded.
-        // Tutor-based Assignment has no classroomId (see prisma/schema.prisma),
-        // so we link to the dashboard assignments section as the best available destination.
+        // Find an associated classroom for deep-linking: look for a classroom owned by
+        // this teacher where the student is enrolled and there is a matching assignment title.
+        // Falls back to generic dashboard links when no classroom association exists.
+        const linkedEnrollment = student && assignment
+          ? await prisma.classroomEnrollment.findFirst({
+              where: {
+                studentId: student.id,
+                classroom: {
+                  teacherId: assignment.teacherId,
+                  assignments: { some: { title: assignment.title } },
+                },
+              },
+              select: { classroomId: true },
+            })
+          : null;
+        const studentGradeLink = linkedEnrollment
+          ? `/classrooms/${linkedEnrollment.classroomId}`
+          : "/dashboard#classrooms";
+        const parentGradeLink = linkedEnrollment
+          ? `/classrooms/${linkedEnrollment.classroomId}`
+          : "/dashboard#children";
+
+        // Notify the student their work was graded
         if (student?.userId) {
           storage.createNotification({
             userId: student.userId,
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
-            link: "/dashboard#classrooms",
+            link: studentGradeLink,
           }).catch(console.error);
         }
 
@@ -1826,7 +1846,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
-            link: "/dashboard#children",
+            link: parentGradeLink,
           }).catch(console.error);
         }
 
