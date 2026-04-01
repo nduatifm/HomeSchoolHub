@@ -433,104 +433,104 @@ export default function ParentDashboard() {
             }}
           />
 
-          {childStats.length > 0 && (
-            <div className="my-6">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {childStats.map((child, index) => {
-                  const assignedTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
-                  return (
-                    <div
-                      key={child.id}
-                      className="p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
-                    >
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-semibold text-primary">
-                            {child.name?.charAt(0).toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-foreground text-sm truncate">{child.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
-                          className="text-muted-foreground hover:text-primary shrink-0"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Assigned teacher */}
-                      <div className="flex items-center justify-between mb-3 py-2 border-y border-border/50">
-                        <div className="flex items-center gap-1.5">
-                          <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            {assignedTeacher
-                              ? <span className="text-foreground font-medium">{assignedTeacher.name}</span>
-                              : <span className="italic">No teacher assigned yet</span>
-                            }
-                          </span>
-                        </div>
-                        {assignedTeacher && (
-                          <button
-                            onClick={() => {
-                              setMessageForm({ receiverId: assignedTeacher.id, content: "" });
-                              setSendMessageOpen(true);
-                            }}
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
-                          >
-                            <MessageSquare className="w-3 h-3" />
-                            Message
-                          </button>
-                        )}
-                      </div>
-
-                      {child.pct !== null ? (
-                        <div>
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
-                            <span className="font-medium text-foreground">{child.pct}%</span>
-                          </div>
-                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all"
-                              style={{ width: `${child.pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">No assignments yet</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4 my-6">
-            <ColorfulStatCard
-              title="Children"
-              value={students.length}
-              icon={Users}
-              accent="blue"
-              subtitle="Registered"
-            />
-            <ColorfulStatCard
-              title="Invites"
-              value={invites.length}
-              icon={UserPlus}
-              accent="green"
-              subtitle="Pending invites"
-            />
-          </div>
-
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="children">
+              {childStats.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {childStats.map((child, index) => {
+                      const assignedTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
+                      return (
+                        <div
+                          key={child.id}
+                          className="p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all"
+                        >
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-sm font-semibold text-primary">
+                                {child.name?.charAt(0).toUpperCase() || "?"}
+                              </span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-foreground text-sm truncate">{child.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
+                              className="text-muted-foreground hover:text-primary shrink-0"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Assigned teacher */}
+                          <div className="flex items-center justify-between mb-3 py-2 border-y border-border/50">
+                            <div className="flex items-center gap-1.5">
+                              <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                {assignedTeacher
+                                  ? <span className="text-foreground font-medium">{assignedTeacher.name}</span>
+                                  : <span className="italic">No teacher assigned yet</span>
+                                }
+                              </span>
+                            </div>
+                            {assignedTeacher && (
+                              <button
+                                onClick={() => {
+                                  setMessageForm({ receiverId: assignedTeacher.id, content: "" });
+                                  setSendMessageOpen(true);
+                                }}
+                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                                Message
+                              </button>
+                            )}
+                          </div>
+
+                          {child.pct !== null ? (
+                            <div>
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className="text-muted-foreground">{child.completed}/{child.total} completed</span>
+                                <span className="font-medium text-foreground">{child.pct}%</span>
+                              </div>
+                              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full transition-all"
+                                  style={{ width: `${child.pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">No assignments yet</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <ColorfulStatCard
+                  title="Children"
+                  value={students.length}
+                  icon={Users}
+                  accent="blue"
+                  subtitle="Registered"
+                />
+                <ColorfulStatCard
+                  title="Invites"
+                  value={invites.length}
+                  icon={UserPlus}
+                  accent="green"
+                  subtitle="Pending invites"
+                />
+              </div>
+
               <Card>
                 <CardHeader>
                   <CardTitle>My Students</CardTitle>
@@ -675,539 +675,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            {/* <TabsContent value="progress">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Track Student Progress</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {selectedStudent ? (
-                    <div>
-                      <h3 className="font-medium mb-4">
-                        {selectedStudent.name}'s Assignments
-                      </h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Assignment</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Grade</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {studentAssignments.map((a: any) => (
-                            <TableRow
-                              key={a.id}
-                              data-testid={`row-assignment-${a.id}`}
-                            >
-                              <TableCell>{a.title}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    a.studentAssignment.status === "graded"
-                                      ? "default"
-                                      : "outline"
-                                  }
-                                >
-                                  {a.studentAssignment.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {a.studentAssignment.grade || "-"}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Select a child from "My Children" tab to view their
-                      progress
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent> */}
-
-            {/* <TabsContent value="payments">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Payments</CardTitle>
-                  <Dialog
-                    open={createPaymentOpen}
-                    onOpenChange={setCreatePaymentOpen}
-                  >
-                    <DialogTrigger asChild>
-                      <Button data-testid="button-create-payment">
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Create Payment
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create New Payment</DialogTitle>
-                      </DialogHeader>
-                      <Form {...paymentForm}>
-                        <form
-                          onSubmit={paymentForm.handleSubmit((data) =>
-                            createPaymentMutation.mutate(data),
-                          )}
-                          className="space-y-4"
-                        >
-                          <FormField
-                            control={paymentForm.control}
-                            name="teacherId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Teacher</FormLabel>
-                                <FormControl>
-                                  <Select
-                                    onValueChange={(v) =>
-                                      field.onChange(parseInt(v))
-                                    }
-                                    value={field.value.toString()}
-                                  >
-                                    <SelectTrigger data-testid="select-payment-teacher">
-                                      <SelectValue placeholder="Select a teacher" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {teachers
-                                        .filter(
-                                          (u: any) => u.role === "teacher",
-                                        )
-                                        .map((t: any) => (
-                                          <SelectItem
-                                            key={t.id}
-                                            value={t.id.toString()}
-                                          >
-                                            {t.name}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={paymentForm.control}
-                            name="amount"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Amount</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    placeholder="Enter amount"
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(
-                                        parseFloat(e.target.value) || 0,
-                                      )
-                                    }
-                                    data-testid="input-payment-amount"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={paymentForm.control}
-                            name="description"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Description</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Payment description..."
-                                    rows={3}
-                                    {...field}
-                                    data-testid="input-payment-description"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={paymentForm.control}
-                            name="subscriptionType"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>
-                                  Subscription Type (Optional)
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="e.g., Monthly, Weekly"
-                                    {...field}
-                                    data-testid="input-payment-subscription"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <Button
-                            type="submit"
-                            disabled={createPaymentMutation.isPending}
-                            className="w-full"
-                            data-testid="button-submit-payment"
-                          >
-                            {createPaymentMutation.isPending
-                              ? "Creating..."
-                              : "Create Payment"}
-                          </Button>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
-                </CardHeader>
-                <CardContent>
-                  {paymentsQuery.isLoading ? (
-                    <div className="text-center py-8">Loading payments...</div>
-                  ) : paymentsQuery.isError ? (
-                    <div className="text-center py-8 text-red-500">
-                      Error loading payments
-                    </div>
-                  ) : payments.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">
-                      No payments yet
-                    </p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payments.map((p: any) => (
-                          <TableRow
-                            key={p.id}
-                            data-testid={`row-payment-${p.id}`}
-                          >
-                            <TableCell
-                              data-testid={`text-payment-date-${p.id}`}
-                            >
-                              {new Date(p.paymentDate).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell
-                              data-testid={`text-payment-amount-${p.id}`}
-                            >
-                              ${p.amount.toFixed(2)}
-                            </TableCell>
-                            <TableCell>{p.description || "-"}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  p.status === "completed"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                              >
-                                {p.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent> */}
-
-{/*
-            <TabsContent value="rate-tutor">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Rate Tutor</CardTitle>
-                  <Dialog open={rateTutorOpen} onOpenChange={setRateTutorOpen}>
-                    <DialogTrigger asChild>
-                      <Button data-testid="button-rate-tutor">
-                        <Star className="h-4 w-4 mr-2" />
-                        Rate a Tutor
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Rate a Tutor</DialogTitle>
-                      </DialogHeader>
-                      <Form {...ratingForm}>
-                        <form
-                          onSubmit={ratingForm.handleSubmit((data) =>
-                            rateTutorMutation.mutate(data),
-                          )}
-                          className="space-y-4"
-                        >
-                          <FormField
-                            control={ratingForm.control}
-                            name="teacherId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Teacher</FormLabel>
-                                <FormControl>
-                                  <Select
-                                    onValueChange={(v) =>
-                                      field.onChange(parseInt(v))
-                                    }
-                                    value={field.value.toString()}
-                                  >
-                                    <SelectTrigger data-testid="select-rating-teacher">
-                                      <SelectValue placeholder="Select a teacher" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {teachers
-                                        .filter(
-                                          (u: any) => u.role === "teacher",
-                                        )
-                                        .map((t: any) => (
-                                          <SelectItem
-                                            key={t.id}
-                                            value={t.id.toString()}
-                                          >
-                                            {t.name}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={ratingForm.control}
-                            name="rating"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Rating (1-5 stars)</FormLabel>
-                                <FormControl>
-                                  <Select
-                                    onValueChange={(v) =>
-                                      field.onChange(parseInt(v))
-                                    }
-                                    value={field.value.toString()}
-                                  >
-                                    <SelectTrigger data-testid="select-rating-stars">
-                                      <SelectValue placeholder="Select rating" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="1">1 Star</SelectItem>
-                                      <SelectItem value="2">2 Stars</SelectItem>
-                                      <SelectItem value="3">3 Stars</SelectItem>
-                                      <SelectItem value="4">4 Stars</SelectItem>
-                                      <SelectItem value="5">5 Stars</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={ratingForm.control}
-                            name="comment"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Comment</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Share your experience..."
-                                    rows={4}
-                                    {...field}
-                                    data-testid="input-rating-comment"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <Button
-                            type="submit"
-                            disabled={rateTutorMutation.isPending}
-                            className="w-full"
-                            data-testid="button-submit-rating"
-                          >
-                            {rateTutorMutation.isPending
-                              ? "Submitting..."
-                              : "Submit Rating"}
-                          </Button>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
-                </CardHeader>
-                <CardContent>
-                  {ratingsQuery.isLoading ? (
-                    <div className="text-center py-8">Loading ratings...</div>
-                  ) : ratingsQuery.isError ? (
-                    <div className="text-center py-8 text-red-500">
-                      Error loading ratings
-                    </div>
-                  ) : tutorRatings.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">
-                      No ratings submitted yet
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {tutorRatings.map((r: any) => (
-                        <div
-                          key={r.id}
-                          className="p-4 border rounded-lg"
-                          data-testid={`card-rating-${r.id}`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <p
-                                  className="font-medium"
-                                  data-testid={`text-rating-teacher-${r.id}`}
-                                >
-                                  {teachers.find(
-                                    (t: any) => t.id === r.teacherId,
-                                  )?.name || `Teacher #${r.teacherId}`}
-                                </p>
-                                <div className="flex items-center">
-                                  {[...Array(r.rating)].map((_, i) => (
-                                    <Star
-                                      key={i}
-                                      className="h-4 w-4 fill-yellow-400 text-yellow-400"
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                              <p
-                                className="text-sm"
-                                data-testid={`text-rating-comment-${r.id}`}
-                              >
-                                {r.comment}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {new Date(r.ratingDate).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-*/}
-
-{/*
-            <TabsContent value="attendance">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Children's Attendance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">
-                        Select Student to View Attendance
-                      </label>
-                      <select
-                        className="w-full mt-1 p-2 border rounded-md"
-                        value={selectedStudentForAttendance || 0}
-                        onChange={(e) =>
-                          setSelectedStudentForAttendance(
-                            parseInt(e.target.value) || null,
-                          )
-                        }
-                        data-testid="select-view-student-attendance"
-                      >
-                        <option value={0}>Select a student</option>
-                        {students.map((s: any) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {selectedStudentForAttendance && (
-                      <div className="mt-6">
-                        <h3 className="text-lg font-semibold mb-4">
-                          Attendance Records for{" "}
-                          {
-                            students.find(
-                              (s: any) => s.id === selectedStudentForAttendance,
-                            )?.name
-                          }
-                        </h3>
-                        {attendanceQuery.isLoading ? (
-                          <div className="text-center py-8">
-                            Loading attendance...
-                          </div>
-                        ) : attendanceQuery.isError ? (
-                          <div className="text-center py-8 text-red-500">
-                            Error loading attendance
-                          </div>
-                        ) : studentAttendance.length === 0 ? (
-                          <p className="text-center text-muted-foreground py-8">
-                            No attendance records yet
-                          </p>
-                        ) : (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Notes</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {studentAttendance.map((a: any) => (
-                                <TableRow
-                                  key={a.id}
-                                  data-testid={`row-student-attendance-${a.id}`}
-                                >
-                                  <TableCell
-                                    data-testid={`text-student-attendance-date-${a.id}`}
-                                  >
-                                    {new Date(a.date).toLocaleDateString()}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge
-                                      variant={
-                                        a.status === "present"
-                                          ? "default"
-                                          : a.status === "late"
-                                            ? "secondary"
-                                            : "destructive"
-                                      }
-                                      data-testid={`badge-student-attendance-status-${a.id}`}
-                                    >
-                                      {a.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell
-                                    data-testid={`text-student-attendance-notes-${a.id}`}
-                                  >
-                                    {a.notes || "-"}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-*/}
+         
 
             <TabsContent value="tutors">
                 <Card>
@@ -1414,204 +882,7 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            {/* old detailed reports (kept for reference) — replaced by live version above
-            <TabsContent value="reports-old">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Student Progress Reports</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">
-                        Select Student to View Reports
-                      </label>
-                      <select
-                        className="w-full mt-1 p-2 border rounded-md"
-                        value={selectedStudent?.id || 0}
-                        onChange={(e) => {
-                          const student = students.find(
-                            (s: any) => s.id === parseInt(e.target.value),
-                          );
-                          setSelectedStudent(student || null);
-                        }}
-                        data-testid="select-student-reports"
-                      >
-                        <option value={0}>Select a student</option>
-                        {students.map((s: any) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {selectedStudent && (
-                      <div className="mt-6">
-                        <h3 className="text-lg font-semibold mb-4">
-                          Progress Reports for {selectedStudent.name}
-                        </h3>
-                        {studentProgressReports.length === 0 ? (
-                          <p className="text-center text-muted-foreground py-8">
-                            No reports available yet
-                          </p>
-                        ) : (
-                          <div className="space-y-4">
-                            {studentProgressReports.map((report: any) => (
-                              <div
-                                key={report.id}
-                                className="p-4 border rounded-lg"
-                                data-testid={`card-report-${report.id}`}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <h4 className="font-medium">
-                                        Report #{report.id}
-                                      </h4>
-                                      <Badge>{report.overallGrade}</Badge>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                      Date:{" "}
-                                      {new Date(
-                                        report.reportDate,
-                                      ).toLocaleDateString()}
-                                    </p>
-                                    <div className="mt-2 space-y-1">
-                                      <p className="text-sm">
-                                        <strong>Comments:</strong>{" "}
-                                        {report.comments}
-                                      </p>
-                                      <p className="text-sm">
-                                        <strong>Strengths:</strong>{" "}
-                                        {report.strengths}
-                                      </p>
-                                      <p className="text-sm">
-                                        <strong>Areas for Improvement:</strong>{" "}
-                                        {report.improvements}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => downloadReport(report)}
-                                    data-testid={`button-download-${report.id}`}
-                                  >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent> */}
-
-{/*
-            <TabsContent value="controls">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Parental Controls</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium">
-                        Select Student
-                      </label>
-                      <select
-                        className="w-full mt-1 p-2 border rounded-md"
-                        value={controlsForm.studentId}
-                        onChange={(e) =>
-                          setControlsForm({
-                            ...controlsForm,
-                            studentId: parseInt(e.target.value),
-                          })
-                        }
-                        data-testid="select-controls-student"
-                      >
-                        <option value={0}>Select a student</option>
-                        {students.map((s: any) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">
-                        Screen Time Limit (minutes)
-                      </label>
-                      <Input
-                        type="number"
-                        value={controlsForm.screenTimeLimit}
-                        onChange={(e) =>
-                          setControlsForm({
-                            ...controlsForm,
-                            screenTimeLimit: parseInt(e.target.value),
-                          })
-                        }
-                        data-testid="input-screen-time"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium">
-                        Allowed Hours
-                      </label>
-                      <div className="grid grid-cols-2 gap-2 mt-1">
-                        <Input
-                          type="time"
-                          value={controlsForm.allowedTimes.start}
-                          onChange={(e) =>
-                            setControlsForm({
-                              ...controlsForm,
-                              allowedTimes: {
-                                ...controlsForm.allowedTimes,
-                                start: e.target.value,
-                              },
-                            })
-                          }
-                          data-testid="input-time-start"
-                        />
-                        <Input
-                          type="time"
-                          value={controlsForm.allowedTimes.end}
-                          onChange={(e) =>
-                            setControlsForm({
-                              ...controlsForm,
-                              allowedTimes: {
-                                ...controlsForm.allowedTimes,
-                                end: e.target.value,
-                              },
-                            })
-                          }
-                          data-testid="input-time-end"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => setControlsMutation.mutate(controlsForm)}
-                      disabled={
-                        !controlsForm.studentId || setControlsMutation.isPending
-                      }
-                      className="w-full"
-                      data-testid="button-save-controls"
-                    >
-                      {setControlsMutation.isPending
-                        ? "Saving..."
-                        : "Save Controls"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-*/}
+            
 
             <TabsContent value="classrooms">
               <Card>
