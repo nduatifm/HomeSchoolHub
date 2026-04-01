@@ -283,7 +283,7 @@ export default function ModernSidebar() {
       </button>
 
       {notifOpen && (
-        <div className="absolute left-full top-0 ml-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-[200] overflow-hidden">
+        <div className="fixed top-16 right-4 w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-[200] overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-sm font-semibold text-gray-800">Notifications</span>
