@@ -402,17 +402,19 @@ export default function ClassworkDetail() {
             </div>
           </div>
 
-          {/* Description */}
-          {assignment.description && (
+          {/* Description / Attachment */}
+          {(assignment.description || assignment.fileUrl) && (
             <Card>
-              <CardContent className="px-4 py-4">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{assignment.description}</p>
+              <CardContent className="px-4 py-4 space-y-3">
+                {assignment.description && (
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{assignment.description}</p>
+                )}
                 {assignment.fileUrl && (
                   <a
                     href={assignment.fileUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-primary hover:underline mt-3"
+                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
                   >
                     <FileText className="h-3.5 w-3.5" />View attached resource
                   </a>
