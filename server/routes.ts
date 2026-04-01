@@ -4268,7 +4268,7 @@ export function registerRoutes(app: Express) {
   });
 
   // POST /api/classrooms/:classroomId/assignments/:assignmentId/submit — student submits
-  app.post("/api/classrooms/:classroomId/assignments/:assignmentId/submit", requireAuth, async (req, res) => {
+  app.post("/api/classrooms/:classroomId/assignments/:assignmentId/submit", requireAuth, memoryUpload.single("file"), async (req, res) => {
     try {
       const classroomId = parseInt(req.params.classroomId);
       const assignmentId = parseInt(req.params.assignmentId);
@@ -4279,11 +4279,18 @@ export function registerRoutes(app: Express) {
       if (!user || user.role !== "student") return res.status(403).json({ error: "Students only" });
       const student = await storage.getStudentByUserId(user.id);
       if (!student) return res.status(403).json({ error: "Student profile not found" });
-      const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
+      const { content } = z.object({ content: z.string() }).parse(req.body);
       const assignments = await storage.getClassroomAssignments(classroomId);
       const assignment = assignments.find((a) => a.id === assignmentId);
       if (!assignment) return res.status(404).json({ error: "Assignment not found" });
-      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate);
+      
+      let fileUrl: string | undefined;
+      if (req.file) {
+        const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-submissions");
+        fileUrl = uploadResult.secure_url;
+      }
+      
+      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl);
       res.json(submission);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

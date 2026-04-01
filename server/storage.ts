@@ -1668,12 +1668,12 @@ class PrismaStorage implements IStorage {
     }));
   }
 
-  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string): Promise<ClassroomSubmission> {
+  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string): Promise<ClassroomSubmission> {
     const now = new Date().toISOString();
     const isLate = now > dueDate;
     const updated = await prisma.classroomSubmission.update({
       where: { assignmentId_studentId: { assignmentId, studentId } },
-      data: { content, status: isLate ? "late" : "submitted", submittedAt: now },
+      data: { content, fileUrl: fileUrl || undefined, status: isLate ? "late" : "submitted", submittedAt: now },
     });
     return {
       id: updated.id,

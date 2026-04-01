@@ -754,15 +754,28 @@ function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classro
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/my-submissions`),
   });
 
+  const [submissionFile, setSubmissionFile] = React.useState<File | null>(null);
+
   const submitMutation = useMutation({
-    mutationFn: (assignmentId: number) =>
-      apiRequest(`/api/classrooms/${classroomId}/assignments/${assignmentId}/submit`, {
+    mutationFn: (assignmentId: number) => {
+      const fd = new FormData();
+      fd.append("content", submissionText);
+      if (submissionFile) fd.append("file", submissionFile);
+      const token = localStorage.getItem("sessionId");
+      return fetch(`/api/classrooms/${classroomId}/assignments/${assignmentId}/submit`, {
         method: "POST",
-        body: JSON.stringify({ content: submissionText }),
-      }),
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      }).then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error ?? "Submission failed");
+        return data;
+      });
+    },
     onSuccess: () => {
       setSubmitOpen(null);
       setSubmissionText("");
+      setSubmissionFile(null);
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       toast({ title: "Submitted!", type: "success" });
     },
@@ -840,7 +853,10 @@ function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classro
                           open={submitOpen === a.id}
                           onOpenChange={(v) => {
                             setSubmitOpen(v ? a.id : null);
-                            if (!v) setSubmissionText("");
+                            if (!v) {
+                              setSubmissionText("");
+                              setSubmissionFile(null);
+                            }
                           }}
                         >
                           <DialogTrigger asChild>
@@ -860,6 +876,11 @@ function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classro
                                   onChange={(e) => setSubmissionText(e.target.value)}
                                   rows={4}
                                 />
+                              </div>
+                              <div>
+                                <Label>Attachment <span className="text-gray-400 font-normal">(optional)</span></Label>
+                                <Input type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="mt-1 cursor-pointer" onChange={(e) => setSubmissionFile(e.target.files?.[0] ?? null)} />
+                                {submissionFile && <p className="text-xs text-gray-500 mt-1">Selected: {submissionFile.name}</p>}
                               </div>
                               <Button
                                 className="w-full"
