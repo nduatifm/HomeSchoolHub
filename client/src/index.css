@@ -115,7 +115,7 @@
   }
 
   [data-radix-dialog-overlay] {
-    @apply backdrop-blur-sm;
+    @apply backdrop-blur-md bg-black/40;
   }
 
   /* Input styles - clean and accessible */
