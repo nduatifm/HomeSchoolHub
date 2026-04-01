@@ -584,7 +584,7 @@ function StudentsTab({ classroomId, teacherId, isArchived }: { classroomId: numb
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/enrollments`),
   });
   const { data: myStudents = [] } = useQuery<(Student & { email?: string })[]>({
-    queryKey: ["/api/students"],
+    queryKey: ["/api/students/teacher"],
   });
   const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
