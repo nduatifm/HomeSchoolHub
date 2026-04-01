@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -508,22 +508,23 @@ type DialogMode = "create" | "edit";
 
 function ClassworkDialog({
   mode,
+  open,
+  onOpenChange,
   initial,
   classroomId,
   assignments,
   isArchived,
   onSuccess,
-  trigger,
 }: {
   mode: DialogMode;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
   initial?: ClassroomMaterial;
   classroomId: number;
   assignments: ClassroomAssignment[];
   isArchived: boolean;
   onSuccess: () => void;
-  trigger: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     title: initial?.title ?? "",
     description: initial?.description ?? "",
@@ -533,6 +534,19 @@ function ClassworkDialog({
   });
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setFile(null);
+      setForm({
+        title: initial?.title ?? "",
+        description: initial?.description ?? "",
+        attachType: (initial?.url ? "url" : "file") as AttachType,
+        url: initial?.url ?? "",
+        assignmentId: initial?.assignmentId ? String(initial.assignmentId) : "",
+      });
+    }
+  }, [open]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "materials"] });
 
@@ -575,7 +589,7 @@ function ClassworkDialog({
       });
     },
     onSuccess: () => {
-      setOpen(false);
+      onOpenChange(false);
       invalidate();
       toast({ title: mode === "create" ? "Classwork added" : "Classwork updated", type: "success" });
       onSuccess();
@@ -586,20 +600,7 @@ function ClassworkDialog({
   const canSubmit = form.title.trim().length > 0 && !submitMutation.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => {
-      setOpen(v);
-      if (!v) {
-        setFile(null);
-        setForm({
-          title: initial?.title ?? "",
-          description: initial?.description ?? "",
-          attachType: (initial?.url ? "url" : "file") as AttachType,
-          url: initial?.url ?? "",
-          assignmentId: initial?.assignmentId ? String(initial.assignmentId) : "",
-        });
-      }
-    }}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Add Classwork" : "Edit Classwork"}</DialogTitle>
@@ -727,6 +728,7 @@ function ClassworkCard({
   assignments: ClassroomAssignment[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [, navigate] = useLocation();
 
   const deleteMutation = useMutation({
@@ -762,21 +764,22 @@ function ClassworkCard({
         <div className="flex items-center gap-1 shrink-0">
           {isTeacher && !isArchived && (
             <>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-primary hover:bg-gray-100 transition-colors"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
               <ClassworkDialog
                 mode="edit"
+                open={editOpen}
+                onOpenChange={setEditOpen}
                 initial={item}
                 classroomId={classroomId}
                 assignments={assignments}
                 isArchived={isArchived}
                 onSuccess={() => {}}
-                trigger={
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-primary hover:bg-gray-100 transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                }
               />
               <Button
                 variant="ghost"
@@ -830,6 +833,8 @@ function ClassworkCard({
 }
 
 function ClassworkTab({ classroomId, classroomSlug, isTeacher, isArchived }: { classroomId: number; classroomSlug: string | number; isTeacher: boolean; isArchived: boolean }) {
+  const [createOpen, setCreateOpen] = useState(false);
+
   const { data: classwork = [], isLoading } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
@@ -845,17 +850,17 @@ function ClassworkTab({ classroomId, classroomSlug, isTeacher, isArchived }: { c
     <div className="space-y-3">
       {isTeacher && !isArchived && (
         <div className="flex justify-end">
+          <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-3.5 w-3.5" />Add Classwork
+          </Button>
           <ClassworkDialog
             mode="create"
+            open={createOpen}
+            onOpenChange={setCreateOpen}
             classroomId={classroomId}
             assignments={assignments}
             isArchived={isArchived}
             onSuccess={() => {}}
-            trigger={
-              <Button size="sm" className="gap-1.5">
-                <Plus className="h-3.5 w-3.5" />Add Classwork
-              </Button>
-            }
           />
         </div>
       )}
