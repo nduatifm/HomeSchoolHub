@@ -632,7 +632,7 @@ function ClassworkDialog({
                 size="sm"
                 variant={form.attachType === "url" ? "default" : "outline"}
                 className="gap-1.5"
-                onClick={() => setForm({ ...form, attachType: "url", file: undefined })}
+                onClick={() => { setFile(null); setForm({ ...form, attachType: "url" }); }}
               >
                 <Link2 className="h-3.5 w-3.5" />URL
               </Button>
@@ -728,20 +728,21 @@ function ClassworkCard({
 
   return (
     <div className="rounded-lg border bg-white hover:border-primary/30 transition-colors">
-      {/* Collapsed header */}
-      <button
-        type="button"
-        className="w-full flex items-center gap-3 px-4 py-3 text-left"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <div className="flex-1 min-w-0">
+      {/* Collapsed header — use div to avoid nested button invalid HTML */}
+      <div className="w-full flex items-center gap-3 px-4 py-3">
+        {/* Clickable info area */}
+        <button
+          type="button"
+          className="flex-1 min-w-0 text-left"
+          onClick={() => setExpanded((v) => !v)}
+        >
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm text-gray-900">{item.title}</span>
             {item.url && <span title="Has attachment"><Paperclip className="h-3 w-3 text-gray-400 shrink-0" /></span>}
             {item.linkedAssignment && <span title="Linked to assignment"><Link2 className="h-3 w-3 text-primary shrink-0" /></span>}
           </div>
           <span className="text-[11px] text-gray-400">{new Date(item.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-        </div>
+        </button>
         <div className="flex items-center gap-1 shrink-0">
           {isTeacher && !isArchived && (
             <>
@@ -756,7 +757,6 @@ function ClassworkCard({
                   <button
                     type="button"
                     className="inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:text-primary hover:bg-gray-100 transition-colors"
-                    onClick={(e) => e.stopPropagation()}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -766,16 +766,18 @@ function ClassworkCard({
                 variant="ghost"
                 size="sm"
                 className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
-                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(); }}
+                onClick={() => deleteMutation.mutate()}
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
               </Button>
             </>
           )}
-          {expanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+          <button type="button" onClick={() => setExpanded((v) => !v)} className="p-1">
+            {expanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Expanded body */}
       {expanded && (
