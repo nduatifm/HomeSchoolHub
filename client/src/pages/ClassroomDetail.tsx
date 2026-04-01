@@ -132,7 +132,7 @@ function FeedTab({ classroomId, isTeacher, isArchived }: { classroomId: number; 
 }
 
 // ── Teacher Assignments tab ───────────────────────────────────────────────────
-function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: number; isArchived: boolean }) {
+function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { classroomId: number; classroomSlug: string | number; isArchived: boolean }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [gradingId, setGradingId] = useState<number | null>(null);
@@ -140,6 +140,7 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
   const [feedbackVal, setFeedbackVal] = useState("");
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [, navigate] = useLocation();
 
   const { data: assignments = [], isLoading } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
@@ -273,7 +274,10 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
                 <React.Fragment key={a.id}>
                   <tr className="hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800">{a.title}</p>
+                      <button
+                        onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
+                        className="font-medium text-gray-800 hover:text-primary text-left transition-colors"
+                      >{a.title}</button>
                       <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
                       {a.fileUrl && (
                         <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-0.5">
@@ -293,7 +297,16 @@ function TeacherAssignmentsTab({ classroomId, isArchived }: { classroomId: numbe
                         {expanded === a.id ? "Collapse" : "View Submissions"}
                       </Button>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-gray-400 hover:text-gray-700"
+                        onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
+                        title="Open assignment detail"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
                       {!isArchived && (
                         <Button
                           variant="ghost"
@@ -740,9 +753,10 @@ function StudentsTab({ classroomId, teacherId, isArchived }: { classroomId: numb
 }
 
 // ── Student Assignments tab ───────────────────────────────────────────────────
-function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classroomId: number; studentId: number; isArchived: boolean }) {
+function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchived }: { classroomId: number; classroomSlug: string | number; studentId: number; isArchived: boolean }) {
   const [submitOpen, setSubmitOpen] = useState<number | null>(null);
   const [submissionText, setSubmissionText] = useState("");
+  const [, navigate] = useLocation();
 
   const { data: assignments = [], isLoading: loadingA } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
@@ -820,7 +834,10 @@ function StudentAssignmentsTab({ classroomId, studentId, isArchived }: { classro
                 return (
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800">{a.title}</p>
+                      <button
+                        onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
+                        className="font-medium text-gray-800 hover:text-primary text-left transition-colors"
+                      >{a.title}</button>
                       {a.description && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>}
                       {a.fileUrl && (
                         <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-1">
@@ -1088,7 +1105,7 @@ export default function ClassroomDetail() {
                 </TabsList>
               </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} /></TabsContent>
-              <TabsContent value="assignments"><TeacherAssignmentsTab classroomId={classroomId} isArchived={isArchived} /></TabsContent>
+              <TabsContent value="assignments"><TeacherAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isArchived={isArchived} /></TabsContent>
               <TabsContent value="grades"><TeacherGradesTab classroomId={classroomId} /></TabsContent>
               <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={true} isArchived={isArchived} classroomSubject={classroom.subject} /></TabsContent>
               <TabsContent value="students"><StudentsTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} /></TabsContent>
@@ -1106,7 +1123,7 @@ export default function ClassroomDetail() {
               </div>
               <TabsContent value="feed"><FeedTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} /></TabsContent>
               <TabsContent value="assignments">
-                <StudentAssignmentsTab classroomId={classroomId} studentId={studentData?.id ?? 0} isArchived={isArchived} />
+                <StudentAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} studentId={studentData?.id ?? 0} isArchived={isArchived} />
               </TabsContent>
               <TabsContent value="materials"><MaterialsTab classroomId={classroomId} isTeacher={false} isArchived={isArchived} classroomSubject={classroom.subject} /></TabsContent>
             </Tabs>

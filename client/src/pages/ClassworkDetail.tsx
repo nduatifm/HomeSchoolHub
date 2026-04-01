@@ -323,10 +323,10 @@ export default function ClassworkDetail() {
 
   const classroomId = classroom?.id ?? 0;
 
-  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<ClassroomAssignment[]>({
-    queryKey: ["/api/classrooms", classroomId, "assignments"],
-    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
-    enabled: !!classroomId,
+  const { data: assignment, isLoading: assignmentLoading } = useQuery<ClassroomAssignment>({
+    queryKey: ["/api/classrooms", classroomId, "assignments", "slug", classworkSlug],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments/slug/${classworkSlug}`),
+    enabled: !!classroomId && !!classworkSlug,
   });
 
   const { data: studentData } = useQuery<{ id: number }>({
@@ -335,8 +335,7 @@ export default function ClassworkDetail() {
     enabled: user?.role === "student",
   });
 
-  const isLoading = classroomLoading || assignmentsLoading;
-  const assignment = assignments.find((a) => a.slug === classworkSlug);
+  const isLoading = classroomLoading || assignmentLoading;
 
   if (isLoading) {
     return (

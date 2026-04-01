@@ -4407,6 +4407,19 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/classrooms/:classroomId/assignments/slug/:assignmentSlug — fetch single assignment by slug
+  app.get("/api/classrooms/:classroomId/assignments/slug/:assignmentSlug", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+      const assignment = await storage.getClassroomAssignmentBySlug(classroom.id, req.params.assignmentSlug);
+      if (!assignment) return res.status(404).json({ error: "Assignment not found" });
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // DELETE /api/classrooms/:classroomId/assignments/:assignmentId — teacher deletes assignment
   app.delete("/api/classrooms/:classroomId/assignments/:assignmentId", requireAuth, async (req, res) => {
     try {
