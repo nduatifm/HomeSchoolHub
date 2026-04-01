@@ -74,7 +74,7 @@ export function DialogContent({
   return (
     <>
       <div 
-        className="fixed inset-0 z-50 bg-black/50"
+        className="fixed top-0 left-0 w-screen h-screen z-50 bg-black/50"
         onClick={() => context.setOpen(false)}
       />
       <div className="fixed left-[50%] top-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 bg-white p-6 shadow-2xl duration-200 rounded-lg border-0">
