@@ -202,9 +202,9 @@ function TeacherClassroomsTab() {
           {classrooms.map(c => {
             const theme = getSubjectTheme(c.subject || "");
             return (
-              <button
+              <div
                 key={c.id}
-                className={`text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] ${theme.bg} group w-full`}
+                className={`rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 ${theme.bg} group`}
                 onClick={() => { window.location.href = `/classrooms/${c.slug ?? c.id}`; }}
               >
                 <div className="w-full h-24 shrink-0 overflow-hidden">
@@ -221,12 +221,18 @@ function TeacherClassroomsTab() {
                   {c.description && (
                     <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{c.description}</p>
                   )}
-                  <div className="mt-auto pt-3 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-primary group-hover:underline">Open Classroom</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-primary opacity-60 group-hover:opacity-100 transition-opacity" />
+                  <div className="mt-auto pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full gap-1.5 text-xs"
+                      onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}`; }}
+                    >
+                      Open Classroom <ChevronRight className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
