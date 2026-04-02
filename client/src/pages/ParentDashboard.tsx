@@ -62,6 +62,7 @@ import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
+import { getSubjectTheme } from "@/lib/subjectTheme";
 import type {
   Student,
   Assignment,
@@ -948,44 +949,59 @@ export default function ParentDashboard() {
             
 
             <TabsContent value="classrooms">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><School className="h-5 w-5 text-primary" />Classrooms</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {students.length === 0 && (
-                    <div className="text-center py-10 text-gray-400 text-sm">Add a student to see their classrooms.</div>
-                  )}
-                  {students.map((child, i) => {
-                    const childClassrooms = (childClassroomQueries[i]?.data ?? []) as Classroom[];
-                    return (
-                      <div key={child.id} className="space-y-3">
-                        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                          <GraduationCap className="h-4 w-4 text-gray-400" />{child.name}
-                        </h3>
-                        {childClassrooms.length === 0 ? (
-                          <p className="text-xs text-gray-400 pl-5">No classrooms yet for this student.</p>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pl-5">
-                            {childClassrooms.map(c => (
-                              <div key={c.id} className="rounded-lg border p-3 flex flex-col gap-1.5 hover:border-primary/40 transition-colors cursor-pointer" onClick={() => { window.location.href = `/classrooms/${c.slug ?? c.id}?studentId=${child.id}`; }}>
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className="font-semibold text-sm text-gray-900 leading-tight">{c.name}</h4>
-                                  {c.status === "archived" && <span className="text-[10px] bg-gray-100 text-gray-500 px-1 py-0.5 rounded shrink-0">Archived</span>}
+              <div className="space-y-6">
+                {students.length === 0 && (
+                  <div className="text-center py-10 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
+                    Add a student to see their classrooms.
+                  </div>
+                )}
+                {students.map((child, i) => {
+                  const childClassrooms = (childClassroomQueries[i]?.data ?? []) as Classroom[];
+                  return (
+                    <div key={child.id} className="space-y-3">
+                      <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                        <GraduationCap className="h-4 w-4 text-muted-foreground" />{child.name}
+                      </h3>
+                      {childClassrooms.length === 0 ? (
+                        <p className="text-xs text-muted-foreground pl-5">No classrooms yet for this student.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {childClassrooms.map(c => {
+                            const theme = getSubjectTheme(c.subject || "");
+                            return (
+                              <button
+                                key={c.id}
+                                className={`text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] ${theme.bg} group w-full`}
+                                onClick={() => { window.location.href = `/classrooms/${c.slug ?? c.id}?studentId=${child.id}`; }}
+                              >
+                                <div className="w-full h-24 shrink-0 overflow-hidden">
+                                  {theme.banner}
                                 </div>
-                                <p className="text-xs text-primary font-medium">{c.subject}</p>
-                                <Button size="sm" variant="outline" className="w-full gap-1 text-xs mt-1" onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}?studentId=${child.id}`; }}>
-                                  View Grades <ChevronRight className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
+                                <div className="px-4 py-3 flex flex-col gap-1 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h4 className="font-bold text-sm text-foreground leading-snug">{c.name}</h4>
+                                    {c.status === "archived" && (
+                                      <span className="text-[10px] bg-white/70 text-muted-foreground px-1.5 py-0.5 rounded shrink-0 border border-border">Archived</span>
+                                    )}
+                                  </div>
+                                  <span className={`text-xs font-semibold ${theme.pillText}`}>{c.subject}</span>
+                                  {c.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{c.description}</p>
+                                  )}
+                                  <div className="mt-auto pt-3 flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-primary group-hover:underline">View Grades</span>
+                                    <ChevronRight className="h-3.5 w-3.5 text-primary opacity-60 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </TabsContent>
 
             <TabsContent value="messages">
