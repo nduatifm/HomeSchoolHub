@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useParams, useLocation } from "wouter";
 import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
@@ -56,19 +57,10 @@ const STUDENT_TABS = ["classrooms", "feedback", "messages"];
 export default function StudentDashboard() {
   const { user, student, logout } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState(() => {
-    const hash = window.location.hash.replace("#", "");
-    return STUDENT_TABS.includes(hash) ? hash : "classrooms";
-  });
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace("#", "");
-      if (hash && STUDENT_TABS.includes(hash)) setActiveTab(hash);
-    };
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
+  const params = useParams<{ tab?: string }>();
+  const [, navigate] = useLocation();
+  const activeTab = STUDENT_TABS.includes(params.tab ?? "") ? params.tab! : "classrooms";
+  const setActiveTab = (tab: string) => navigate("/dashboard/" + tab);
 
   const [submitDialogAssignmentId, setSubmitDialogAssignmentId] = useState<number | null>(null);
 

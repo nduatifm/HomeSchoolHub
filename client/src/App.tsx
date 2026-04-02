@@ -121,6 +121,9 @@ function AppRoutes() {
       <Route path="/classrooms/:slug">
         <ProtectedRoute component={ClassroomDetail} />
       </Route>
+      <Route path="/dashboard/:tab">
+        <DashboardRouter />
+      </Route>
       <Route path="/dashboard">
         <DashboardRouter />
       </Route>

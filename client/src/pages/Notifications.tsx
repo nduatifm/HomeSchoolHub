@@ -130,13 +130,11 @@ export default function NotificationsPage() {
       await markReadMutation.mutateAsync(n.id).catch(console.error);
     }
     if (n.link) {
-      const [path, hash] = n.link.split("#");
       const isSpaPath = ["/dashboard", "/notifications", "/settings", "/admin"].some(
-        (p) => path === p || path.startsWith("/classrooms/")
-      );
+        (p) => n.link === p || n.link!.startsWith(p + "/")
+      ) || n.link.startsWith("/classrooms/");
       if (isSpaPath) {
-        setLocation(path);
-        if (hash) setTimeout(() => { window.location.hash = hash; }, 50);
+        setLocation(n.link);
       } else {
         window.location.href = n.link;
       }

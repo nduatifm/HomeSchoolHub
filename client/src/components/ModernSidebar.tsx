@@ -73,40 +73,16 @@ export default function ModernSidebar() {
 
   const otherRoles = (user?.roles ?? []).filter((r) => r !== user?.role);
 
-  const [currentHash, setCurrentHash] = useState(
-    window.location.hash
-      ? window.location.hash.replace("#", "")
-      : user?.role === "parent"
-        ? "children"
-        : "classrooms",
-  );
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      setCurrentHash(
-        window.location.hash
-          ? window.location.hash.replace("#", "")
-          : user?.role === "parent"
-            ? "children"
-            : "classrooms",
-      );
-    };
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
-
-  useEffect(() => {
     setMobileOpen(false);
-  }, [currentHash, location]);
+  }, [location]);
 
-  const handleNavigation = (hash: string) => {
-    if (location !== "/dashboard") {
-      setLocation("/dashboard");
-      setTimeout(() => { window.location.hash = hash; }, 0);
-    } else {
-      window.location.hash = hash;
-    }
+  const defaultTab = user?.role === "parent" ? "children" : "classrooms";
+
+  const handleNavigation = (tab: string) => {
+    setLocation("/dashboard/" + tab);
     setMobileOpen(false);
   };
 
@@ -142,7 +118,7 @@ export default function ModernSidebar() {
   const items = getItems();
 
   const isActive = (hash: string) =>
-    currentHash === hash && location === "/dashboard";
+    location === `/dashboard/${hash}` || (location === "/dashboard" && hash === defaultTab);
 
   // ── Nav item ──────────────────────────────────────────────────────────────
   const NavItem = ({ item }: { item: SidebarItem }) => {

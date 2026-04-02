@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams, useLocation } from "wouter";
 import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -215,20 +216,10 @@ function TeacherClassroomsTab() {
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState(() => {
-    const hash = window.location.hash.replace("#", "");
-    return TEACHER_TABS.includes(hash) ? hash : "classrooms";
-  });
-
-  // Listen to hash changes from sidebar navigation
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace("#", "");
-      if (hash && TEACHER_TABS.includes(hash)) setActiveTab(hash);
-    };
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
+  const params = useParams<{ tab?: string }>();
+  const [, navigate] = useLocation();
+  const activeTab = TEACHER_TABS.includes(params.tab ?? "") ? params.tab! : "classrooms";
+  const setActiveTab = (tab: string) => navigate("/dashboard/" + tab);
 
   // Dialog state
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);

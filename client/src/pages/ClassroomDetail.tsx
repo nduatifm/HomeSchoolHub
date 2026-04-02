@@ -1359,7 +1359,7 @@ export default function ClassroomDetail() {
           {/* Header */}
           <div>
             <button
-              onClick={() => navigate("/dashboard#classrooms")}
+              onClick={() => navigate("/dashboard/classrooms")}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 mb-4 transition-colors"
             >
               <ChevronLeft className="h-3.5 w-3.5" />Back to Classrooms

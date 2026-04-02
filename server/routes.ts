@@ -1441,7 +1441,7 @@ export function registerRoutes(app: Express) {
             type: "new_assignment",
             title: "New Assignment",
             body: `You have a new assignment: "${assignment.title}"`,
-            link: "/dashboard#classrooms",
+            link: "/dashboard/classrooms",
           }).catch(console.error);
         }
       }
@@ -1859,7 +1859,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
-            link: "/dashboard#classrooms",
+            link: "/dashboard/classrooms",
           }).catch(console.error);
         }
 
@@ -1870,7 +1870,7 @@ export function registerRoutes(app: Express) {
             type: "assignment_graded",
             title: "Assignment Graded",
             body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
-            link: "/dashboard#children",
+            link: "/dashboard/children",
           }).catch(console.error);
         }
 
@@ -2640,7 +2640,7 @@ export function registerRoutes(app: Express) {
           type: "new_tutor_request",
           title: "New Tutor Request",
           body: `${user!.name} has sent you a tutor request.`,
-          link: "/dashboard#requests",
+          link: "/dashboard/requests",
         }).catch(console.error);
       }
 
@@ -3014,7 +3014,7 @@ export function registerRoutes(app: Express) {
           type: "progress_report",
           title: "New Progress Report",
           body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
-          link: "/dashboard#reports",
+          link: "/dashboard/reports",
         }).catch(console.error);
       }
 
@@ -3093,7 +3093,7 @@ export function registerRoutes(app: Express) {
             type: "new_clarification",
             title: "New Clarification Question",
             body: `${student.name} asked a clarification question on assignment "${clarificationAssignment.title}".`,
-            link: "/dashboard#students",
+            link: "/dashboard/students",
           }).catch(console.error);
         }
       }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams, useLocation } from "wouter";
 import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
@@ -125,20 +126,10 @@ const PARENT_TABS = ["children", "classrooms", "tutors", "invites", "reports", "
 export default function ParentDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState(() => {
-    const hash = window.location.hash.replace("#", "");
-    return PARENT_TABS.includes(hash) ? hash : "children";
-  });
-
-  // Listen to hash changes from sidebar navigation
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace("#", "");
-      if (hash && PARENT_TABS.includes(hash)) setActiveTab(hash);
-    };
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
+  const params = useParams<{ tab?: string }>();
+  const [, navigate] = useLocation();
+  const activeTab = PARENT_TABS.includes(params.tab ?? "") ? params.tab! : "children";
+  const setActiveTab = (tab: string) => navigate("/dashboard/" + tab);
 
   // Check if tutor request mode is enabled (for showing/hiding tutor request UI)
   const { data: tutorRequestModeData } = useQuery<{ enabled: boolean }>({
@@ -510,7 +501,7 @@ export default function ParentDashboard() {
                               </p>
                             </div>
                             <button
-                              onClick={() => { setActiveTab("children"); window.location.hash = "children"; }}
+                              onClick={() => setActiveTab("children")}
                               className="text-muted-foreground hover:text-primary shrink-0"
                             >
                               <ChevronRight className="w-4 h-4" />
