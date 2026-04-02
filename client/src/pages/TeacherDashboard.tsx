@@ -2653,8 +2653,8 @@ export default function TeacherDashboard() {
             </TabsContent>
 
             <TabsContent value="messages">
-              <div className="rounded-xl border border-border/40 overflow-hidden bg-background">
-                <div className="flex flex-col md:flex-row h-auto md:h-[620px]">
+              <div className="overflow-hidden bg-background">
+                <div className="flex flex-col md:flex-row h-auto md:h-screen">
                   {/* Left conversation sidebar */}
                   <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border/40 flex flex-col shrink-0 max-h-60 md:max-h-none">
                     <div className="px-4 py-3">
