@@ -561,12 +561,14 @@ function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { cla
                                 </a>
                               )}
                             </div>
-                            <div className="shrink-0">
-                              <Button size="sm" variant="outline" className="text-xs h-8"
-                                onClick={() => openModal(sub, a)}>
-                                Review
-                              </Button>
-                            </div>
+                            {(sub.status === "submitted" || sub.status === "late" || sub.status === "graded") && (
+                              <div className="shrink-0">
+                                <Button size="sm" variant="outline" className="text-xs h-8"
+                                  onClick={() => openModal(sub, a)}>
+                                  {sub.status === "graded" ? "Edit Grade" : "Review"}
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
