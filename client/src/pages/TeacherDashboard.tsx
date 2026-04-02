@@ -62,11 +62,9 @@ import {
   Trash2,
   Clock,
   Star,
-  LibraryBig,
   Presentation,
   Upload,
   Link,
-  ClipboardCheck,
   Eye,
   School,
   Plus,
@@ -76,7 +74,6 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
-import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
 import ClassroomCard from "@/components/ClassroomCard";
 import type {
@@ -242,7 +239,7 @@ export default function TeacherDashboard() {
   const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
 
   // Fetch data
-  const { data: students = [], isLoading: studentsLoading } = useQuery<StudentWithParent[]>({
+  const { data: students = [] } = useQuery<StudentWithParent[]>({
     queryKey: ["/api/students/teacher"],
   });
 
@@ -263,10 +260,10 @@ export default function TeacherDashboard() {
     staleTime: 30000,
   });
 
-  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<Assignment[]>({
+  const { data: assignments = [] } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments/teacher"],
   });
-  const { data: materials = [], isLoading: materialsLoading } = useQuery<Material[]>({
+  const { data: materials = [] } = useQuery<Material[]>({
     queryKey: ["/api/materials/teacher"],
   });
   const { data: sessions = [] } = useQuery<Session[]>({
@@ -298,7 +295,7 @@ export default function TeacherDashboard() {
   const attendanceRecords = attendanceQuery.data || [];
 
   // Fetch student submissions for grading
-  const { data: studentSubmissions = [], isLoading: submissionsLoading } =
+  const { data: studentSubmissions = [] } =
     useQuery<StudentSubmissionWithRelations[]>({
       queryKey: ["/api/student-submissions/teacher"],
     });
@@ -946,8 +943,6 @@ export default function TeacherDashboard() {
             const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
             const firstName = user?.name?.split(" ")[0] || "there";
             const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-            const pendingSubmissions = studentSubmissions.filter(s => s.status === "submitted");
-            const statsLoading = submissionsLoading || assignmentsLoading || studentsLoading || materialsLoading;
             return (
               <>
                 <div className="mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -960,47 +955,6 @@ export default function TeacherDashboard() {
                     <span className="font-semibold text-green-700">${totalEarnings.toLocaleString()}</span>
                     <span>total earnings</span>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  {statsLoading ? (
-                    <>
-                      <Skeleton className="h-20 rounded-xl" />
-                      <Skeleton className="h-20 rounded-xl" />
-                      <Skeleton className="h-20 rounded-xl" />
-                      <Skeleton className="h-20 rounded-xl" />
-                    </>
-                  ) : (
-                    <>
-                      <ColorfulStatCard
-                        title="Assignments"
-                        value={assignments.length}
-                        icon={FileText}
-                        accent="rose"
-                        subtitle="Created"
-                      />
-                      <ColorfulStatCard
-                        title="To Grade"
-                        value={pendingSubmissions.length}
-                        icon={ClipboardCheck}
-                        accent="amber"
-                        subtitle="Submissions waiting"
-                      />
-                      <ColorfulStatCard
-                        title="Students"
-                        value={students.length}
-                        icon={Users}
-                        accent="purple"
-                        subtitle="Under your care"
-                      />
-                      <ColorfulStatCard
-                        title="Materials"
-                        value={materials.length}
-                        icon={LibraryBig}
-                        accent="blue"
-                        subtitle="Study resources"
-                      />
-                    </>
-                  )}
                 </div>
               </>
             );

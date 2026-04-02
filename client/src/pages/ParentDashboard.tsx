@@ -46,7 +46,6 @@ import {
 import {
   Users,
   FileText,
-  UserPlus,
   MessageSquare,
   Download,
   DollarSign,
@@ -61,7 +60,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
-import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
 import ClassroomCard from "@/components/ClassroomCard";
 import type {
@@ -138,7 +136,7 @@ export default function ParentDashboard() {
   const isTutorRequestModeEnabled = tutorRequestModeData?.enabled ?? false;
 
   // Fetch data
-  const { data: students = [], isLoading: studentsLoading } = useQuery<Student[]>({
+  const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students/parent"],
   });
 
@@ -156,7 +154,7 @@ export default function ParentDashboard() {
   }, [students]);
 
   const [rateTutorOpen, setRateTutorOpen] = useState(false);
-  const { data: invites = [], isLoading: invitesLoading } = useQuery<StudentInvite[]>({
+  const { data: invites = [] } = useQuery<StudentInvite[]>({
     queryKey: ["/api/invites/student/parent"],
   });
   const { data: tutorRequests = [] } = useQuery<EnrichedTutorRequest[]>({
@@ -562,29 +560,6 @@ export default function ParentDashboard() {
                 </div>
               )}
 
-              {(studentsLoading || invitesLoading || childAssignmentQueries.some(q => q.isLoading) || childClassroomQueries.some(q => q.isLoading)) ? (
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <Skeleton className="h-20 rounded-xl" />
-                  <Skeleton className="h-20 rounded-xl" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <ColorfulStatCard
-                    title="Children"
-                    value={students.length}
-                    icon={Users}
-                    accent="blue"
-                    subtitle="Registered"
-                  />
-                  <ColorfulStatCard
-                    title="Invites"
-                    value={invites.length}
-                    icon={UserPlus}
-                    accent="green"
-                    subtitle="Pending invites"
-                  />
-                </div>
-              )}
 
               <Card>
                 <CardHeader>
