@@ -967,7 +967,7 @@ export default function ParentDashboard() {
                         {childClassrooms.length === 0 ? (
                           <p className="text-xs text-gray-400 pl-5">No classrooms yet for this student.</p>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {childClassrooms.map(c => (
                               <ClassroomCard
                                 key={c.id}
