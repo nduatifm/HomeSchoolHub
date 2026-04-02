@@ -294,7 +294,7 @@ export default function StudentDashboard() {
                     variant="secondary"
                     className="h-12 px-8 text-base font-semibold shrink-0 w-full sm:w-auto"
                     onClick={() => {
-                      window.location.href = `/classrooms/${pendingClassworkItems[0].classroomSlug}/classwork/${pendingClassworkItems[0].slug}`;
+                      navigate(`/classrooms/${pendingClassworkItems[0].classroomSlug}/classwork/${pendingClassworkItems[0].slug}`);
                     }}
                   >
                     Start →
@@ -343,7 +343,7 @@ export default function StudentDashboard() {
                           className={`w-full text-left flex items-center gap-4 p-4 rounded-2xl border border-border border-l-4 ${accent} ${bgHover} bg-card transition-all duration-150 active:scale-[0.985] cursor-pointer group`}
                           onClick={() => {
                             if (task.type === "classwork") {
-                              window.location.href = `/classrooms/${task.classroomSlug}/classwork/${task.assignmentSlug}`;
+                              navigate(`/classrooms/${task.classroomSlug}/classwork/${task.assignmentSlug}`);
                             } else {
                               setSubmitDialogAssignmentId(task.assignmentId!);
                               setSubmissionForm({

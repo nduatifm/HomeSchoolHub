@@ -167,7 +167,7 @@ function TeacherClassroomsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       toast({ title: "Classroom created!" });
     },
-    onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, type: "error" }),
   });
   return (
     <Card>
@@ -245,14 +245,14 @@ function TeacherGradeDialog({
       onClose();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to grade assignment", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to grade assignment", description: error.message, type: "error" });
     },
   });
 
   const handleSave = () => {
     const gradeNum = parseInt(grade);
     if (isNaN(gradeNum) || gradeNum < 0 || gradeNum > 100) {
-      toast({ title: "Please enter a valid grade between 0 and 100", variant: "destructive" });
+      toast({ title: "Please enter a valid grade between 0 and 100", type: "error" });
       return;
     }
     mutation.mutate();
