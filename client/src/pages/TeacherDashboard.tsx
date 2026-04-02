@@ -2653,12 +2653,12 @@ export default function TeacherDashboard() {
             </TabsContent>
 
             <TabsContent value="messages">
-              <Card className="overflow-hidden">
+              <div className="rounded-xl border border-border/40 overflow-hidden bg-background">
                 <div className="flex flex-col md:flex-row h-auto md:h-[620px]">
                   {/* Left conversation sidebar */}
-                  <div className="w-full md:w-72 border-b md:border-b-0 md:border-r flex flex-col shrink-0 bg-muted/20 max-h-60 md:max-h-none">
-                    <div className="px-4 py-3 border-b bg-background">
-                      <p className="text-sm font-semibold text-foreground">Conversations</p>
+                  <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border/40 flex flex-col shrink-0 max-h-60 md:max-h-none">
+                    <div className="px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversations</p>
                     </div>
                     <div className="flex-1 overflow-y-auto">
                       {students.length === 0 ? (
@@ -2674,7 +2674,7 @@ export default function TeacherDashboard() {
                             <button
                               key={s.id}
                               onClick={() => setSelectedStudentForMessages(s)}
-                              className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
+                              className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
                               style={isActive ? { background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" } : { paddingLeft: "13px" }}
                               onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "hsl(var(--muted))"; }}
                               onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = ""; }}
@@ -2729,7 +2729,7 @@ export default function TeacherDashboard() {
                     )}
                   </div>
                 </div>
-              </Card>
+              </div>
             </TabsContent>
           </Tabs>
         </main>

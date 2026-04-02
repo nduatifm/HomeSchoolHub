@@ -437,12 +437,12 @@ export default function StudentDashboard() {
           )}
 
           {activeTab === "messages" && (
-            <Card className="overflow-hidden">
+            <div className="rounded-xl border border-border/40 overflow-hidden bg-background">
               <div className="flex flex-col md:flex-row h-auto md:h-[620px]">
                 {/* Left conversation sidebar */}
-                <div className="w-full md:w-72 border-b md:border-b-0 md:border-r flex flex-col shrink-0 bg-muted/20 max-h-48 md:max-h-none">
-                  <div className="px-4 py-3 border-b bg-background">
-                    <p className="text-sm font-semibold text-foreground">Conversations</p>
+                <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border/40 flex flex-col shrink-0 max-h-48 md:max-h-none">
+                  <div className="px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversations</p>
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     {!assignedTeacher ? (
@@ -452,7 +452,7 @@ export default function StudentDashboard() {
                       </div>
                     ) : (
                       <button
-                        className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors border-b border-border/30"
+                        className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
                         style={{ background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" }}
                       >
                         <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -502,7 +502,7 @@ export default function StudentDashboard() {
                   )}
                 </div>
               </div>
-            </Card>
+            </div>
           )}
 
           {/* Submit assignment dialog */}

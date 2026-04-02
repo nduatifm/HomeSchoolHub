@@ -243,8 +243,8 @@ export default function MessageThread({
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div
-        className="flex items-center gap-2 px-3 py-2.5 border-b shrink-0"
-        style={{ borderColor: BORDER, background: PAGE_BG }}
+        className="flex items-center gap-2 px-3 py-2.5 shrink-0"
+        style={{ background: PAGE_BG }}
       >
           {onBack && (
             <button
@@ -471,8 +471,8 @@ export default function MessageThread({
 
       {/* ── Input bar ───────────────────────────────────────────────────────── */}
       <div
-        className="shrink-0 flex items-end gap-2 px-3 py-2.5 border-t"
-        style={{ background: PAGE_BG, borderColor: BORDER }}
+        className="shrink-0 flex items-end gap-2 px-3 py-2.5 border-t border-slate-100"
+        style={{ background: PAGE_BG }}
       >
         <textarea
           ref={textareaRef}
