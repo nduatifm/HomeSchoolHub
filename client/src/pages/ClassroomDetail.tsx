@@ -545,14 +545,20 @@ function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { cla
                                 {sub.grade !== null && sub.grade !== undefined && (
                                   <span className="text-xs font-semibold text-green-700">{sub.grade}/{a.points} pts</span>
                                 )}
-                                {sub.fileUrl && (
-                                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Paperclip className="h-3 w-3" />File attached
-                                  </span>
-                                )}
                               </div>
                               {sub.content && (
                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-3">{sub.content}</p>
+                              )}
+                              {sub.fileUrl && (
+                                <a
+                                  href={sub.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Paperclip className="h-3 w-3" />View submission
+                                </a>
                               )}
                             </div>
                             <div className="shrink-0">
