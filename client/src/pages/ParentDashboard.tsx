@@ -62,7 +62,7 @@ import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
-import { getSubjectTheme } from "@/lib/subjectTheme";
+import ClassroomCard from "@/components/ClassroomCard";
 import type {
   Student,
   Assignment,
@@ -968,39 +968,14 @@ export default function ParentDashboard() {
                           <p className="text-xs text-gray-400 pl-5">No classrooms yet for this student.</p>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {childClassrooms.map(c => {
-                              const theme = getSubjectTheme(c.subject || "");
-                              return (
-                                <div
-                                  key={c.id}
-                                  className={`rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 ${theme.bg} group`}
-                                  onClick={() => { window.location.href = `/classrooms/${c.slug ?? c.id}?studentId=${child.id}`; }}
-                                >
-                                  <div className="w-full h-24 shrink-0 overflow-hidden">
-                                    {theme.banner}
-                                  </div>
-                                  <div className="px-4 py-3 flex flex-col gap-1 flex-1">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <h4 className="font-bold text-sm text-foreground leading-snug">{c.name}</h4>
-                                      {c.status === "archived" && (
-                                        <span className="text-[10px] bg-white/70 text-muted-foreground px-1 py-0.5 rounded shrink-0 border border-border">Archived</span>
-                                      )}
-                                    </div>
-                                    <span className={`text-xs font-semibold ${theme.pillText}`}>{c.subject}</span>
-                                    <div className="mt-auto pt-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="w-full gap-1 text-xs mt-1"
-                                        onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}?studentId=${child.id}`; }}
-                                      >
-                                        View Grades <ChevronRight className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                            {childClassrooms.map(c => (
+                              <ClassroomCard
+                                key={c.id}
+                                classroom={c}
+                                href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
+                                ctaLabel="View Grades"
+                              />
+                            ))}
                           </div>
                         )}
                       </div>

@@ -69,7 +69,6 @@ import {
   Eye,
   School,
   Plus,
-  ChevronRight,
   Loader2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -78,7 +77,7 @@ import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ColorfulStatCard from "@/components/ColorfulStatCard";
 import ModernCombobox from "@/components/ModernCombobox";
-import { getSubjectTheme } from "@/lib/subjectTheme";
+import ClassroomCard from "@/components/ClassroomCard";
 import type {
   Session,
   StudentAssignment,
@@ -199,42 +198,14 @@ function TeacherClassroomsTab() {
           <div className="text-center py-10 text-gray-400 text-sm">No classrooms yet. Create your first classroom to get started.</div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classrooms.map(c => {
-            const theme = getSubjectTheme(c.subject || "");
-            return (
-              <div
-                key={c.id}
-                className={`rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 ${theme.bg} group`}
-                onClick={() => { window.location.href = `/classrooms/${c.slug ?? c.id}`; }}
-              >
-                <div className="w-full h-24 shrink-0 overflow-hidden">
-                  {theme.banner}
-                </div>
-                <div className="px-4 py-3 flex flex-col gap-1 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-sm text-foreground leading-snug">{c.name}</h3>
-                    {c.status === "archived" && (
-                      <span className="text-[10px] bg-white/70 text-muted-foreground px-1.5 py-0.5 rounded shrink-0 border border-border">Archived</span>
-                    )}
-                  </div>
-                  <span className={`text-xs font-semibold ${theme.pillText}`}>{c.subject}</span>
-                  {c.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{c.description}</p>
-                  )}
-                  <div className="mt-auto pt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full gap-1.5 text-xs"
-                      onClick={e => { e.stopPropagation(); window.location.href = `/classrooms/${c.slug ?? c.id}`; }}
-                    >
-                      Open Classroom <ChevronRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {classrooms.map(c => (
+            <ClassroomCard
+              key={c.id}
+              classroom={c}
+              href={`/classrooms/${c.slug ?? c.id}`}
+              ctaLabel="Open Classroom"
+            />
+          ))}
         </div>
       </CardContent>
     </Card>
