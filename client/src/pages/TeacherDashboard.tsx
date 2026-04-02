@@ -212,6 +212,118 @@ function TeacherClassroomsTab() {
   );
 }
 
+// ── Grade-submission dialog (isolated so typing doesn't re-render parent) ─────
+function TeacherGradeDialog({
+  open,
+  submission,
+  onClose,
+}: {
+  open: boolean;
+  submission: StudentSubmissionWithRelations | null;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [grade, setGrade] = useState("");
+  const [feedback, setFeedback] = useState("");
+
+  useEffect(() => {
+    if (submission) {
+      setGrade(submission.grade?.toString() ?? "");
+      setFeedback(submission.feedback ?? "");
+    }
+  }, [submission?.id]);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/student-assignments/${submission!.id}/grade`, {
+        method: "PATCH",
+        body: JSON.stringify({ grade: parseInt(grade), feedback }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-submissions/teacher"] });
+      toast({ title: "Assignment graded successfully!" });
+      onClose();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to grade assignment", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    const gradeNum = parseInt(grade);
+    if (isNaN(gradeNum) || gradeNum < 0 || gradeNum > 100) {
+      toast({ title: "Please enter a valid grade between 0 and 100", variant: "destructive" });
+      return;
+    }
+    mutation.mutate();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{submission?.assignment?.title ?? "Grade Submission"}</DialogTitle>
+          {submission && (
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {submission.student?.name ?? "Student"}
+              {submission.status === "late" && (
+                <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Late</span>
+              )}
+            </p>
+          )}
+        </DialogHeader>
+        {submission && (
+          <div className="space-y-4 pt-1">
+            {submission.submission ? (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Student Answer</p>
+                <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                  {submission.submission}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No text answer submitted.</p>
+            )}
+            {submission.fileUrl && (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Submitted File</p>
+                <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium">
+                  <Paperclip className="h-4 w-4" />View submission file<ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            )}
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grade Submission</p>
+              <div className="flex gap-3 items-start">
+                <div className="w-28 shrink-0">
+                  <label className="text-xs font-medium text-foreground block mb-1">Score (0–100)</label>
+                  <Input type="number" min={0} max={100} placeholder="0–100" value={grade}
+                    onChange={(e) => setGrade(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-medium text-foreground block mb-1">
+                    Feedback <span className="font-normal text-muted-foreground">(optional)</span>
+                  </label>
+                  <Textarea placeholder="Leave feedback for the student…" value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)} rows={3} className="text-sm resize-none" />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+                <Button size="sm" disabled={grade === "" || mutation.isPending} onClick={handleSave}>
+                  {mutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                  Save Grade
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -302,71 +414,13 @@ export default function TeacherDashboard() {
       queryKey: ["/api/student-submissions/teacher"],
     });
 
-  // Grading state
+  // Grading state — only open/submission pointer; form state lives in TeacherGradeDialog
   const [gradeDialogOpen, setGradeDialogOpen] = useState(false);
-  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
-  const [gradeForm, setGradeForm] = useState({
-    grade: "",
-    feedback: "",
-  });
+  const [selectedSubmission, setSelectedSubmission] = useState<StudentSubmissionWithRelations | null>(null);
 
-  // Grade submission mutation
-  const gradeSubmissionMutation = useMutation({
-    mutationFn: ({
-      id,
-      grade,
-      feedback,
-    }: {
-      id: number;
-      grade: number;
-      feedback: string;
-    }) =>
-      apiRequest(`/api/student-assignments/${id}/grade`, {
-        method: "PATCH",
-        body: JSON.stringify({ grade, feedback }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/student-submissions/teacher"],
-      });
-      toast({ title: "Assignment graded successfully!" });
-      setGradeDialogOpen(false);
-      setSelectedSubmission(null);
-      setGradeForm({ grade: "", feedback: "" });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to grade assignment",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleOpenGradeDialog = (submission: any) => {
+  const handleOpenGradeDialog = (submission: StudentSubmissionWithRelations) => {
     setSelectedSubmission(submission);
-    setGradeForm({
-      grade: submission.grade?.toString() || "",
-      feedback: submission.feedback || "",
-    });
     setGradeDialogOpen(true);
-  };
-
-  const handleSubmitGrade = () => {
-    if (!selectedSubmission) return;
-    const gradeNum = parseInt(gradeForm.grade);
-    if (isNaN(gradeNum) || gradeNum < 0 || gradeNum > 100) {
-      toast({
-        title: "Please enter a valid grade between 0 and 100",
-        variant: "destructive",
-      });
-      return;
-    }
-    gradeSubmissionMutation.mutate({
-      id: selectedSubmission.id,
-      grade: gradeNum,
-      feedback: gradeForm.feedback,
-    });
   };
 
   // Create assignment
@@ -2783,87 +2837,11 @@ export default function TeacherDashboard() {
         </main>
       </div>
 
-      {/* Grade submission dialog */}
-      <Dialog open={gradeDialogOpen} onOpenChange={(v) => { if (!v) { setGradeDialogOpen(false); setSelectedSubmission(null); setGradeForm({ grade: "", feedback: "" }); } }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{selectedSubmission?.assignment?.title ?? "Grade Submission"}</DialogTitle>
-            {selectedSubmission && (
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {selectedSubmission.student?.name ?? "Student"}
-                {selectedSubmission.status === "late" && (
-                  <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Late</span>
-                )}
-              </p>
-            )}
-          </DialogHeader>
-          {selectedSubmission && (
-            <div className="space-y-4 pt-1">
-              {/* Student text answer */}
-              {selectedSubmission.submission ? (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Student Answer</p>
-                  <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
-                    {selectedSubmission.submission}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">No text answer submitted.</p>
-              )}
-              {/* Submitted file */}
-              {selectedSubmission.fileUrl && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Submitted File</p>
-                  <a href={selectedSubmission.fileUrl} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium">
-                    <Paperclip className="h-4 w-4" />View submission file<ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              )}
-              {/* Grading form */}
-              <div className="border-t border-border pt-4 space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grade Submission</p>
-                <div className="flex gap-3 items-start">
-                  <div className="w-28 shrink-0">
-                    <label className="text-xs font-medium text-foreground block mb-1">Score (0–100)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      placeholder="0–100"
-                      value={gradeForm.grade}
-                      onChange={(e) => setGradeForm({ ...gradeForm, grade: e.target.value })}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs font-medium text-foreground block mb-1">Feedback <span className="font-normal text-muted-foreground">(optional)</span></label>
-                    <Textarea
-                      placeholder="Leave feedback for the student…"
-                      value={gradeForm.feedback}
-                      onChange={(e) => setGradeForm({ ...gradeForm, feedback: e.target.value })}
-                      rows={3}
-                      className="text-sm resize-none"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button variant="ghost" size="sm"
-                    onClick={() => { setGradeDialogOpen(false); setSelectedSubmission(null); setGradeForm({ grade: "", feedback: "" }); }}>
-                    Cancel
-                  </Button>
-                  <Button size="sm"
-                    disabled={gradeForm.grade === "" || gradeSubmissionMutation.isPending}
-                    onClick={handleSubmitGrade}>
-                    {gradeSubmissionMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-                    Save Grade
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <TeacherGradeDialog
+        open={gradeDialogOpen}
+        submission={selectedSubmission}
+        onClose={() => { setGradeDialogOpen(false); setSelectedSubmission(null); }}
+      />
 
       {/* Standalone send-message dialog — opened by "Message parent" button in students tab */}
       <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>
