@@ -69,6 +69,8 @@ import {
   School,
   Plus,
   Loader2,
+  Paperclip,
+  ExternalLink,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -2649,6 +2651,52 @@ export default function TeacherDashboard() {
 */}
 
             <TabsContent value="classrooms">
+              {/* Pending submissions section */}
+              {studentSubmissions.filter(s => s.status === "submitted" || s.status === "late").length > 0 && (
+                <div className="mb-5">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    Pending Submissions
+                    <span className="ml-1 inline-flex items-center justify-center text-xs font-bold bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                      {studentSubmissions.filter(s => s.status === "submitted" || s.status === "late").length}
+                    </span>
+                  </h3>
+                  <div className="space-y-2">
+                    {studentSubmissions.filter(s => s.status === "submitted" || s.status === "late").map((sub) => (
+                      <div key={sub.id} className="rounded-xl border border-border bg-card px-4 py-3 flex items-start gap-3 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm text-foreground">{sub.student?.name ?? "Student"}</span>
+                            <span className="text-xs text-muted-foreground">·</span>
+                            <span className="text-sm text-foreground">{sub.assignment?.title ?? "Assignment"}</span>
+                            {sub.status === "late" && (
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium">Late</span>
+                            )}
+                            {sub.fileUrl && (
+                              <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                <Paperclip className="h-3 w-3" />View file
+                              </a>
+                            )}
+                          </div>
+                          {sub.submission && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{sub.submission}</p>
+                          )}
+                          {sub.submittedAt && (
+                            <p className="text-xs text-muted-foreground/70 mt-0.5">
+                              Submitted {new Date(sub.submittedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                            </p>
+                          )}
+                        </div>
+                        <Button size="sm" variant="outline" className="text-xs h-8 shrink-0"
+                          onClick={() => handleOpenGradeDialog(sub)}>
+                          Grade
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <TeacherClassroomsTab />
             </TabsContent>
 
@@ -2734,6 +2782,88 @@ export default function TeacherDashboard() {
           </Tabs>
         </main>
       </div>
+
+      {/* Grade submission dialog */}
+      <Dialog open={gradeDialogOpen} onOpenChange={(v) => { if (!v) { setGradeDialogOpen(false); setSelectedSubmission(null); setGradeForm({ grade: "", feedback: "" }); } }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{selectedSubmission?.assignment?.title ?? "Grade Submission"}</DialogTitle>
+            {selectedSubmission && (
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {selectedSubmission.student?.name ?? "Student"}
+                {selectedSubmission.status === "late" && (
+                  <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Late</span>
+                )}
+              </p>
+            )}
+          </DialogHeader>
+          {selectedSubmission && (
+            <div className="space-y-4 pt-1">
+              {/* Student text answer */}
+              {selectedSubmission.submission ? (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Student Answer</p>
+                  <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                    {selectedSubmission.submission}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">No text answer submitted.</p>
+              )}
+              {/* Submitted file */}
+              {selectedSubmission.fileUrl && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Submitted File</p>
+                  <a href={selectedSubmission.fileUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium">
+                    <Paperclip className="h-4 w-4" />View submission file<ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              )}
+              {/* Grading form */}
+              <div className="border-t border-border pt-4 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grade Submission</p>
+                <div className="flex gap-3 items-start">
+                  <div className="w-28 shrink-0">
+                    <label className="text-xs font-medium text-foreground block mb-1">Score (0–100)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="0–100"
+                      value={gradeForm.grade}
+                      onChange={(e) => setGradeForm({ ...gradeForm, grade: e.target.value })}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs font-medium text-foreground block mb-1">Feedback <span className="font-normal text-muted-foreground">(optional)</span></label>
+                    <Textarea
+                      placeholder="Leave feedback for the student…"
+                      value={gradeForm.feedback}
+                      onChange={(e) => setGradeForm({ ...gradeForm, feedback: e.target.value })}
+                      rows={3}
+                      className="text-sm resize-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm"
+                    onClick={() => { setGradeDialogOpen(false); setSelectedSubmission(null); setGradeForm({ grade: "", feedback: "" }); }}>
+                    Cancel
+                  </Button>
+                  <Button size="sm"
+                    disabled={gradeForm.grade === "" || gradeSubmissionMutation.isPending}
+                    onClick={handleSubmitGrade}>
+                    {gradeSubmissionMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                    Save Grade
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Standalone send-message dialog — opened by "Message parent" button in students tab */}
       <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>

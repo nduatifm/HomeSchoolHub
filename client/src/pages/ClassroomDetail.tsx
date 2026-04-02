@@ -339,12 +339,27 @@ function FeedTab({ classroomId, isTeacher, isArchived }: { classroomId: number; 
 function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { classroomId: number; classroomSlug: string | number; isArchived: boolean }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [gradingId, setGradingId] = useState<number | null>(null);
-  const [gradeVal, setGradeVal] = useState("");
-  const [feedbackVal, setFeedbackVal] = useState("");
+  const [modalSub, setModalSub] = useState<SubmissionWithName | null>(null);
+  const [modalAssignment, setModalAssignment] = useState<ClassroomAssignment | null>(null);
+  const [modalGradeVal, setModalGradeVal] = useState("");
+  const [modalFeedbackVal, setModalFeedbackVal] = useState("");
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [, navigate] = useLocation();
+
+  const openModal = (sub: SubmissionWithName, assignment: ClassroomAssignment) => {
+    setModalSub(sub);
+    setModalAssignment(assignment);
+    setModalGradeVal(sub.grade !== null && sub.grade !== undefined ? String(sub.grade) : "");
+    setModalFeedbackVal(sub.feedback ?? "");
+  };
+
+  const closeModal = () => {
+    setModalSub(null);
+    setModalAssignment(null);
+    setModalGradeVal("");
+    setModalFeedbackVal("");
+  };
 
   const { data: assignments = [], isLoading } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
@@ -413,12 +428,10 @@ function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { cla
     mutationFn: ({ submissionId }: { submissionId: number }) =>
       apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/grade`, {
         method: "PATCH",
-        body: JSON.stringify({ grade: parseInt(gradeVal), feedback: feedbackVal || null }),
+        body: JSON.stringify({ grade: parseInt(modalGradeVal), feedback: modalFeedbackVal || null }),
       }),
     onSuccess: () => {
-      setGradingId(null);
-      setGradeVal("");
-      setFeedbackVal("");
+      closeModal();
       if (expanded) queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", expanded, "submissions"] });
       toast({ title: "Graded", type: "success" });
     },
@@ -532,39 +545,21 @@ function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { cla
                                 {sub.grade !== null && sub.grade !== undefined && (
                                   <span className="text-xs font-semibold text-green-700">{sub.grade}/{a.points} pts</span>
                                 )}
+                                {sub.fileUrl && (
+                                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Paperclip className="h-3 w-3" />File attached
+                                  </span>
+                                )}
                               </div>
                               {sub.content && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{sub.content}</p>
-                              )}
-                              {sub.feedback && (
-                                <p className="text-xs text-muted-foreground italic mt-0.5">"{sub.feedback}"</p>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-3">{sub.content}</p>
                               )}
                             </div>
                             <div className="shrink-0">
-                              {(sub.status === "submitted" || sub.status === "late") && gradingId !== sub.id && (
-                                <Button size="sm" variant="outline" className="text-xs h-8"
-                                  onClick={() => { setGradingId(sub.id); setGradeVal(""); setFeedbackVal(""); }}>
-                                  Grade
-                                </Button>
-                              )}
-                              {gradingId === sub.id && (
-                                <div className="space-y-2 min-w-[240px]">
-                                  <div className="flex gap-1.5">
-                                    <Input type="number" min={0} max={a.points} placeholder={`0–${a.points}`} value={gradeVal}
-                                      onChange={(e) => setGradeVal(e.target.value)} className="w-20 h-8 text-xs" />
-                                    <Input placeholder="Feedback" value={feedbackVal}
-                                      onChange={(e) => setFeedbackVal(e.target.value)} className="h-8 text-xs" />
-                                  </div>
-                                  <div className="flex gap-1.5">
-                                    <Button size="sm" className="h-8 text-xs"
-                                      disabled={gradeVal === "" || gradeMutation.isPending}
-                                      onClick={() => gradeMutation.mutate({ submissionId: sub.id })}>
-                                      {gradeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
-                                    </Button>
-                                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setGradingId(null)}>Cancel</Button>
-                                  </div>
-                                </div>
-                              )}
+                              <Button size="sm" variant="outline" className="text-xs h-8"
+                                onClick={() => openModal(sub, a)}>
+                                Review
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -577,6 +572,114 @@ function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { cla
           );
         })}
       </div>
+
+      {/* Submission review/grading modal */}
+      <Dialog open={!!modalSub} onOpenChange={(v) => { if (!v) closeModal(); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{modalAssignment?.title ?? "Submission"}</DialogTitle>
+            {modalSub && (
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {modalSub.studentName} · <StatusBadge status={modalSub.status} />
+                {modalSub.grade !== null && modalSub.grade !== undefined && (
+                  <span className="ml-2 text-xs font-semibold text-green-700">
+                    {modalSub.grade}/{modalAssignment?.points} pts
+                  </span>
+                )}
+              </p>
+            )}
+          </DialogHeader>
+
+          {modalSub && (
+            <div className="space-y-4 pt-1">
+              {/* Assignment context */}
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                {modalAssignment?.dueDate && <span>Due: {modalAssignment.dueDate}</span>}
+                {modalAssignment?.points && <span>{modalAssignment.points} points</span>}
+              </div>
+
+              {/* Student text answer */}
+              {modalSub.content ? (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Student Answer</p>
+                  <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                    {modalSub.content}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">No text answer submitted.</p>
+              )}
+
+              {/* Submitted file */}
+              {modalSub.fileUrl && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Submitted File</p>
+                  <a
+                    href={modalSub.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    View submission file
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              )}
+
+              {/* Previous feedback (if already graded) */}
+              {modalSub.feedback && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Previous Feedback</p>
+                  <p className="text-sm text-muted-foreground italic">"{modalSub.feedback}"</p>
+                </div>
+              )}
+
+              {/* Grading form */}
+              <div className="border-t border-border pt-4 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {modalSub.status === "graded" ? "Update Grade" : "Grade Submission"}
+                </p>
+                <div className="flex gap-3 items-start">
+                  <div className="w-28 shrink-0">
+                    <Label className="text-xs">Score (0–{modalAssignment?.points ?? 100})</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={modalAssignment?.points ?? 100}
+                      placeholder={`0–${modalAssignment?.points ?? 100}`}
+                      value={modalGradeVal}
+                      onChange={(e) => setModalGradeVal(e.target.value)}
+                      className="mt-1 h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs">Feedback <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                    <Textarea
+                      placeholder="Leave feedback for the student…"
+                      value={modalFeedbackVal}
+                      onChange={(e) => setModalFeedbackVal(e.target.value)}
+                      rows={3}
+                      className="mt-1 text-sm resize-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={closeModal}>Cancel</Button>
+                  <Button
+                    size="sm"
+                    disabled={modalGradeVal === "" || gradeMutation.isPending}
+                    onClick={() => gradeMutation.mutate({ submissionId: modalSub.id })}
+                  >
+                    {gradeMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                    Save Grade
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
