@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import type { User } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -95,6 +96,8 @@ function SignupMethodBadge({ googleId }: { googleId: string | null }) {
   return <span className="text-xs text-muted-foreground">Email</span>;
 }
 
+type ParentUser = Pick<User, "id" | "name" | "email">;
+
 export default function AdminUsers() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -102,21 +105,28 @@ export default function AdminUsers() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [newRole, setNewRole] = useState("");
+  const [newParentId, setNewParentId] = useState(0);
 
   const { data: users = [], isLoading, refetch } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
   });
 
+  const { data: allUsers = [] } = useQuery<ParentUser[]>({
+    queryKey: ["/api/users"],
+  });
+  const parentUsers = (allUsers as (ParentUser & { role?: string })[]).filter((u) => u.role === "parent");
+
   const changeRoleMutation = useMutation({
-    mutationFn: ({ id, role }: { id: number; role: string }) =>
+    mutationFn: ({ id, role, parentId }: { id: number; role: string; parentId?: number }) =>
       apiRequest(`/api/admin/users/${id}/role`, {
         method: "PATCH",
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role, ...(parentId ? { parentId } : {}) }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({ title: "Role updated successfully" });
       setRoleDialogOpen(false);
+      setNewParentId(0);
     },
     onError: (e: any) => toast({ title: "Failed to update role", description: e.message, type: "error" }),
   });
@@ -336,19 +346,14 @@ export default function AdminUsers() {
                                 <DropdownMenuSeparator />
 
                                 <DropdownMenuItem
-                                  disabled={u.role === "student"}
                                   onClick={() => {
-                                    if (u.role !== "student") {
-                                      setSelectedUser(u);
-                                      setNewRole(u.role || "");
-                                      setRoleDialogOpen(true);
-                                    }
+                                    setSelectedUser(u);
+                                    setNewRole(u.role || "");
+                                    setNewParentId(0);
+                                    setRoleDialogOpen(true);
                                   }}
                                 >
                                   Change role
-                                  {u.role === "student" && (
-                                    <span className="ml-auto text-xs text-muted-foreground">(student)</span>
-                                  )}
                                 </DropdownMenuItem>
 
                                 {!u.isSuperAdmin && (
@@ -394,8 +399,8 @@ export default function AdminUsers() {
         </main>
       </div>
 
-      {/* Change role dialog — teacher/parent only */}
-      <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+      {/* Change role dialog */}
+      <Dialog open={roleDialogOpen} onOpenChange={(open) => { setRoleDialogOpen(open); if (!open) setNewParentId(0); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Change Role</DialogTitle>
@@ -417,26 +422,57 @@ export default function AdminUsers() {
 
               <div>
                 <label className="text-sm font-medium text-foreground mb-1.5 block">New role</label>
-                <Select value={newRole} onValueChange={setNewRole}>
+                <Select value={newRole} onValueChange={(v) => { setNewRole(v); setNewParentId(0); }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="teacher">Teacher</SelectItem>
                     <SelectItem value="parent">Parent</SelectItem>
+                    <SelectItem value="student">Student</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
+              {newRole === "student" && (
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">
+                    Assign parent <span className="text-destructive">*</span>
+                  </label>
+                  <Select value={newParentId ? newParentId.toString() : ""} onValueChange={(v) => setNewParentId(parseInt(v))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a parent account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {parentUsers.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-muted-foreground">No parent accounts found</div>
+                      ) : (
+                        parentUsers.map((p) => (
+                          <SelectItem key={p.id} value={p.id.toString()}>
+                            <span className="font-medium">{p.name}</span>
+                            <span className="text-xs text-muted-foreground ml-1.5">{p.email}</span>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">The student record will be created under this parent.</p>
+                </div>
+              )}
+
               <div className="flex gap-2 justify-end pt-1">
-                <Button variant="outline" onClick={() => setRoleDialogOpen(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => { setRoleDialogOpen(false); setNewParentId(0); }}>Cancel</Button>
                 <Button
                   onClick={() => {
                     if (newRole && selectedUser) {
-                      changeRoleMutation.mutate({ id: selectedUser.id, role: newRole });
+                      changeRoleMutation.mutate({
+                        id: selectedUser.id,
+                        role: newRole,
+                        ...(newRole === "student" ? { parentId: newParentId } : {}),
+                      });
                     }
                   }}
-                  disabled={!newRole || changeRoleMutation.isPending}
+                  disabled={!newRole || changeRoleMutation.isPending || (newRole === "student" && !newParentId)}
                 >
                   {changeRoleMutation.isPending ? "Saving…" : "Save"}
                 </Button>

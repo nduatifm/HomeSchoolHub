@@ -4075,20 +4075,40 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/admin/users/:id/role — change role (super admin only, teacher/parent only, not students)
+  // PATCH /api/admin/users/:id/role — change role (super admin only; supports teacher, parent, student)
   app.patch("/api/admin/users/:id/role", requireSuperAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { role } = req.body;
-      if (!["teacher", "parent"].includes(role)) {
-        return res.status(400).json({ error: "Role must be teacher or parent" });
+      const { role, parentId } = req.body;
+      if (!["teacher", "parent", "student"].includes(role)) {
+        return res.status(400).json({ error: "Role must be teacher, parent, or student" });
       }
-      // Prevent reassigning students server-side
       const target = await storage.getUserById(id);
       if (!target) return res.status(404).json({ error: "User not found" });
-      if (target.role === "student") {
-        return res.status(400).json({ error: "Cannot change the role of a student account" });
+
+      // When converting to student, a parentId is required and the Student record must be created
+      if (role === "student") {
+        const pid = parseInt(parentId);
+        if (!pid || isNaN(pid)) {
+          return res.status(400).json({ error: "parentId is required when setting role to student" });
+        }
+        const parentUser = await storage.getUserById(pid);
+        if (!parentUser) return res.status(404).json({ error: "Parent user not found" });
+
+        // Auto-create a Student record if one doesn't already exist for this user
+        const existingStudent = await prisma.student.findUnique({ where: { userId: id } });
+        if (!existingStudent) {
+          await storage.createStudent({
+            userId: id,
+            parentId: pid,
+            name: target.name,
+            gradeLevel: "",
+            badges: [],
+            points: 0,
+          });
+        }
       }
+
       const updated = await storage.updateUser(id, { role });
       res.json({ success: true, id: updated.id, role: updated.role });
     } catch (error: any) {
