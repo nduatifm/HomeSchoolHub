@@ -29,6 +29,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -48,6 +49,7 @@ import {
   RefreshCw,
   Crown,
   ChevronLeft,
+  Trash2,
 } from "lucide-react";
 import { Link } from "wouter";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -106,6 +108,9 @@ export default function AdminUsers() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [newRole, setNewRole] = useState("");
   const [newParentId, setNewParentId] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
 
   const { data: users = [], isLoading, refetch } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
@@ -142,6 +147,19 @@ export default function AdminUsers() {
       toast({ title: "Admin status updated" });
     },
     onError: (e: any) => toast({ title: "Failed to update admin status", description: e.message, type: "error" }),
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest(`/api/admin/users/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "User deleted", description: `${userToDelete?.name} has been permanently removed.` });
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+      setDeleteConfirmName("");
+    },
+    onError: (e: any) => toast({ title: "Failed to delete user", description: e.message, type: "error" }),
   });
 
   const filtered = users.filter((u) => {
@@ -375,6 +393,18 @@ export default function AdminUsers() {
                                         Make admin
                                       </DropdownMenuItem>
                                     )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive focus:bg-red-50"
+                                      onClick={() => {
+                                        setUserToDelete(u);
+                                        setDeleteConfirmName("");
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete user
+                                    </DropdownMenuItem>
                                   </>
                                 )}
                               </DropdownMenuContent>
@@ -398,6 +428,72 @@ export default function AdminUsers() {
           )}
         </main>
       </div>
+
+      {/* Delete user confirmation dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) { setUserToDelete(null); setDeleteConfirmName(""); }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="w-4 h-4" />
+              Delete User
+            </DialogTitle>
+            <DialogDescription>
+              This action is permanent and cannot be undone. All data associated with this account will be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          {userToDelete && (
+            <div className="space-y-4 pt-1">
+              <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarImage src={userToDelete.profilePicture || ""} />
+                  <AvatarFallback className="bg-red-100 text-red-700 text-sm font-semibold">
+                    {userToDelete.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{userToDelete.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{userToDelete.email}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1.5 block">
+                  Type <span className="font-bold text-foreground">{userToDelete.name}</span> to confirm
+                </label>
+                <Input
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  placeholder={userToDelete.name}
+                  className="border-red-200 focus-visible:ring-red-400"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => { setDeleteDialogOpen(false); setUserToDelete(null); setDeleteConfirmName(""); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleteConfirmName !== userToDelete.name || deleteUserMutation.isPending}
+                  onClick={() => deleteUserMutation.mutate(userToDelete.id)}
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  {deleteUserMutation.isPending ? "Deleting…" : "Delete permanently"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Change role dialog */}
       <Dialog open={roleDialogOpen} onOpenChange={(open) => { setRoleDialogOpen(open); if (!open) setNewParentId(0); }}>

@@ -4162,6 +4162,34 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // DELETE /api/admin/users/:id — permanently delete a user (super admin only)
+  app.delete("/api/admin/users/:id", requireSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
+
+      // Guard: cannot delete yourself
+      if (req.session.userId === id) {
+        return res.status(400).json({ error: "You cannot delete your own account" });
+      }
+
+      const target = await storage.getUserById(id);
+      if (!target) return res.status(404).json({ error: "User not found" });
+
+      // Guard: cannot delete other super admins
+      if (target.isSuperAdmin) {
+        return res.status(400).json({ error: "Cannot delete a super admin account" });
+      }
+
+      // All related records cascade via Prisma schema onDelete: Cascade
+      await prisma.user.delete({ where: { id } });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/students/me — resolve the current user's student record
   app.get("/api/students/me", requireAuth, async (req, res) => {
     try {
