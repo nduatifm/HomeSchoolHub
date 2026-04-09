@@ -4181,7 +4181,25 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Cannot delete a super admin account" });
       }
 
-      // All related records cascade via Prisma schema onDelete: Cascade
+      // Clean up non-FK references that won't cascade automatically:
+
+      // 1. ThreadLabel records keyed by teacherUserId (no FK relation)
+      await prisma.threadLabel.deleteMany({ where: { teacherUserId: id } });
+
+      // 2. If user has a Student record, remove their studentId from Session.studentIds arrays
+      const studentRecord = await prisma.student.findUnique({ where: { userId: id } });
+      if (studentRecord) {
+        // ThreadLabel records keyed by studentId
+        await prisma.threadLabel.deleteMany({ where: { studentId: studentRecord.id } });
+        // Remove from Session.studentIds arrays via raw SQL (Prisma doesn't support array element removal natively)
+        await prisma.$executeRaw`
+          UPDATE "Session"
+          SET "studentIds" = array_remove("studentIds", ${studentRecord.id}::integer)
+          WHERE ${studentRecord.id} = ANY("studentIds")
+        `;
+      }
+
+      // All FK-related records cascade via Prisma schema onDelete: Cascade
       await prisma.user.delete({ where: { id } });
 
       res.json({ success: true });
