@@ -101,7 +101,7 @@ export default function StudentDashboard() {
     enabled: !!student,
   });
 
-  const { data: classrooms = [] } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
+  const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
 
   const classroomAssignmentQueries = useQueries({
     queries: classrooms.map(c => ({
@@ -216,7 +216,7 @@ export default function StudentDashboard() {
     hasStudentAssignment?: boolean;
   };
 
-  const isTasksLoading = assignmentsLoading || classroomAssignmentQueries.some(q => q.isLoading);
+  const isTasksLoading = assignmentsLoading || classroomsLoading || classroomAssignmentQueries.some(q => q.isLoading);
 
   const allPendingItems: PendingTask[] = [
     ...pendingClassworkItems.map(a => ({
