@@ -254,9 +254,21 @@ export default function ModernSidebar() {
                   {user?.name?.charAt(0).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <span className="flex-1 text-left text-sm font-medium text-gray-800 truncate">
-                {user?.name}
-              </span>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-gray-800 truncate leading-tight">
+                  {user?.name}
+                </p>
+                {user?.role && (
+                  <p className={`text-[10px] font-semibold capitalize leading-tight mt-0.5 ${
+                    user.role === "teacher" ? "text-blue-600" :
+                    user.role === "parent"  ? "text-purple-600" :
+                    user.role === "student" ? "text-amber-600" :
+                    "text-gray-400"
+                  }`}>
+                    {user.role}
+                  </p>
+                )}
+              </div>
             </button>
           </DropdownMenuTrigger>
 
