@@ -760,11 +760,14 @@ export default function ParentDashboard() {
                                 {user?.roles?.includes("teacher") && user?.id && (
                                   <SelectItem key="self" value={user.id.toString()}>
                                     <span className="font-medium">Myself (as teacher)</span>
-                                    {tutorRequestForm.studentId && (
-                                      <span className="text-xs text-muted-foreground ml-1.5">
-                                        — homeschool
-                                      </span>
-                                    )}
+                                    {tutorRequestForm.studentId && (() => {
+                                      const selectedStudent = students.find((s: any) => s.id === tutorRequestForm.studentId);
+                                      return selectedStudent ? (
+                                        <span className="text-xs text-muted-foreground ml-1.5">
+                                          — teach {selectedStudent.name}
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </SelectItem>
                                 )}
                                 {teachers.filter((t: any) => t.id !== user?.id).map((t: any) => (
