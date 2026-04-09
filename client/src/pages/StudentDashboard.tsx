@@ -272,7 +272,7 @@ export default function StudentDashboard() {
           {isHomeTab && (
             <>
               {/* Change 2: Hero banner — solid primary, one CTA */}
-              {pendingClassworkItems[0] ? (
+              {!isTasksLoading && pendingClassworkItems[0] ? (
                 <div className="mb-6 rounded-2xl bg-primary p-6 text-primary-foreground flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium opacity-80 mb-1">Up next</p>
@@ -290,18 +290,22 @@ export default function StudentDashboard() {
                     Start →
                   </Button>
                 </div>
-              ) : (
+              ) : !isTasksLoading ? (
                 <div className="mb-6 rounded-2xl bg-green-50 border border-green-200 p-6 text-center">
                   <p className="text-2xl mb-1">🎉</p>
                   <p className="font-semibold text-green-800">You're all caught up!</p>
                   <p className="text-sm text-green-600 mt-0.5">Nothing due right now. Great work.</p>
                 </div>
-              )}
+              ) : null}
 
               {/* Today's Tasks — kid-friendly tappable cards */}
               <div className="mb-6">
                 <h2 className="text-base font-semibold text-foreground mb-3">Today's Tasks</h2>
-                {allPendingItems.length === 0 ? (
+                {isTasksLoading ? (
+                  <div className="rounded-2xl border border-dashed border-border p-6 text-center">
+                    <p className="text-sm text-muted-foreground">Loading tasks…</p>
+                  </div>
+                ) : allPendingItems.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border p-6 text-center">
                     <p className="text-sm text-muted-foreground">You're all caught up 🎉</p>
                   </div>

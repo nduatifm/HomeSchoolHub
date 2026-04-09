@@ -1420,10 +1420,14 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const isParent = existing.parentId === callerId;
       const isOwner = existing.userId === callerId;
+      const relation = await prisma.tutorRelation.findFirst({
+        where: { teacherUserId: callerId, studentId: existing.id },
+      });
+      const isTeacher = !!relation;
       const caller = await storage.getUserById(callerId);
       const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 
-      if (!isParent && !isOwner && !isAdmin) {
+      if (!isParent && !isOwner && !isTeacher && !isAdmin) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
