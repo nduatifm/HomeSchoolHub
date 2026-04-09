@@ -1637,7 +1637,7 @@ export default function TeacherDashboard() {
                                     onValueChange={(v) =>
                                       field.onChange(parseInt(v))
                                     }
-                                    value={field.value.toString()}
+                                    value={field.value ? field.value.toString() : ""}
                                   >
                                     <SelectTrigger data-testid="select-schedule-student">
                                       <SelectValue placeholder="Select a student" />
@@ -1861,7 +1861,7 @@ export default function TeacherDashboard() {
                         <div>
                           <label className="text-sm font-medium">Student</label>
                           <Select
-                            value={editScheduleForm.studentId.toString()}
+                            value={editScheduleForm.studentId ? editScheduleForm.studentId.toString() : ""}
                             onValueChange={(value) =>
                               setEditScheduleForm({
                                 ...editScheduleForm,
@@ -2009,7 +2009,7 @@ export default function TeacherDashboard() {
                                     onValueChange={(v) =>
                                       field.onChange(parseInt(v))
                                     }
-                                    value={field.value.toString()}
+                                    value={field.value ? field.value.toString() : ""}
                                   >
                                     <SelectTrigger data-testid="select-feedback-student">
                                       <SelectValue placeholder="Select a student" />
@@ -2190,7 +2190,7 @@ export default function TeacherDashboard() {
                                     onValueChange={(v) =>
                                       field.onChange(parseInt(v))
                                     }
-                                    value={field.value.toString()}
+                                    value={field.value ? field.value.toString() : ""}
                                   >
                                     <SelectTrigger data-testid="select-attendance-student">
                                       <SelectValue placeholder="Select a student" />
