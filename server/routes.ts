@@ -4094,6 +4094,7 @@ export function registerRoutes(app: Express) {
         }
         const parentUser = await storage.getUserById(pid);
         if (!parentUser) return res.status(404).json({ error: "Parent user not found" });
+        if (parentUser.role !== "parent") return res.status(400).json({ error: "Selected user does not have the parent role" });
 
         // Auto-create a Student record if one doesn't already exist for this user
         const existingStudent = await prisma.student.findUnique({ where: { userId: id } });

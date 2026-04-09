@@ -96,7 +96,7 @@ function SignupMethodBadge({ googleId }: { googleId: string | null }) {
   return <span className="text-xs text-muted-foreground">Email</span>;
 }
 
-type ParentUser = Pick<User, "id" | "name" | "email">;
+type ParentUser = Pick<User, "id" | "name" | "email" | "role">;
 
 export default function AdminUsers() {
   const { user: currentUser } = useAuth();
@@ -114,7 +114,7 @@ export default function AdminUsers() {
   const { data: allUsers = [] } = useQuery<ParentUser[]>({
     queryKey: ["/api/users"],
   });
-  const parentUsers = (allUsers as (ParentUser & { role?: string })[]).filter((u) => u.role === "parent");
+  const parentUsers = allUsers.filter((u) => u.role === "parent");
 
   const changeRoleMutation = useMutation({
     mutationFn: ({ id, role, parentId }: { id: number; role: string; parentId?: number }) =>
