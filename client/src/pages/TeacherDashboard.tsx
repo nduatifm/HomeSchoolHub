@@ -803,6 +803,7 @@ export default function TeacherDashboard() {
   // Send message
   const [messageForm, setMessageForm] = useState({
     receiverId: 0,
+    receiverName: "",
     content: "",
   });
 
@@ -816,7 +817,7 @@ export default function TeacherDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       toast({ title: "Message sent!", type: "success" });
-      setMessageForm({ receiverId: 0, content: "" });
+      setMessageForm({ receiverId: 0, receiverName: "", content: "" });
       setSendMessageOpen(false);
     },
   });
@@ -1059,7 +1060,7 @@ export default function TeacherDashboard() {
                                 variant="ghost"
                                 className="h-7 px-2 text-muted-foreground hover:text-primary"
                                 onClick={() => {
-                                  setMessageForm({ receiverId: s.parentId, content: "" });
+                                  setMessageForm({ receiverId: s.parentId, receiverName: (s as any).parentName ?? "", content: "" });
                                   setSendMessageOpen(true);
                                 }}
                                 data-testid={`button-message-parent-${s.id}`}
@@ -1775,8 +1776,7 @@ export default function TeacherDashboard() {
                             <TableCell
                               data-testid={`text-schedule-student-${s.id}`}
                             >
-                              {students.find((st: any) => st.id === s.studentId)
-                                ?.name || `Student #${s.studentId}`}
+                              {(s as any).studentName || students.find((st: any) => st.id === s.studentId)?.name || "Unknown student"}
                             </TableCell>
                             <TableCell>{s.dayOfWeek}</TableCell>
                             <TableCell>
@@ -2098,9 +2098,7 @@ export default function TeacherDashboard() {
                                   className="font-medium"
                                   data-testid={`text-feedback-student-${f.id}`}
                                 >
-                                  {students.find(
-                                    (st: any) => st.id === f.studentId,
-                                  )?.name || `Student #${f.studentId}`}
+                                  {(f as any).studentName || students.find((st: any) => st.id === f.studentId)?.name || "Unknown student"}
                                 </p>
                                 <Badge
                                   variant={
@@ -2855,7 +2853,7 @@ export default function TeacherDashboard() {
               {messageForm.receiverId ? (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/40 text-sm">
                   <span className="font-medium">
-                    {users.find((u) => u.id === messageForm.receiverId)?.name || `User #${messageForm.receiverId}`}
+                    {messageForm.receiverName || users.find((u) => u.id === messageForm.receiverId)?.name || `User #${messageForm.receiverId}`}
                   </span>
                   <span className="text-xs text-muted-foreground ml-auto">
                     {users.find((u) => u.id === messageForm.receiverId)?.email}
@@ -2886,7 +2884,7 @@ export default function TeacherDashboard() {
                 variant="outline"
                 onClick={() => {
                   setSendMessageOpen(false);
-                  setMessageForm({ receiverId: 0, content: "" });
+                  setMessageForm({ receiverId: 0, receiverName: "", content: "" });
                 }}
               >
                 Cancel

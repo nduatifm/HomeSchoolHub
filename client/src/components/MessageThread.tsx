@@ -426,7 +426,7 @@ export default function MessageThread({
                       className="text-xs font-semibold"
                       style={{ color: RECV_TEXT }}
                     >
-                      {group.isMe ? "You" : (group.senderName || `User #${group.senderId}`)}
+                      {group.isMe ? "You" : (group.senderName || "Deleted user")}
                     </span>
                     <span className="text-[10px]" style={{ color: META_TEXT }}>
                       {formatSmartTimestamp(group.messages[0].timestamp)}

@@ -126,7 +126,7 @@ export interface IStorage {
   deleteMaterial(id: number): Promise<void>;
 
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
-  getSchedulesByTeacher(teacherId: number): Promise<Schedule[]>;
+  getSchedulesByTeacher(teacherId: number): Promise<(Schedule & { studentName: string })[]>;
   getSchedulesByStudent(studentId: number): Promise<Schedule[]>;
   updateSchedule(
     id: number,
@@ -144,7 +144,7 @@ export interface IStorage {
 
   createFeedback(feedback: InsertFeedback): Promise<Feedback>;
   getFeedbackByStudent(studentId: number): Promise<Feedback[]>;
-  getFeedbackByTeacher(teacherId: number): Promise<Feedback[]>;
+  getFeedbackByTeacher(teacherId: number): Promise<(Feedback & { studentName: string })[]>;
 
   createAttendance(attendance: InsertAttendance): Promise<Attendance>;
   getAttendanceByStudent(studentId: number): Promise<Attendance[]>;
@@ -569,10 +569,12 @@ class PrismaStorage implements IStorage {
     return (await prisma.schedule.create({ data: schedule })) as Schedule;
   }
 
-  async getSchedulesByTeacher(teacherId: number): Promise<Schedule[]> {
-    return (await prisma.schedule.findMany({
+  async getSchedulesByTeacher(teacherId: number): Promise<(Schedule & { studentName: string })[]> {
+    const rows = await prisma.schedule.findMany({
       where: { teacherId },
-    })) as Schedule[];
+      include: { student: { select: { name: true } } },
+    });
+    return rows.map((r) => ({ ...r, studentName: r.student?.name ?? "Unknown student" })) as (Schedule & { studentName: string })[];
   }
 
   async getSchedulesByStudent(studentId: number): Promise<Schedule[]> {
@@ -644,10 +646,12 @@ class PrismaStorage implements IStorage {
     })) as Feedback[];
   }
 
-  async getFeedbackByTeacher(teacherId: number): Promise<Feedback[]> {
-    return (await prisma.feedback.findMany({
+  async getFeedbackByTeacher(teacherId: number): Promise<(Feedback & { studentName: string })[]> {
+    const rows = await prisma.feedback.findMany({
       where: { teacherId },
-    })) as Feedback[];
+      include: { student: { select: { name: true } } },
+    });
+    return rows.map((r) => ({ ...r, studentName: r.student?.name ?? "Unknown student" })) as (Feedback & { studentName: string })[];
   }
 
   async createAttendance(attendance: InsertAttendance): Promise<Attendance> {
@@ -834,7 +838,7 @@ class PrismaStorage implements IStorage {
       message: m.message,
       timestamp: m.timestamp,
       isRead: m.isRead,
-      senderName: m.sender.name,
+      senderName: m.sender?.name ?? "Deleted user",
     }));
   }
 
