@@ -316,7 +316,7 @@ export default function ParentDashboard() {
 
   // Request tutor form
   const [tutorRequestForm, setTutorRequestForm] = useState({
-    teacherId: 0,
+    teacherId: null as number | null,
     message: "",
     studentId: null as number | null,
   });
@@ -338,7 +338,7 @@ export default function ParentDashboard() {
           : "Your request has been sent. The teacher will review and approve it shortly.",
         type: "success",
       });
-      setTutorRequestForm({ teacherId: 0, message: "", studentId: null });
+      setTutorRequestForm({ teacherId: null, message: "", studentId: null });
       setRequestTutorOpen(false);
     },
     onError: (err: any) => {
@@ -713,7 +713,10 @@ export default function ParentDashboard() {
                     <CardTitle>Tutor Requests</CardTitle>
                     <Dialog
                       open={requestTutorOpen}
-                      onOpenChange={setRequestTutorOpen}
+                      onOpenChange={(open) => {
+                        setRequestTutorOpen(open);
+                        if (!open) setTutorRequestForm({ teacherId: null, message: "", studentId: null });
+                      }}
                     >
                       <DialogTrigger asChild>
                         <Button data-testid="button-request-tutor">
