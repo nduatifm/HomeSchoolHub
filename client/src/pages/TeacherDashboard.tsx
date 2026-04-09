@@ -1790,7 +1790,7 @@ export default function TeacherDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {schedules.map((s: any) => (
+                        {schedules.map((s) => (
                           <TableRow
                             key={s.id}
                             data-testid={`row-schedule-${s.id}`}
@@ -2107,7 +2107,7 @@ export default function TeacherDashboard() {
                     </p>
                   ) : (
                     <div className="space-y-4">
-                      {feedbacks.map((f: any) => (
+                      {feedbacks.map((f) => (
                         <div
                           key={f.id}
                           className="p-4 border rounded-lg"
