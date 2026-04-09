@@ -1394,8 +1394,8 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const isParent = student.parentId === callerId;
       const isOwner = student.userId === callerId;
-      const relation = await prisma.tutorRelation.findFirst({
-        where: { teacherUserId: callerId, studentId: student.id },
+      const relation = await prisma.teacherStudentAssignment.findFirst({
+        where: { teacherId: callerId, studentId: student.id },
       });
       const isTeacher = !!relation;
       const caller = await storage.getUserById(callerId);
@@ -1420,8 +1420,8 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const isParent = existing.parentId === callerId;
       const isOwner = existing.userId === callerId;
-      const relation = await prisma.tutorRelation.findFirst({
-        where: { teacherUserId: callerId, studentId: existing.id },
+      const relation = await prisma.teacherStudentAssignment.findFirst({
+        where: { teacherId: callerId, studentId: existing.id },
       });
       const isTeacher = !!relation;
       const caller = await storage.getUserById(callerId);
