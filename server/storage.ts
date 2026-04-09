@@ -535,7 +535,7 @@ class PrismaStorage implements IStorage {
 
   async getAllTeachers(): Promise<User[]> {
     return (await prisma.user.findMany({
-      where: { role: "teacher" },
+      where: { OR: [{ role: "teacher" }, { roles: { has: "teacher" } }] },
       select: {
         id: true,
         email: true,

@@ -1864,7 +1864,8 @@ export function registerRoutes(app: Express) {
         }
 
         // Also notify the parent when a child's assignment is graded
-        if (student?.parentId) {
+        // Skip if the teacher and parent are the same person (homeschool dual-role)
+        if (student?.parentId && student.parentId !== req.session.userId!) {
           storage.createNotification({
             userId: student.parentId,
             type: "assignment_graded",
@@ -2593,9 +2594,13 @@ export function registerRoutes(app: Express) {
         responseDate: null,
       });
 
-      // Guard: cannot request yourself as a tutor
-      if (data.teacherId === user.id) {
-        return res.status(400).json({ error: "You cannot request yourself as a tutor" });
+      // Self-assignment: dual-role parent+teacher may assign themselves as their own child's tutor
+      const isSelfRequest = data.teacherId === user.id;
+      if (isSelfRequest) {
+        // Only allowed if the user actually has the teacher role in their roles array
+        if (!user.roles?.includes("teacher")) {
+          return res.status(400).json({ error: "You cannot request yourself as a tutor" });
+        }
       }
 
       // Validate that studentId (if provided) belongs to this parent
@@ -2625,23 +2630,31 @@ export function registerRoutes(app: Express) {
 
       let request = await storage.createTutorRequest(data);
 
-      // When tutor-request mode is OFF, auto-approve immediately.
-      // TutorRequest is the single authoritative link — no secondary TeacherStudentAssignment write needed.
-      const isRequestMode = await isTutorRequestModeEnabled();
-      if (!isRequestMode) {
+      // Self-requests auto-approve instantly — no pending flow, no notification to yourself
+      if (isSelfRequest) {
         request = await storage.updateTutorRequest(request.id, {
           status: "approved",
           responseDate: new Date().toISOString(),
         });
       } else {
-        // Notify the teacher of a new pending tutor request
-        storage.createNotification({
-          userId: data.teacherId as number,
-          type: "new_tutor_request",
-          title: "New Tutor Request",
-          body: `${user!.name} has sent you a tutor request.`,
-          link: "/dashboard/requests",
-        }).catch(console.error);
+        // When tutor-request mode is OFF, auto-approve immediately.
+        // TutorRequest is the single authoritative link — no secondary TeacherStudentAssignment write needed.
+        const isRequestMode = await isTutorRequestModeEnabled();
+        if (!isRequestMode) {
+          request = await storage.updateTutorRequest(request.id, {
+            status: "approved",
+            responseDate: new Date().toISOString(),
+          });
+        } else {
+          // Notify the teacher of a new pending tutor request (skip if teacher === parent)
+          storage.createNotification({
+            userId: data.teacherId as number,
+            type: "new_tutor_request",
+            title: "New Tutor Request",
+            body: `${user!.name} has sent you a tutor request.`,
+            link: "/dashboard/requests",
+          }).catch(console.error);
+        }
       }
 
       res.json(request);
@@ -2696,7 +2709,8 @@ export function registerRoutes(app: Express) {
       });
 
       // Notify the parent of approval or rejection
-      if (existingRequest && (status === "approved" || status === "rejected")) {
+      // Skip if the teacher and parent are the same person (homeschool dual-role)
+      if (existingRequest && (status === "approved" || status === "rejected") && existingRequest.parentId !== user!.id) {
         const statusText = status === "approved" ? "approved" : "declined";
         storage.createNotification({
           userId: existingRequest.parentId,
@@ -2765,9 +2779,11 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const allParticipants = [teacherUserId, student.userId, student.parentId].filter(
-        (id): id is number => id != null,
-      );
+      const allParticipants = Array.from(new Set(
+        [teacherUserId, student.userId, student.parentId].filter(
+          (id): id is number => id != null,
+        ),
+      ));
       const recipients = allParticipants.filter((id) => id !== requesterId);
 
       const timestamp = new Date().toISOString();
@@ -4587,8 +4603,8 @@ export function registerRoutes(app: Express) {
           body: `Your submission for "${assignmentData?.title ?? "assignment"}" in "${classroomData?.name ?? "classroom"}" has been graded: ${grade}/${sub.assignment.points}`,
           link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
         }).catch(console.error);
-        // Also notify the parent
-        if (gradedStudent.parentId) {
+        // Also notify the parent (skip if teacher === parent — homeschool dual-role)
+        if (gradedStudent.parentId && gradedStudent.parentId !== req.session.userId!) {
           storage.createNotification({
             userId: gradedStudent.parentId,
             type: "assignment_graded",

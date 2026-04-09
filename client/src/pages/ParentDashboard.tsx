@@ -757,7 +757,17 @@ export default function ParentDashboard() {
                                 <SelectValue placeholder="Select a teacher" />
                               </SelectTrigger>
                               <SelectContent>
-                                {teachers.map((t: any) => (
+                                {user?.roles?.includes("teacher") && user?.id && (
+                                  <SelectItem key="self" value={user.id.toString()}>
+                                    <span className="font-medium">Myself (as teacher)</span>
+                                    {tutorRequestForm.studentId && (
+                                      <span className="text-xs text-muted-foreground ml-1.5">
+                                        — homeschool
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                )}
+                                {teachers.filter((t: any) => t.id !== user?.id).map((t: any) => (
                                   <SelectItem key={t.id} value={t.id.toString()}>
                                     <span className="font-medium">{t.name}</span>
                                     {(t.teachingSubjects?.length > 0 || t.yearsExperience) && (
@@ -999,7 +1009,7 @@ export default function ParentDashboard() {
                                 </p>
                                 {summary?.teacherName && (
                                   <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                                    Teacher: {summary.teacherName}
+                                    Teacher: {summary.teacherUserId === user?.id ? "You (as teacher)" : summary.teacherName}
                                   </p>
                                 )}
                               </div>
@@ -1033,12 +1043,13 @@ export default function ParentDashboard() {
                           </div>
                         );
                       }
+                      const teacherLabel = selectedTeacher.id === user!.id ? "You (as teacher)" : selectedTeacher.name;
                       return (
                         <MessageThread
                           teacherId={selectedTeacher.id}
                           studentId={selectedChildForMessages.id}
                           myUserId={user!.id}
-                          title={`Thread: ${selectedChildForMessages.name} & ${selectedTeacher.name}`}
+                          title={`Thread: ${selectedChildForMessages.name} & ${teacherLabel}`}
                           customName={conversationSummaries.find((c) => c.studentId === selectedChildForMessages.id)?.customName ?? null}
                         />
                       );
