@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -172,28 +172,14 @@ export default function StudentDashboard() {
       if (file) formData.append("file", file);
 
       if (hasStudentAssignment) {
-        const response = await fetch(
+        return apiUpload(
           `/api/student-assignments/${studentAssignmentId}/submit`,
-          {
-            method: "PATCH",
-            headers: { Authorization: `Bearer ${localStorage.getItem("sessionId")}` },
-            body: formData,
-          },
+          formData,
+          { method: "PATCH" },
         );
-        if (!response.ok) throw new Error("Failed to submit");
-        return response.json();
       } else {
         formData.append("studentId", String(student?.id));
-        const response = await fetch(
-          `/api/assignments/${assignmentId}/submit`,
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${localStorage.getItem("sessionId")}` },
-            body: formData,
-          },
-        );
-        if (!response.ok) throw new Error("Failed to submit");
-        return response.json();
+        return apiUpload(`/api/assignments/${assignmentId}/submit`, formData);
       }
     },
     onSuccess: () => {
@@ -229,6 +215,8 @@ export default function StudentDashboard() {
     studentAssignmentId?: number;
     hasStudentAssignment?: boolean;
   };
+
+  const isTasksLoading = assignmentsLoading || classroomAssignmentQueries.some(q => q.isLoading);
 
   const allPendingItems: PendingTask[] = [
     ...pendingClassworkItems.map(a => ({
@@ -270,9 +258,11 @@ export default function StudentDashboard() {
               <div className="mb-5">
                 <h1 className="text-xl font-semibold text-foreground">{g}, {firstName} 👋</h1>
                 <p className="text-sm text-muted-foreground">
-                  {allPendingItems.length > 0
-                    ? `You have ${allPendingItems.length} thing${allPendingItems.length === 1 ? "" : "s"} to do today.`
-                    : "Nothing due today — you're ahead of the game!"}
+                  {isTasksLoading
+                    ? "Loading your tasks…"
+                    : allPendingItems.length > 0
+                      ? `You have ${allPendingItems.length} thing${allPendingItems.length === 1 ? "" : "s"} to do today.`
+                      : "Nothing due today — you're ahead of the game!"}
                 </p>
               </div>
             );

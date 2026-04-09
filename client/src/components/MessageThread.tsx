@@ -141,21 +141,21 @@ export default function MessageThread({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Mark ALL raw DB rows for this viewer as read when thread is opened.
+  // Mark ALL raw DB rows for this viewer as read when thread is opened or new messages arrive.
   // Uses the /thread-read endpoint (not per-message PATCH) so broadcast duplicates
   // (e.g. the parent's copy of a teacher→student message) also get cleared.
+  // messages.length in deps ensures newly-polled messages are marked read while user is on the thread.
   useEffect(() => {
-    if (!teacherId || !studentId) return;
+    if (!teacherId || !studentId || messages.length === 0) return;
     apiRequest(
       `/api/messages/thread-read?teacherId=${teacherId}&studentId=${studentId}`,
       { method: "PATCH" }
     )
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
       })
       .catch(console.error);
-  }, [teacherId, studentId]);
+  }, [teacherId, studentId, messages.length]);
 
   const autoResize = () => {
     const el = textareaRef.current;

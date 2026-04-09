@@ -1024,7 +1024,7 @@ class PrismaStorage implements IStorage {
 
       const groups: ConvGroup[] = assignedStudents.map((s) => ({
         studentId: s.id,
-        teacherUserId: teacherMap.get(s.id)!.id,
+        teacherUserId: teacherMap.get(s.id)?.id ?? 0,
         studentUserId: s.userId,
         parentUserId: userId,
       }));
@@ -1032,24 +1032,28 @@ class PrismaStorage implements IStorage {
       const stats = await fetchThreadStats(groups, userId);
 
       const assignedGroups = assignedStudents.map((s) => ({
-        teacherUserId: teacherMap.get(s.id)!.id,
+        teacherUserId: teacherMap.get(s.id)?.id ?? 0,
         studentId: s.id,
-      }));
+      })).filter((g) => g.teacherUserId !== 0);
       const parentThreadLabels = assignedGroups.length > 0 ? await prisma.threadLabel.findMany({
         where: { OR: assignedGroups },
         select: { teacherUserId: true, studentId: true, name: true },
       }) : [];
       const parentLabelMap = new Map(parentThreadLabels.map((l) => [`${l.teacherUserId}:${l.studentId}`, l.name]));
 
-      const summaries: ConversationSummary[] = assignedStudents.map((s) => ({
-        studentId: s.id,
-        teacherUserId: teacherMap.get(s.id)!.id,
-        studentName: s.name,
-        teacherName: teacherMap.get(s.id)!.name,
-        parentName: parentUser?.name ?? null,
-        customName: parentLabelMap.get(`${teacherMap.get(s.id)!.id}:${s.id}`) ?? null,
-        ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
-      }));
+      const summaries: ConversationSummary[] = assignedStudents.map((s) => {
+        const teacher = teacherMap.get(s.id);
+        const teacherUserId = teacher?.id ?? 0;
+        return {
+          studentId: s.id,
+          teacherUserId,
+          studentName: s.name,
+          teacherName: teacher?.name ?? "",
+          parentName: parentUser?.name ?? null,
+          customName: parentLabelMap.get(`${teacherUserId}:${s.id}`) ?? null,
+          ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
+        };
+      });
 
       for (const s of unassignedStudents) {
         summaries.push({

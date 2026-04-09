@@ -994,6 +994,15 @@ export function registerRoutes(app: Express) {
       const hashedPassword = await hashPassword(newPassword);
       await storage.updateUser(user.id, { password: hashedPassword });
 
+      // Invalidate all OTHER active sessions for this user (keep the current one)
+      const currentSessionId = req.headers.authorization?.replace("Bearer ", "") ?? "";
+      await prisma.authSession.deleteMany({
+        where: {
+          userId: user.id,
+          ...(currentSessionId ? { id: { not: currentSessionId } } : {}),
+        },
+      });
+
       res.json({
         success: true,
         message: "Password changed successfully",
@@ -1378,7 +1387,24 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/students/:id", requireAuth, async (req, res) => {
     try {
-      const student = await storage.getStudentById(parseInt(req.params.id));
+      const id = parseInt(req.params.id);
+      const student = await storage.getStudentById(id);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const callerId = req.session.userId!;
+      const isParent = student.parentId === callerId;
+      const isOwner = student.userId === callerId;
+      const relation = await prisma.tutorRelation.findFirst({
+        where: { teacherUserId: callerId, studentId: student.id },
+      });
+      const isTeacher = !!relation;
+      const caller = await storage.getUserById(callerId);
+      const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
+
+      if (!isParent && !isOwner && !isTeacher && !isAdmin) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       res.json(student);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1387,10 +1413,21 @@ export function registerRoutes(app: Express) {
 
   app.patch("/api/students/:id", requireAuth, async (req, res) => {
     try {
-      const student = await storage.updateStudent(
-        parseInt(req.params.id),
-        req.body,
-      );
+      const id = parseInt(req.params.id);
+      const existing = await storage.getStudentById(id);
+      if (!existing) return res.status(404).json({ error: "Student not found" });
+
+      const callerId = req.session.userId!;
+      const isParent = existing.parentId === callerId;
+      const isOwner = existing.userId === callerId;
+      const caller = await storage.getUserById(callerId);
+      const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
+
+      if (!isParent && !isOwner && !isAdmin) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const student = await storage.updateStudent(id, req.body);
       res.json(student);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3308,10 +3345,10 @@ export function registerRoutes(app: Express) {
   app.post("/api/system-settings", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (!user?.isAdmin && !user?.isSuperAdmin) {
         return res
           .status(403)
-          .json({ error: "Only teachers can modify system settings" });
+          .json({ error: "Only admins can modify system settings" });
       }
 
       const { key, value, description } = req.body;
@@ -4402,16 +4439,14 @@ export function registerRoutes(app: Express) {
   // POST /api/classrooms/:classroomId/posts — post to feed
   app.post("/api/classrooms/:classroomId/posts", requireAuth, async (req, res) => {
     try {
-      const classroomId = parseInt(req.params.classroomId);
-      const classroom = await storage.getClassroomById(classroomId);
-      if (!classroom) return res.status(404).json({ error: "Classroom not found" });
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot post to an archived classroom" });
-      if (classroom.teacherId !== req.session.userId!) return res.status(403).json({ error: "Not your classroom" });
       const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
-      const post = await storage.createClassroomPost({ classroomId, authorId: req.session.userId!, content });
+      const post = await storage.createClassroomPost({ classroomId: classroom.id, authorId: req.session.userId!, content });
 
       // Notify all enrolled students about the new post
-      const postEnrollments = await storage.getEnrollments(classroomId);
+      const postEnrollments = await storage.getEnrollments(classroom.id);
       for (const enrollment of postEnrollments) {
         const postStudent = await storage.getStudentById(enrollment.student.id);
         if (postStudent?.userId) {
@@ -4420,7 +4455,7 @@ export function registerRoutes(app: Express) {
             type: "new_post",
             title: "New Classroom Post",
             body: `New post in "${classroom.name}": ${content.slice(0, 80)}${content.length > 80 ? "…" : ""}`,
-            link: `/classrooms/${classroom.slug ?? classroomId}`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
           }).catch(console.error);
         }
       }
