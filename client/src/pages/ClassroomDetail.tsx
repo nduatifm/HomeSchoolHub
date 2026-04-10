@@ -1252,6 +1252,7 @@ function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchiv
                     {urgency === "overdue"   && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-red-100 text-red-700 hover:bg-red-100 border-0">Overdue</Badge>}
                     {urgency === "due-today" && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0">Due Today</Badge>}
                     {urgency === "due-soon"  && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-0">in {dueSoonDays} day{dueSoonDays !== 1 ? "s" : ""}</Badge>}
+                    {urgency === "new"       && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-green-100 text-green-700 hover:bg-green-100 border-0">New</Badge>}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>

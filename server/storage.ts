@@ -301,6 +301,14 @@ export interface IStorage {
   getUnreadNotificationCount(userId: number): Promise<number>;
   markNotificationRead(id: number, userId: number): Promise<any>;
   markAllNotificationsRead(userId: number): Promise<void>;
+
+  getClassroomNotificationsForStudent(studentId: number): Promise<Array<{
+    classroomId: number;
+    newCount: number;
+    dueCount: number;
+    dueSoonCount: number;
+    total: number;
+  }>>;
 }
 
 class PrismaStorage implements IStorage {
@@ -1708,6 +1716,70 @@ class PrismaStorage implements IStorage {
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
     }));
+  }
+
+  async getClassroomNotificationsForStudent(studentId: number): Promise<Array<{
+    classroomId: number;
+    newCount: number;
+    dueCount: number;
+    dueSoonCount: number;
+    total: number;
+  }>> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    const enrollments = await prisma.classroomEnrollment.findMany({
+      where: { studentId },
+      include: {
+        classroom: {
+          include: {
+            assignments: {
+              include: {
+                submissions: { where: { studentId } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return enrollments.map((enrollment) => {
+      const classroom = enrollment.classroom as any;
+      if (classroom.status === "archived") {
+        return { classroomId: classroom.id, newCount: 0, dueCount: 0, dueSoonCount: 0, total: 0 };
+      }
+
+      let newCount = 0;
+      let dueCount = 0;
+      let dueSoonCount = 0;
+
+      for (const assignment of classroom.assignments as any[]) {
+        const sub = (assignment.submissions as any[])[0];
+        if (sub && sub.status !== "pending") continue;
+
+        let classified = false;
+
+        if (assignment.dueDate) {
+          const due = new Date(assignment.dueDate);
+          if (!isNaN(due.getTime())) {
+            due.setHours(0, 0, 0, 0);
+            const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000);
+            if (diffDays <= 0) { dueCount++; classified = true; }
+            else if (diffDays <= 3) { dueSoonCount++; classified = true; }
+          }
+        }
+
+        if (!classified && assignment.createdAt) {
+          const created = new Date(assignment.createdAt);
+          if (created >= sevenDaysAgo) newCount++;
+        }
+      }
+
+      const total = newCount + dueCount + dueSoonCount;
+      return { classroomId: classroom.id, newCount, dueCount, dueSoonCount, total };
+    });
   }
 
   async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string): Promise<ClassroomSubmission> {

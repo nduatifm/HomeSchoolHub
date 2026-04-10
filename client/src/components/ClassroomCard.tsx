@@ -1,22 +1,37 @@
 import { ChevronRight } from "lucide-react";
 import { getSubjectTheme } from "@/lib/subjectTheme";
 import type { Classroom } from "@shared/schema";
-import type { NotificationSummary } from "@/lib/classroomNotifications";
+import type { ClassroomNotification } from "@/lib/classroomNotifications";
 
 type Props = {
   classroom: Classroom;
   href: string;
   ctaLabel?: string;
-  notification?: NotificationSummary;
+  notification?: ClassroomNotification | null;
 };
 
 export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Class", notification }: Props) {
   const theme = getSubjectTheme(c.subject || "");
 
-  const showBadge = notification?.worstLabel != null;
-  const badgeIsRed = notification?.worstLabel === "overdue";
-  const badgeCount = badgeIsRed ? (notification?.overdueCount ?? 0) : (notification?.urgentCount ?? 0);
-  const badgeLabel = badgeCount > 9 ? "9+" : String(badgeCount);
+  const total = notification?.total ?? 0;
+  const dueCount = notification?.dueCount ?? 0;
+  const dueSoonCount = notification?.dueSoonCount ?? 0;
+  const newCount = notification?.newCount ?? 0;
+
+  const showBadge = total > 0;
+  const badgeIsRed = dueCount > 0;
+  const badgeIsAmber = !badgeIsRed && dueSoonCount > 0;
+  const badgeIsGreen = !badgeIsRed && !badgeIsAmber && newCount > 0;
+
+  const badgeBg = badgeIsRed
+    ? "bg-red-500"
+    : badgeIsAmber
+      ? "bg-amber-500"
+      : badgeIsGreen
+        ? "bg-green-500"
+        : "bg-gray-400";
+
+  const badgeLabel = total > 9 ? "9+" : String(total);
 
   return (
     <button
@@ -25,7 +40,7 @@ export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Cl
     >
       {showBadge && (
         <span
-          className={`absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm ${badgeIsRed ? "bg-red-500" : "bg-amber-500"}`}
+          className={`absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm ${badgeBg}`}
         >
           {badgeLabel}
         </span>

@@ -1385,6 +1385,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/students/:studentId/classroom-notifications", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+      const notifications = await storage.getClassroomNotificationsForStudent(studentId);
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/students/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
