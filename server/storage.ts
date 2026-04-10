@@ -303,11 +303,14 @@ export interface IStorage {
   markAllNotificationsRead(userId: number): Promise<void>;
 
   getClassroomNotificationsForStudent(studentId: number): Promise<Record<number, {
+    pendingCount: number;
     newCount: number;
     dueCount: number;
     dueSoonCount: number;
     total: number;
   }>>;
+
+  getTeacherClassroomStats(userId: number): Promise<Record<number, { toGradeCount: number }>>;
 }
 
 class PrismaStorage implements IStorage {
@@ -1753,15 +1756,16 @@ class PrismaStorage implements IStorage {
       },
     });
 
-    const result: Record<number, { newCount: number; dueCount: number; dueSoonCount: number; total: number }> = {};
+    const result: Record<number, { pendingCount: number; newCount: number; dueCount: number; dueSoonCount: number; total: number }> = {};
 
     for (const enrollment of enrollments) {
       const classroom = enrollment.classroom;
       if (classroom.status === "archived") {
-        result[classroom.id] = { newCount: 0, dueCount: 0, dueSoonCount: 0, total: 0 };
+        result[classroom.id] = { pendingCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: 0 };
         continue;
       }
 
+      let pendingCount = 0;
       let newCount = 0;
       let dueCount = 0;
       let dueSoonCount = 0;
@@ -1770,6 +1774,9 @@ class PrismaStorage implements IStorage {
         const sub = assignment.submissions[0] ?? null;
         // Skip if already submitted (not pending)
         if (sub && sub.status !== "pending") continue;
+
+        // Count every unsubmitted assignment toward pendingCount
+        pendingCount++;
 
         let classified = false;
 
@@ -1791,9 +1798,32 @@ class PrismaStorage implements IStorage {
       }
 
       const total = newCount + dueCount + dueSoonCount;
-      result[classroom.id] = { newCount, dueCount, dueSoonCount, total };
+      result[classroom.id] = { pendingCount, newCount, dueCount, dueSoonCount, total };
     }
 
+    return result;
+  }
+
+  async getTeacherClassroomStats(userId: number): Promise<Record<number, { toGradeCount: number }>> {
+    const classrooms = await prisma.classroom.findMany({
+      where: { teacherId: userId },
+      include: {
+        assignments: {
+          include: {
+            submissions: {
+              where: { status: { in: ["submitted", "late"] }, grade: null },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+
+    const result: Record<number, { toGradeCount: number }> = {};
+    for (const classroom of classrooms) {
+      const toGradeCount = classroom.assignments.reduce((sum, a) => sum + a.submissions.length, 0);
+      result[classroom.id] = { toGradeCount };
+    }
     return result;
   }
 

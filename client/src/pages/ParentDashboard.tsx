@@ -62,6 +62,7 @@ import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
 import ClassroomCard from "@/components/ClassroomCard";
+import type { ClassroomNotificationsMap } from "@/lib/classroomNotifications";
 import type {
   Student,
   Assignment,
@@ -333,6 +334,14 @@ export default function ParentDashboard() {
     queries: students.map((child) => ({
       queryKey: ["/api/classrooms/parent", child.id],
       queryFn: () => apiRequest(`/api/classrooms/parent/${child.id}`) as Promise<Classroom[]>,
+      enabled: students.length > 0,
+    })),
+  });
+
+  const childNotificationQueries = useQueries({
+    queries: students.map((child) => ({
+      queryKey: ["/api/students", child.id, "classroom-notifications"],
+      queryFn: () => apiRequest(`/api/students/${child.id}/classroom-notifications`) as Promise<ClassroomNotificationsMap>,
       enabled: students.length > 0,
     })),
   });
@@ -941,6 +950,7 @@ export default function ParentDashboard() {
                   )}
                   {students.map((child, i) => {
                     const childClassrooms = (childClassroomQueries[i]?.data ?? []) as Classroom[];
+                    const childNotifMap = (childNotificationQueries[i]?.data ?? {}) as ClassroomNotificationsMap;
                     return (
                       <div key={child.id} className="space-y-3">
                         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -956,6 +966,7 @@ export default function ParentDashboard() {
                                 classroom={c}
                                 href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
                                 ctaLabel="View Grades"
+                                notification={childNotifMap[c.id] ?? null}
                               />
                             ))}
                           </div>

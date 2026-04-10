@@ -3,6 +3,7 @@ import type { ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 export type UrgencyLabel = "overdue" | "due-today" | "due-soon" | "new" | null;
 
 export type ClassroomNotification = {
+  pendingCount: number;
   newCount: number;
   dueCount: number;
   dueSoonCount: number;

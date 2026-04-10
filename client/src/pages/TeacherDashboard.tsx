@@ -78,6 +78,7 @@ import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
 import ClassroomCard from "@/components/ClassroomCard";
+import type { ClassroomNotification } from "@/lib/classroomNotifications";
 import type {
   Session,
   StudentAssignment,
@@ -169,12 +170,16 @@ function TeacherClassroomsTab() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", subject: "", description: "" });
   const { data: classrooms = [], isLoading } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
+  const { data: classroomStats = {} as Record<number, { toGradeCount: number }> } = useQuery<Record<number, { toGradeCount: number }>>({
+    queryKey: ["/api/teacher/classroom-stats"],
+  });
   const createMutation = useMutation({
     mutationFn: () => apiRequest("/api/classrooms", { method: "POST", body: JSON.stringify(form) }),
     onSuccess: () => {
       setOpen(false);
       setForm({ name: "", subject: "", description: "" });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
       toast({ title: "Classroom created!" });
     },
     onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, type: "error" }),
@@ -208,14 +213,21 @@ function TeacherClassroomsTab() {
           <div className="text-center py-10 text-gray-400 text-sm">No classrooms yet. Create your first classroom to get started.</div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classrooms.map(c => (
-            <ClassroomCard
-              key={c.id}
-              classroom={c}
-              href={`/classrooms/${c.slug ?? c.id}`}
-              ctaLabel="Open Classroom"
-            />
-          ))}
+          {classrooms.map(c => {
+            const stats = classroomStats[c.id];
+            const teacherNotif: ClassroomNotification | null = stats && stats.toGradeCount > 0
+              ? { pendingCount: stats.toGradeCount, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount }
+              : null;
+            return (
+              <ClassroomCard
+                key={c.id}
+                classroom={c}
+                href={`/classrooms/${c.slug ?? c.id}`}
+                ctaLabel="Open Classroom"
+                notification={teacherNotif}
+              />
+            );
+          })}
         </div>
       </CardContent>
     </Card>

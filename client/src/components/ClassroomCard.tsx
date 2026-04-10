@@ -13,12 +13,12 @@ type Props = {
 export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Class", notification }: Props) {
   const theme = getSubjectTheme(c.subject || "");
 
-  const total = notification?.total ?? 0;
+  const pendingCount = notification?.pendingCount ?? 0;
   const dueCount = notification?.dueCount ?? 0;
   const dueSoonCount = notification?.dueSoonCount ?? 0;
   const newCount = notification?.newCount ?? 0;
 
-  const showBadge = total > 0;
+  const showBadge = pendingCount > 0;
   const badgeIsRed = dueCount > 0;
   const badgeIsAmber = !badgeIsRed && dueSoonCount > 0;
   const badgeIsGreen = !badgeIsRed && !badgeIsAmber && newCount > 0;
@@ -29,9 +29,9 @@ export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Cl
       ? "bg-amber-500"
       : badgeIsGreen
         ? "bg-green-500"
-        : "bg-gray-400";
+        : "bg-primary";
 
-  const badgeLabel = total > 9 ? "9+" : String(total);
+  const badgeLabel = pendingCount > 9 ? "9+" : String(pendingCount);
 
   return (
     <button

@@ -1414,6 +1414,16 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.get("/api/teacher/classroom-stats", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const stats = await storage.getTeacherClassroomStats(userId);
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/students/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
