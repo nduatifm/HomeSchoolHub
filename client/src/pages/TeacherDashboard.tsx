@@ -1179,68 +1179,95 @@ export default function TeacherDashboard() {
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="students">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Students</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Grade</TableHead>
-                        <TableHead>Parent</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {students.map((s: any) => (
-                        <TableRow
-                          key={s.id}
-                          data-testid={`row-student-${s.id}`}
-                        >
-                          <TableCell data-testid={`text-student-name-${s.id}`}>
-                            {s.name}
-                          </TableCell>
-                          <TableCell>{s.email}</TableCell>
-                          <TableCell>{s.gradeLevel || "-"}</TableCell>
-                          <TableCell>
-                            {s.parentName ? (
-                              <span className="text-sm text-muted-foreground">{s.parentName}</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground/50 italic">Unknown</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {s.parentId && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-muted-foreground hover:text-primary"
-                                onClick={() => {
-                                  setSendMessageReceiverId(s.parentId as number);
-                                  setSendMessageReceiverName(s.parentName ?? "");
-                                  setSendMessageOpen(true);
-                                }}
-                                data-testid={`button-message-parent-${s.id}`}
-                              >
-                                <MessageSquare className="w-3.5 h-3.5 mr-1" />
-                                Message parent
-                              </Button>
-                            )}
-                          </TableCell>
+              <div className="space-y-4">
+                {/* Quick actions bar */}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setCreateAssignmentOpen(true)} data-testid="button-create-assignment">
+                    + Assignment
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setUploadMaterialOpen(true)} data-testid="button-upload-material">
+                    + Material
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setCreateScheduleOpen(true)} data-testid="button-create-schedule">
+                    + Schedule
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setMarkAttendanceOpen(true)} data-testid="button-mark-attendance">
+                    Mark Attendance
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setCreateReportOpen(true)} data-testid="button-create-report">
+                    + Progress Report
+                  </Button>
+                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Students</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Grade</TableHead>
+                          <TableHead>Parent</TableHead>
+                          <TableHead></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {students.map((s: any) => (
+                          <TableRow
+                            key={s.id}
+                            data-testid={`row-student-${s.id}`}
+                          >
+                            <TableCell data-testid={`text-student-name-${s.id}`}>
+                              {s.name}
+                            </TableCell>
+                            <TableCell>{s.email}</TableCell>
+                            <TableCell>{s.gradeLevel || "-"}</TableCell>
+                            <TableCell>
+                              {s.parentName ? (
+                                <span className="text-sm text-muted-foreground">{s.parentName}</span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/50 italic">Unknown</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {s.parentId && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-muted-foreground hover:text-primary"
+                                    onClick={() => {
+                                      setSendMessageReceiverId(s.parentId as number);
+                                      setSendMessageReceiverName(s.parentName ?? "");
+                                      setSendMessageOpen(true);
+                                    }}
+                                    data-testid={`button-message-parent-${s.id}`}
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                                    Message parent
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-muted-foreground hover:text-primary"
+                                  onClick={() => setCreateScheduleOpen(true)}
+                                  data-testid={`button-schedule-student-${s.id}`}
+                                >
+                                  Schedule
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
-
-{/* sessions tab — handled by session sub-components */}
-
-{/* schedule tab — handled by TeacherCreateScheduleDialog and TeacherEditScheduleDialog sub-components */}
 
             <TabsContent value="feedback">
               <Card>
