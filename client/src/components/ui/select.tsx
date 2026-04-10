@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 
@@ -7,8 +7,9 @@ interface SelectContextType {
   onValueChange: (value: string) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
+  labeledValue: string;
   label: string;
-  setLabel: (label: string) => void;
+  setLabelFor: (value: string, label: string) => void;
 }
 
 const SelectContext = createContext<SelectContextType | undefined>(undefined);
@@ -23,14 +24,16 @@ export function Select({
   onValueChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [labeledValue, setLabeledValue] = useState("");
   const [label, setLabel] = useState("");
 
-  useEffect(() => {
-    if (!value) setLabel("");
-  }, [value]);
+  const setLabelFor = (v: string, l: string) => {
+    setLabeledValue(v);
+    setLabel(l);
+  };
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, label, setLabel }}>
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, labeledValue, label, setLabelFor }}>
       <div className="relative">
         {children}
       </div>
@@ -70,7 +73,10 @@ export function SelectValue({ placeholder }: { placeholder?: string }) {
   const context = useContext(SelectContext);
   if (!context) throw new Error("SelectValue must be used within Select");
 
-  const display = context.label || context.value;
+  const display =
+    context.value && context.labeledValue === context.value
+      ? context.label || context.value
+      : context.value;
 
   return (
     <span className={display ? undefined : "text-muted-foreground"}>
@@ -119,9 +125,9 @@ export function SelectItem({
         context.value === value && "bg-accent"
       )}
       onClick={() => {
-        context.onValueChange(value);
         const resolvedLabel = textValue ?? (typeof children === "string" ? children : "");
-        context.setLabel(resolvedLabel);
+        context.setLabelFor(value, resolvedLabel);
+        context.onValueChange(value);
         context.setOpen(false);
       }}
     >
