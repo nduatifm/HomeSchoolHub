@@ -1012,7 +1012,7 @@ function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived
   );
 }
 
-function ClassworkTab({ classroomId, classroomSlug, isTeacher, isArchived }: { classroomId: number; classroomSlug: string | number; isTeacher: boolean; isArchived: boolean }) {
+function ClassworkTab({ classroomId, classroomSlug, isTeacher, isStudent, isArchived }: { classroomId: number; classroomSlug: string | number; isTeacher: boolean; isStudent: boolean; isArchived: boolean }) {
   const [createOpen, setCreateOpen] = useState(false);
   const { data: classwork = [], isLoading } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
@@ -1025,7 +1025,7 @@ function ClassworkTab({ classroomId, classroomSlug, isTeacher, isArchived }: { c
   const { data: mySubmissions } = useQuery<ClassroomSubmission[]>({
     queryKey: ["/api/classrooms", classroomId, "my-submissions"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/my-submissions`),
-    enabled: !isTeacher,
+    enabled: isStudent,
   });
 
   return (
@@ -1573,7 +1573,7 @@ export default function ClassroomDetail() {
           {activeTab === "assignments" && isStudent && <StudentAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} studentId={studentData?.id ?? 0} isArchived={isArchived} />}
           {activeTab === "grades" && isTeacher && <TeacherGradesTab classroomId={classroomId} />}
           {activeTab === "grades" && isParent && <ParentGradesTab classroomId={classroomId} studentId={parentStudentId} />}
-          {activeTab === "classwork" && <ClassworkTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isTeacher={isTeacher} isArchived={isArchived} />}
+          {activeTab === "classwork" && <ClassworkTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isTeacher={isTeacher} isStudent={isStudent} isArchived={isArchived} />}
           {activeTab === "students" && isTeacher && <StudentsTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} />}
 
         </div>
