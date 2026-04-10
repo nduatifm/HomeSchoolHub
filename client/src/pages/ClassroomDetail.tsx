@@ -1222,6 +1222,15 @@ function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchiv
           const accent = accentColors[index % accentColors.length];
           const bgHover = bgHovers[index % bgHovers.length];
 
+          const dueSoonDays = (() => {
+            if (urgency !== "due-soon" || !a.dueDate) return 0;
+            const due = new Date(a.dueDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            due.setHours(0, 0, 0, 0);
+            return Math.round((due.getTime() - today.getTime()) / 86400000);
+          })();
+
           return (
             <div
               key={a.id}
@@ -1235,9 +1244,9 @@ function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchiv
                       onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
                       className="font-semibold text-sm text-foreground hover:text-primary text-left transition-colors leading-snug"
                     >{a.title}</button>
-                    {urgency === "overdue"   && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">Overdue</span>}
-                    {urgency === "due-today" && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">Due Today</span>}
-                    {urgency === "due-soon"  && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-yellow-100 text-yellow-700">Due Soon</span>}
+                    {urgency === "overdue"   && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-red-100 text-red-700 hover:bg-red-100 border-0">Overdue</Badge>}
+                    {urgency === "due-today" && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0">Due Today</Badge>}
+                    {urgency === "due-soon"  && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-0">in {dueSoonDays} day{dueSoonDays !== 1 ? "s" : ""}</Badge>}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
