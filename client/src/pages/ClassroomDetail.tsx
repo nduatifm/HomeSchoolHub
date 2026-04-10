@@ -236,7 +236,7 @@ function TabNav({
   active,
   onChange,
 }: {
-  tabs: { value: string; label: string; icon: React.ReactNode }[];
+  tabs: { value: string; label: string; icon: React.ReactNode; badge?: number }[];
   active: string;
   onChange: (v: string) => void;
 }) {
@@ -254,6 +254,11 @@ function TabNav({
         >
           {t.icon}
           {t.label}
+          {!!t.badge && t.badge > 0 && (
+            <span className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white bg-red-500 flex items-center justify-center leading-none">
+              {t.badge > 9 ? "9+" : t.badge}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -1392,6 +1397,23 @@ export default function ClassroomDetail() {
     enabled: user?.role === "student",
   });
 
+  // Badge counts for student tab pills — share cache with child component queries
+  const { data: _badgeAssignments = [] } = useQuery<ClassroomAssignment[]>({
+    queryKey: ["/api/classrooms", classroomId, "assignments"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
+    enabled: user?.role === "student" && classroomId > 0,
+  });
+  const { data: _badgeSubmissions = [] } = useQuery<ClassroomSubmission[]>({
+    queryKey: ["/api/classrooms", classroomId, "my-submissions"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/my-submissions`),
+    enabled: user?.role === "student" && classroomId > 0,
+  });
+  const { data: _badgeMaterials = [] } = useQuery<ClassroomMaterial[]>({
+    queryKey: ["/api/classrooms", classroomId, "materials"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
+    enabled: user?.role === "student" && classroomId > 0,
+  });
+
   const archiveMutation = useMutation({
     mutationFn: (status: "active" | "archived") =>
       apiRequest(`/api/classrooms/${classroomId}`, { method: "PATCH", body: JSON.stringify({ status }) }),
@@ -1429,6 +1451,23 @@ export default function ClassroomDetail() {
   const isArchived = classroom.status === "archived";
   const theme = getSubjectTheme(classroom.subject || "");
 
+  // Count pending (unsubmitted) assignments for the student tab badges
+  const assignmentsBadge = isStudent
+    ? _badgeAssignments.filter((a) => {
+        const sub = _badgeSubmissions.find((s) => s.assignmentId === a.id);
+        return !sub || sub.status === "pending";
+      }).length
+    : 0;
+
+  // Count classwork materials that have a linked assignment still pending
+  const classworkBadge = isStudent
+    ? _badgeMaterials.filter((m) => {
+        if (!m.linkedAssignment?.id) return false;
+        const sub = _badgeSubmissions.find((s) => s.assignmentId === m.linkedAssignment!.id);
+        return !sub || sub.status === "pending";
+      }).length
+    : 0;
+
   const teacherTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
     { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" /> },
@@ -1438,8 +1477,8 @@ export default function ClassroomDetail() {
   ];
   const studentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
-    { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" /> },
-    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
+    { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" />, badge: assignmentsBadge || undefined },
+    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
   ];
   const parentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
