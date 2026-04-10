@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { classifyAssignment } from "@/lib/classroomNotifications";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1215,7 +1216,8 @@ function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchiv
       <div className="space-y-2.5">
         {assignments.map((a, index) => {
           const sub = subMap[a.id];
-          const isOverdue = !sub && new Date(a.dueDate) < new Date();
+          const classroomStatus = isArchived ? "archived" : "active";
+          const urgency = classifyAssignment(a, mySubmissions, classroomStatus);
           const emoji = taskEmojis[index % taskEmojis.length];
           const accent = accentColors[index % accentColors.length];
           const bgHover = bgHovers[index % bgHovers.length];
@@ -1228,14 +1230,17 @@ function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchiv
               <div className="flex items-center gap-4 px-4 py-3.5">
                 <span className="text-2xl select-none shrink-0 leading-none">{emoji}</span>
                 <div className="flex-1 min-w-0">
-                  <button
-                    onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
-                    className="font-semibold text-sm text-foreground hover:text-primary text-left transition-colors leading-snug"
-                  >{a.title}</button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
+                      className="font-semibold text-sm text-foreground hover:text-primary text-left transition-colors leading-snug"
+                    >{a.title}</button>
+                    {urgency === "overdue"   && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">Overdue</span>}
+                    {urgency === "due-today" && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">Due Today</span>}
+                    {urgency === "due-soon"  && <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-yellow-100 text-yellow-700">Due Soon</span>}
+                  </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className={`text-xs ${isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground"}`}>
-                      {isOverdue ? "Overdue" : `Due ${a.dueDate}`}
-                    </span>
+                    <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
                     <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
                     {sub && <StatusBadge status={sub.status} />}
                     {sub?.grade !== null && sub?.grade !== undefined && (

@@ -24,6 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ClassroomCard from "@/components/ClassroomCard";
+import { buildNotifMap } from "@/lib/classroomNotifications";
 import type { Assignment, StudentAssignment, Session, Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 
 type AssignmentWithStatus = Assignment & {
@@ -118,6 +119,18 @@ export default function StudentDashboard() {
       enabled: classrooms.length > 0,
     })),
   });
+
+  const notifQueriesLoading =
+    classroomAssignmentQueries.some((q) => q.isLoading) ||
+    classroomSubmissionQueries.some((q) => q.isLoading);
+
+  const notifMap = notifQueriesLoading
+    ? {}
+    : buildNotifMap(
+        classrooms,
+        classroomAssignmentQueries.map((q) => q.data as ClassroomAssignment[] | undefined),
+        classroomSubmissionQueries.map((q) => q.data as ClassroomSubmission[] | undefined),
+      );
 
   const pendingClassworkItems: ClassworkItem[] = classrooms.flatMap((c, i) => {
     const cwAssignments: ClassroomAssignment[] = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];
@@ -423,6 +436,7 @@ export default function StudentDashboard() {
                       key={c.id}
                       classroom={c}
                       href={`/classrooms/${c.slug ?? c.id}`}
+                      notification={notifMap[c.id] ?? null}
                     />
                   ))}
                 </div>

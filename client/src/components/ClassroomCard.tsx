@@ -1,20 +1,35 @@
 import { ChevronRight } from "lucide-react";
 import { getSubjectTheme } from "@/lib/subjectTheme";
 import type { Classroom } from "@shared/schema";
+import type { NotificationSummary } from "@/lib/classroomNotifications";
 
 type Props = {
   classroom: Classroom;
   href: string;
   ctaLabel?: string;
+  notification?: NotificationSummary;
 };
 
-export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Class" }: Props) {
+export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Class", notification }: Props) {
   const theme = getSubjectTheme(c.subject || "");
+
+  const showBadge = notification?.worstLabel != null;
+  const badgeIsRed = notification?.worstLabel === "overdue";
+  const badgeCount = badgeIsRed ? (notification?.overdueCount ?? 0) : (notification?.urgentCount ?? 0);
+  const badgeLabel = badgeCount > 9 ? "9+" : String(badgeCount);
+
   return (
     <button
-      className={`text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] ${theme.bg} group w-full`}
+      className={`relative text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] ${theme.bg} group w-full`}
       onClick={() => { window.location.href = href; }}
     >
+      {showBadge && (
+        <span
+          className={`absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm ${badgeIsRed ? "bg-red-500" : "bg-amber-500"}`}
+        >
+          {badgeLabel}
+        </span>
+      )}
       <div className="w-full h-24 shrink-0 overflow-hidden">
         {theme.banner}
       </div>
