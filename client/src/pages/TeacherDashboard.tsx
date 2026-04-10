@@ -346,6 +346,223 @@ function TeacherGradeDialog({
   );
 }
 
+// ── Give-feedback dialog (isolated so typing doesn't re-render parent) ─────
+function TeacherGiveFeedbackDialog({
+  open,
+  onClose,
+  students,
+}: {
+  open: boolean;
+  onClose: () => void;
+  students: any[];
+}) {
+  const { toast } = useToast();
+  const form = useForm({
+    resolver: zodResolver(feedbackSchema),
+    defaultValues: { studentId: 0, message: "", type: "general" },
+  });
+  const mutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest("/api/feedback", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/feedback/teacher"] });
+      toast({ title: "Feedback sent!", type: "success" });
+      form.reset();
+      onClose();
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Give Student Feedback</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit((data) => mutation.mutate(data))}
+            className="space-y-4"
+          >
+            <FormField
+              control={form.control}
+              name="studentId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Student</FormLabel>
+                  <FormControl>
+                    <Select
+                      onValueChange={(v) => field.onChange(parseInt(v))}
+                      value={field.value ? field.value.toString() : ""}
+                    >
+                      <SelectTrigger data-testid="select-feedback-student">
+                        <SelectValue placeholder="Select a student" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {students.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id.toString()}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Feedback Type</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger data-testid="select-feedback-type">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="positive">Positive</SelectItem>
+                        <SelectItem value="constructive">Constructive</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="message"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Message</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Enter your feedback..."
+                      rows={4}
+                      {...field}
+                      data-testid="input-feedback-message"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button
+              type="submit"
+              disabled={mutation.isPending}
+              className="w-full"
+              data-testid="button-submit-feedback"
+            >
+              {mutation.isPending ? "Sending..." : "Send Feedback"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Send-message dialog (isolated so typing doesn't re-render parent) ──────
+function TeacherSendMessageDialog({
+  open,
+  onClose,
+  users,
+  initialReceiverId,
+  initialReceiverName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  users: any[];
+  initialReceiverId?: number;
+  initialReceiverName?: string;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    receiverId: 0,
+    receiverName: "",
+    content: "",
+  });
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        receiverId: initialReceiverId ?? 0,
+        receiverName: initialReceiverName ?? "",
+        content: "",
+      });
+    }
+  }, [open, initialReceiverId, initialReceiverName]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest("/api/messages", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+      toast({ title: "Message sent!", type: "success" });
+      onClose();
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send Message</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">To</label>
+            {form.receiverId ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/40 text-sm">
+                <span className="font-medium">
+                  {form.receiverName || users.find((u) => u.id === form.receiverId)?.name || "Unknown user"}
+                </span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {users.find((u) => u.id === form.receiverId)?.email}
+                </span>
+              </div>
+            ) : (
+              <ModernCombobox
+                users={users}
+                selectedUserId={form.receiverId}
+                onSelect={(userId) => setForm({ ...form, receiverId: userId })}
+                placeholder="Search users..."
+                testId="select-receiver-teacher"
+              />
+            )}
+          </div>
+          <div>
+            <label className="text-sm font-medium">Message</label>
+            <Textarea
+              placeholder="Type your message..."
+              value={form.content}
+              onChange={(e) => setForm({ ...form, content: e.target.value })}
+              rows={4}
+              data-testid="input-message-content"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => mutation.mutate(form)}
+              disabled={mutation.isPending || !form.receiverId || !form.content}
+              data-testid="button-send-message"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {mutation.isPending ? "Sending..." : "Send"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function TeacherDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -822,27 +1039,9 @@ export default function TeacherDashboard() {
     }
   }, [students]);
 
-  // Send message
-  const [messageForm, setMessageForm] = useState({
-    receiverId: 0,
-    receiverName: "",
-    content: "",
-  });
-
-  const sendMessageMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/messages", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
-      toast({ title: "Message sent!", type: "success" });
-      setMessageForm({ receiverId: 0, receiverName: "", content: "" });
-      setSendMessageOpen(false);
-    },
-  });
+  // Send message — state lives in TeacherSendMessageDialog; parent only tracks receiver for pre-fill
+  const [sendMessageReceiverId, setSendMessageReceiverId] = useState(0);
+  const [sendMessageReceiverName, setSendMessageReceiverName] = useState("");
 
   // Generate progress report
   const [reportForm, setReportForm] = useState({
@@ -958,25 +1157,7 @@ export default function TeacherDashboard() {
     },
   });
 
-  // Give feedback
-  const feedbackForm = useForm({
-    resolver: zodResolver(feedbackSchema),
-    defaultValues: { studentId: 0, message: "", type: "general" },
-  });
-
-  const giveFeedbackMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/feedback", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/feedback/teacher"] });
-      toast({ title: "Feedback sent!", type: "success" });
-      feedbackForm.reset();
-      setGiveFeedbackOpen(false);
-    },
-  });
+  // Give feedback — form state lives in TeacherGiveFeedbackDialog
 
   // Mark attendance
   const attendanceForm = useForm({
@@ -1082,7 +1263,8 @@ export default function TeacherDashboard() {
                                 variant="ghost"
                                 className="h-7 px-2 text-muted-foreground hover:text-primary"
                                 onClick={() => {
-                                  setMessageForm({ receiverId: s.parentId, receiverName: s.parentName ?? "", content: "" });
+                                  setSendMessageReceiverId(s.parentId as number);
+                                  setSendMessageReceiverName(s.parentName ?? "");
                                   setSendMessageOpen(true);
                                 }}
                                 data-testid={`button-message-parent-${s.id}`}
@@ -1977,122 +2159,13 @@ export default function TeacherDashboard() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Student Feedback</CardTitle>
-                  <Dialog
-                    open={giveFeedbackOpen}
-                    onOpenChange={setGiveFeedbackOpen}
+                  <Button
+                    onClick={() => setGiveFeedbackOpen(true)}
+                    data-testid="button-give-feedback"
                   >
-                    <DialogTrigger asChild>
-                      <Button data-testid="button-give-feedback">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Give Feedback
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Give Student Feedback</DialogTitle>
-                      </DialogHeader>
-                      <Form {...feedbackForm}>
-                        <form
-                          onSubmit={feedbackForm.handleSubmit((data) =>
-                            giveFeedbackMutation.mutate(data),
-                          )}
-                          className="space-y-4"
-                        >
-                          <FormField
-                            control={feedbackForm.control}
-                            name="studentId"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Student</FormLabel>
-                                <FormControl>
-                                  <Select
-                                    onValueChange={(v) =>
-                                      field.onChange(parseInt(v))
-                                    }
-                                    value={field.value ? field.value.toString() : ""}
-                                  >
-                                    <SelectTrigger data-testid="select-feedback-student">
-                                      <SelectValue placeholder="Select a student" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {students.map((s: any) => (
-                                        <SelectItem
-                                          key={s.id}
-                                          value={s.id.toString()}
-                                        >
-                                          {s.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={feedbackForm.control}
-                            name="type"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Feedback Type</FormLabel>
-                                <FormControl>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                  >
-                                    <SelectTrigger data-testid="select-feedback-type">
-                                      <SelectValue placeholder="Select type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="positive">
-                                        Positive
-                                      </SelectItem>
-                                      <SelectItem value="constructive">
-                                        Constructive
-                                      </SelectItem>
-                                      <SelectItem value="general">
-                                        General
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={feedbackForm.control}
-                            name="message"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Message</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Enter your feedback..."
-                                    rows={4}
-                                    {...field}
-                                    data-testid="input-feedback-message"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <Button
-                            type="submit"
-                            disabled={giveFeedbackMutation.isPending}
-                            className="w-full"
-                            data-testid="button-submit-feedback"
-                          >
-                            {giveFeedbackMutation.isPending
-                              ? "Sending..."
-                              : "Send Feedback"}
-                          </Button>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Give Feedback
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {feedbacksQuery.isLoading ? (
@@ -2863,66 +2936,20 @@ export default function TeacherDashboard() {
         onClose={() => { setGradeDialogOpen(false); setSelectedSubmission(null); }}
       />
 
+      <TeacherGiveFeedbackDialog
+        open={giveFeedbackOpen}
+        onClose={() => setGiveFeedbackOpen(false)}
+        students={students}
+      />
+
       {/* Standalone send-message dialog — opened by "Message parent" button in students tab */}
-      <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Message</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">To</label>
-              {messageForm.receiverId ? (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/40 text-sm">
-                  <span className="font-medium">
-                    {messageForm.receiverName || users.find((u) => u.id === messageForm.receiverId)?.name || "Unknown user"}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {users.find((u) => u.id === messageForm.receiverId)?.email}
-                  </span>
-                </div>
-              ) : (
-                <ModernCombobox
-                  users={users}
-                  selectedUserId={messageForm.receiverId}
-                  onSelect={(userId) => setMessageForm({ ...messageForm, receiverId: userId })}
-                  placeholder="Search users..."
-                  testId="select-receiver-teacher"
-                />
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium">Message</label>
-              <Textarea
-                placeholder="Type your message..."
-                value={messageForm.content}
-                onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-                rows={4}
-                data-testid="input-message-content"
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSendMessageOpen(false);
-                  setMessageForm({ receiverId: 0, receiverName: "", content: "" });
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => sendMessageMutation.mutate(messageForm)}
-                disabled={sendMessageMutation.isPending || !messageForm.receiverId || !messageForm.content}
-                data-testid="button-send-message"
-              >
-                <Send className="w-4 h-4 mr-2" />
-                {sendMessageMutation.isPending ? "Sending..." : "Send"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TeacherSendMessageDialog
+        open={sendMessageOpen}
+        onClose={() => setSendMessageOpen(false)}
+        users={users}
+        initialReceiverId={sendMessageReceiverId}
+        initialReceiverName={sendMessageReceiverName}
+      />
     </div>
   );
 }

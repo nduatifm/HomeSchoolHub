@@ -544,7 +544,7 @@ export default function AdminUsers() {
                         <div className="px-3 py-2 text-xs text-muted-foreground">No parent accounts found</div>
                       ) : (
                         parentUsers.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
+                          <SelectItem key={p.id} value={p.id.toString()} textValue={p.name}>
                             <span className="font-medium">{p.name}</span>
                             <span className="text-xs text-muted-foreground ml-1.5">{p.email}</span>
                           </SelectItem>

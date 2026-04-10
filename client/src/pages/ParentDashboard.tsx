@@ -761,7 +761,7 @@ export default function ParentDashboard() {
                               </SelectTrigger>
                               <SelectContent>
                                 {user?.roles?.includes("teacher") && user?.id && (
-                                  <SelectItem key="self" value={user.id.toString()}>
+                                  <SelectItem key="self" value={user.id.toString()} textValue="Myself (as teacher)">
                                     <span className="font-medium">Myself (as teacher)</span>
                                     {tutorRequestForm.studentId && (() => {
                                       const selectedStudent = students.find((s: any) => s.id === tutorRequestForm.studentId);
@@ -774,7 +774,7 @@ export default function ParentDashboard() {
                                   </SelectItem>
                                 )}
                                 {teachers.filter((t: any) => t.id !== user?.id).map((t: any) => (
-                                  <SelectItem key={t.id} value={t.id.toString()}>
+                                  <SelectItem key={t.id} value={t.id.toString()} textValue={t.name}>
                                     <span className="font-medium">{t.name}</span>
                                     {(t.teachingSubjects?.length > 0 || t.yearsExperience) && (
                                       <span className="text-xs text-muted-foreground ml-1.5">
