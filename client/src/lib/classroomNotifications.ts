@@ -4,6 +4,8 @@ export type UrgencyLabel = "overdue" | "due-today" | "due-soon" | "new" | null;
 
 export type ClassroomNotification = {
   pendingCount: number;
+  newMaterialsCount: number;
+  newPostsCount: number;
   newCount: number;
   dueCount: number;
   dueSoonCount: number;

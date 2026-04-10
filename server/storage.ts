@@ -304,11 +304,13 @@ export interface IStorage {
 
   getClassroomNotificationsForStudent(studentId: number): Promise<Record<number, {
     pendingCount: number;
+    newMaterialsCount: number;
+    newPostsCount: number;
     newCount: number;
     dueCount: number;
     dueSoonCount: number;
     total: number;
-  }>>;
+  }>>; // pendingCount = assignments pending + new materials + new posts
 
   getTeacherClassroomStats(userId: number): Promise<Record<number, { toGradeCount: number }>>;
 }
@@ -1733,6 +1735,8 @@ class PrismaStorage implements IStorage {
             assignments: {
               include: { submissions: true };
             };
+            materials: { select: { id: true; assignmentId: true; uploadedAt: true } };
+            posts: { select: { id: true; createdAt: true } };
           };
         };
       };
@@ -1751,17 +1755,19 @@ class PrismaStorage implements IStorage {
             assignments: {
               include: { submissions: { where: { studentId } } },
             },
+            materials: { select: { id: true, assignmentId: true, uploadedAt: true } },
+            posts: { select: { id: true, createdAt: true } },
           },
         },
       },
     });
 
-    const result: Record<number, { pendingCount: number; newCount: number; dueCount: number; dueSoonCount: number; total: number }> = {};
+    const result: Record<number, { pendingCount: number; newMaterialsCount: number; newPostsCount: number; newCount: number; dueCount: number; dueSoonCount: number; total: number }> = {};
 
     for (const enrollment of enrollments) {
       const classroom = enrollment.classroom;
       if (classroom.status === "archived") {
-        result[classroom.id] = { pendingCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: 0 };
+        result[classroom.id] = { pendingCount: 0, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: 0 };
         continue;
       }
 
@@ -1797,8 +1803,17 @@ class PrismaStorage implements IStorage {
         }
       }
 
+      // Count new classwork materials (without linked assignment) uploaded in the last 7 days
+      const newMaterialsCount = classroom.materials.filter((m) => {
+        if (m.assignmentId) return false; // linked materials count via assignment pendingCount
+        return new Date(m.uploadedAt) >= sevenDaysAgo;
+      }).length;
+
+      // Count new feed posts created in the last 7 days
+      const newPostsCount = classroom.posts.filter((p) => new Date(p.createdAt) >= sevenDaysAgo).length;
+
       const total = newCount + dueCount + dueSoonCount;
-      result[classroom.id] = { pendingCount, newCount, dueCount, dueSoonCount, total };
+      result[classroom.id] = { pendingCount: pendingCount + newMaterialsCount + newPostsCount, newMaterialsCount, newPostsCount, newCount, dueCount, dueSoonCount, total };
     }
 
     return result;

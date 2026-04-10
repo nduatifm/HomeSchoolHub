@@ -216,7 +216,7 @@ function TeacherClassroomsTab() {
           {classrooms.map(c => {
             const stats = classroomStats[c.id];
             const teacherNotif: ClassroomNotification | null = stats && stats.toGradeCount > 0
-              ? { pendingCount: stats.toGradeCount, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount }
+              ? { pendingCount: stats.toGradeCount, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount }
               : null;
             return (
               <ClassroomCard
