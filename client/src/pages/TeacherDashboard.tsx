@@ -1266,6 +1266,93 @@ export default function TeacherDashboard() {
                     </Table>
                   </CardContent>
                 </Card>
+
+                {/* Assignments list — edit existing */}
+                {assignments.length > 0 && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between py-3">
+                      <CardTitle className="text-base">Assignments</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        {(assignments as any[]).map((a: any) => (
+                          <div key={a.id} className="flex items-center justify-between p-2 rounded border border-border">
+                            <div>
+                              <p className="text-sm font-medium">{a.title}</p>
+                              <p className="text-xs text-muted-foreground">{a.subject} · Due: {a.dueDate ?? "—"}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => { setEditingAssignment(a); setEditAssignmentOpen(true); }}
+                              data-testid={`button-edit-assignment-${a.id}`}
+                            >
+                              Edit
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Materials list — edit existing */}
+                {materials.length > 0 && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between py-3">
+                      <CardTitle className="text-base">Materials</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        {(materials as any[]).map((m: any) => (
+                          <div key={m.id} className="flex items-center justify-between p-2 rounded border border-border">
+                            <div>
+                              <p className="text-sm font-medium">{m.title}</p>
+                              <p className="text-xs text-muted-foreground">{m.subject}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => { setEditingMaterial(m); setEditMaterialOpen(true); }}
+                              data-testid={`button-edit-material-${m.id}`}
+                            >
+                              Edit
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Schedules list — edit existing */}
+                {schedules.length > 0 && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between py-3">
+                      <CardTitle className="text-base">Schedules</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        {schedules.map((s: any) => (
+                          <div key={s.id} className="flex items-center justify-between p-2 rounded border border-border">
+                            <div>
+                              <p className="text-sm font-medium">{s.studentName ?? s.studentId} · {s.dayOfWeek}</p>
+                              <p className="text-xs text-muted-foreground">{s.startTime}–{s.endTime} · {s.subject}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => { setEditingSchedule(s); setEditScheduleOpen(true); }}
+                              data-testid={`button-edit-schedule-${s.id}`}
+                            >
+                              Edit
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </TabsContent>
 
