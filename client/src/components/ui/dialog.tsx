@@ -113,6 +113,14 @@ export function DialogContent({
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  // Keep a stable ref to setOpen so the focus effect never needs it as a dep.
+  // This prevents the effect from re-running (and stealing focus) on every render
+  // that produces a new setOpen reference (e.g. every keystroke in a form field).
+  const setOpenRef = useRef(setOpen);
+  useEffect(() => {
+    setOpenRef.current = setOpen;
+  });
+
   // Lock body scroll while open
   useEffect(() => {
     if (!open) return;
@@ -123,20 +131,22 @@ export function DialogContent({
     };
   }, [open]);
 
-  // Close on Escape; trap focus inside the panel
+  // Close on Escape; trap focus inside the panel.
+  // Depends only on `open` — NOT on setOpen — so it only fires when the dialog
+  // actually opens or closes, never on intermediate re-renders while open.
   useEffect(() => {
     if (!open) return;
 
     // Save the element that was focused before the dialog opened
     previouslyFocused.current = document.activeElement as HTMLElement;
 
-    // Move focus into the panel
+    // Move focus into the panel (only runs on open transition, not on re-renders)
     panelRef.current?.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        setOpen(false);
+        setOpenRef.current(false);
         return;
       }
 
@@ -168,7 +178,7 @@ export function DialogContent({
       // Restore focus to the element that triggered the dialog
       previouslyFocused.current?.focus();
     };
-  }, [open, setOpen]);
+  }, [open]);
 
   if (!open) return null;
 
