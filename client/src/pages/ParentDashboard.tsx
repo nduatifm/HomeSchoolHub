@@ -121,6 +121,142 @@ const ratingSchema = z.object({
 
 const PARENT_TABS = ["children", "classrooms", "tutors", "invites", "reports", "messages"];
 
+function ParentRequestTutorDialog({
+  open,
+  onClose,
+  students,
+  teachers,
+}: {
+  open: boolean;
+  onClose: () => void;
+  students: any[];
+  teachers: any[];
+}) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    teacherId: null as number | null,
+    message: "",
+    studentId: null as number | null,
+  });
+
+  const mutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest("/api/tutor-requests", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tutor-requests/parent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teachers/student"] });
+      const approved = data?.status === "approved";
+      toast({
+        title: approved ? "Teacher assigned!" : "Request sent!",
+        description: approved
+          ? "Your child has been linked to the selected teacher."
+          : "Your request has been sent. The teacher will review and approve it shortly.",
+        type: "success",
+      });
+      setForm({ teacherId: null, message: "", studentId: null });
+      onClose();
+    },
+    onError: (err: any) => {
+      const msg = err?.message || "Failed to send request. Please try again.";
+      toast({ title: "Could not send request", description: msg, type: "error" });
+    },
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) { setForm({ teacherId: null, message: "", studentId: null }); onClose(); }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Request a Tutor</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Which child needs a tutor?</label>
+            <Select
+              value={form.studentId?.toString() || ""}
+              onValueChange={(val) => setForm({ ...form, studentId: parseInt(val) })}
+            >
+              <SelectTrigger data-testid="select-student-tutor-request">
+                <SelectValue placeholder="Select a child" />
+              </SelectTrigger>
+              <SelectContent>
+                {students.map((s: any) => (
+                  <SelectItem key={s.id} value={s.id.toString()} textValue={`${s.name}${s.gradeLevel ? ` (Grade ${s.gradeLevel})` : ""}`}>
+                    {s.name} {s.gradeLevel ? `(Grade ${s.gradeLevel})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Which teacher would you like?</label>
+            <Select
+              value={form.teacherId?.toString() || ""}
+              onValueChange={(val) => setForm({ ...form, teacherId: parseInt(val) })}
+            >
+              <SelectTrigger data-testid="select-teacher-tutor-request">
+                <SelectValue placeholder="Select a teacher" />
+              </SelectTrigger>
+              <SelectContent>
+                {user?.roles?.includes("teacher") && user?.id && (
+                  <SelectItem key="self" value={user.id.toString()} textValue="Myself (as teacher)">
+                    <span className="font-medium">Myself (as teacher)</span>
+                    {form.studentId && (() => {
+                      const sel = students.find((s: any) => s.id === form.studentId);
+                      return sel ? (
+                        <span className="text-xs text-muted-foreground ml-1.5">— teach {sel.name}</span>
+                      ) : null;
+                    })()}
+                  </SelectItem>
+                )}
+                {teachers.filter((t: any) => t.id !== user?.id).map((t: any) => (
+                  <SelectItem key={t.id} value={t.id.toString()} textValue={t.name}>
+                    <span className="font-medium">{t.name}</span>
+                    {(t.teachingSubjects?.length > 0 || t.yearsExperience) && (
+                      <span className="text-xs text-muted-foreground ml-1.5">
+                        {[
+                          t.teachingSubjects?.slice(0, 2).join(", "),
+                          t.yearsExperience && `${t.yearsExperience}y exp`,
+                        ].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Message (optional)</label>
+            <Textarea
+              placeholder="Any details about your child's needs, schedule, or subject..."
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              rows={3}
+              data-testid="input-tutor-request-message"
+            />
+          </div>
+          <Button
+            onClick={() => mutation.mutate(form)}
+            disabled={mutation.isPending || !form.studentId || !form.teacherId}
+            className="w-full"
+            data-testid="button-submit-tutor-request"
+          >
+            {mutation.isPending ? "Sending..." : "Send Request"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ParentDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -311,39 +447,6 @@ export default function ParentDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invites/student/parent"] });
       toast({ title: "Invite revoked", type: "success" });
-    },
-  });
-
-  // Request tutor form
-  const [tutorRequestForm, setTutorRequestForm] = useState({
-    teacherId: null as number | null,
-    message: "",
-    studentId: null as number | null,
-  });
-
-  const requestTutorMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/tutor-requests", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tutor-requests/parent"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/teachers/student"] });
-      const approved = data?.status === "approved";
-      toast({
-        title: approved ? "Teacher assigned!" : "Request sent!",
-        description: approved
-          ? "Your child has been linked to the selected teacher."
-          : "Your request has been sent. The teacher will review and approve it shortly.",
-        type: "success",
-      });
-      setTutorRequestForm({ teacherId: null, message: "", studentId: null });
-      setRequestTutorOpen(false);
-    },
-    onError: (err: any) => {
-      const message = err?.message || "Failed to send request. Please try again.";
-      toast({ title: "Could not send request", description: message, type: "error" });
     },
   });
 
@@ -711,118 +814,9 @@ export default function ParentDashboard() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Tutor Requests</CardTitle>
-                    <Dialog
-                      open={requestTutorOpen}
-                      onOpenChange={(open) => {
-                        setRequestTutorOpen(open);
-                        if (!open) setTutorRequestForm({ teacherId: null, message: "", studentId: null });
-                      }}
-                    >
-                      <DialogTrigger asChild>
-                        <Button data-testid="button-request-tutor">
-                          Request Tutor
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Request a Tutor</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-medium">Which child needs a tutor?</label>
-                            <Select
-                              value={tutorRequestForm.studentId?.toString() || ""}
-                              onValueChange={(val) =>
-                                setTutorRequestForm({ ...tutorRequestForm, studentId: parseInt(val) })
-                              }
-                            >
-                              <SelectTrigger data-testid="select-student-tutor-request">
-                                <SelectValue placeholder="Select a child" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {students.map((s: any) => (
-                                  <SelectItem key={s.id} value={s.id.toString()} textValue={`${s.name}${s.gradeLevel ? ` (Grade ${s.gradeLevel})` : ""}`}>
-                                    {s.name} {s.gradeLevel ? `(Grade ${s.gradeLevel})` : ""}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-medium">Which teacher would you like?</label>
-                            <Select
-                              value={tutorRequestForm.teacherId?.toString() || ""}
-                              onValueChange={(val) =>
-                                setTutorRequestForm({ ...tutorRequestForm, teacherId: parseInt(val) })
-                              }
-                            >
-                              <SelectTrigger data-testid="select-teacher-tutor-request">
-                                <SelectValue placeholder="Select a teacher" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {user?.roles?.includes("teacher") && user?.id && (
-                                  <SelectItem key="self" value={user.id.toString()} textValue="Myself (as teacher)">
-                                    <span className="font-medium">Myself (as teacher)</span>
-                                    {tutorRequestForm.studentId && (() => {
-                                      const selectedStudent = students.find((s: any) => s.id === tutorRequestForm.studentId);
-                                      return selectedStudent ? (
-                                        <span className="text-xs text-muted-foreground ml-1.5">
-                                          — teach {selectedStudent.name}
-                                        </span>
-                                      ) : null;
-                                    })()}
-                                  </SelectItem>
-                                )}
-                                {teachers.filter((t: any) => t.id !== user?.id).map((t: any) => (
-                                  <SelectItem key={t.id} value={t.id.toString()} textValue={t.name}>
-                                    <span className="font-medium">{t.name}</span>
-                                    {(t.teachingSubjects?.length > 0 || t.yearsExperience) && (
-                                      <span className="text-xs text-muted-foreground ml-1.5">
-                                        {[
-                                          t.teachingSubjects?.slice(0, 2).join(", "),
-                                          t.yearsExperience && `${t.yearsExperience}y exp`,
-                                        ].filter(Boolean).join(" · ")}
-                                      </span>
-                                    )}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-medium">Message (optional)</label>
-                            <Textarea
-                              placeholder="Any details about your child's needs, schedule, or subject..."
-                              value={tutorRequestForm.message}
-                              onChange={(e) =>
-                                setTutorRequestForm({
-                                  ...tutorRequestForm,
-                                  message: e.target.value,
-                                })
-                              }
-                              rows={3}
-                              data-testid="input-tutor-request-message"
-                            />
-                          </div>
-                          <Button
-                            onClick={() =>
-                              requestTutorMutation.mutate(tutorRequestForm)
-                            }
-                            disabled={
-                              requestTutorMutation.isPending ||
-                              !tutorRequestForm.studentId ||
-                              !tutorRequestForm.teacherId
-                            }
-                            className="w-full"
-                            data-testid="button-submit-tutor-request"
-                          >
-                            {requestTutorMutation.isPending
-                              ? "Sending..."
-                              : "Send Request"}
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                    <Button onClick={() => setRequestTutorOpen(true)} data-testid="button-request-tutor">
+                      Request Tutor
+                    </Button>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
@@ -873,6 +867,12 @@ export default function ParentDashboard() {
                   </CardContent>
                 </Card>
             </TabsContent>
+            <ParentRequestTutorDialog
+              open={requestTutorOpen}
+              onClose={() => setRequestTutorOpen(false)}
+              students={students}
+              teachers={teachers}
+            />
 
             <TabsContent value="reports">
               <Card>
