@@ -346,6 +346,247 @@ function TeacherGradeDialog({
   );
 }
 
+// ── Create-schedule dialog ────────────────────────────────────────────────
+function TeacherCreateScheduleDialog({
+  open,
+  onClose,
+  students,
+}: {
+  open: boolean;
+  onClose: () => void;
+  students: any[];
+}) {
+  const { toast } = useToast();
+  const form = useForm({
+    resolver: zodResolver(scheduleSchema),
+    defaultValues: { studentId: 0, dayOfWeek: "", startTime: "", endTime: "", subject: "" },
+  });
+  const mutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest("/api/schedules", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
+      toast({ title: "Schedule created!", type: "success" });
+      form.reset();
+      onClose();
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Create New Schedule</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
+            <FormField control={form.control} name="studentId" render={({ field }) => (
+              <FormItem><FormLabel>Student</FormLabel><FormControl>
+                <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value ? field.value.toString() : ""}>
+                  <SelectTrigger data-testid="select-schedule-student"><SelectValue placeholder="Select a student" /></SelectTrigger>
+                  <SelectContent>{students.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="dayOfWeek" render={({ field }) => (
+              <FormItem><FormLabel>Day of Week</FormLabel><FormControl>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger data-testid="select-day-of-week"><SelectValue placeholder="Select a day" /></SelectTrigger>
+                  <SelectContent>
+                    {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="startTime" render={({ field }) => (
+              <FormItem><FormLabel>Start Time</FormLabel><FormControl><Input type="time" {...field} data-testid="input-schedule-start-time" /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="endTime" render={({ field }) => (
+              <FormItem><FormLabel>End Time</FormLabel><FormControl><Input type="time" {...field} data-testid="input-schedule-end-time" /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="subject" render={({ field }) => (
+              <FormItem><FormLabel>Subject</FormLabel><FormControl><Input placeholder="Subject" {...field} data-testid="input-schedule-subject" /></FormControl><FormMessage /></FormItem>
+            )} />
+            <Button type="submit" disabled={mutation.isPending} className="w-full" data-testid="button-submit-schedule">
+              {mutation.isPending ? "Creating..." : "Create Schedule"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Edit-schedule dialog ───────────────────────────────────────────────────
+function TeacherEditScheduleDialog({
+  open,
+  onClose,
+  students,
+  schedule,
+}: {
+  open: boolean;
+  onClose: () => void;
+  students: any[];
+  schedule: { id: number; studentId: number; dayOfWeek: string; startTime: string; endTime: string; subject: string } | null;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ id: 0, studentId: 0, dayOfWeek: "", startTime: "", endTime: "", subject: "" });
+  useEffect(() => { if (schedule) setForm(schedule); }, [schedule?.id]);
+  const mutation = useMutation({
+    mutationFn: ({ id, ...data }: any) =>
+      apiRequest(`/api/schedules/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
+      toast({ title: "Schedule updated!", type: "success" });
+      onClose();
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Edit Schedule</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Student</label>
+            <Select value={form.studentId ? form.studentId.toString() : ""} onValueChange={(v) => setForm({ ...form, studentId: parseInt(v) })}>
+              <SelectTrigger data-testid="select-edit-schedule-student"><SelectValue placeholder="Select a student" /></SelectTrigger>
+              <SelectContent>{students.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Day of Week</label>
+            <Select value={form.dayOfWeek} onValueChange={(v) => setForm({ ...form, dayOfWeek: v })}>
+              <SelectTrigger data-testid="select-edit-day-of-week"><SelectValue placeholder="Select a day" /></SelectTrigger>
+              <SelectContent>
+                {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div><label className="text-sm font-medium">Start Time</label><Input type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} data-testid="input-edit-schedule-start-time" /></div>
+          <div><label className="text-sm font-medium">End Time</label><Input type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} data-testid="input-edit-schedule-end-time" /></div>
+          <Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} data-testid="input-edit-schedule-subject" />
+          <Button onClick={() => mutation.mutate(form)} disabled={mutation.isPending} className="w-full" data-testid="button-update-schedule">
+            {mutation.isPending ? "Updating..." : "Update Schedule"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Mark-attendance dialog ─────────────────────────────────────────────────
+function TeacherMarkAttendanceDialog({
+  open,
+  onClose,
+  students,
+}: {
+  open: boolean;
+  onClose: () => void;
+  students: any[];
+}) {
+  const { toast } = useToast();
+  const form = useForm({
+    resolver: zodResolver(attendanceSchema),
+    defaultValues: { studentId: 0, date: new Date().toISOString().split("T")[0], status: "present", notes: "" },
+  });
+  const mutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest("/api/attendance", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/attendance/student", variables.studentId] });
+      toast({ title: "Attendance marked!", type: "success" });
+      form.reset();
+      onClose();
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Mark Attendance</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
+            <FormField control={form.control} name="studentId" render={({ field }) => (
+              <FormItem><FormLabel>Student</FormLabel><FormControl>
+                <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value ? field.value.toString() : ""}>
+                  <SelectTrigger data-testid="select-attendance-student"><SelectValue placeholder="Select a student" /></SelectTrigger>
+                  <SelectContent>{students.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="date" render={({ field }) => (
+              <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} data-testid="input-attendance-date" /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="status" render={({ field }) => (
+              <FormItem><FormLabel>Status</FormLabel><FormControl>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger data-testid="select-attendance-status"><SelectValue placeholder="Select status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="present">Present</SelectItem>
+                    <SelectItem value="absent">Absent</SelectItem>
+                    <SelectItem value="late">Late</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="notes" render={({ field }) => (
+              <FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Additional notes..." rows={3} {...field} data-testid="input-attendance-notes" /></FormControl><FormMessage /></FormItem>
+            )} />
+            <Button type="submit" disabled={mutation.isPending} className="w-full" data-testid="button-submit-attendance">
+              {mutation.isPending ? "Saving..." : "Mark Attendance"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Create-report dialog ───────────────────────────────────────────────────
+function TeacherCreateReportDialog({
+  open,
+  onClose,
+  students,
+}: {
+  open: boolean;
+  onClose: () => void;
+  students: any[];
+}) {
+  const { toast } = useToast();
+  const defaultPeriod = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const [form, setForm] = useState({ studentId: 0, period: defaultPeriod, overallGrade: "", comments: "", strengths: "", improvements: "" });
+  const mutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest("/api/progress-reports", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/progress-reports/teacher"] });
+      toast({ title: "Progress report created!", type: "success" });
+      setForm({ studentId: 0, period: defaultPeriod, overallGrade: "", comments: "", strengths: "", improvements: "" });
+      onClose();
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Generate Progress Report</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Select Student</label>
+            <select className="w-full mt-1 p-2 border rounded-md" value={form.studentId} onChange={(e) => setForm({ ...form, studentId: parseInt(e.target.value) })} data-testid="select-report-student">
+              <option value={0}>Select a student</option>
+              {students.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div><label className="text-sm font-medium">Period</label><Input placeholder="e.g. March 2026, Q1 2026" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} data-testid="input-report-period" /></div>
+          <div><label className="text-sm font-medium">Overall Grade</label><Input placeholder="e.g., A, B+, 85%" value={form.overallGrade} onChange={(e) => setForm({ ...form, overallGrade: e.target.value })} data-testid="input-overall-grade" /></div>
+          <div><label className="text-sm font-medium">Comments</label><Textarea placeholder="General comments about student performance..." value={form.comments} onChange={(e) => setForm({ ...form, comments: e.target.value })} rows={3} data-testid="input-report-comments" /></div>
+          <div><label className="text-sm font-medium">Strengths</label><Textarea placeholder="List student's strengths..." value={form.strengths} onChange={(e) => setForm({ ...form, strengths: e.target.value })} rows={2} data-testid="input-report-strengths" /></div>
+          <div><label className="text-sm font-medium">Areas for Improvement</label><Textarea placeholder="List areas where student can improve..." value={form.improvements} onChange={(e) => setForm({ ...form, improvements: e.target.value })} rows={2} data-testid="input-report-improvements" /></div>
+          <Button onClick={() => mutation.mutate(form)} disabled={!form.studentId || mutation.isPending} className="w-full" data-testid="button-generate-report">
+            {mutation.isPending ? "Generating..." : "Generate Report"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Give-feedback dialog (isolated so typing doesn't re-render parent) ─────
 function TeacherGiveFeedbackDialog({
   open,
@@ -582,6 +823,7 @@ export default function TeacherDashboard() {
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [createScheduleOpen, setCreateScheduleOpen] = useState(false);
   const [editScheduleOpen, setEditScheduleOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<{ id: number; studentId: number; dayOfWeek: string; startTime: string; endTime: string; subject: string } | null>(null);
   const [giveFeedbackOpen, setGiveFeedbackOpen] = useState(false);
   const [markAttendanceOpen, setMarkAttendanceOpen] = useState(false);
 
@@ -662,230 +904,6 @@ export default function TeacherDashboard() {
     setGradeDialogOpen(true);
   };
 
-  // Create assignment
-  const [assignmentForm, setAssignmentForm] = useState({
-    title: "",
-    description: "",
-    subject: "",
-    dueDate: "",
-    gradeLevel: "",
-  });
-  const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
-  const [assignmentFileUrl, setAssignmentFileUrl] = useState("");
-  const [assignmentInputType, setAssignmentInputType] = useState<
-    "file" | "url"
-  >("file");
-  const [assignmentUploadProgress, setAssignmentUploadProgress] = useState(0);
-  const [isAssignmentUploading, setIsAssignmentUploading] = useState(false);
-
-  const createAssignmentMutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (assignmentInputType === "file" && assignmentFile) {
-        setIsAssignmentUploading(true);
-        setAssignmentUploadProgress(0);
-
-        const formData = new FormData();
-        formData.append("file", assignmentFile);
-        formData.append("title", data.title);
-        formData.append("description", data.description);
-        formData.append("subject", data.subject);
-        formData.append("dueDate", data.dueDate);
-        formData.append("gradeLevel", data.gradeLevel);
-
-        return apiUploadWithProgress(
-          "/api/assignments/with-file",
-          formData,
-          (progress) => setAssignmentUploadProgress(progress),
-        );
-      } else if (assignmentInputType === "url" && assignmentFileUrl) {
-        return apiRequest("/api/assignments", {
-          method: "POST",
-          body: JSON.stringify({ ...data, fileUrl: assignmentFileUrl }),
-        });
-      } else {
-        return apiRequest("/api/assignments", {
-          method: "POST",
-          body: JSON.stringify({ ...data, fileUrl: null }),
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
-      toast({ title: "Assignment created!", description: "success" });
-      setAssignmentForm({
-        title: "",
-        description: "",
-        subject: "",
-        dueDate: "",
-        gradeLevel: "",
-      });
-      setAssignmentFile(null);
-      setAssignmentFileUrl("");
-      setAssignmentUploadProgress(0);
-      setIsAssignmentUploading(false);
-      setCreateAssignmentOpen(false);
-    },
-    onError: () => {
-      setAssignmentUploadProgress(0);
-      setIsAssignmentUploading(false);
-    },
-  });
-
-  // Edit assignment
-  const [editAssignmentForm, setEditAssignmentForm] = useState({
-    id: 0,
-    title: "",
-    description: "",
-    subject: "",
-    dueDate: "",
-    gradeLevel: "",
-    fileUrl: "",
-  });
-
-  const updateAssignmentMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) =>
-      apiRequest(`/api/assignments/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
-      toast({ title: "Assignment updated!", description: "success" });
-      setEditAssignmentForm({
-        id: 0,
-        title: "",
-        description: "",
-        subject: "",
-        dueDate: "",
-        gradeLevel: "",
-        fileUrl: "",
-      });
-      setEditAssignmentOpen(false);
-    },
-  });
-
-  // Delete assignment
-  const deleteAssignmentMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest(`/api/assignments/${id}`, {
-        method: "DELETE",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
-      toast({ title: "Assignment deleted!", type: "success" });
-    },
-  });
-
-  // Upload material
-  const [materialForm, setMaterialForm] = useState({
-    title: "",
-    description: "",
-    subject: "",
-    gradeLevel: "",
-  });
-  const [materialFile, setMaterialFile] = useState<File | null>(null);
-  const [materialLink, setMaterialLink] = useState("");
-  const [materialInputType, setMaterialInputType] = useState<"file" | "link">(
-    "file",
-  );
-  const [materialUploadProgress, setMaterialUploadProgress] = useState(0);
-  const [isMaterialUploading, setIsMaterialUploading] = useState(false);
-
-  const uploadMaterialMutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (materialInputType === "file" && materialFile) {
-        setIsMaterialUploading(true);
-        setMaterialUploadProgress(0);
-
-        const formData = new FormData();
-        formData.append("file", materialFile);
-        formData.append("title", data.title);
-        formData.append("description", data.description || "");
-        formData.append("subject", data.subject);
-        formData.append("gradeLevel", data.gradeLevel);
-
-        return apiUploadWithProgress(
-          "/api/materials/with-file",
-          formData,
-          (progress) => setMaterialUploadProgress(progress),
-        );
-      } else if (materialInputType === "link" && materialLink) {
-        return apiRequest("/api/materials", {
-          method: "POST",
-          body: JSON.stringify({
-            ...data,
-            fileUrl: materialLink,
-            uploadDate: new Date().toISOString(),
-          }),
-        });
-      } else {
-        throw new Error("Please provide a file or link");
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
-      toast({ title: "Material uploaded!", description: "success" });
-      setMaterialForm({
-        title: "",
-        description: "",
-        subject: "",
-        gradeLevel: "",
-      });
-      setMaterialFile(null);
-      setMaterialLink("");
-      setMaterialUploadProgress(0);
-      setIsMaterialUploading(false);
-      setUploadMaterialOpen(false);
-    },
-    onError: () => {
-      setMaterialUploadProgress(0);
-      setIsMaterialUploading(false);
-    },
-  });
-
-  // Edit material
-  const [editMaterialForm, setEditMaterialForm] = useState({
-    id: 0,
-    title: "",
-    description: "",
-    fileUrl: "",
-    subject: "",
-    gradeLevel: "",
-  });
-
-  const updateMaterialMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) =>
-      apiRequest(`/api/materials/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
-      toast({ title: "Material updated!", type: "success" });
-      setEditMaterialForm({
-        id: 0,
-        title: "",
-        description: "",
-        fileUrl: "",
-        subject: "",
-        gradeLevel: "",
-      });
-      setEditMaterialOpen(false);
-    },
-  });
-
-  // Delete material
-  const deleteMaterialMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest(`/api/materials/${id}`, {
-        method: "DELETE",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
-      toast({ title: "Material deleted!", type: "success" });
-    },
-  });
-
   // Approve tutor request
   const approveTutorRequestMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
@@ -901,134 +919,6 @@ export default function TeacherDashboard() {
     },
   });
 
-  // Create session
-  const [sessionForm, setSessionForm] = useState({
-    subject: "",
-    sessionDate: "",
-    startTime: "",
-    endTime: "",
-    studentIds: [] as number[],
-    title: "",
-    description: "",
-    meetingUrl: "",
-    notes: "",
-    status: "scheduled",
-  });
-  const [sessionFormErrors, setSessionFormErrors] = useState<
-    Record<string, string>
-  >({});
-
-  const createSessionMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/sessions", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions/teacher"] });
-      toast({ title: "Session created!", type: "success" });
-      setSessionForm({
-        subject: "",
-        sessionDate: "",
-        startTime: "",
-        endTime: "",
-        studentIds: [],
-        title: "",
-        description: "",
-        meetingUrl: "",
-        notes: "",
-        status: "scheduled",
-      });
-      setSessionFormErrors({});
-      setCreateSessionOpen(false);
-    },
-  });
-
-  // Edit session
-  const [editSessionForm, setEditSessionForm] = useState({
-    id: 0,
-    subject: "",
-    sessionDate: "",
-    startTime: "",
-    endTime: "",
-    studentIds: [] as number[],
-    title: "",
-    description: "",
-    meetingUrl: "",
-    notes: "",
-    status: "scheduled",
-  });
-  const [editSessionFormErrors, setEditSessionFormErrors] = useState<
-    Record<string, string>
-  >({});
-
-  const validateSessionForm = (
-    form: typeof sessionForm,
-  ): Record<string, string> => {
-    const result = sessionFormSchema.safeParse(form);
-    if (result.success) return {};
-    const errors: Record<string, string> = {};
-    result.error.errors.forEach((err) => {
-      if (err.path[0]) {
-        errors[err.path[0] as string] = err.message;
-      }
-    });
-    return errors;
-  };
-
-  const handleCreateSession = () => {
-    const errors = validateSessionForm(sessionForm);
-    setSessionFormErrors(errors);
-    if (Object.keys(errors).length > 0) return;
-    createSessionMutation.mutate(sessionForm);
-  };
-
-  const handleUpdateSession = () => {
-    const { id, ...formWithoutId } = editSessionForm;
-    const errors = validateSessionForm(formWithoutId);
-    setEditSessionFormErrors(errors);
-    if (Object.keys(errors).length > 0) return;
-    updateSessionMutation.mutate(editSessionForm);
-  };
-
-  const updateSessionMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) =>
-      apiRequest(`/api/sessions/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions/teacher"] });
-      toast({ title: "Session updated!", type: "success" });
-      setEditSessionForm({
-        id: 0,
-        subject: "",
-        sessionDate: "",
-        startTime: "",
-        endTime: "",
-        studentIds: [],
-        title: "",
-        description: "",
-        meetingUrl: "",
-        notes: "",
-        status: "scheduled",
-      });
-      setEditSessionFormErrors({});
-      setEditSessionOpen(false);
-    },
-  });
-
-  // Delete session
-  const deleteSessionMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest(`/api/sessions/${id}`, {
-        method: "DELETE",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions/teacher"] });
-      toast({ title: "Session deleted!", type: "success" });
-    },
-  });
 
   // Messages tab — selected student for thread view (auto-select first on load)
   const [selectedStudentForMessages, setSelectedStudentForMessages] = useState<StudentWithParent | null>(null);
@@ -1042,149 +932,6 @@ export default function TeacherDashboard() {
   // Send message — state lives in TeacherSendMessageDialog; parent only tracks receiver for pre-fill
   const [sendMessageReceiverId, setSendMessageReceiverId] = useState(0);
   const [sendMessageReceiverName, setSendMessageReceiverName] = useState("");
-
-  // Generate progress report
-  const [reportForm, setReportForm] = useState({
-    studentId: 0,
-    period: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-    overallGrade: "",
-    comments: "",
-    strengths: "",
-    improvements: "",
-  });
-
-  const generateReportMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/progress-reports", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/progress-reports/teacher"],
-      });
-      toast({ title: "Progress report created!", type: "success" });
-      setReportForm({
-        studentId: 0,
-        period: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-        overallGrade: "",
-        comments: "",
-        strengths: "",
-        improvements: "",
-      });
-      setCreateReportOpen(false);
-    },
-  });
-
-  // Download report as JSON
-  const downloadReport = (report: any) => {
-    const dataStr = JSON.stringify(report, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `progress-report-${report.id}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // Create schedule
-  const scheduleForm = useForm({
-    resolver: zodResolver(scheduleSchema),
-    defaultValues: {
-      studentId: 0,
-      dayOfWeek: "",
-      startTime: "",
-      endTime: "",
-      subject: "",
-    },
-  });
-
-  const createScheduleMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/schedules", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
-      toast({ title: "Schedule created!", type: "success" });
-      scheduleForm.reset();
-      setCreateScheduleOpen(false);
-    },
-  });
-
-  // Edit schedule
-  const [editScheduleForm, setEditScheduleForm] = useState({
-    id: 0,
-    studentId: 0,
-    dayOfWeek: "",
-    startTime: "",
-    endTime: "",
-    subject: "",
-  });
-
-  const updateScheduleMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) =>
-      apiRequest(`/api/schedules/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
-      toast({ title: "Schedule updated!", type: "success" });
-      setEditScheduleForm({
-        id: 0,
-        studentId: 0,
-        dayOfWeek: "",
-        startTime: "",
-        endTime: "",
-        subject: "",
-      });
-      setEditScheduleOpen(false);
-    },
-  });
-
-  // Delete schedule
-  const deleteScheduleMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest(`/api/schedules/${id}`, {
-        method: "DELETE",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules/teacher"] });
-      toast({ title: "Schedule deleted!", type: "success" });
-    },
-  });
-
-  // Give feedback — form state lives in TeacherGiveFeedbackDialog
-
-  // Mark attendance
-  const attendanceForm = useForm({
-    resolver: zodResolver(attendanceSchema),
-    defaultValues: {
-      studentId: 0,
-      date: new Date().toISOString().split("T")[0],
-      status: "present",
-      notes: "",
-    },
-  });
-
-  const markAttendanceMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/attendance", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/attendance/student", variables.studentId],
-      });
-      toast({ title: "Attendance marked!", type: "success" });
-      attendanceForm.reset();
-      setMarkAttendanceOpen(false);
-    },
-  });
 
   const totalEarnings = earnings.reduce(
     (sum: number, e: any) => sum + e.amount,
@@ -2949,6 +2696,31 @@ export default function TeacherDashboard() {
         users={users}
         initialReceiverId={sendMessageReceiverId}
         initialReceiverName={sendMessageReceiverName}
+      />
+
+      <TeacherCreateScheduleDialog
+        open={createScheduleOpen}
+        onClose={() => setCreateScheduleOpen(false)}
+        students={students}
+      />
+
+      <TeacherEditScheduleDialog
+        open={editScheduleOpen}
+        onClose={() => { setEditScheduleOpen(false); setEditingSchedule(null); }}
+        students={students}
+        schedule={editingSchedule}
+      />
+
+      <TeacherMarkAttendanceDialog
+        open={markAttendanceOpen}
+        onClose={() => setMarkAttendanceOpen(false)}
+        students={students}
+      />
+
+      <TeacherCreateReportDialog
+        open={createReportOpen}
+        onClose={() => setCreateReportOpen(false)}
+        students={students}
       />
     </div>
   );
