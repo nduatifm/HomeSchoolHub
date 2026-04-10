@@ -915,9 +915,9 @@ function ClassworkDialog({
   );
 }
 
-function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived, assignments }: {
+function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived, assignments, mySubmissions }: {
   item: ClassroomMaterial; classroomId: number; classroomSlug: string | number;
-  isTeacher: boolean; isArchived: boolean; assignments: ClassroomAssignment[];
+  isTeacher: boolean; isArchived: boolean; assignments: ClassroomAssignment[]; mySubmissions?: ClassroomSubmission[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -933,6 +933,23 @@ function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived
     ? `/classrooms/${classroomSlug}/classwork/${item.linkedAssignment.slug ?? item.linkedAssignment.id}`
     : null;
 
+  const linkedFullAssignment = item.linkedAssignment
+    ? assignments.find((a) => a.id === item.linkedAssignment!.id) ?? null
+    : null;
+  const classroomStatus = isArchived ? "archived" : "active";
+  const urgency = linkedFullAssignment && mySubmissions
+    ? classifyAssignment(linkedFullAssignment, mySubmissions, classroomStatus)
+    : null;
+
+  const dueSoonDays = (() => {
+    if (urgency !== "due-soon" || !linkedFullAssignment?.dueDate) return 0;
+    const due = new Date(linkedFullAssignment.dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    return Math.round((due.getTime() - today.getTime()) / 86400000);
+  })();
+
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3.5">
@@ -941,6 +958,10 @@ function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived
             <span className="font-semibold text-sm text-foreground">{item.title}</span>
             {item.url && <Paperclip className="h-3 w-3 text-muted-foreground shrink-0" />}
             {item.linkedAssignment && <Link2 className="h-3 w-3 text-primary shrink-0" />}
+            {urgency === "overdue"   && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-red-100 text-red-700 hover:bg-red-100 border-0">Overdue</Badge>}
+            {urgency === "due-today" && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0">Due Today</Badge>}
+            {urgency === "due-soon"  && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-0">Due Soon (in {dueSoonDays} day{dueSoonDays !== 1 ? "s" : ""})</Badge>}
+            {urgency === "new"       && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-green-100 text-green-700 hover:bg-green-100 border-0">New</Badge>}
           </div>
           <span className="text-[11px] text-muted-foreground">
             {new Date(item.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -1000,7 +1021,11 @@ function ClassworkTab({ classroomId, classroomSlug, isTeacher, isArchived }: { c
   const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
-    enabled: isTeacher,
+  });
+  const { data: mySubmissions } = useQuery<ClassroomSubmission[]>({
+    queryKey: ["/api/classrooms", classroomId, "my-submissions"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/my-submissions`),
+    enabled: !isTeacher,
   });
 
   return (
@@ -1021,7 +1046,7 @@ function ClassworkTab({ classroomId, classroomSlug, isTeacher, isArchived }: { c
       <div className="space-y-2">
         {classwork.map((item) => (
           <ClassworkCard key={item.id} item={item} classroomId={classroomId} classroomSlug={classroomSlug}
-            isTeacher={isTeacher} isArchived={isArchived} assignments={assignments} />
+            isTeacher={isTeacher} isArchived={isArchived} assignments={assignments} mySubmissions={mySubmissions} />
         ))}
       </div>
     </div>
@@ -1251,7 +1276,7 @@ function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchiv
                     >{a.title}</button>
                     {urgency === "overdue"   && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-red-100 text-red-700 hover:bg-red-100 border-0">Overdue</Badge>}
                     {urgency === "due-today" && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0">Due Today</Badge>}
-                    {urgency === "due-soon"  && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-0">in {dueSoonDays} day{dueSoonDays !== 1 ? "s" : ""}</Badge>}
+                    {urgency === "due-soon"  && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-0">Due Soon (in {dueSoonDays} day{dueSoonDays !== 1 ? "s" : ""})</Badge>}
                     {urgency === "new"       && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-green-100 text-green-700 hover:bg-green-100 border-0">New</Badge>}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
