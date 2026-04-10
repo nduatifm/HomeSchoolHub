@@ -302,8 +302,7 @@ export interface IStorage {
   markNotificationRead(id: number, userId: number): Promise<any>;
   markAllNotificationsRead(userId: number): Promise<void>;
 
-  getClassroomNotificationsForStudent(studentId: number): Promise<Array<{
-    classroomId: number;
+  getClassroomNotificationsForStudent(studentId: number): Promise<Record<number, {
     newCount: number;
     dueCount: number;
     dueSoonCount: number;
@@ -1718,45 +1717,58 @@ class PrismaStorage implements IStorage {
     }));
   }
 
-  async getClassroomNotificationsForStudent(studentId: number): Promise<Array<{
-    classroomId: number;
+  async getClassroomNotificationsForStudent(studentId: number): Promise<Record<number, {
     newCount: number;
     dueCount: number;
     dueSoonCount: number;
     total: number;
   }>> {
+    type EnrollmentRow = Prisma.ClassroomEnrollmentGetPayload<{
+      include: {
+        classroom: {
+          include: {
+            assignments: {
+              include: { submissions: true };
+            };
+          };
+        };
+      };
+    }>;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
 
-    const enrollments = await prisma.classroomEnrollment.findMany({
+    const enrollments: EnrollmentRow[] = await prisma.classroomEnrollment.findMany({
       where: { studentId },
       include: {
         classroom: {
           include: {
             assignments: {
-              include: {
-                submissions: { where: { studentId } },
-              },
+              include: { submissions: { where: { studentId } } },
             },
           },
         },
       },
     });
 
-    return enrollments.map((enrollment) => {
-      const classroom = enrollment.classroom as any;
+    const result: Record<number, { newCount: number; dueCount: number; dueSoonCount: number; total: number }> = {};
+
+    for (const enrollment of enrollments) {
+      const classroom = enrollment.classroom;
       if (classroom.status === "archived") {
-        return { classroomId: classroom.id, newCount: 0, dueCount: 0, dueSoonCount: 0, total: 0 };
+        result[classroom.id] = { newCount: 0, dueCount: 0, dueSoonCount: 0, total: 0 };
+        continue;
       }
 
       let newCount = 0;
       let dueCount = 0;
       let dueSoonCount = 0;
 
-      for (const assignment of classroom.assignments as any[]) {
-        const sub = (assignment.submissions as any[])[0];
+      for (const assignment of classroom.assignments) {
+        const sub = assignment.submissions[0] ?? null;
+        // Skip if already submitted (not pending)
         if (sub && sub.status !== "pending") continue;
 
         let classified = false;
@@ -1771,15 +1783,18 @@ class PrismaStorage implements IStorage {
           }
         }
 
-        if (!classified && assignment.createdAt) {
+        // "New" requires strictly no submission row at all (not even pending)
+        if (!classified && !sub) {
           const created = new Date(assignment.createdAt);
           if (created >= sevenDaysAgo) newCount++;
         }
       }
 
       const total = newCount + dueCount + dueSoonCount;
-      return { classroomId: classroom.id, newCount, dueCount, dueSoonCount, total };
-    });
+      result[classroom.id] = { newCount, dueCount, dueSoonCount, total };
+    }
+
+    return result;
   }
 
   async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string): Promise<ClassroomSubmission> {

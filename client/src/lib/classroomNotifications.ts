@@ -3,14 +3,13 @@ import type { ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 export type UrgencyLabel = "overdue" | "due-today" | "due-soon" | "new" | null;
 
 export type ClassroomNotification = {
-  classroomId: number;
   newCount: number;
   dueCount: number;
   dueSoonCount: number;
   total: number;
 };
 
-export type NotificationSummary = ClassroomNotification | null;
+export type ClassroomNotificationsMap = Record<number, ClassroomNotification>;
 
 export function classifyAssignment(
   assignment: ClassroomAssignment,
@@ -20,11 +19,13 @@ export function classifyAssignment(
   if (classroomStatus === "archived") return null;
 
   const sub = submissions.find((s) => s.assignmentId === assignment.id);
+  // If submitted/graded/late — no action needed
   if (sub && sub.status !== "pending") return null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Overdue / Due Today / Due Soon apply when there's a pending submission or no submission
   if (assignment.dueDate) {
     const due = new Date(assignment.dueDate);
     if (!isNaN(due.getTime())) {
@@ -36,7 +37,8 @@ export function classifyAssignment(
     }
   }
 
-  if (assignment.createdAt) {
+  // "New" requires strictly no submission row at all (not even a pending one)
+  if (!sub && assignment.createdAt) {
     const sevenDaysAgo = new Date(today);
     sevenDaysAgo.setDate(today.getDate() - 7);
     const created = new Date(assignment.createdAt);

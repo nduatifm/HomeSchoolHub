@@ -24,7 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ClassroomCard from "@/components/ClassroomCard";
-import type { ClassroomNotification } from "@/lib/classroomNotifications";
+import type { ClassroomNotificationsMap } from "@/lib/classroomNotifications";
 import type { Assignment, StudentAssignment, Session, Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 
 type AssignmentWithStatus = Assignment & {
@@ -120,14 +120,11 @@ export default function StudentDashboard() {
     })),
   });
 
-  const { data: classroomNotifications = [] } = useQuery<ClassroomNotification[]>({
+  const { data: notifMap = {} as ClassroomNotificationsMap } = useQuery<ClassroomNotificationsMap>({
     queryKey: ["/api/students", student?.id, "classroom-notifications"],
     queryFn: () => apiRequest(`/api/students/${student!.id}/classroom-notifications`),
     enabled: !!student,
   });
-  const notifMap: Record<number, ClassroomNotification> = Object.fromEntries(
-    classroomNotifications.map((n) => [n.classroomId, n]),
-  );
 
   const pendingClassworkItems: ClassworkItem[] = classrooms.flatMap((c, i) => {
     const cwAssignments: ClassroomAssignment[] = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];

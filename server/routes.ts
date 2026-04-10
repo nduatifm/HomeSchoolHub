@@ -1389,6 +1389,24 @@ export function registerRoutes(app: Express) {
     try {
       const studentId = parseInt(req.params.studentId);
       if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const callerId = req.session.userId!;
+      const isOwner = student.userId === callerId;
+      const isParent = student.parentId === callerId;
+      const relation = await prisma.teacherStudentAssignment.findFirst({
+        where: { teacherId: callerId, studentId: student.id },
+      });
+      const isTeacher = !!relation;
+      const caller = await storage.getUserById(callerId);
+      const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
+
+      if (!isOwner && !isParent && !isTeacher && !isAdmin) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       const notifications = await storage.getClassroomNotificationsForStudent(studentId);
       res.json(notifications);
     } catch (error: any) {
