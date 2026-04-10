@@ -346,6 +346,227 @@ function TeacherGradeDialog({
   );
 }
 
+// ── Create-assignment dialog ──────────────────────────────────────────────
+function TeacherCreateAssignmentDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ title: "", description: "", subject: "", dueDate: "", gradeLevel: "" });
+  const [inputType, setInputType] = useState<"file" | "url">("file");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileUrl, setFileUrl] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const mutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (inputType === "file" && file) {
+        setIsUploading(true);
+        setUploadProgress(0);
+        const fd = new FormData();
+        fd.append("file", file);
+        Object.entries(data).forEach(([k, v]) => fd.append(k, v as string));
+        return apiUploadWithProgress("/api/assignments/with-file", fd, setUploadProgress);
+      }
+      return apiRequest("/api/assignments", {
+        method: "POST",
+        body: JSON.stringify({ ...data, fileUrl: inputType === "url" ? fileUrl : null }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
+      toast({ title: "Assignment created!", type: "success" });
+      setForm({ title: "", description: "", subject: "", dueDate: "", gradeLevel: "" });
+      setFile(null); setFileUrl(""); setUploadProgress(0); setIsUploading(false);
+      onClose();
+    },
+    onError: () => { setUploadProgress(0); setIsUploading(false); },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Create Assignment</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="input-assignment-title" />
+          <Textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} data-testid="input-assignment-description" />
+          <Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} data-testid="input-assignment-subject" />
+          <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} data-testid="input-assignment-due-date" />
+          <Input placeholder="Grade Level" value={form.gradeLevel} onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })} data-testid="input-assignment-grade-level" />
+          <div className="flex gap-2">
+            <Button type="button" variant={inputType === "file" ? "default" : "outline"} size="sm" onClick={() => setInputType("file")}>Upload File</Button>
+            <Button type="button" variant={inputType === "url" ? "default" : "outline"} size="sm" onClick={() => setInputType("url")}>Link URL</Button>
+          </div>
+          {inputType === "file" ? (
+            <div>
+              <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} data-testid="input-assignment-file" />
+              {isUploading && <div className="mt-1 text-sm text-muted-foreground">Uploading: {uploadProgress}%</div>}
+            </div>
+          ) : (
+            <Input placeholder="https://..." value={fileUrl} onChange={(e) => setFileUrl(e.target.value)} data-testid="input-assignment-file-url" />
+          )}
+          <Button onClick={() => mutation.mutate(form)} disabled={!form.title || mutation.isPending || isUploading} className="w-full" data-testid="button-create-assignment">
+            {mutation.isPending || isUploading ? "Creating..." : "Create Assignment"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Edit-assignment dialog ─────────────────────────────────────────────────
+function TeacherEditAssignmentDialog({
+  open,
+  onClose,
+  assignment,
+}: {
+  open: boolean;
+  onClose: () => void;
+  assignment: { id: number; title: string; description: string; subject: string; dueDate: string; gradeLevel: string; fileUrl?: string } | null;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ id: 0, title: "", description: "", subject: "", dueDate: "", gradeLevel: "", fileUrl: "" });
+  useEffect(() => { if (assignment) setForm({ ...assignment, fileUrl: assignment.fileUrl ?? "", description: assignment.description ?? "", dueDate: assignment.dueDate ?? "" }); }, [assignment?.id]);
+  const mutation = useMutation({
+    mutationFn: ({ id, ...data }: any) =>
+      apiRequest(`/api/assignments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments/teacher"] });
+      toast({ title: "Assignment updated!", type: "success" });
+      onClose();
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Edit Assignment</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="input-edit-assignment-title" />
+          <Textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} data-testid="input-edit-assignment-description" />
+          <Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} data-testid="input-edit-assignment-subject" />
+          <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} data-testid="input-edit-assignment-due-date" />
+          <Input placeholder="Grade Level" value={form.gradeLevel} onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })} data-testid="input-edit-assignment-grade-level" />
+          <Input placeholder="File URL (optional)" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} data-testid="input-edit-assignment-file-url" />
+          <Button onClick={() => mutation.mutate(form)} disabled={!form.title || mutation.isPending} className="w-full" data-testid="button-update-assignment">
+            {mutation.isPending ? "Updating..." : "Update Assignment"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Upload-material dialog ─────────────────────────────────────────────────
+function TeacherUploadMaterialDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ title: "", description: "", subject: "", gradeLevel: "" });
+  const [inputType, setInputType] = useState<"file" | "link">("file");
+  const [file, setFile] = useState<File | null>(null);
+  const [link, setLink] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const mutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (inputType === "file" && file) {
+        setIsUploading(true);
+        setUploadProgress(0);
+        const fd = new FormData();
+        fd.append("file", file);
+        Object.entries(data).forEach(([k, v]) => fd.append(k, v as string));
+        return apiUploadWithProgress("/api/materials/with-file", fd, setUploadProgress);
+      } else if (inputType === "link" && link) {
+        return apiRequest("/api/materials", { method: "POST", body: JSON.stringify({ ...data, fileUrl: link, uploadDate: new Date().toISOString() }) });
+      }
+      throw new Error("Please provide a file or link");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
+      toast({ title: "Material uploaded!", type: "success" });
+      setForm({ title: "", description: "", subject: "", gradeLevel: "" });
+      setFile(null); setLink(""); setUploadProgress(0); setIsUploading(false);
+      onClose();
+    },
+    onError: () => { setUploadProgress(0); setIsUploading(false); },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Upload Material</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="input-material-title" />
+          <Textarea placeholder="Description (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} data-testid="input-material-description" />
+          <Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} data-testid="input-material-subject" />
+          <Input placeholder="Grade Level" value={form.gradeLevel} onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })} data-testid="input-material-grade-level" />
+          <div className="flex gap-2">
+            <Button type="button" variant={inputType === "file" ? "default" : "outline"} size="sm" onClick={() => setInputType("file")}>Upload File</Button>
+            <Button type="button" variant={inputType === "link" ? "default" : "outline"} size="sm" onClick={() => setInputType("link")}>Link URL</Button>
+          </div>
+          {inputType === "file" ? (
+            <div>
+              <Input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} data-testid="input-material-file" />
+              {isUploading && <div className="mt-1 text-sm text-muted-foreground">Uploading: {uploadProgress}%</div>}
+            </div>
+          ) : (
+            <Input placeholder="https://..." value={link} onChange={(e) => setLink(e.target.value)} data-testid="input-material-link" />
+          )}
+          <Button onClick={() => mutation.mutate(form)} disabled={!form.title || mutation.isPending || isUploading} className="w-full" data-testid="button-upload-material">
+            {mutation.isPending || isUploading ? "Uploading..." : "Upload Material"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Edit-material dialog ───────────────────────────────────────────────────
+function TeacherEditMaterialDialog({
+  open,
+  onClose,
+  material,
+}: {
+  open: boolean;
+  onClose: () => void;
+  material: { id: number; title: string; description: string; fileUrl: string; subject: string; gradeLevel: string } | null;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ id: 0, title: "", description: "", fileUrl: "", subject: "", gradeLevel: "" });
+  useEffect(() => { if (material) setForm({ ...material, description: material.description ?? "", fileUrl: material.fileUrl ?? "" }); }, [material?.id]);
+  const mutation = useMutation({
+    mutationFn: ({ id, ...data }: any) =>
+      apiRequest(`/api/materials/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/materials/teacher"] });
+      toast({ title: "Material updated!", type: "success" });
+      onClose();
+    },
+  });
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Edit Material</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <Input placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="input-edit-material-title" />
+          <Textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} data-testid="input-edit-material-description" />
+          <Input placeholder="File URL" value={form.fileUrl} onChange={(e) => setForm({ ...form, fileUrl: e.target.value })} data-testid="input-edit-material-file-url" />
+          <Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} data-testid="input-edit-material-subject" />
+          <Input placeholder="Grade Level" value={form.gradeLevel} onChange={(e) => setForm({ ...form, gradeLevel: e.target.value })} data-testid="input-edit-material-grade-level" />
+          <Button onClick={() => mutation.mutate(form)} disabled={!form.title || mutation.isPending} className="w-full" data-testid="button-update-material">
+            {mutation.isPending ? "Updating..." : "Update Material"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Create-schedule dialog ────────────────────────────────────────────────
 function TeacherCreateScheduleDialog({
   open,
@@ -815,8 +1036,10 @@ export default function TeacherDashboard() {
   // Dialog state
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
   const [editAssignmentOpen, setEditAssignmentOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<{ id: number; title: string; description: string; subject: string; dueDate: string; gradeLevel: string; fileUrl?: string } | null>(null);
   const [uploadMaterialOpen, setUploadMaterialOpen] = useState(false);
   const [editMaterialOpen, setEditMaterialOpen] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<{ id: number; title: string; description: string; fileUrl: string; subject: string; gradeLevel: string } | null>(null);
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [createReportOpen, setCreateReportOpen] = useState(false);
@@ -2696,6 +2919,28 @@ export default function TeacherDashboard() {
         users={users}
         initialReceiverId={sendMessageReceiverId}
         initialReceiverName={sendMessageReceiverName}
+      />
+
+      <TeacherCreateAssignmentDialog
+        open={createAssignmentOpen}
+        onClose={() => setCreateAssignmentOpen(false)}
+      />
+
+      <TeacherEditAssignmentDialog
+        open={editAssignmentOpen}
+        onClose={() => { setEditAssignmentOpen(false); setEditingAssignment(null); }}
+        assignment={editingAssignment}
+      />
+
+      <TeacherUploadMaterialDialog
+        open={uploadMaterialOpen}
+        onClose={() => setUploadMaterialOpen(false)}
+      />
+
+      <TeacherEditMaterialDialog
+        open={editMaterialOpen}
+        onClose={() => { setEditMaterialOpen(false); setEditingMaterial(null); }}
+        material={editingMaterial}
       />
 
       <TeacherCreateScheduleDialog
