@@ -741,7 +741,7 @@ export default function ParentDashboard() {
                               </SelectTrigger>
                               <SelectContent>
                                 {students.map((s: any) => (
-                                  <SelectItem key={s.id} value={s.id.toString()}>
+                                  <SelectItem key={s.id} value={s.id.toString()} textValue={`${s.name}${s.gradeLevel ? ` (Grade ${s.gradeLevel})` : ""}`}>
                                     {s.name} {s.gradeLevel ? `(Grade ${s.gradeLevel})` : ""}
                                   </SelectItem>
                                 ))}

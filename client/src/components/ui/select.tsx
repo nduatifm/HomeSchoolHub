@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 
@@ -7,6 +7,8 @@ interface SelectContextType {
   onValueChange: (value: string) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
+  label: string;
+  setLabel: (label: string) => void;
 }
 
 const SelectContext = createContext<SelectContextType | undefined>(undefined);
@@ -21,9 +23,14 @@ export function Select({
   onValueChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState("");
+
+  useEffect(() => {
+    if (!value) setLabel("");
+  }, [value]);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen }}>
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, label, setLabel }}>
       <div className="relative">
         {children}
       </div>
@@ -62,10 +69,12 @@ export function SelectTrigger({
 export function SelectValue({ placeholder }: { placeholder?: string }) {
   const context = useContext(SelectContext);
   if (!context) throw new Error("SelectValue must be used within Select");
-  
+
+  const display = context.label || context.value;
+
   return (
-    <span className={context.value ? undefined : "text-muted-foreground"}>
-      {context.value || placeholder || "Select..."}
+    <span className={display ? undefined : "text-muted-foreground"}>
+      {display || placeholder || "Select..."}
     </span>
   );
 }
@@ -93,10 +102,12 @@ export function SelectContent({ children }: { children: React.ReactNode }) {
 
 export function SelectItem({ 
   value, 
-  children 
+  children,
+  textValue,
 }: { 
   value: string; 
   children: React.ReactNode;
+  textValue?: string;
 }) {
   const context = useContext(SelectContext);
   if (!context) throw new Error("SelectItem must be used within Select");
@@ -109,6 +120,8 @@ export function SelectItem({
       )}
       onClick={() => {
         context.onValueChange(value);
+        const resolvedLabel = textValue ?? (typeof children === "string" ? children : "");
+        context.setLabel(resolvedLabel);
         context.setOpen(false);
       }}
     >
