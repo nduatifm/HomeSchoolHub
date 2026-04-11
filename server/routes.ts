@@ -4887,23 +4887,35 @@ export function registerRoutes(app: Express) {
 
   // ─── Seen-content endpoints ────────────────────────────────────────────────
 
-  // GET /api/classrooms/:classroomId/my-seen — IDs the current user has seen in this classroom
+  // GET /api/classrooms/:classroomId/my-seen — IDs the current user has seen, scoped to this classroom's content
   app.get("/api/classrooms/:classroomId/my-seen", requireAuth, async (req, res) => {
     try {
-      const classroomId = parseInt(req.params.classroomId);
-      if (isNaN(classroomId)) return res.status(400).json({ error: "Invalid classroom ID" });
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
       const userId = req.session.userId!;
+      const cid = classroom.id;
 
-      const [posts, materials, assignments] = await Promise.all([
+      // Fetch content IDs that actually belong to this classroom
+      const [classroomPosts, classroomMaterials, classroomAssignments] = await Promise.all([
+        prisma.classroomPost.findMany({ where: { classroomId: cid }, select: { id: true } }),
+        prisma.classroomMaterial.findMany({ where: { classroomId: cid }, select: { id: true } }),
+        prisma.classroomAssignment.findMany({ where: { classroomId: cid }, select: { id: true } }),
+      ]);
+      const postSet = new Set(classroomPosts.map((p) => p.id));
+      const materialSet = new Set(classroomMaterials.map((m) => m.id));
+      const assignmentSet = new Set(classroomAssignments.map((a) => a.id));
+
+      // Fetch what the user has seen, filtered to this classroom's content
+      const [seenPosts, seenMaterials, seenAssignments] = await Promise.all([
         prisma.classroomContentSeen.findMany({ where: { userId, contentType: "post" }, select: { contentId: true } }),
         prisma.classroomContentSeen.findMany({ where: { userId, contentType: "material" }, select: { contentId: true } }),
         prisma.classroomContentSeen.findMany({ where: { userId, contentType: "assignment" }, select: { contentId: true } }),
       ]);
 
       res.json({
-        postIds: posts.map((r) => r.contentId),
-        materialIds: materials.map((r) => r.contentId),
-        assignmentIds: assignments.map((r) => r.contentId),
+        postIds: seenPosts.map((r) => r.contentId).filter((id) => postSet.has(id)),
+        materialIds: seenMaterials.map((r) => r.contentId).filter((id) => materialSet.has(id)),
+        assignmentIds: seenAssignments.map((r) => r.contentId).filter((id) => assignmentSet.has(id)),
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4913,10 +4925,13 @@ export function registerRoutes(app: Express) {
   // POST /api/classrooms/:classroomId/posts/:postId/seen
   app.post("/api/classrooms/:classroomId/posts/:postId/seen", requireAuth, async (req, res) => {
     try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
       const postId = parseInt(req.params.postId);
       if (isNaN(postId)) return res.status(400).json({ error: "Invalid post ID" });
-      const userId = req.session.userId!;
-      await storage.markContentSeen(userId, "post", postId);
+      const post = await prisma.classroomPost.findFirst({ where: { id: postId, classroomId: classroom.id } });
+      if (!post) return res.status(404).json({ error: "Post not found in this classroom" });
+      await storage.markContentSeen(req.session.userId!, "post", postId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4926,10 +4941,13 @@ export function registerRoutes(app: Express) {
   // POST /api/classrooms/:classroomId/materials/:materialId/seen
   app.post("/api/classrooms/:classroomId/materials/:materialId/seen", requireAuth, async (req, res) => {
     try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
       const materialId = parseInt(req.params.materialId);
       if (isNaN(materialId)) return res.status(400).json({ error: "Invalid material ID" });
-      const userId = req.session.userId!;
-      await storage.markContentSeen(userId, "material", materialId);
+      const material = await prisma.classroomMaterial.findFirst({ where: { id: materialId, classroomId: classroom.id } });
+      if (!material) return res.status(404).json({ error: "Material not found in this classroom" });
+      await storage.markContentSeen(req.session.userId!, "material", materialId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4939,10 +4957,13 @@ export function registerRoutes(app: Express) {
   // POST /api/classrooms/:classroomId/assignments/:assignmentId/seen
   app.post("/api/classrooms/:classroomId/assignments/:assignmentId/seen", requireAuth, async (req, res) => {
     try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
       const assignmentId = parseInt(req.params.assignmentId);
       if (isNaN(assignmentId)) return res.status(400).json({ error: "Invalid assignment ID" });
-      const userId = req.session.userId!;
-      await storage.markContentSeen(userId, "assignment", assignmentId);
+      const assignment = await prisma.classroomAssignment.findFirst({ where: { id: assignmentId, classroomId: classroom.id } });
+      if (!assignment) return res.status(404).json({ error: "Assignment not found in this classroom" });
+      await storage.markContentSeen(req.session.userId!, "assignment", assignmentId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
