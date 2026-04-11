@@ -1580,7 +1580,7 @@ export default function ClassroomDetail() {
         return !seenMaterialIds.has(m.id);
       }).length
     : isParent
-      ? _badgeMaterials.filter((m) => !seenMaterialIds.has(m.id)).length
+      ? _badgeMaterials.filter((m) => !m.linkedAssignment?.id && !seenMaterialIds.has(m.id)).length
       : 0;
 
   // Feed badge: unseen posts for students/parents; teachers have no feed badge

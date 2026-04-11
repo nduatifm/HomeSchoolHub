@@ -1831,9 +1831,15 @@ class PrismaStorage implements IStorage {
           }
         }
 
-        // "New" requires strictly no submission row at all (not even pending)
+        // "New" = no submission and (for student view) created within last 7 days
         if (!classified && !sub) {
-          newCount++;
+          if (isParentView) {
+            newCount++; // parents use seen-state filtering above; no time bound needed
+          } else {
+            const sevenDaysAgo = new Date(today);
+            sevenDaysAgo.setDate(today.getDate() - 7);
+            if (new Date(assignment.createdAt) >= sevenDaysAgo) newCount++;
+          }
         }
       }
 
