@@ -390,6 +390,8 @@ function GradingModal({
       }),
     onSuccess: () => {
       if (expandedAssignmentId) queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", expandedAssignmentId, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classroom-notifications/total"] });
       toast({ title: "Graded", type: "success" });
       onClose();
     },

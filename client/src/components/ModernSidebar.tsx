@@ -61,7 +61,7 @@ export default function ModernSidebar() {
   const { data: classroomNotifData } = useQuery<{ total: number }>({
     queryKey: ["/api/classroom-notifications/total"],
     refetchInterval: 15000,
-    enabled: user?.role === "student" || user?.role === "parent",
+    enabled: user?.role === "student" || user?.role === "parent" || user?.role === "teacher",
   });
   const classroomBadge = classroomNotifData?.total ?? 0;
 
@@ -95,7 +95,7 @@ export default function ModernSidebar() {
   };
 
   const teacherItems: SidebarItem[] = [
-    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
     { icon: <User className="w-4 h-4" />, label: "Students", hash: "students" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Tutor Requests", hash: "requests" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },

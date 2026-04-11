@@ -1442,6 +1442,12 @@ export function registerRoutes(app: Express) {
         return res.json({ total });
       }
 
+      if (user.role === "teacher" || (user.roles && user.roles.includes("teacher"))) {
+        const stats = await storage.getTeacherClassroomStats(userId);
+        const total = Object.values(stats).reduce((sum, s) => sum + s.toGradeCount, 0);
+        return res.json({ total });
+      }
+
       res.json({ total: 0 });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
