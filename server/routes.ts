@@ -1414,6 +1414,39 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/classroom-notifications/total — aggregate pending count for the sidebar badge
+  app.get("/api/classroom-notifications/total", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        const student = await storage.getStudentByUserId(userId);
+        if (!student) return res.json({ total: 0 });
+        const notifications = await storage.getClassroomNotificationsForStudent(student.id, userId);
+        const total = Object.values(notifications).reduce((sum, n: any) => sum + (n.pendingCount ?? 0), 0);
+        return res.json({ total });
+      }
+
+      if (user.role === "parent") {
+        const children = await storage.getStudentsByParent(userId);
+        if (!children.length) return res.json({ total: 0 });
+        const allNotifications = await Promise.all(
+          children.map((child: any) => storage.getClassroomNotificationsForStudent(child.id, userId))
+        );
+        const total = allNotifications.reduce((sum, notifMap) =>
+          sum + Object.values(notifMap).reduce((s, n: any) => s + (n.pendingCount ?? 0), 0), 0
+        );
+        return res.json({ total });
+      }
+
+      res.json({ total: 0 });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/teacher/classroom-stats", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;

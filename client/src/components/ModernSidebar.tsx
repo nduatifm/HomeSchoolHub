@@ -38,6 +38,7 @@ interface SidebarItem {
   label: string;
   hash: string;
   badge?: number;
+  badgeCap?: number;
 }
 
 export default function ModernSidebar() {
@@ -56,6 +57,13 @@ export default function ModernSidebar() {
     refetchInterval: 15000,
   });
   const unreadNotifCount = notifCount?.count ?? 0;
+
+  const { data: classroomNotifData } = useQuery<{ total: number }>({
+    queryKey: ["/api/classroom-notifications/total"],
+    refetchInterval: 15000,
+    enabled: user?.role === "student" || user?.role === "parent",
+  });
+  const classroomBadge = classroomNotifData?.total ?? 0;
 
   const switchRoleMutation = useMutation({
     mutationFn: async (role: string) =>
@@ -96,7 +104,7 @@ export default function ModernSidebar() {
 
   const parentItems: SidebarItem[] = [
     { icon: <Users className="w-4 h-4" />, label: "My Children", hash: "children" },
-    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
     { icon: <GraduationCap className="w-4 h-4" />, label: "Find a Tutor", hash: "tutors" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Invite Student", hash: "invites" },
     { icon: <FileText className="w-4 h-4" />, label: "Progress Reports", hash: "reports" },
@@ -104,7 +112,7 @@ export default function ModernSidebar() {
   ];
 
   const studentItems: SidebarItem[] = [
-    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms" },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
   ];
@@ -142,7 +150,7 @@ export default function ModernSidebar() {
         <span className="flex-1 text-left">{item.label}</span>
         {item.badge && item.badge > 0 ? (
           <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-green-700 text-white text-[10px] font-semibold flex items-center justify-center leading-none">
-            {item.badge > 99 ? "99+" : item.badge}
+            {item.badge > (item.badgeCap ?? 99) ? `${item.badgeCap ?? 99}+` : item.badge}
           </span>
         ) : null}
       </button>
