@@ -1499,10 +1499,12 @@ export default function ClassroomDetail() {
       }).length
     : 0;
 
-  // Count feed posts created in the last 7 days
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const feedBadge = _badgePosts.filter((p) => new Date(p.createdAt) >= sevenDaysAgo).length;
+  // Count feed posts created in the last 7 days (day-normalized, matching backend ClassroomCard logic)
+  const _today = new Date();
+  _today.setHours(0, 0, 0, 0);
+  const _sevenDaysAgo = new Date(_today);
+  _sevenDaysAgo.setDate(_today.getDate() - 7);
+  const feedBadge = _badgePosts.filter((p) => new Date(p.createdAt) >= _sevenDaysAgo).length;
 
   const teacherTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
