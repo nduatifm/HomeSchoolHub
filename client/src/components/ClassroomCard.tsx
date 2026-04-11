@@ -17,9 +17,11 @@ export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Cl
   const dueCount = notification?.dueCount ?? 0;
   const dueSoonCount = notification?.dueSoonCount ?? 0;
   const newCount = notification?.newCount ?? 0;
+  const newPostsCount = notification?.newPostsCount ?? 0;
 
   const showBadge = pendingCount > 0;
-  const badgeIsRed = dueCount > 0;
+  // New feed posts are treated as red (important announcements)
+  const badgeIsRed = dueCount > 0 || newPostsCount > 0;
   const badgeIsAmber = !badgeIsRed && dueSoonCount > 0;
   const badgeIsGreen = !badgeIsRed && !badgeIsAmber && newCount > 0;
 

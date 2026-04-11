@@ -1804,13 +1804,13 @@ class PrismaStorage implements IStorage {
       }
 
       // Count new classwork materials (without linked assignment) uploaded in the last 7 days
-      const newMaterialsCount = classroom.materials.filter((m) => {
+      const newMaterialsCount = (classroom.materials ?? []).filter((m) => {
         if (m.assignmentId) return false; // linked materials count via assignment pendingCount
         return new Date(m.uploadedAt) >= sevenDaysAgo;
       }).length;
 
       // Count new feed posts created in the last 7 days
-      const newPostsCount = classroom.posts.filter((p) => new Date(p.createdAt) >= sevenDaysAgo).length;
+      const newPostsCount = (classroom.posts ?? []).filter((p) => new Date(p.createdAt) >= sevenDaysAgo).length;
 
       const total = newCount + dueCount + dueSoonCount;
       result[classroom.id] = { pendingCount: pendingCount + newMaterialsCount + newPostsCount, newMaterialsCount, newPostsCount, newCount, dueCount, dueSoonCount, total };
