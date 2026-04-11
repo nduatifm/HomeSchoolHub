@@ -4488,21 +4488,6 @@ export function registerRoutes(app: Express) {
       const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
       const post = await storage.createClassroomPost({ classroomId: classroom.id, authorId: req.session.userId!, content });
 
-      // Notify all enrolled students about the new post
-      const postEnrollments = await storage.getEnrollments(classroom.id);
-      for (const enrollment of postEnrollments) {
-        const postStudent = await storage.getStudentById(enrollment.student.id);
-        if (postStudent?.userId) {
-          storage.createNotification({
-            userId: postStudent.userId,
-            type: "new_post",
-            title: "New Classroom Post",
-            body: `New post in "${classroom.name}": ${content.slice(0, 80)}${content.length > 80 ? "…" : ""}`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
-          }).catch(console.error);
-        }
-      }
-
       res.status(201).json(post);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4535,21 +4520,6 @@ export function registerRoutes(app: Express) {
       }).parse(req.body);
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data });
 
-      // Notify all enrolled students
-      const enrollments = await storage.getEnrollments(classroom.id);
-      for (const enrollment of enrollments) {
-        const studentUser = await storage.getStudentById(enrollment.student.id);
-        if (studentUser?.userId) {
-          storage.createNotification({
-            userId: studentUser.userId,
-            type: "new_assignment",
-            title: "New Classroom Assignment",
-            body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
-          }).catch(console.error);
-        }
-      }
-
       res.status(201).json(assignment);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4577,21 +4547,6 @@ export function registerRoutes(app: Express) {
       }
 
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl });
-
-      // Notify all enrolled students
-      const enrollments2 = await storage.getEnrollments(classroom.id);
-      for (const enrollment of enrollments2) {
-        const studentUser = await storage.getStudentById(enrollment.student.id);
-        if (studentUser?.userId) {
-          storage.createNotification({
-            userId: studentUser.userId,
-            type: "new_assignment",
-            title: "New Classroom Assignment",
-            body: `New assignment in "${classroom.name}": "${assignment.title}" — due ${assignment.dueDate}`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
-          }).catch(console.error);
-        }
-      }
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -4703,15 +4658,6 @@ export function registerRoutes(app: Express) {
       
       const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl);
 
-      // Notify the teacher that a student submitted
-      storage.createNotification({
-        userId: classroom.teacherId,
-        type: "assignment_submitted",
-        title: "Assignment Submitted",
-        body: `${user.name} submitted "${assignment.title}" in "${classroom.name}".`,
-        link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
-      }).catch(console.error);
-
       res.json(submission);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4736,30 +4682,6 @@ export function registerRoutes(app: Express) {
       if (!sub) return res.status(404).json({ error: "Submission not found" });
       const updated = await storage.gradeClassroomSubmission(submissionId, grade, feedback ?? null, sub.assignment.points);
 
-      // Notify the student their submission was graded
-      const gradedStudent = await storage.getStudentById(sub.studentId);
-      if (gradedStudent?.userId) {
-        const classroomData = await storage.getClassroomById(parseInt(req.params.classroomId));
-        const assignmentData = await prisma.classroomAssignment.findUnique({ where: { id: sub.assignmentId }, select: { title: true } });
-        storage.createNotification({
-          userId: gradedStudent.userId,
-          type: "assignment_graded",
-          title: "Assignment Graded",
-          body: `Your submission for "${assignmentData?.title ?? "assignment"}" in "${classroomData?.name ?? "classroom"}" has been graded: ${grade}/${sub.assignment.points}`,
-          link: `/classrooms/${classroom.slug ?? classroom.id}?tab=assignments`,
-        }).catch(console.error);
-        // Also notify the parent (skip if teacher === parent — homeschool dual-role)
-        if (gradedStudent.parentId && gradedStudent.parentId !== req.session.userId!) {
-          storage.createNotification({
-            userId: gradedStudent.parentId,
-            type: "assignment_graded",
-            title: "Assignment Graded",
-            body: `${gradedStudent.name}'s submission for "${assignmentData?.title ?? "assignment"}" was graded: ${grade}/${sub.assignment.points}`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=grades`,
-          }).catch(console.error);
-        }
-      }
-
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -4783,21 +4705,6 @@ export function registerRoutes(app: Express) {
         if (!assignment || assignment.classroomId !== classroom.id) return res.status(400).json({ error: "Assignment does not belong to this classroom" });
       }
       const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data });
-
-      // Notify all enrolled students about the new material
-      const materialEnrollments = await storage.getEnrollments(classroom.id);
-      for (const enrollment of materialEnrollments) {
-        const materialStudent = await storage.getStudentById(enrollment.student.id);
-        if (materialStudent?.userId) {
-          storage.createNotification({
-            userId: materialStudent.userId,
-            type: "new_classwork",
-            title: "New Classwork Material",
-            body: `New material in "${classroom.name}": "${material.title}"`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}?tab=classwork`,
-          }).catch(console.error);
-        }
-      }
 
       res.status(201).json(material);
     } catch (error: any) {
@@ -4833,21 +4740,6 @@ export function registerRoutes(app: Express) {
           url = uploadResult.url;
         }
         const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data, url });
-
-        // Notify all enrolled students about the new material
-        const materialEnrollments2 = await storage.getEnrollments(classroom.id);
-        for (const enrollment of materialEnrollments2) {
-          const materialStudent = await storage.getStudentById(enrollment.student.id);
-          if (materialStudent?.userId) {
-            storage.createNotification({
-              userId: materialStudent.userId,
-              type: "new_classwork",
-              title: "New Classwork Material",
-              body: `New material in "${classroom.name}": "${material.title}"`,
-              link: `/classrooms/${classroom.slug ?? classroom.id}?tab=classwork`,
-            }).catch(console.error);
-          }
-        }
 
         res.status(201).json(material);
       } catch (error: any) {

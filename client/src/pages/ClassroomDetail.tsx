@@ -1490,20 +1490,25 @@ export default function ClassroomDetail() {
       }).length
     : 0;
 
-  // Count classwork materials that have a linked assignment still pending
-  const classworkBadge = isStudent
-    ? _badgeMaterials.filter((m) => {
-        if (!m.linkedAssignment?.id) return false;
-        const sub = _badgeSubmissions.find((s) => s.assignmentId === m.linkedAssignment!.id);
-        return !sub || sub.status === "pending";
-      }).length
-    : 0;
-
-  // Count feed posts created in the last 7 days (day-normalized, matching backend ClassroomCard logic)
+  // Day-normalised 7-day window (matches ClassroomCard + backend logic)
   const _today = new Date();
   _today.setHours(0, 0, 0, 0);
   const _sevenDaysAgo = new Date(_today);
   _sevenDaysAgo.setDate(_today.getDate() - 7);
+
+  // Count classwork materials: linked-assignment pending + new standalone classwork (last 7 days)
+  const classworkBadge = isStudent
+    ? _badgeMaterials.filter((m) => {
+        if (m.linkedAssignment?.id) {
+          const sub = _badgeSubmissions.find((s) => s.assignmentId === m.linkedAssignment!.id);
+          return !sub || sub.status === "pending";
+        }
+        // Standalone classwork (no linked assignment): badge if uploaded within the last 7 days
+        return new Date(m.uploadedAt) >= _sevenDaysAgo;
+      }).length
+    : 0;
+
+  // Count feed posts created in the last 7 days
   const feedBadge = _badgePosts.filter((p) => new Date(p.createdAt) >= _sevenDaysAgo).length;
 
   const teacherTabs = [
