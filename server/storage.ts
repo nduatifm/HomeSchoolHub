@@ -295,6 +295,10 @@ export interface IStorage {
   updateClassroomMaterial(id: number, data: Partial<InsertClassroomMaterial>): Promise<ClassroomMaterial>;
   deleteClassroomMaterial(id: number): Promise<void>;
 
+  // ─── Seen content tracking ────────────────────────────────────────────────
+  markContentSeen(userId: number, contentType: string, contentId: number): Promise<void>;
+  getSeenContentIds(userId: number, contentType: string, contentIds: number[]): Promise<number[]>;
+
   // ─── Notifications ────────────────────────────────────────────────────────
   createNotification(data: { userId: number; type: string; title: string; body: string; link?: string }): Promise<any>;
   getNotificationsForUser(userId: number, limit?: number): Promise<any[]>;
@@ -302,7 +306,7 @@ export interface IStorage {
   markNotificationRead(id: number, userId: number): Promise<any>;
   markAllNotificationsRead(userId: number): Promise<void>;
 
-  getClassroomNotificationsForStudent(studentId: number): Promise<Record<number, {
+  getClassroomNotificationsForStudent(studentId: number, viewerUserId: number): Promise<Record<number, {
     pendingCount: number;
     newMaterialsCount: number;
     newPostsCount: number;
@@ -1722,7 +1726,7 @@ class PrismaStorage implements IStorage {
     }));
   }
 
-  async getClassroomNotificationsForStudent(studentId: number): Promise<Record<number, {
+  async getClassroomNotificationsForStudent(studentId: number, viewerUserId: number): Promise<Record<number, {
     newCount: number;
     dueCount: number;
     dueSoonCount: number;
@@ -1735,8 +1739,8 @@ class PrismaStorage implements IStorage {
             assignments: {
               include: { submissions: true };
             };
-            materials: { select: { id: true; assignmentId: true; uploadedAt: true } };
-            posts: { select: { id: true; createdAt: true } };
+            materials: { select: { id: true; assignmentId: true } };
+            posts: { select: { id: true } };
           };
         };
       };
@@ -1744,8 +1748,6 @@ class PrismaStorage implements IStorage {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 7);
 
     const enrollments: EnrollmentRow[] = await prisma.classroomEnrollment.findMany({
       where: { studentId },
@@ -1755,12 +1757,42 @@ class PrismaStorage implements IStorage {
             assignments: {
               include: { submissions: { where: { studentId } } },
             },
-            materials: { select: { id: true, assignmentId: true, uploadedAt: true } },
-            posts: { select: { id: true, createdAt: true } },
+            materials: { select: { id: true, assignmentId: true } },
+            posts: { select: { id: true } },
           },
         },
       },
     });
+
+    // Collect all content IDs across all classrooms for a single batch lookup
+    const allMaterialIds: number[] = [];
+    const allPostIds: number[] = [];
+    const allAssignmentIds: number[] = [];
+    for (const enrollment of enrollments) {
+      const cl = enrollment.classroom;
+      allMaterialIds.push(...(cl.materials ?? []).filter((m) => !m.assignmentId).map((m) => m.id));
+      allPostIds.push(...(cl.posts ?? []).map((p) => p.id));
+      // For parent viewers only: track assignments they've seen
+      if (viewerUserId !== undefined) {
+        allAssignmentIds.push(...cl.assignments.map((a) => a.id));
+      }
+    }
+
+    // Batch-fetch seen IDs for this viewer
+    const seenMaterialIds = await this.getSeenContentIds(viewerUserId, "material", allMaterialIds);
+    const seenPostIds = await this.getSeenContentIds(viewerUserId, "post", allPostIds);
+    const seenMaterialSet = new Set(seenMaterialIds);
+    const seenPostSet = new Set(seenPostIds);
+
+    // For parent: also load seen assignment IDs
+    const isParentView = viewerUserId !== (
+      await prisma.student.findUnique({ where: { id: studentId }, select: { userId: true } })
+    )?.userId;
+    const seenAssignmentSet = new Set<number>();
+    if (isParentView && allAssignmentIds.length > 0) {
+      const seenAssignmentIds = await this.getSeenContentIds(viewerUserId, "assignment", allAssignmentIds);
+      seenAssignmentIds.forEach((id) => seenAssignmentSet.add(id));
+    }
 
     const result: Record<number, { pendingCount: number; newMaterialsCount: number; newPostsCount: number; newCount: number; dueCount: number; dueSoonCount: number; total: number }> = {};
 
@@ -1781,7 +1813,10 @@ class PrismaStorage implements IStorage {
         // Skip if already submitted (not pending)
         if (sub && sub.status !== "pending") continue;
 
-        // Count every unsubmitted assignment toward pendingCount
+        // For parent viewers: skip assignments they've already seen
+        if (isParentView && seenAssignmentSet.has(assignment.id)) continue;
+
+        // Count every unsubmitted (and unseen-by-parent) assignment toward pendingCount
         pendingCount++;
 
         let classified = false;
@@ -1798,19 +1833,18 @@ class PrismaStorage implements IStorage {
 
         // "New" requires strictly no submission row at all (not even pending)
         if (!classified && !sub) {
-          const created = new Date(assignment.createdAt);
-          if (created >= sevenDaysAgo) newCount++;
+          newCount++;
         }
       }
 
-      // Count new classwork materials (without linked assignment) uploaded in the last 7 days
+      // Count unseen standalone classwork materials (without linked assignment)
       const newMaterialsCount = (classroom.materials ?? []).filter((m) => {
         if (m.assignmentId) return false; // linked materials count via assignment pendingCount
-        return new Date(m.uploadedAt) >= sevenDaysAgo;
+        return !seenMaterialSet.has(m.id);
       }).length;
 
-      // Count new feed posts created in the last 7 days
-      const newPostsCount = (classroom.posts ?? []).filter((p) => new Date(p.createdAt) >= sevenDaysAgo).length;
+      // Count unseen feed posts
+      const newPostsCount = (classroom.posts ?? []).filter((p) => !seenPostSet.has(p.id)).length;
 
       const total = newCount + dueCount + dueSoonCount;
       result[classroom.id] = { pendingCount: pendingCount + newMaterialsCount + newPostsCount, newMaterialsCount, newPostsCount, newCount, dueCount, dueSoonCount, total };
@@ -1926,6 +1960,25 @@ class PrismaStorage implements IStorage {
 
   async deleteClassroomMaterial(id: number): Promise<void> {
     await prisma.classroomMaterial.delete({ where: { id } });
+  }
+
+  // ─── Seen content tracking ────────────────────────────────────────────────
+
+  async markContentSeen(userId: number, contentType: string, contentId: number): Promise<void> {
+    await prisma.classroomContentSeen.upsert({
+      where: { userId_contentType_contentId: { userId, contentType, contentId } },
+      create: { userId, contentType, contentId },
+      update: { seenAt: new Date() },
+    });
+  }
+
+  async getSeenContentIds(userId: number, contentType: string, contentIds: number[]): Promise<number[]> {
+    if (contentIds.length === 0) return [];
+    const rows = await prisma.classroomContentSeen.findMany({
+      where: { userId, contentType, contentId: { in: contentIds } },
+      select: { contentId: true },
+    });
+    return rows.map((r) => r.contentId);
   }
 
   // ─── Notifications ────────────────────────────────────────────────────────

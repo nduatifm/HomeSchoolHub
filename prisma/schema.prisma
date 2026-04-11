@@ -69,6 +69,7 @@ model User {
   teacherClassrooms          Classroom[]                 @relation("TeacherClassrooms")
   classroomPosts             ClassroomPost[]             @relation("ClassroomPostAuthor")
   notifications              Notification[]
+  seenContent                ClassroomContentSeen[]
 
   @@index([email])
   @@index([googleId])
@@ -516,6 +517,21 @@ model ClassroomMaterial {
   @@unique([classroomId, slug])
   @@index([classroomId])
   @@index([assignmentId])
+}
+
+// ─── Content seen tracking ──────────────────────────────────────────────────
+
+model ClassroomContentSeen {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  contentType String
+  contentId   Int
+  seenAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentType, contentId])
+  @@index([userId, contentType])
 }
 
 // ─── Notifications ─────────────────────────────────────────────────────────

@@ -281,7 +281,13 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ── Feed tab ──────────────────────────────────────────────────────────────────
-function FeedTab({ classroomId, isTeacher, isArchived }: { classroomId: number; isTeacher: boolean; isArchived: boolean }) {
+function FeedTab({ classroomId, isTeacher, isArchived, seenPostIds, onPostSeen }: {
+  classroomId: number;
+  isTeacher: boolean;
+  isArchived: boolean;
+  seenPostIds?: Set<number>;
+  onPostSeen?: (postId: number) => void;
+}) {
   const [content, setContent] = useState("");
   const { data: posts = [], isLoading } = useQuery<PostWithAuthor[]>({
     queryKey: ["/api/classrooms", classroomId, "posts"],
@@ -328,14 +334,24 @@ function FeedTab({ classroomId, isTeacher, isArchived }: { classroomId: number; 
       )}
 
       <div className="space-y-3">
-        {posts.map((post) => (
-          <div key={post.id} className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{post.content}</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              {post.authorName} · {new Date(post.createdAt).toLocaleString()}
-            </p>
-          </div>
-        ))}
+        {posts.map((post) => {
+          const isUnseen = !isTeacher && seenPostIds && !seenPostIds.has(post.id);
+          return (
+            <div
+              key={post.id}
+              onClick={() => { if (isUnseen && onPostSeen) onPostSeen(post.id); }}
+              className={`rounded-2xl border bg-card p-4 transition-colors ${isUnseen ? "border-primary/30 bg-primary/5 cursor-pointer hover:bg-primary/10" : "border-border"}`}
+            >
+              {isUnseen && (
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary mb-2" />
+              )}
+              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{post.content}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {post.authorName} · {new Date(post.createdAt).toLocaleString()}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -915,9 +931,10 @@ function ClassworkDialog({
   );
 }
 
-function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived, assignments, mySubmissions }: {
+function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived, assignments, mySubmissions, isUnseen, onSeen }: {
   item: ClassroomMaterial; classroomId: number; classroomSlug: string | number;
   isTeacher: boolean; isArchived: boolean; assignments: ClassroomAssignment[]; mySubmissions?: ClassroomSubmission[];
+  isUnseen?: boolean; onSeen?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -950,11 +967,18 @@ function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived
     return Math.round((due.getTime() - today.getTime()) / 86400000);
   })();
 
+  const handleToggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && isUnseen && onSeen) onSeen();
+  };
+
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className={`rounded-2xl border bg-card overflow-hidden transition-colors ${isUnseen ? "border-primary/30" : "border-border"}`}>
       <div className="flex items-center gap-3 px-4 py-3.5">
-        <button type="button" className="flex-1 min-w-0 text-left" onClick={() => setExpanded((v) => !v)}>
+        <button type="button" className="flex-1 min-w-0 text-left" onClick={handleToggle}>
           <div className="flex items-center gap-2 flex-wrap">
+            {isUnseen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
             <span className="font-semibold text-sm text-foreground">{item.title}</span>
             {item.url && <Paperclip className="h-3 w-3 text-muted-foreground shrink-0" />}
             {item.linkedAssignment && <Link2 className="h-3 w-3 text-primary shrink-0" />}
@@ -982,7 +1006,7 @@ function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived
               </Button>
             </>
           )}
-          <button type="button" onClick={() => setExpanded((v) => !v)} className="p-1">
+          <button type="button" onClick={handleToggle} className="p-1">
             {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </button>
         </div>
@@ -1012,7 +1036,10 @@ function ClassworkCard({ item, classroomId, classroomSlug, isTeacher, isArchived
   );
 }
 
-function ClassworkTab({ classroomId, classroomSlug, isTeacher, isStudent, isArchived }: { classroomId: number; classroomSlug: string | number; isTeacher: boolean; isStudent: boolean; isArchived: boolean }) {
+function ClassworkTab({ classroomId, classroomSlug, isTeacher, isStudent, isArchived, seenMaterialIds, onMaterialSeen }: {
+  classroomId: number; classroomSlug: string | number; isTeacher: boolean; isStudent: boolean; isArchived: boolean;
+  seenMaterialIds?: Set<number>; onMaterialSeen?: (materialId: number) => void;
+}) {
   const [createOpen, setCreateOpen] = useState(false);
   const { data: classwork = [], isLoading } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
@@ -1044,10 +1071,14 @@ function ClassworkTab({ classroomId, classroomSlug, isTeacher, isStudent, isArch
         <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No classwork yet.</div>
       )}
       <div className="space-y-2">
-        {classwork.map((item) => (
-          <ClassworkCard key={item.id} item={item} classroomId={classroomId} classroomSlug={classroomSlug}
-            isTeacher={isTeacher} isArchived={isArchived} assignments={assignments} mySubmissions={mySubmissions} />
-        ))}
+        {classwork.map((item) => {
+          const isUnseen = !isTeacher && seenMaterialIds ? !seenMaterialIds.has(item.id) : false;
+          return (
+            <ClassworkCard key={item.id} item={item} classroomId={classroomId} classroomSlug={classroomSlug}
+              isTeacher={isTeacher} isArchived={isArchived} assignments={assignments} mySubmissions={mySubmissions}
+              isUnseen={isUnseen} onSeen={isUnseen ? () => onMaterialSeen?.(item.id) : undefined} />
+          );
+        })}
       </div>
     </div>
   );
@@ -1336,7 +1367,10 @@ function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchiv
 }
 
 // ── Parent Grades tab ─────────────────────────────────────────────────────────
-function ParentGradesTab({ classroomId, studentId }: { classroomId: number; studentId: number }) {
+function ParentGradesTab({ classroomId, studentId, seenAssignmentIds, onAssignmentSeen }: {
+  classroomId: number; studentId: number;
+  seenAssignmentIds?: Set<number>; onAssignmentSeen?: (assignmentId: number) => void;
+}) {
   const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
@@ -1377,9 +1411,19 @@ function ParentGradesTab({ classroomId, studentId }: { classroomId: number; stud
           <tbody className="divide-y divide-border">
             {assignments.map((a) => {
               const sub = subMap[a.id];
+              const isUnseen = seenAssignmentIds && !seenAssignmentIds.has(a.id);
               return (
-                <tr key={a.id} className="hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium text-foreground">{a.title}</td>
+                <tr
+                  key={a.id}
+                  onClick={() => { if (isUnseen && onAssignmentSeen) onAssignmentSeen(a.id); }}
+                  className={`transition-colors ${isUnseen ? "bg-primary/5 hover:bg-primary/10 cursor-pointer" : "hover:bg-muted/20"}`}
+                >
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    <div className="flex items-center gap-1.5">
+                      {isUnseen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                      {a.title}
+                    </div>
+                  </td>
                   <td className="px-3 py-3 text-muted-foreground">{a.dueDate}</td>
                   <td className="px-3 py-3 text-center"><StatusBadge status={sub?.status ?? "pending"} /></td>
                   <td className="px-3 py-3 text-center">
@@ -1423,7 +1467,12 @@ export default function ClassroomDetail() {
     enabled: user?.role === "student",
   });
 
-  // Badge counts for student tab pills — share cache with child component queries
+  // Optimistic local seen tracking (cleared on remount / navigation)
+  const [localSeenPosts, setLocalSeenPosts] = useState<Set<number>>(new Set());
+  const [localSeenMaterials, setLocalSeenMaterials] = useState<Set<number>>(new Set());
+  const [localSeenAssignments, setLocalSeenAssignments] = useState<Set<number>>(new Set());
+
+  // Badge counts for student/parent tab pills — share cache with child component queries
   const { data: _badgeAssignments = [] } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
@@ -1437,12 +1486,20 @@ export default function ClassroomDetail() {
   const { data: _badgeMaterials = [] } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
-    enabled: user?.role === "student" && classroomId > 0,
+    enabled: (user?.role === "student" || user?.role === "parent") && classroomId > 0,
   });
   const { data: _badgePosts = [] } = useQuery<PostWithAuthor[]>({
     queryKey: ["/api/classrooms", classroomId, "posts"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/posts`),
     enabled: classroomId > 0,
+  });
+
+  // Server-persisted seen record — polled every 15 s for multi-device sync
+  const { data: _seenData } = useQuery<{ postIds: number[]; materialIds: number[]; assignmentIds: number[] }>({
+    queryKey: ["/api/classrooms", classroomId, "my-seen"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/my-seen`),
+    enabled: (user?.role === "student" || user?.role === "parent") && classroomId > 0,
+    refetchInterval: 15000,
   });
 
   const archiveMutation = useMutation({
@@ -1482,6 +1539,29 @@ export default function ClassroomDetail() {
   const isArchived = classroom.status === "archived";
   const theme = getSubjectTheme(classroom.subject || "");
 
+  // Merge server-seen + optimistic local-seen into unified Sets
+  const seenPostIds = new Set<number>(_seenData?.postIds ?? []);
+  localSeenPosts.forEach((id) => seenPostIds.add(id));
+  const seenMaterialIds = new Set<number>(_seenData?.materialIds ?? []);
+  localSeenMaterials.forEach((id) => seenMaterialIds.add(id));
+  const seenAssignmentIds = new Set<number>(_seenData?.assignmentIds ?? []);
+  localSeenAssignments.forEach((id) => seenAssignmentIds.add(id));
+
+  // Fire-and-forget seen mark: optimistic update + API call + cache invalidation
+  const markSeen = (type: "post" | "material" | "assignment", contentId: number) => {
+    if (type === "post") setLocalSeenPosts((prev) => new Set(prev).add(contentId));
+    else if (type === "material") setLocalSeenMaterials((prev) => new Set(prev).add(contentId));
+    else setLocalSeenAssignments((prev) => new Set(prev).add(contentId));
+    apiRequest(`/api/classrooms/${classroomId}/${type}s/${contentId}/seen`, { method: "POST" })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-seen"] });
+        if (studentData?.id) {
+          queryClient.invalidateQueries({ queryKey: ["/api/students", studentData.id, "classroom-notifications"] });
+        }
+      })
+      .catch(console.error);
+  };
+
   // Count pending (unsubmitted) assignments for the student tab badges
   const assignmentsBadge = isStudent
     ? _badgeAssignments.filter((a) => {
@@ -1490,29 +1570,26 @@ export default function ClassroomDetail() {
       }).length
     : 0;
 
-  // Day-normalised 7-day window (matches ClassroomCard + backend logic)
-  const _today = new Date();
-  _today.setHours(0, 0, 0, 0);
-  const _sevenDaysAgo = new Date(_today);
-  _sevenDaysAgo.setDate(_today.getDate() - 7);
-
-  // Count classwork materials: linked-assignment pending + new standalone classwork (last 7 days)
+  // Classwork badge: student = linked-pending + unseen standalone; parent = all unseen
   const classworkBadge = isStudent
     ? _badgeMaterials.filter((m) => {
         if (m.linkedAssignment?.id) {
           const sub = _badgeSubmissions.find((s) => s.assignmentId === m.linkedAssignment!.id);
           return !sub || sub.status === "pending";
         }
-        // Standalone classwork (no linked assignment): badge if uploaded within the last 7 days
-        return new Date(m.uploadedAt) >= _sevenDaysAgo;
+        return !seenMaterialIds.has(m.id);
       }).length
+    : isParent
+      ? _badgeMaterials.filter((m) => !seenMaterialIds.has(m.id)).length
+      : 0;
+
+  // Feed badge: unseen posts for students/parents; teachers have no feed badge
+  const feedBadge = (isStudent || isParent)
+    ? _badgePosts.filter((p) => !seenPostIds.has(p.id)).length
     : 0;
 
-  // Count feed posts created in the last 7 days
-  const feedBadge = _badgePosts.filter((p) => new Date(p.createdAt) >= _sevenDaysAgo).length;
-
   const teacherTabs = [
-    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
+    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
     { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" /> },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
@@ -1526,7 +1603,7 @@ export default function ClassroomDetail() {
   const parentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
-    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
+    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
   ];
 
   const tabs = isTeacher ? teacherTabs : isStudent ? studentTabs : parentTabs;
@@ -1585,12 +1662,37 @@ export default function ClassroomDetail() {
           <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
           {/* Tab content */}
-          {activeTab === "feed" && <FeedTab classroomId={classroomId} isTeacher={isTeacher} isArchived={isArchived} />}
+          {activeTab === "feed" && (
+            <FeedTab
+              classroomId={classroomId}
+              isTeacher={isTeacher}
+              isArchived={isArchived}
+              seenPostIds={seenPostIds}
+              onPostSeen={(id) => markSeen("post", id)}
+            />
+          )}
           {activeTab === "assignments" && isTeacher && <TeacherAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isArchived={isArchived} />}
           {activeTab === "assignments" && isStudent && <StudentAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} studentId={studentData?.id ?? 0} isArchived={isArchived} />}
           {activeTab === "grades" && isTeacher && <TeacherGradesTab classroomId={classroomId} />}
-          {activeTab === "grades" && isParent && <ParentGradesTab classroomId={classroomId} studentId={parentStudentId} />}
-          {activeTab === "classwork" && <ClassworkTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isTeacher={isTeacher} isStudent={isStudent} isArchived={isArchived} />}
+          {activeTab === "grades" && isParent && (
+            <ParentGradesTab
+              classroomId={classroomId}
+              studentId={parentStudentId}
+              seenAssignmentIds={seenAssignmentIds}
+              onAssignmentSeen={(id) => markSeen("assignment", id)}
+            />
+          )}
+          {activeTab === "classwork" && (
+            <ClassworkTab
+              classroomId={classroomId}
+              classroomSlug={classroom.slug ?? classroom.id}
+              isTeacher={isTeacher}
+              isStudent={isStudent}
+              isArchived={isArchived}
+              seenMaterialIds={seenMaterialIds}
+              onMaterialSeen={(id) => markSeen("material", id)}
+            />
+          )}
           {activeTab === "students" && isTeacher && <StudentsTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} />}
 
         </div>

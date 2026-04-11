@@ -1407,7 +1407,7 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const notifications = await storage.getClassroomNotificationsForStudent(studentId);
+      const notifications = await storage.getClassroomNotificationsForStudent(studentId, callerId);
       res.json(notifications);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4879,6 +4879,70 @@ export function registerRoutes(app: Express) {
   app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
     try {
       await storage.markNotificationRead(parseInt(req.params.id), req.session.userId!);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── Seen-content endpoints ────────────────────────────────────────────────
+
+  // GET /api/classrooms/:classroomId/my-seen — IDs the current user has seen in this classroom
+  app.get("/api/classrooms/:classroomId/my-seen", requireAuth, async (req, res) => {
+    try {
+      const classroomId = parseInt(req.params.classroomId);
+      if (isNaN(classroomId)) return res.status(400).json({ error: "Invalid classroom ID" });
+      const userId = req.session.userId!;
+
+      const [posts, materials, assignments] = await Promise.all([
+        prisma.classroomContentSeen.findMany({ where: { userId, contentType: "post" }, select: { contentId: true } }),
+        prisma.classroomContentSeen.findMany({ where: { userId, contentType: "material" }, select: { contentId: true } }),
+        prisma.classroomContentSeen.findMany({ where: { userId, contentType: "assignment" }, select: { contentId: true } }),
+      ]);
+
+      res.json({
+        postIds: posts.map((r) => r.contentId),
+        materialIds: materials.map((r) => r.contentId),
+        assignmentIds: assignments.map((r) => r.contentId),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/posts/:postId/seen
+  app.post("/api/classrooms/:classroomId/posts/:postId/seen", requireAuth, async (req, res) => {
+    try {
+      const postId = parseInt(req.params.postId);
+      if (isNaN(postId)) return res.status(400).json({ error: "Invalid post ID" });
+      const userId = req.session.userId!;
+      await storage.markContentSeen(userId, "post", postId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/materials/:materialId/seen
+  app.post("/api/classrooms/:classroomId/materials/:materialId/seen", requireAuth, async (req, res) => {
+    try {
+      const materialId = parseInt(req.params.materialId);
+      if (isNaN(materialId)) return res.status(400).json({ error: "Invalid material ID" });
+      const userId = req.session.userId!;
+      await storage.markContentSeen(userId, "material", materialId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/assignments/:assignmentId/seen
+  app.post("/api/classrooms/:classroomId/assignments/:assignmentId/seen", requireAuth, async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.assignmentId);
+      if (isNaN(assignmentId)) return res.status(400).json({ error: "Invalid assignment ID" });
+      const userId = req.session.userId!;
+      await storage.markContentSeen(userId, "assignment", assignmentId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
