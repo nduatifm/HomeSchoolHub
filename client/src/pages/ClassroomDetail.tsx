@@ -1439,6 +1439,11 @@ export default function ClassroomDetail() {
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
     enabled: user?.role === "student" && classroomId > 0,
   });
+  const { data: _badgePosts = [] } = useQuery<PostWithAuthor[]>({
+    queryKey: ["/api/classrooms", classroomId, "posts"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/posts`),
+    enabled: classroomId > 0,
+  });
 
   const archiveMutation = useMutation({
     mutationFn: (status: "active" | "archived") =>
@@ -1494,20 +1499,25 @@ export default function ClassroomDetail() {
       }).length
     : 0;
 
+  // Count feed posts created in the last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const feedBadge = _badgePosts.filter((p) => new Date(p.createdAt) >= sevenDaysAgo).length;
+
   const teacherTabs = [
-    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
+    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
     { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" /> },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
     { value: "students", label: "Students", icon: <Users className="h-3.5 w-3.5" /> },
   ];
   const studentTabs = [
-    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
+    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
     { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" />, badge: assignmentsBadge || undefined },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
   ];
   const parentTabs = [
-    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
+    { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
   ];
