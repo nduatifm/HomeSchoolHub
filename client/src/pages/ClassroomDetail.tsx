@@ -316,7 +316,7 @@ export default function ClassroomDetail() {
               onMaterialSeen={(id) => markSeen("material", id)}
             />
           )}
-          {activeTab === "students" && isTeacher && <StudentsTab classroomId={classroomId} teacherId={classroom.teacherId} isArchived={isArchived} />}
+          {activeTab === "students" && isTeacher && <StudentsTab classroomId={classroomId} isArchived={isArchived} />}
 
         </div>
       </div>

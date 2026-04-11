@@ -17,7 +17,7 @@ import type { EnrollmentWithStudent } from "./types";
 
 type StudentSearchResult = { id: number; name: string; gradeLevel: string; email: string };
 
-export default function StudentsTab({ classroomId, teacherId, isArchived }: { classroomId: number; teacherId: number; isArchived: boolean }) {
+export default function StudentsTab({ classroomId, isArchived }: { classroomId: number; isArchived: boolean }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
 
