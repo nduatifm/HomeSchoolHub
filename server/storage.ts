@@ -1727,6 +1727,9 @@ class PrismaStorage implements IStorage {
   }
 
   async getClassroomNotificationsForStudent(studentId: number, viewerUserId: number): Promise<Record<number, {
+    pendingCount: number;
+    newMaterialsCount: number;
+    newPostsCount: number;
     newCount: number;
     dueCount: number;
     dueSoonCount: number;

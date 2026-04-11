@@ -1425,7 +1425,7 @@ export function registerRoutes(app: Express) {
         const student = await storage.getStudentByUserId(userId);
         if (!student) return res.json({ total: 0 });
         const notifications = await storage.getClassroomNotificationsForStudent(student.id, userId);
-        const total = Object.values(notifications).reduce((sum, n: any) => sum + (n.pendingCount ?? 0), 0);
+        const total = Object.values(notifications).reduce((sum, n) => sum + n.pendingCount, 0);
         return res.json({ total });
       }
 
@@ -1433,10 +1433,11 @@ export function registerRoutes(app: Express) {
         const children = await storage.getStudentsByParent(userId);
         if (!children.length) return res.json({ total: 0 });
         const allNotifications = await Promise.all(
-          children.map((child: any) => storage.getClassroomNotificationsForStudent(child.id, userId))
+          children.map((child) => storage.getClassroomNotificationsForStudent(child.id, userId))
         );
-        const total = allNotifications.reduce((sum, notifMap) =>
-          sum + Object.values(notifMap).reduce((s, n: any) => s + (n.pendingCount ?? 0), 0), 0
+        const total = allNotifications.reduce(
+          (sum, notifMap) => sum + Object.values(notifMap).reduce((s, n) => s + n.pendingCount, 0),
+          0
         );
         return res.json({ total });
       }
