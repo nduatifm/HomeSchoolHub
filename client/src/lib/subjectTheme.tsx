@@ -3,6 +3,10 @@ type SubjectTheme = {
   banner: React.ReactNode;
   pill: string;
   pillText: string;
+  accentText: string;
+  accent: string;
+  bannerBg: string;
+  wideBanner: React.ReactNode;
 };
 
 export function getSubjectTheme(subject: string): SubjectTheme {
@@ -12,6 +16,9 @@ export function getSubjectTheme(subject: string): SubjectTheme {
     bg: "bg-violet-50",
     pill: "bg-violet-100 text-violet-700",
     pillText: "text-violet-700",
+    accentText: "text-violet-700",
+    accent: "border-l-violet-400",
+    bannerBg: "bg-violet-100",
     banner: (
       <svg viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <rect width="320" height="100" fill="#ede9fe"/>
@@ -26,12 +33,30 @@ export function getSubjectTheme(subject: string): SubjectTheme {
         <circle cx="290" cy="80" r="6" fill="#ddd6fe" opacity="0.5"/>
       </svg>
     ),
+    wideBanner: (
+      <svg viewBox="0 0 640 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <rect width="640" height="120" fill="#ede9fe"/>
+        <text x="40" y="88" fontSize="72" fill="#c4b5fd" fontFamily="serif" opacity="0.6">∑</text>
+        <text x="140" y="75" fontSize="54" fill="#a78bfa" fontFamily="serif" opacity="0.55">π</text>
+        <text x="230" y="90" fontSize="42" fill="#c4b5fd" fontFamily="monospace" opacity="0.6">x²</text>
+        <text x="318" y="72" fontSize="56" fill="#a78bfa" fontFamily="serif" opacity="0.45">∫</text>
+        <text x="400" y="88" fontSize="40" fill="#c4b5fd" fontFamily="monospace" opacity="0.55">÷</text>
+        <text x="468" y="68" fontSize="48" fill="#a78bfa" fontFamily="monospace" opacity="0.4">√</text>
+        <text x="554" y="84" fontSize="38" fill="#c4b5fd" fontFamily="serif" opacity="0.5">θ</text>
+        <circle cx="520" cy="20" r="7" fill="#ddd6fe" opacity="0.5"/>
+        <circle cx="200" cy="18" r="5" fill="#c4b5fd" opacity="0.45"/>
+        <circle cx="610" cy="95" r="8" fill="#ddd6fe" opacity="0.4"/>
+      </svg>
+    ),
   };
 
   if (/science|biology|chemistry|physics|lab|nature|earth/.test(s)) return {
     bg: "bg-emerald-50",
     pill: "bg-emerald-100 text-emerald-700",
     pillText: "text-emerald-700",
+    accentText: "text-emerald-700",
+    accent: "border-l-emerald-400",
+    bannerBg: "bg-emerald-100",
     banner: (
       <svg viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <rect width="320" height="100" fill="#ecfdf5"/>
@@ -50,12 +75,34 @@ export function getSubjectTheme(subject: string): SubjectTheme {
         <circle cx="305" cy="75" r="4" fill="#a7f3d0" opacity="0.5"/>
       </svg>
     ),
+    wideBanner: (
+      <svg viewBox="0 0 640 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <rect width="640" height="120" fill="#ecfdf5"/>
+        <path d="M70 20 L70 68 L46 104 L94 104 Z" fill="none" stroke="#6ee7b7" strokeWidth="3.5" strokeLinejoin="round"/>
+        <path d="M58 80 L82 80 L94 104 L46 104 Z" fill="#a7f3d0" opacity="0.7"/>
+        <line x1="62" y1="20" x2="78" y2="20" stroke="#6ee7b7" strokeWidth="3"/>
+        <path d="M190 12 Q216 38 190 64 Q164 90 190 116" fill="none" stroke="#6ee7b7" strokeWidth="3" opacity="0.65"/>
+        <path d="M220 12 Q194 38 220 64 Q246 90 220 116" fill="none" stroke="#a7f3d0" strokeWidth="3" opacity="0.55"/>
+        <line x1="190" y1="38" x2="220" y2="38" stroke="#34d399" strokeWidth="2" opacity="0.45"/>
+        <line x1="190" y1="64" x2="220" y2="64" stroke="#34d399" strokeWidth="2" opacity="0.45"/>
+        <circle cx="380" cy="60" r="8" fill="#6ee7b7"/>
+        <ellipse cx="380" cy="60" rx="36" ry="14" fill="none" stroke="#a7f3d0" strokeWidth="2.5" opacity="0.65"/>
+        <ellipse cx="380" cy="60" rx="36" ry="14" fill="none" stroke="#6ee7b7" strokeWidth="2.5" opacity="0.55" transform="rotate(60 380 60)"/>
+        <ellipse cx="380" cy="60" rx="36" ry="14" fill="none" stroke="#a7f3d0" strokeWidth="2.5" opacity="0.45" transform="rotate(120 380 60)"/>
+        <circle cx="540" cy="30" r="4" fill="#d1fae5" opacity="0.7"/>
+        <circle cx="580" cy="88" r="6" fill="#a7f3d0" opacity="0.5"/>
+        <circle cx="490" cy="96" r="5" fill="#6ee7b7" opacity="0.4"/>
+      </svg>
+    ),
   };
 
   if (/art|draw|paint|music|creative|design|craft/.test(s)) return {
     bg: "bg-pink-50",
     pill: "bg-pink-100 text-pink-700",
     pillText: "text-pink-700",
+    accentText: "text-pink-700",
+    accent: "border-l-pink-400",
+    bannerBg: "bg-pink-100",
     banner: (
       <svg viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <rect width="320" height="100" fill="#fdf2f8"/>
@@ -76,12 +123,37 @@ export function getSubjectTheme(subject: string): SubjectTheme {
         <rect x="286" y="68" width="14" height="14" rx="3" fill="#fde68a" opacity="0.7"/>
       </svg>
     ),
+    wideBanner: (
+      <svg viewBox="0 0 640 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <rect width="640" height="120" fill="#fdf2f8"/>
+        <ellipse cx="90" cy="64" rx="44" ry="34" fill="#fbcfe8" opacity="0.8"/>
+        <circle cx="66" cy="46" r="9" fill="#f9a8d4"/>
+        <circle cx="92" cy="36" r="9" fill="#c4b5fd"/>
+        <circle cx="118" cy="46" r="9" fill="#6ee7b7"/>
+        <circle cx="122" cy="72" r="9" fill="#fde68a"/>
+        <circle cx="78" cy="84" r="7" fill="#fff" opacity="0.9"/>
+        <line x1="132" y1="92" x2="200" y2="28" stroke="#f9a8d4" strokeWidth="5" strokeLinecap="round"/>
+        <ellipse cx="202" cy="26" rx="6" ry="10" fill="#f472b6" transform="rotate(-45 202 26)"/>
+        <text x="240" y="60" fontSize="36" fill="#f9a8d4" opacity="0.65">✦</text>
+        <text x="310" y="88" fontSize="26" fill="#c4b5fd" opacity="0.55">✦</text>
+        <text x="370" y="46" fontSize="20" fill="#fbcfe8" opacity="0.75">✦</text>
+        <rect x="430" y="44" width="22" height="22" rx="4" fill="#f9a8d4" opacity="0.65"/>
+        <rect x="460" y="44" width="22" height="22" rx="4" fill="#c4b5fd" opacity="0.65"/>
+        <rect x="490" y="44" width="22" height="22" rx="4" fill="#6ee7b7" opacity="0.65"/>
+        <rect x="430" y="72" width="22" height="22" rx="4" fill="#fde68a" opacity="0.65"/>
+        <rect x="460" y="72" width="22" height="22" rx="4" fill="#f9a8d4" opacity="0.55"/>
+        <rect x="490" y="72" width="22" height="22" rx="4" fill="#c4b5fd" opacity="0.55"/>
+      </svg>
+    ),
   };
 
   if (/history|social|civics|geography|world|culture/.test(s)) return {
     bg: "bg-amber-50",
     pill: "bg-amber-100 text-amber-700",
     pillText: "text-amber-700",
+    accentText: "text-amber-700",
+    accent: "border-l-amber-400",
+    bannerBg: "bg-amber-100",
     banner: (
       <svg viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <rect width="320" height="100" fill="#fffbeb"/>
@@ -101,12 +173,35 @@ export function getSubjectTheme(subject: string): SubjectTheme {
         <text x="285" y="38" fontSize="14" fill="#fcd34d" opacity="0.5">★</text>
       </svg>
     ),
+    wideBanner: (
+      <svg viewBox="0 0 640 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <rect width="640" height="120" fill="#fffbeb"/>
+        <circle cx="80" cy="60" r="42" fill="none" stroke="#fcd34d" strokeWidth="3"/>
+        <ellipse cx="80" cy="60" rx="20" ry="42" fill="none" stroke="#fde68a" strokeWidth="2.5" opacity="0.8"/>
+        <line x1="38" y1="60" x2="122" y2="60" stroke="#fcd34d" strokeWidth="2" opacity="0.65"/>
+        <line x1="44" y1="38" x2="116" y2="38" stroke="#fde68a" strokeWidth="2" opacity="0.55"/>
+        <line x1="44" y1="82" x2="116" y2="82" stroke="#fde68a" strokeWidth="2" opacity="0.55"/>
+        <rect x="175" y="30" width="80" height="60" rx="5" fill="#fde68a" opacity="0.7"/>
+        <rect x="167" y="30" width="12" height="60" rx="5" fill="#fcd34d" opacity="0.8"/>
+        <rect x="255" y="30" width="12" height="60" rx="5" fill="#fcd34d" opacity="0.8"/>
+        <line x1="188" y1="50" x2="244" y2="50" stroke="#f59e0b" strokeWidth="2" opacity="0.55"/>
+        <line x1="188" y1="64" x2="244" y2="64" stroke="#f59e0b" strokeWidth="2" opacity="0.55"/>
+        <line x1="188" y1="78" x2="232" y2="78" stroke="#f59e0b" strokeWidth="2" opacity="0.45"/>
+        <text x="310" y="56" fontSize="38" fill="#fcd34d" opacity="0.65">★</text>
+        <text x="376" y="82" fontSize="28" fill="#fde68a" opacity="0.55">★</text>
+        <text x="430" y="46" fontSize="22" fill="#fcd34d" opacity="0.5">★</text>
+        <text x="490" y="70" fontSize="32" fill="#fde68a" opacity="0.45">★</text>
+      </svg>
+    ),
   };
 
   if (/english|writing|reading|language|lit|grammar|spelling|phonics/.test(s)) return {
     bg: "bg-sky-50",
     pill: "bg-sky-100 text-sky-700",
     pillText: "text-sky-700",
+    accentText: "text-sky-700",
+    accent: "border-l-sky-400",
+    bannerBg: "bg-sky-100",
     banner: (
       <svg viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <rect width="320" height="100" fill="#f0f9ff"/>
@@ -125,12 +220,34 @@ export function getSubjectTheme(subject: string): SubjectTheme {
         <text x="290" y="32" fontSize="16" fill="#bae6fd" fontFamily="Georgia, serif" opacity="0.5">Dd</text>
       </svg>
     ),
+    wideBanner: (
+      <svg viewBox="0 0 640 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <rect width="640" height="120" fill="#f0f9ff"/>
+        <path d="M40 96 L40 28 Q72 20 90 38 L90 96 Q72 82 40 96Z" fill="#bae6fd" opacity="0.8"/>
+        <path d="M90 38 Q108 20 140 28 L140 96 Q108 82 90 96 L90 38Z" fill="#7dd3fc" opacity="0.7"/>
+        <line x1="90" y1="38" x2="90" y2="96" stroke="#38bdf8" strokeWidth="2"/>
+        <line x1="54" y1="52" x2="82" y2="48" stroke="#38bdf8" strokeWidth="2" opacity="0.45"/>
+        <line x1="54" y1="64" x2="82" y2="61" stroke="#38bdf8" strokeWidth="2" opacity="0.45"/>
+        <line x1="54" y1="76" x2="82" y2="74" stroke="#38bdf8" strokeWidth="2" opacity="0.35"/>
+        <line x1="98" y1="48" x2="126" y2="52" stroke="#0ea5e9" strokeWidth="2" opacity="0.45"/>
+        <line x1="98" y1="61" x2="126" y2="64" stroke="#0ea5e9" strokeWidth="2" opacity="0.45"/>
+        <line x1="98" y1="74" x2="122" y2="76" stroke="#0ea5e9" strokeWidth="2" opacity="0.35"/>
+        <text x="180" y="80" fontSize="58" fill="#7dd3fc" fontFamily="Georgia, serif" opacity="0.65">Aa</text>
+        <text x="320" y="60" fontSize="38" fill="#bae6fd" fontFamily="Georgia, serif" opacity="0.55">Bb</text>
+        <text x="406" y="88" fontSize="32" fill="#7dd3fc" fontFamily="Georgia, serif" opacity="0.5">Cc</text>
+        <text x="482" y="52" fontSize="26" fill="#bae6fd" fontFamily="Georgia, serif" opacity="0.45">Dd</text>
+        <text x="554" y="80" fontSize="22" fill="#7dd3fc" fontFamily="Georgia, serif" opacity="0.4">Ee</text>
+      </svg>
+    ),
   };
 
   return {
     bg: "bg-slate-50",
     pill: "bg-slate-100 text-slate-600",
     pillText: "text-slate-600",
+    accentText: "text-slate-600",
+    accent: "border-l-slate-300",
+    bannerBg: "bg-slate-100",
     banner: (
       <svg viewBox="0 0 320 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <rect width="320" height="100" fill="#f8fafc"/>
@@ -138,6 +255,16 @@ export function getSubjectTheme(subject: string): SubjectTheme {
         <circle cx="160" cy="50" r="22" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="2"/>
         <circle cx="250" cy="50" r="18" fill="none" stroke="#e2e8f0" strokeWidth="2" strokeDasharray="4 3"/>
         <text x="148" y="56" fontSize="18" fill="#94a3b8" textAnchor="middle" fontFamily="sans-serif">✦</text>
+      </svg>
+    ),
+    wideBanner: (
+      <svg viewBox="0 0 640 120" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <rect width="640" height="120" fill="#f8fafc"/>
+        <circle cx="100" cy="60" r="40" fill="none" stroke="#cbd5e1" strokeWidth="2.5" strokeDasharray="7 5"/>
+        <circle cx="260" cy="60" r="32" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="2.5"/>
+        <circle cx="400" cy="60" r="26" fill="none" stroke="#e2e8f0" strokeWidth="2" strokeDasharray="5 4"/>
+        <circle cx="520" cy="60" r="20" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="2"/>
+        <text x="248" y="66" fontSize="22" fill="#94a3b8" textAnchor="middle" fontFamily="sans-serif">✦</text>
       </svg>
     ),
   };
