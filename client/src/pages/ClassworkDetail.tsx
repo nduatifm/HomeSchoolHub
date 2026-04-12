@@ -9,9 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink } from "lucide-react";
+import DOMPurify from "dompurify";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
+import { getAttachmentKind } from "@/lib/classroomUtils";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
 
 type SubmissionWithName = ClassroomSubmission & { studentName: string };
@@ -299,6 +307,7 @@ export default function ClassworkDetail() {
   const [, params] = useRoute("/classrooms/:slug/classwork/:classworkSlug");
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const [materialDialogOpen, setMaterialDialogOpen] = useState<ClassroomMaterial | null>(null);
 
   const classroomSlug = params?.slug ?? "";
   const classworkSlug = params?.classworkSlug ?? "";
@@ -419,29 +428,35 @@ export default function ClassworkDetail() {
             <div className="space-y-3">
               <h2 className="text-sm font-semibold text-gray-800">Classwork Materials</h2>
               {linkedMaterials.map((material) => (
-                <Card key={material.id}>
-                  <CardContent className="px-4 py-4 space-y-2">
-                    <div>
-                      <h3 className="font-medium text-sm text-gray-900">{material.title}</h3>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {new Date(material.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </p>
-                    </div>
-                    {material.description && (
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{material.description}</p>
-                    )}
-                    {material.url && (
-                      <a
-                        href={material.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-                      >
-                        <FileText className="h-3.5 w-3.5" />View attachment
-                      </a>
-                    )}
-                  </CardContent>
-                </Card>
+                <button
+                  key={material.id}
+                  type="button"
+                  onClick={() => {
+                    setMaterialDialogOpen(material);
+                    if (!isTeacher) {
+                      apiRequest(`/api/classrooms/${classroomId}/materials/${material.id}/seen`, { method: "POST" }).catch(() => {});
+                    }
+                  }}
+                  className="w-full text-left"
+                >
+                  <Card className="hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
+                    <CardContent className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <BookOpen className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-foreground">{material.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {new Date(material.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            {material.url ? ` · ${getAttachmentKind(material.url) === "pdf" ? "PDF" : getAttachmentKind(material.url) === "image" ? "Image" : "Link"} attached` : ""}
+                          </p>
+                        </div>
+                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </button>
               ))}
             </div>
           )}
@@ -452,6 +467,93 @@ export default function ClassworkDetail() {
           {isParent && <ParentPanel assignment={assignment} classroomId={classroomId} studentId={parentStudentId} />}
         </div>
       </div>
+
+      {/* Material preview dialog */}
+      <Dialog open={materialDialogOpen !== null} onOpenChange={(v) => { if (!v) setMaterialDialogOpen(null); }}>
+        <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh]">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-border shrink-0">
+            <DialogTitle className="text-base font-semibold leading-snug pr-6">
+              {materialDialogOpen?.title}
+            </DialogTitle>
+            {materialDialogOpen?.uploadedAt && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {new Date(materialDialogOpen.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </p>
+            )}
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto px-6 py-5 space-y-5">
+            {materialDialogOpen?.description &&
+              materialDialogOpen.description !== "<p></p>" &&
+              materialDialogOpen.description.trim() !== "" && (
+              <div
+                className="prose prose-sm max-w-none text-foreground
+                  prose-headings:font-semibold prose-headings:text-foreground
+                  prose-h2:text-xl prose-h2:mt-4 prose-h2:mb-2
+                  prose-p:leading-relaxed prose-p:my-1.5 prose-p:text-foreground/90
+                  prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
+                  prose-strong:font-semibold prose-strong:text-foreground
+                  prose-em:text-foreground/80
+                  prose-a:text-primary prose-a:underline
+                  prose-hr:border-border prose-hr:my-5
+                  prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(materialDialogOpen.description, { USE_PROFILES: { html: true } }),
+                }}
+              />
+            )}
+
+            {materialDialogOpen?.url && (() => {
+              const kind = getAttachmentKind(materialDialogOpen.url!);
+              if (kind === "image") {
+                return (
+                  <img
+                    src={materialDialogOpen.url}
+                    alt={materialDialogOpen.title}
+                    className="rounded-xl max-w-full border border-border"
+                  />
+                );
+              }
+              if (kind === "pdf") {
+                return (
+                  <a
+                    href={materialDialogOpen.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
+                  >
+                    <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                      <FileText className="h-4 w-4 text-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">Open PDF</p>
+                      <p className="text-xs text-muted-foreground truncate">{materialDialogOpen.url}</p>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                  </a>
+                );
+              }
+              return (
+                <a
+                  href={materialDialogOpen.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <ExternalLink className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">Open link</p>
+                    <p className="text-xs text-muted-foreground truncate">{materialDialogOpen.url}</p>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                </a>
+              );
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -15,9 +15,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, BarChart2, ChevronRight } from "lucide-react";
-import type { ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
+import { Loader2, BarChart2, ChevronRight, BookOpen, FileText, ExternalLink } from "lucide-react";
+import DOMPurify from "dompurify";
+import type { ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
 import { classifyAssignment } from "@/lib/classroomNotifications";
+import { getAttachmentKind } from "@/lib/classroomUtils";
 import StatusBadge from "./StatusBadge";
 
 export default function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchived }: {
@@ -26,6 +28,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   const [submitOpen, setSubmitOpen] = useState<number | null>(null);
   const [submissionText, setSubmissionText] = useState("");
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [materialOpen, setMaterialOpen] = useState<ClassroomMaterial | null>(null);
   const [, navigate] = useLocation();
 
   const { data: assignments = [], isLoading: loadingA } = useQuery<ClassroomAssignment[]>({
@@ -35,6 +38,10 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   const { data: mySubmissions = [], isLoading: loadingS } = useQuery<ClassroomSubmission[]>({
     queryKey: ["/api/classrooms", classroomId, "my-submissions"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/my-submissions`),
+  });
+  const { data: materials = [] } = useQuery<ClassroomMaterial[]>({
+    queryKey: ["/api/classrooms", classroomId, "materials"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
   });
 
   const submitMutation = useMutation({
@@ -60,6 +67,16 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   const subMap = Object.fromEntries(mySubmissions.map((s) => [s.assignmentId, s]));
   const totalPoints = assignments.reduce((s, a) => s + a.points, 0);
   const earned = mySubmissions.reduce((s, sub) => s + (sub.grade ?? 0), 0);
+
+  const materialByAssignment: Record<number, ClassroomMaterial> = {};
+  for (const m of materials) {
+    if (m.assignmentId != null) materialByAssignment[m.assignmentId] = m;
+  }
+
+  function openMaterial(m: ClassroomMaterial) {
+    setMaterialOpen(m);
+    apiRequest(`/api/classrooms/${classroomId}/materials/${m.id}/seen`, { method: "POST" }).catch(() => {});
+  }
 
   if (loadingA || loadingS) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
@@ -126,6 +143,15 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                       <span className="text-xs font-semibold text-green-700">{sub.grade}/{a.points}</span>
                     )}
                   </div>
+                  {materialByAssignment[a.id] && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); openMaterial(materialByAssignment[a.id]); }}
+                      className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 bg-primary/8 hover:bg-primary/12 px-2 py-0.5 rounded-full transition-colors"
+                    >
+                      <BookOpen className="h-3 w-3" />View material
+                    </button>
+                  )}
                   {sub?.feedback && (
                     <p className="text-xs text-muted-foreground italic mt-1">"{sub.feedback}"</p>
                   )}
@@ -170,6 +196,95 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
           );
         })}
       </div>
+
+      {/* Material preview dialog */}
+      <Dialog open={materialOpen !== null} onOpenChange={(v) => { if (!v) setMaterialOpen(null); }}>
+        <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh]">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-border shrink-0">
+            <DialogTitle className="text-base font-semibold leading-snug pr-6">
+              {materialOpen?.title}
+            </DialogTitle>
+            {materialOpen?.uploadedAt && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {new Date(materialOpen.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </p>
+            )}
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto px-6 py-5 space-y-5">
+            {/* Rich content body */}
+            {materialOpen?.description &&
+              materialOpen.description !== "<p></p>" &&
+              materialOpen.description.trim() !== "" && (
+              <div
+                className="prose prose-sm max-w-none text-foreground
+                  prose-headings:font-semibold prose-headings:text-foreground
+                  prose-h2:text-xl prose-h2:mt-4 prose-h2:mb-2
+                  prose-p:leading-relaxed prose-p:my-1.5 prose-p:text-foreground/90
+                  prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
+                  prose-strong:font-semibold prose-strong:text-foreground
+                  prose-em:text-foreground/80
+                  prose-a:text-primary prose-a:underline
+                  prose-hr:border-border prose-hr:my-5
+                  prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(materialOpen.description, { USE_PROFILES: { html: true } }),
+                }}
+              />
+            )}
+
+            {/* Attachment */}
+            {materialOpen?.url && (() => {
+              const kind = getAttachmentKind(materialOpen.url!);
+              if (kind === "image") {
+                return (
+                  <img
+                    src={materialOpen.url}
+                    alt={materialOpen.title}
+                    className="rounded-xl max-w-full border border-border"
+                  />
+                );
+              }
+              if (kind === "pdf") {
+                return (
+                  <a
+                    href={materialOpen.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
+                  >
+                    <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                      <FileText className="h-4 w-4 text-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">Open PDF</p>
+                      <p className="text-xs text-muted-foreground truncate">{materialOpen.url}</p>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                  </a>
+                );
+              }
+              return (
+                <a
+                  href={materialOpen.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <ExternalLink className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">Open link</p>
+                    <p className="text-xs text-muted-foreground truncate">{materialOpen.url}</p>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                </a>
+              );
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
