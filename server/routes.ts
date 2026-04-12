@@ -4800,6 +4800,57 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/classrooms/:classroomId/materials/slug/:slug — fetch single classwork by slug (classroom members)
+  // NOTE: must be registered BEFORE /:materialId to avoid "slug" being parsed as an integer
+  app.get("/api/classrooms/:classroomId/materials/slug/:slug", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+      const material = await prisma.classroomMaterial.findFirst({
+        where: { classroomId: classroom.id, slug: req.params.slug },
+        include: { assignment: { select: { id: true, title: true, slug: true } } },
+      });
+      if (!material) return res.status(404).json({ error: "Classwork not found" });
+      res.json({
+        id: material.id, classroomId: material.classroomId, title: material.title,
+        description: material.description, url: material.url ?? null,
+        assignmentId: material.assignmentId ?? null, slug: material.slug ?? null,
+        uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
+        linkedAssignment: material.assignment
+          ? { id: material.assignment.id, title: material.assignment.title, slug: material.assignment.slug ?? null }
+          : null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/classrooms/:classroomId/materials/:materialId — fetch single classwork by ID (classroom members)
+  app.get("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+      const materialId = parseInt(req.params.materialId);
+      if (isNaN(materialId)) return res.status(400).json({ error: "Invalid material ID" });
+      const material = await prisma.classroomMaterial.findFirst({
+        where: { id: materialId, classroomId: classroom.id },
+        include: { assignment: { select: { id: true, title: true, slug: true } } },
+      });
+      if (!material) return res.status(404).json({ error: "Classwork not found" });
+      res.json({
+        id: material.id, classroomId: material.classroomId, title: material.title,
+        description: material.description, url: material.url ?? null,
+        assignmentId: material.assignmentId ?? null, slug: material.slug ?? null,
+        uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
+        linkedAssignment: material.assignment
+          ? { id: material.assignment.id, title: material.assignment.title, slug: material.assignment.slug ?? null }
+          : null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // PATCH /api/classrooms/:classroomId/materials/:materialId — teacher edits classwork (JSON)
   app.patch("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
     try {

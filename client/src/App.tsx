@@ -13,6 +13,7 @@ import ParentDashboard from "./pages/ParentDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import ClassroomDetail from "./pages/ClassroomDetail";
 import ClassworkDetail from "./pages/ClassworkDetail";
+import ClassroomMaterialPage from "./pages/ClassroomMaterialPage";
 import Landing from "./pages/Landing";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminUsers from "./pages/AdminUsers";
@@ -117,6 +118,12 @@ function AppRoutes() {
       </Route>
       <Route path="/classrooms/:slug/classwork/:classworkSlug">
         <ProtectedRoute component={ClassworkDetail} />
+      </Route>
+      <Route path="/classrooms/:slug/materials/new">
+        <ProtectedRoute component={ClassroomMaterialPage} />
+      </Route>
+      <Route path="/classrooms/:slug/materials/:materialSlug">
+        <ProtectedRoute component={ClassroomMaterialPage} />
       </Route>
       <Route path="/classrooms/:slug">
         <ProtectedRoute component={ClassroomDetail} />
