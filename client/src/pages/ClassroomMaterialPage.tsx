@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useReducer } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -109,9 +109,13 @@ function TeacherEditor({
   const initialUrlKind = initial?.url ? getAttachmentKind(initial.url) : null;
   const [showUrl, setShowUrl] = useState(initialUrlKind === "link");
   const [externalUrl, setExternalUrl] = useState(
-    initialUrlKind === "link" ? (initial!.url ?? "") : "",
+    initialUrlKind === "link" ? (initial?.url ?? "") : "",
   );
   const [keepExistingPdf, setKeepExistingPdf] = useState(initialUrlKind === "pdf");
+
+  // Force a re-render whenever the editor selection or content changes so
+  // toolbar active-state highlights (bold, italic, heading, link…) stay current.
+  const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -139,6 +143,10 @@ function TeacherEditor({
       }),
     ],
     content: initial?.description ?? "",
+    // Re-render the parent (and therefore toolbar buttons) whenever the
+    // selection moves or content changes so isActive() stays accurate.
+    onSelectionUpdate: () => forceUpdate(),
+    onUpdate: () => forceUpdate(),
     editorProps: {
       attributes: {
         class: "min-h-[280px] px-5 py-4 outline-none text-sm leading-relaxed",
@@ -153,10 +161,26 @@ function TeacherEditor({
 
   const applyLink = () => {
     if (!editor) return;
-    if (!linkDialogUrl.trim()) {
+    const url = linkDialogUrl.trim();
+
+    if (!url) {
+      // Clear any existing link mark
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
     } else {
-      editor.chain().focus().extendMarkRange("link").setLink({ href: linkDialogUrl.trim() }).run();
+      const { from, to } = editor.state.selection;
+      const hasSelection = from !== to;
+
+      if (hasSelection) {
+        // Wrap the selected text in a link
+        editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+      } else {
+        // No text selected — insert the URL as visible link text
+        editor.chain().focus().insertContent({
+          type: "text",
+          marks: [{ type: "link", attrs: { href: url } }],
+          text: url,
+        }).run();
+      }
     }
     setShowLinkDialog(false);
     setLinkDialogUrl("");
@@ -517,12 +541,27 @@ function TeacherEditor({
                   className="h-9 font-mono text-sm" />
               )}
               {file && (
-                <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
-                  <Paperclip className="h-4 w-4 text-primary shrink-0" />
-                  <p className="text-sm flex-1 truncate">{file.name}</p>
-                  <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}>
-                    <X className="h-4 w-4 text-muted-foreground" />
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
+                    {fileKind === "pdf"
+                      ? <FileText className="h-4 w-4 text-primary shrink-0" />
+                      : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
+                    <p className="text-sm flex-1 truncate">{file.name}</p>
+                    <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}>
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                  {fileKind === "image" && (
+                    <Button size="sm" variant="outline" className="w-full gap-1.5 h-8 text-xs"
+                      onClick={handleInsertImage} disabled={isUploadingImage}>
+                      {isUploadingImage
+                        ? <><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</>
+                        : <><ImageIcon className="h-3 w-3" /> Insert into content</>}
+                    </Button>
+                  )}
+                  {fileKind === "pdf" && (
+                    <p className="text-[11px] text-muted-foreground">Will appear as an attachment for students.</p>
+                  )}
                 </div>
               )}
               {assignments.length > 0 && (
