@@ -155,12 +155,13 @@ function TeacherEditor({
   const [assignmentId, setAssignmentId] = useState(
     initial?.assignmentId ? String(initial.assignmentId) : "",
   );
-  const [showUrl, setShowUrl] = useState(
-    !!(initial?.url && getAttachmentKind(initial.url) === "link"),
-  );
+  const initialUrlKind = initial?.url ? getAttachmentKind(initial.url) : null;
+  const [showUrl, setShowUrl] = useState(initialUrlKind === "link");
   const [externalUrl, setExternalUrl] = useState(
-    initial?.url && getAttachmentKind(initial.url) === "link" ? initial.url : "",
+    initialUrlKind === "link" ? (initial!.url ?? "") : "",
   );
+  // Track whether the original server-side PDF should be kept or removed
+  const [keepExistingPdf, setKeepExistingPdf] = useState(initialUrlKind === "pdf");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -272,6 +273,16 @@ function TeacherEditor({
         return d as ClassroomMaterial;
       }
 
+      // Resolve which URL to persist:
+      // 1. External link explicitly provided
+      // 2. Existing PDF kept (no new file, user hasn't removed it)
+      // 3. null (new material with no attachment, or user removed attachment)
+      const resolvedUrl = showUrl && externalUrl
+        ? externalUrl
+        : keepExistingPdf && initial?.url
+        ? initial.url
+        : null;
+
       const endpoint = isEdit
         ? `/api/classrooms/${classroomId}/materials/${initial!.id}`
         : `/api/classrooms/${classroomId}/materials`;
@@ -280,7 +291,7 @@ function TeacherEditor({
         body: JSON.stringify({
           title,
           description,
-          url: showUrl && externalUrl ? externalUrl : null,
+          url: resolvedUrl,
           assignmentId: assignmentId ? Number(assignmentId) : null,
         }),
       }) as Promise<ClassroomMaterial>;
@@ -296,8 +307,7 @@ function TeacherEditor({
   });
 
   const canSave = title.trim().length > 0 && !saveMutation.isPending && !isUploadingImage;
-  const existingPdfUrl =
-    initial?.url && getAttachmentKind(initial.url) === "pdf" ? initial.url : null;
+  const existingPdfUrl = keepExistingPdf && initial?.url ? initial.url : null;
   const fileKind = file ? getAttachmentKind(file.name) : null;
 
   return (
@@ -428,6 +438,14 @@ function TeacherEditor({
                     Open PDF
                   </a>
                 </div>
+                <button
+                  type="button"
+                  title="Remove PDF attachment"
+                  onClick={() => setKeepExistingPdf(false)}
+                  className="shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-muted transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
 
