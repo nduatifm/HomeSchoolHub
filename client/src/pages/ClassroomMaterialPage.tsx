@@ -143,16 +143,24 @@ function TeacherEditor({
       }),
     ],
     content: initial?.description ?? "",
-    // Re-render the parent (and therefore toolbar buttons) whenever the
-    // selection moves or content changes so isActive() stays accurate.
-    onSelectionUpdate: () => forceUpdate(),
-    onUpdate: () => forceUpdate(),
     editorProps: {
       attributes: {
         class: "min-h-[280px] px-5 py-4 outline-none text-sm leading-relaxed",
       },
     },
   });
+
+  // Wire up selection/update listeners using stable references so the editor
+  // is never re-initialized. forceUpdate from useReducer is a stable fn ref.
+  useEffect(() => {
+    if (!editor) return;
+    editor.on("selectionUpdate", forceUpdate);
+    editor.on("update", forceUpdate);
+    return () => {
+      editor.off("selectionUpdate", forceUpdate);
+      editor.off("update", forceUpdate);
+    };
+  }, [editor, forceUpdate]);
 
   const handleInsertLink = useCallback(() => {
     setLinkDialogUrl(editor?.getAttributes("link").href ?? "");
