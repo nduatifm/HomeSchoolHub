@@ -146,6 +146,7 @@ function TeacherEditor({
   const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
+    enabled: !!classroomId,
   });
 
   const editor = useEditor({
@@ -665,9 +666,13 @@ function TeacherEditor({
             <div className="border-t border-border" />
 
             {/* Link to assignment */}
-            {assignments.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Link to assignment</p>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">Link to assignment</p>
+              {assignments.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No assignments in this classroom yet.
+                </p>
+              ) : (
                 <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
                   <SelectTrigger className="h-9 gap-2 text-sm">
                     <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -680,8 +685,8 @@ function TeacherEditor({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </aside>
 
@@ -735,7 +740,9 @@ function TeacherEditor({
                   </div>
                 );
               })}
-              {assignments.length > 0 && (
+              {assignments.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No assignments in this classroom yet.</p>
+              ) : (
                 <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
                   <SelectTrigger className="h-9 gap-2">
                     <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
