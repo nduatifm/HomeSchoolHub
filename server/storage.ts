@@ -1961,9 +1961,13 @@ class PrismaStorage implements IStorage {
   }
 
   async updateClassroomMaterial(id: number, data: Partial<InsertClassroomMaterial>): Promise<ClassroomMaterial> {
+    const { attachments, ...rest } = data;
     const updated = await prisma.classroomMaterial.update({
       where: { id },
-      data,
+      data: {
+        ...rest,
+        ...(attachments !== undefined ? { attachments: { set: attachments } } : {}),
+      },
       include: { assignment: { select: { id: true, title: true, slug: true } } },
     });
     return this.mapClassroomMaterial(updated);
