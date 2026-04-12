@@ -26,6 +26,7 @@ export default function ClassworkCard({
   assignments,
   mySubmissions,
   isUnseen,
+  onSeen,
 }: {
   item: ClassroomMaterial;
   classroomId: number;
