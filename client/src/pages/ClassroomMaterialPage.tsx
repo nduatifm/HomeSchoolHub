@@ -323,7 +323,6 @@ function TeacherEditor({
         body: JSON.stringify({
           title,
           description,
-          url: null,
           attachments,
           assignmentId: assignmentId ? Number(assignmentId) : null,
         }),
