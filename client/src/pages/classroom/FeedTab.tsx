@@ -2,12 +2,59 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Megaphone } from "lucide-react";
 import type { PostWithAuthor } from "./types";
 
-export default function FeedTab({ classroomId, isTeacher, isArchived, seenPostIds, onPostSeen }: {
+const MAX_CHARS = 1000;
+
+function AuthorAvatar({ name }: { name: string }) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  // Stable color derived from name
+  const colors = [
+    "bg-violet-100 text-violet-700",
+    "bg-sky-100 text-sky-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-amber-100 text-amber-700",
+    "bg-pink-100 text-pink-700",
+    "bg-teal-100 text-teal-700",
+  ];
+  const idx = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length;
+  return (
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${colors[idx]}`}>
+      {initials}
+    </div>
+  );
+}
+
+function formatPostTime(ts: string): string {
+  const date = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+export default function FeedTab({
+  classroomId,
+  isTeacher,
+  isArchived,
+  seenPostIds,
+  onPostSeen,
+}: {
   classroomId: number;
   isTeacher: boolean;
   isArchived: boolean;
@@ -15,12 +62,20 @@ export default function FeedTab({ classroomId, isTeacher, isArchived, seenPostId
   onPostSeen?: (postId: number) => void;
 }) {
   const [content, setContent] = useState("");
+  const charsLeft = MAX_CHARS - content.length;
+  const isOverLimit = charsLeft < 0;
+
   const { data: posts = [], isLoading } = useQuery<PostWithAuthor[]>({
     queryKey: ["/api/classrooms", classroomId, "posts"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/posts`),
   });
+
   const postMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/classrooms/${classroomId}/posts`, { method: "POST", body: JSON.stringify({ content }) }),
+    mutationFn: () =>
+      apiRequest(`/api/classrooms/${classroomId}/posts`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      }),
     onSuccess: () => {
       setContent("");
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "posts"] });
@@ -29,56 +84,124 @@ export default function FeedTab({ classroomId, isTeacher, isArchived, seenPostId
     onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
   });
 
+  const unseenCount = !isTeacher && seenPostIds
+    ? posts.filter((p) => !seenPostIds.has(p.id)).length
+    : 0;
+
   return (
-    <div className="space-y-4">
-      {isTeacher && !isArchived && (
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <Textarea
-            placeholder="Post an announcement to the class…"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="resize-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0 shadow-none"
-            rows={3}
-          />
-          <div className="flex justify-end pt-2 border-t border-border mt-2">
-            <Button
-              size="sm"
-              disabled={!content.trim() || postMutation.isPending}
-              onClick={() => postMutation.mutate()}
-              className="gap-1.5"
-            >
-              {postMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              Post
-            </Button>
+    <div className="flex flex-col gap-4">
+      {/* Unread banner — student only */}
+      {unseenCount > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/8 border border-primary/20">
+          <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+          <p className="text-xs font-medium text-primary">
+            {unseenCount} new {unseenCount === 1 ? "announcement" : "announcements"} — tap to mark as read
+          </p>
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading && (
+        <div className="flex justify-center py-10">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && posts.length === 0 && (
+        <div className="flex flex-col items-center justify-center gap-3 py-14 text-center rounded-2xl border border-dashed border-border">
+          <span className="text-3xl">📢</span>
+          <div>
+            <p className="text-sm font-medium text-foreground">No announcements yet</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isTeacher ? "Use the box below to post your first announcement." : "Your teacher hasn't posted anything yet."}
+            </p>
           </div>
         </div>
       )}
 
-      {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
-      {!isLoading && posts.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No announcements yet.</div>
+      {/* Posts */}
+      {!isLoading && posts.length > 0 && (
+        <div className="space-y-3">
+          {posts.map((post) => {
+            const isUnseen = !isTeacher && seenPostIds && !seenPostIds.has(post.id);
+            return (
+              <div
+                key={post.id}
+                onClick={() => { if (isUnseen && onPostSeen) onPostSeen(post.id); }}
+                className={`rounded-2xl border bg-card p-4 transition-all duration-150 ${
+                  isUnseen
+                    ? "border-primary/40 bg-primary/5 cursor-pointer hover:bg-primary/8 shadow-sm"
+                    : "border-border"
+                }`}
+              >
+                {/* Author row */}
+                <div className="flex items-center gap-2.5 mb-3">
+                  <AuthorAvatar name={post.authorName} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-none">{post.authorName}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{formatPostTime(post.createdAt)}</p>
+                  </div>
+                  {isUnseen && (
+                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      New
+                    </span>
+                  )}
+                </div>
+
+                {/* Content */}
+                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-[2.625rem]">
+                  {post.content}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      <div className="space-y-3">
-        {posts.map((post) => {
-          const isUnseen = !isTeacher && seenPostIds && !seenPostIds.has(post.id);
-          return (
-            <div
-              key={post.id}
-              onClick={() => { if (isUnseen && onPostSeen) onPostSeen(post.id); }}
-              className={`rounded-2xl border bg-card p-4 transition-colors ${isUnseen ? "border-primary/30 bg-primary/5 cursor-pointer hover:bg-primary/10" : "border-border"}`}
-            >
-              {isUnseen && (
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary mb-2" />
-              )}
-              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{post.content}</p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {post.authorName} · {new Date(post.createdAt).toLocaleString()}
-              </p>
+      {/* Compose box — teacher only, pinned to bottom */}
+      {isTeacher && !isArchived && (
+        <div className="sticky bottom-0 pt-2 pb-1 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6">
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-md">
+            <div className="flex items-end gap-3 p-3">
+              <span className="mb-0.5 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Megaphone className="h-4 w-4 text-primary" />
+              </span>
+              <textarea
+                placeholder="Post an announcement to the class…"
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value.slice(0, MAX_CHARS + 20));
+                  // Auto-grow
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                }}
+                rows={1}
+                style={{ height: "36px" }}
+                className="flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm focus:outline-none placeholder:text-muted-foreground leading-relaxed overflow-hidden"
+              />
+              <div className="flex items-end gap-2 shrink-0 mb-0.5">
+                {charsLeft < 200 && (
+                  <span className={`text-xs tabular-nums ${isOverLimit ? "text-red-500 font-semibold" : charsLeft < 100 ? "text-amber-500" : "text-muted-foreground"}`}>
+                    {charsLeft}
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  disabled={!content.trim() || isOverLimit || postMutation.isPending}
+                  onClick={() => postMutation.mutate()}
+                  className="gap-1.5 h-9 px-4 rounded-xl"
+                >
+                  {postMutation.isPending
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <Send className="h-3.5 w-3.5" />}
+                  Post
+                </Button>
+              </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
