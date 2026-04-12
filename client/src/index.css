@@ -166,3 +166,21 @@
     @apply bg-white rounded-xl border shadow-sm;
   }
 }
+
+/* ── Tiptap / ProseMirror editor ─────────────────────────────────────── */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
+}
+
+/* Keep the prose wrapper from capping the editor width */
+.prose .ProseMirror {
+  max-width: none;
+}

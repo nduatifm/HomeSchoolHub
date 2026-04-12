@@ -373,7 +373,18 @@ function TeacherEditor({
             <div className="border-t border-border mb-8" />
 
             {/* Body — no border, no card, just text */}
-            <EditorContent editor={editor} />
+            <div className="prose prose-sm max-w-none text-foreground
+              prose-headings:font-semibold prose-headings:text-foreground
+              prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
+              prose-p:leading-relaxed prose-p:my-2 prose-p:text-foreground/90
+              prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
+              prose-strong:font-semibold prose-strong:text-foreground
+              prose-em:text-foreground/80
+              prose-a:text-primary prose-a:underline
+              prose-hr:border-border prose-hr:my-6
+              prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full">
+              <EditorContent editor={editor} />
+            </div>
           </div>
         </main>
 
