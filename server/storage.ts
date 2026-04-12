@@ -1514,6 +1514,7 @@ class PrismaStorage implements IStorage {
       status: c.status as "active" | "archived",
       createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
       slug: c.slug ?? null,
+      teacherName: c.teacher?.name ?? null,
     };
   }
 
@@ -1545,7 +1546,7 @@ class PrismaStorage implements IStorage {
   async getClassroomsForStudent(studentId: number): Promise<Classroom[]> {
     const enrollments = await prisma.classroomEnrollment.findMany({
       where: { studentId },
-      include: { classroom: true },
+      include: { classroom: { include: { teacher: { select: { name: true } } } } },
       orderBy: { enrolledAt: "desc" },
     });
     return enrollments.map((e) => this.mapClassroom(e.classroom));

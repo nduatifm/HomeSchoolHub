@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, GraduationCap } from "lucide-react";
 import { getSubjectTheme } from "@/lib/subjectTheme";
 import type { Classroom } from "@shared/schema";
 import type { ClassroomNotification } from "@/lib/classroomNotifications";
@@ -58,6 +58,11 @@ export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Cl
           )}
         </div>
         <span className={`text-xs font-semibold ${theme.pillText}`}>{c.subject}</span>
+        {c.teacherName && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+            <GraduationCap className="h-3 w-3 shrink-0" />{c.teacherName}
+          </span>
+        )}
         {c.description && (
           <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{c.description}</p>
         )}

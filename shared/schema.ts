@@ -431,8 +431,9 @@ export const classroomSchema = z.object({
   status: z.enum(["active", "archived"]),
   createdAt: z.string(),
   slug: z.string().nullable().optional(),
+  teacherName: z.string().nullable().optional(),
 });
-export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true });
+export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true, teacherName: true });
 export type Classroom = z.infer<typeof classroomSchema>;
 export type InsertClassroom = z.infer<typeof insertClassroomSchema>;
 
