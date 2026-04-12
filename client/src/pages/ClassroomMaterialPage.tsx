@@ -601,12 +601,14 @@ function ReadView({
   classroomId,
   material,
   isParent,
+  isTeacher,
 }: {
   classroomSlug: string;
   classroom: Classroom;
   classroomId: number;
   material: ClassroomMaterial;
   isParent: boolean;
+  isTeacher: boolean;
 }) {
   const [, navigate] = useLocation();
   const sp = new URLSearchParams(window.location.search);
@@ -616,12 +618,14 @@ function ReadView({
     isParent && parentStudentId ? `&studentId=${parentStudentId}` : ""
   }`;
 
+  // Only fire seen tracking for non-teachers (students and parents)
   useEffect(() => {
+    if (isTeacher) return;
     apiRequest(
       `/api/classrooms/${classroomId}/materials/${material.id}/seen`,
       { method: "POST" },
     ).catch(() => {});
-  }, [classroomId, material.id]);
+  }, [classroomId, material.id, isTeacher]);
 
   const urlKind = material.url ? getAttachmentKind(material.url) : null;
   const assignmentHref = material.linkedAssignment
@@ -835,6 +839,7 @@ export default function ClassroomMaterialPage() {
       classroomId={classroomId}
       material={material!}
       isParent={isParent}
+      isTeacher={isTeacher}
     />
   );
 }

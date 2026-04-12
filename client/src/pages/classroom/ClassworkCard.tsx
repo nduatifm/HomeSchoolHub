@@ -79,7 +79,7 @@ export default function ClassworkCard({
       className={`rounded-2xl border bg-card overflow-hidden transition-colors hover:border-primary/30 cursor-pointer ${
         isUnseen ? "border-primary/30" : "border-border"
       }`}
-      onClick={() => navigate(materialHref)}
+      onClick={() => { onSeen?.(); navigate(materialHref); }}
     >
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div className="flex-1 min-w-0">
