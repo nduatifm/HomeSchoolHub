@@ -38,67 +38,18 @@ import {
   BookOpen,
   ImageIcon,
   Minus,
+  Calendar,
+  GraduationCap,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import type { Classroom, ClassroomAssignment, ClassroomMaterial } from "@shared/schema";
 import { getAttachmentKind } from "@/lib/classroomUtils";
 
-// ─── Sanitize HTML for safe rendering ───────────────────────────────────────
-
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
 }
 
-// ─── Tiptap toolbar ─────────────────────────────────────────────────────────
-
-function Toolbar({
-  editor,
-  onInsertLink,
-}: {
-  editor: ReturnType<typeof useEditor>;
-  onInsertLink: () => void;
-}) {
-  if (!editor) return null;
-
-  const btn = (
-    active: boolean,
-    onClick: () => void,
-    icon: React.ReactNode,
-    title: string,
-  ) => (
-    <button
-      type="button"
-      title={title}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
-      className={`h-7 w-7 rounded flex items-center justify-center transition-colors ${
-        active
-          ? "bg-primary/10 text-primary"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-      }`}
-    >
-      {icon}
-    </button>
-  );
-
-  return (
-    <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border bg-muted/30">
-      {btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), <Bold className="h-3.5 w-3.5" />, "Bold")}
-      {btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), <Italic className="h-3.5 w-3.5" />, "Italic")}
-      <div className="w-px h-4 bg-border mx-1" />
-      {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), <Heading2 className="h-3.5 w-3.5" />, "Heading")}
-      {btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), <List className="h-3.5 w-3.5" />, "Bullet list")}
-      {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), <ListOrdered className="h-3.5 w-3.5" />, "Numbered list")}
-      <div className="w-px h-4 bg-border mx-1" />
-      {btn(editor.isActive("link"), onInsertLink, <Link2 className="h-3.5 w-3.5" />, "Insert link")}
-      {btn(false, () => editor.chain().focus().setHorizontalRule().run(), <Minus className="h-3.5 w-3.5" />, "Divider")}
-    </div>
-  );
-}
-
-// ─── Rendered rich HTML (read view) ─────────────────────────────────────────
+// ─── Rich content renderer ───────────────────────────────────────────────────
 
 function RichContent({ html }: { html: string }) {
   return (
@@ -118,7 +69,7 @@ function RichContent({ html }: { html: string }) {
   );
 }
 
-// ─── Upload image file to Cloudinary and return the URL ─────────────────────
+// ─── Upload image ────────────────────────────────────────────────────────────
 
 async function uploadImageToCloudinary(file: File): Promise<string> {
   const token = localStorage.getItem("sessionId");
@@ -160,14 +111,11 @@ function TeacherEditor({
   const [externalUrl, setExternalUrl] = useState(
     initialUrlKind === "link" ? (initial!.url ?? "") : "",
   );
-  // Track whether the original server-side PDF should be kept or removed
   const [keepExistingPdf, setKeepExistingPdf] = useState(initialUrlKind === "pdf");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  // Link insertion dialog
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [linkDialogUrl, setLinkDialogUrl] = useState("");
 
@@ -193,7 +141,7 @@ function TeacherEditor({
     content: initial?.description ?? "",
     editorProps: {
       attributes: {
-        class: "min-h-[260px] px-4 py-4 outline-none text-sm leading-relaxed",
+        class: "min-h-[280px] px-5 py-4 outline-none text-sm leading-relaxed",
       },
     },
   });
@@ -208,8 +156,7 @@ function TeacherEditor({
     if (!linkDialogUrl.trim()) {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
     } else {
-      editor.chain().focus().extendMarkRange("link")
-        .setLink({ href: linkDialogUrl.trim() }).run();
+      editor.chain().focus().extendMarkRange("link").setLink({ href: linkDialogUrl.trim() }).run();
     }
     setShowLinkDialog(false);
     setLinkDialogUrl("");
@@ -273,10 +220,6 @@ function TeacherEditor({
         return d as ClassroomMaterial;
       }
 
-      // Resolve which URL to persist:
-      // 1. External link explicitly provided
-      // 2. Existing PDF kept (no new file, user hasn't removed it)
-      // 3. null (new material with no attachment, or user removed attachment)
       const resolvedUrl = showUrl && externalUrl
         ? externalUrl
         : keepExistingPdf && initial?.url
@@ -297,9 +240,7 @@ function TeacherEditor({
       }) as Promise<ClassroomMaterial>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/classrooms", classroomId, "materials"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "materials"] });
       toast({ title: isEdit ? "Classwork updated" : "Classwork created", type: "success" });
       navigate(`/classrooms/${classroomSlug}?tab=classwork`);
     },
@@ -311,289 +252,325 @@ function TeacherEditor({
   const fileKind = file ? getAttachmentKind(file.name) : null;
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <ModernSidebar />
-      <div className="flex-1 md:ml-[228px] flex flex-col">
-        {/* Sticky top bar */}
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 sm:px-8 py-3 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-white dark:bg-background">
+
+      {/* ── Minimal top bar — full width, no sidebar ── */}
+      <div className="fixed top-0 left-0 right-0 z-20 bg-white/95 dark:bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          {/* Left: back crumb */}
           <button
             type="button"
             onClick={() => navigate(`/classrooms/${classroomSlug}?tab=classwork`)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to {classroom.name}</span>
-            <span className="sm:hidden">Back</span>
+            <span className="hidden sm:inline font-medium">{classroom.name}</span>
+            <span className="sm:hidden font-medium">Back</span>
           </button>
-          <Button
-            size="sm"
-            disabled={!canSave}
-            onClick={() => saveMutation.mutate()}
-            className="min-w-[100px]"
-          >
-            {saveMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
-            {isEdit ? "Save changes" : "Publish"}
-          </Button>
-        </div>
 
-        {/* Writing canvas */}
-        <div className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-8 pt-10 pb-24 space-y-6">
-          {/* Headline title */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Untitled"
-            className="w-full text-3xl font-bold text-foreground placeholder:text-muted-foreground/40 bg-transparent border-none outline-none"
-            autoFocus={!isEdit}
-          />
-
-          {/* Rich text editor */}
-          <div className="rounded-xl border border-border overflow-hidden">
-            <Toolbar editor={editor} onInsertLink={handleInsertLink} />
-            <EditorContent editor={editor} />
+          {/* Center: floating toolbar */}
+          <div className="flex-1 flex justify-center">
+            <div className="flex items-center gap-0.5 bg-muted/50 rounded-xl px-2 py-1.5">
+              {editor && <>
+                {[
+                  { active: editor.isActive("bold"), fn: () => editor.chain().focus().toggleBold().run(), icon: <Bold className="h-3.5 w-3.5" />, title: "Bold" },
+                  { active: editor.isActive("italic"), fn: () => editor.chain().focus().toggleItalic().run(), icon: <Italic className="h-3.5 w-3.5" />, title: "Italic" },
+                ].map((b, i) => (
+                  <button key={i} type="button" title={b.title}
+                    onMouseDown={(e) => { e.preventDefault(); b.fn(); }}
+                    className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${b.active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
+                    {b.icon}
+                  </button>
+                ))}
+                <div className="w-px h-4 bg-border mx-1" />
+                {[
+                  { active: editor.isActive("heading", { level: 2 }), fn: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), icon: <Heading2 className="h-3.5 w-3.5" />, title: "Heading" },
+                  { active: editor.isActive("bulletList"), fn: () => editor.chain().focus().toggleBulletList().run(), icon: <List className="h-3.5 w-3.5" />, title: "Bullet list" },
+                  { active: editor.isActive("orderedList"), fn: () => editor.chain().focus().toggleOrderedList().run(), icon: <ListOrdered className="h-3.5 w-3.5" />, title: "Numbered list" },
+                ].map((b, i) => (
+                  <button key={i} type="button" title={b.title}
+                    onMouseDown={(e) => { e.preventDefault(); b.fn(); }}
+                    className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${b.active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
+                    {b.icon}
+                  </button>
+                ))}
+                <div className="w-px h-4 bg-border mx-1" />
+                {[
+                  { active: editor.isActive("link"), fn: handleInsertLink, icon: <Link2 className="h-3.5 w-3.5" />, title: "Link" },
+                  { active: false, fn: () => editor.chain().focus().setHorizontalRule().run(), icon: <Minus className="h-3.5 w-3.5" />, title: "Divider" },
+                ].map((b, i) => (
+                  <button key={i} type="button" title={b.title}
+                    onMouseDown={(e) => { e.preventDefault(); b.fn(); }}
+                    className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${b.active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
+                    {b.icon}
+                  </button>
+                ))}
+              </>}
+            </div>
           </div>
 
-          {/* Link dialog */}
-          {showLinkDialog && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-              onClick={() => setShowLinkDialog(false)}
+          {/* Right: save state + publish */}
+          <div className="flex items-center gap-3">
+            {saveMutation.isPending && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" /> Saving…
+              </span>
+            )}
+            <Button
+              disabled={!canSave}
+              onClick={() => saveMutation.mutate()}
+              className="h-8 px-5 text-sm font-medium rounded-full"
             >
-              <div
-                className="bg-background rounded-xl border border-border shadow-lg p-5 w-full max-w-sm mx-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <p className="text-sm font-semibold mb-3">Insert link</p>
-                <Input
-                  type="url"
-                  placeholder="https://…"
-                  value={linkDialogUrl}
-                  onChange={(e) => setLinkDialogUrl(e.target.value)}
-                  className="h-9 font-mono text-sm mb-3"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") applyLink();
-                    if (e.key === "Escape") setShowLinkDialog(false);
-                  }}
-                />
-                <div className="flex gap-2 justify-end">
-                  <Button variant="outline" size="sm" onClick={() => setShowLinkDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button size="sm" onClick={applyLink}>
-                    Apply
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Attachments ── */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Attachments
-              </p>
-              <div className="flex items-center gap-1.5">
-                {!showUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setShowUrl(true)}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-2.5 py-1 hover:bg-muted/50 transition-colors"
-                  >
-                    <Plus className="h-3 w-3" />
-                    <Link2 className="h-3 w-3 ml-0.5" /> URL
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-2.5 py-1 hover:bg-muted/50 transition-colors"
-                >
-                  <Plus className="h-3 w-3" />
-                  <Upload className="h-3 w-3 ml-0.5" /> File
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-              </div>
-            </div>
-
-            {/* Existing server-side PDF */}
-            {existingPdfUrl && !file && (
-              <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-muted/20">
-                <FileText className="h-4 w-4 text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">Attached PDF</p>
-                  <a
-                    href={existingPdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Open PDF
-                  </a>
-                </div>
-                <button
-                  type="button"
-                  title="Remove PDF attachment"
-                  onClick={() => setKeepExistingPdf(false)}
-                  className="shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-muted transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* External URL */}
-            {showUrl && (
-              <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <Link2 className="h-3.5 w-3.5 text-primary" /> URL link
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUrl(false);
-                      setExternalUrl("");
-                    }}
-                    className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <Input
-                  type="url"
-                  placeholder="https://…"
-                  value={externalUrl}
-                  onChange={(e) => setExternalUrl(e.target.value)}
-                  className="h-9 font-mono text-sm bg-background"
-                />
-              </div>
-            )}
-
-            {/* Staged file */}
-            {file && (
-              <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-                <div className="flex items-center gap-3">
-                  {fileKind === "pdf" ? (
-                    <FileText className="h-4 w-4 text-primary shrink-0" />
-                  ) : (
-                    <ImageIcon className="h-4 w-4 text-primary shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(file.size / (1024 * 1024)).toFixed(1)} MB
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFile(null);
-                      if (fileRef.current) fileRef.current.value = "";
-                    }}
-                    className="shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {fileKind === "image" && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full gap-1.5 h-8 text-xs"
-                    onClick={handleInsertImage}
-                    disabled={isUploadingImage}
-                  >
-                    {isUploadingImage ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
-                    ) : (
-                      <><ImageIcon className="h-3.5 w-3.5" /> Insert into content</>
-                    )}
-                  </Button>
-                )}
-                {fileKind === "pdf" && (
-                  <p className="text-xs text-muted-foreground">
-                    Will appear in the Attachments section for students.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Empty state drop zone */}
-            {!showUrl && !file && !existingPdfUrl && (
-              <div
-                className={`w-full flex flex-col items-center gap-2 px-4 py-6 rounded-xl border-2 border-dashed transition-all text-center cursor-pointer ${
-                  isDragging
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/40 hover:bg-muted/30"
-                }`}
-                onClick={() => fileRef.current?.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  pickFile(e.dataTransfer.files?.[0] ?? null);
-                }}
-              >
-                <Upload
-                  className={`h-5 w-5 ${isDragging ? "text-primary" : "text-muted-foreground"}`}
-                />
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Drop a file or <span className="text-primary">browse</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Images upload to content · PDFs appear as attachments · Max 10 MB
-                  </p>
-                </div>
-              </div>
-            )}
+              {isEdit ? "Save" : "Publish"}
+            </Button>
           </div>
-
-          {/* ── Link to assignment ── */}
-          {assignments.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Link to assignment{" "}
-                <span className="normal-case font-normal tracking-normal">(optional)</span>
-              </p>
-              <Select
-                value={assignmentId || "none"}
-                onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}
-              >
-                <SelectTrigger className="h-10 gap-2">
-                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <SelectValue placeholder="No linked assignment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No linked assignment</SelectItem>
-                  {assignments.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* ── Page body: writing canvas + right panel ── */}
+      <div className="pt-14 flex min-h-screen">
+
+        {/* Writing canvas — centered, Substack-width */}
+        <main className="flex-1 flex justify-center">
+          <div className="w-full max-w-[680px] px-5 sm:px-8 pt-16 pb-40">
+
+            {/* Title */}
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title"
+              className="w-full text-4xl sm:text-5xl font-bold text-foreground placeholder:text-muted-foreground/25 bg-transparent border-none outline-none leading-tight mb-3 tracking-tight"
+              autoFocus={!isEdit}
+            />
+
+            {/* Thin divider */}
+            <div className="border-t border-border mb-8" />
+
+            {/* Body — no border, no card, just text */}
+            <EditorContent editor={editor} />
+          </div>
+        </main>
+
+        {/* Right settings panel — sticky, Substack-style */}
+        <aside className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 border-l border-border bg-background/60 min-h-screen sticky top-14 self-start max-h-[calc(100vh-3.5rem)] overflow-y-auto">
+          <div className="px-5 py-6 space-y-6">
+
+            {/* Panel header */}
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Settings</p>
+
+            {/* Attachments */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-foreground">Attachments</p>
+                <div className="flex items-center gap-1.5">
+                  {!showUrl && (
+                    <button type="button" onClick={() => setShowUrl(true)}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-0.5 hover:bg-muted/50 transition-colors">
+                      <Plus className="h-3 w-3" /><Link2 className="h-3 w-3" />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => fileRef.current?.click()}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-0.5 hover:bg-muted/50 transition-colors">
+                    <Plus className="h-3 w-3" /><Upload className="h-3 w-3" />
+                  </button>
+                  <input ref={fileRef} type="file" className="hidden"
+                    onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+                </div>
+              </div>
+
+              {/* Existing PDF */}
+              {existingPdfUrl && !file && (
+                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground">Attached PDF</p>
+                    <a href={existingPdfUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] text-primary hover:underline">Open PDF</a>
+                  </div>
+                  <button type="button" onClick={() => setKeepExistingPdf(false)}
+                    className="shrink-0 h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* External URL */}
+              {showUrl && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <Link2 className="h-3 w-3 text-primary" /> URL link
+                    </span>
+                    <button type="button" onClick={() => { setShowUrl(false); setExternalUrl(""); }}
+                      className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <Input type="url" placeholder="https://…" value={externalUrl}
+                    onChange={(e) => setExternalUrl(e.target.value)}
+                    className="h-8 font-mono text-xs" />
+                </div>
+              )}
+
+              {/* Staged file */}
+              {file && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
+                    {fileKind === "pdf"
+                      ? <FileText className="h-4 w-4 text-primary shrink-0" />
+                      : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(1)} MB</p>
+                    </div>
+                    <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}
+                      className="shrink-0 h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {fileKind === "image" && (
+                    <Button size="sm" variant="outline" className="w-full gap-1.5 h-7 text-xs"
+                      onClick={handleInsertImage} disabled={isUploadingImage}>
+                      {isUploadingImage
+                        ? <><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</>
+                        : <><ImageIcon className="h-3 w-3" /> Insert into content</>}
+                    </Button>
+                  )}
+                  {fileKind === "pdf" && (
+                    <p className="text-[11px] text-muted-foreground">Will appear as an attachment for students.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Drop zone */}
+              {!showUrl && !file && !existingPdfUrl && (
+                <div
+                  className={`w-full flex flex-col items-center gap-1.5 px-3 py-5 rounded-xl border-2 border-dashed transition-all text-center cursor-pointer ${
+                    isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/20"
+                  }`}
+                  onClick={() => fileRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
+                >
+                  <Upload className={`h-4 w-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                  <p className="text-xs text-muted-foreground">
+                    Drop or <span className="text-primary">browse</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/60">Images · PDFs · Max 10 MB</p>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border" />
+
+            {/* Link to assignment */}
+            {assignments.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Link to assignment</p>
+                <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
+                  <SelectTrigger className="h-9 gap-2 text-sm">
+                    <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent side="top">
+                    <SelectItem value="none">No linked assignment</SelectItem>
+                    {assignments.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>{a.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Mobile settings — bottom sheet feel, shown below canvas */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-border bg-background/95 backdrop-blur-sm px-4 py-3">
+          <details className="group">
+            <summary className="flex items-center justify-between text-sm font-medium text-foreground cursor-pointer list-none">
+              <span className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                Attachments & settings
+              </span>
+              <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-[-90deg] group-open:rotate-90 transition-transform" />
+            </summary>
+            <div className="pt-4 pb-2 space-y-4">
+              {/* Mobile: URL + File buttons */}
+              <div className="flex gap-2">
+                {!showUrl && (
+                  <button type="button" onClick={() => setShowUrl(true)}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs border border-border rounded-lg py-2 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+                    <Link2 className="h-3.5 w-3.5" /> Add URL
+                  </button>
+                )}
+                <button type="button" onClick={() => fileRef.current?.click()}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs border border-border rounded-lg py-2 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+                  <Upload className="h-3.5 w-3.5" /> Upload file
+                </button>
+              </div>
+              {showUrl && (
+                <Input type="url" placeholder="https://…" value={externalUrl}
+                  onChange={(e) => setExternalUrl(e.target.value)}
+                  className="h-9 font-mono text-sm" />
+              )}
+              {file && (
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
+                  <Paperclip className="h-4 w-4 text-primary shrink-0" />
+                  <p className="text-sm flex-1 truncate">{file.name}</p>
+                  <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}>
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
+              {assignments.length > 0 && (
+                <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
+                  <SelectTrigger className="h-9 gap-2">
+                    <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <SelectValue placeholder="No linked assignment" />
+                  </SelectTrigger>
+                  <SelectContent side="top">
+                    <SelectItem value="none">No linked assignment</SelectItem>
+                    {assignments.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>{a.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button disabled={!canSave} onClick={() => saveMutation.mutate()} className="w-full rounded-xl">
+                {saveMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+                {isEdit ? "Save changes" : "Publish"}
+              </Button>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      {/* ── Link insertion dialog ── */}
+      {showLinkDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setShowLinkDialog(false)}>
+          <div className="bg-background rounded-2xl border border-border shadow-xl p-5 w-full max-w-sm mx-4"
+            onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm font-semibold mb-3 text-foreground">Insert link</p>
+            <Input type="url" placeholder="https://…" value={linkDialogUrl}
+              onChange={(e) => setLinkDialogUrl(e.target.value)}
+              className="h-9 font-mono text-sm mb-3" autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") applyLink(); if (e.key === "Escape") setShowLinkDialog(false); }} />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowLinkDialog(false)}>Cancel</Button>
+              <Button size="sm" onClick={applyLink}>Apply</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Read view (student / parent) ───────────────────────────────────────────
+// ─── Read view ───────────────────────────────────────────────────────────────
 
 function ReadView({
   classroomSlug,
@@ -618,27 +595,26 @@ function ReadView({
     isParent && parentStudentId ? `&studentId=${parentStudentId}` : ""
   }`;
 
-  // Only fire seen tracking for non-teachers (students and parents)
   useEffect(() => {
     if (isTeacher) return;
-    apiRequest(
-      `/api/classrooms/${classroomId}/materials/${material.id}/seen`,
-      { method: "POST" },
-    ).catch(() => {});
+    apiRequest(`/api/classrooms/${classroomId}/materials/${material.id}/seen`, { method: "POST" }).catch(() => {});
   }, [classroomId, material.id, isTeacher]);
 
   const urlKind = material.url ? getAttachmentKind(material.url) : null;
   const assignmentHref = material.linkedAssignment
-    ? `/classrooms/${classroomSlug}/classwork/${
-        material.linkedAssignment.slug ?? material.linkedAssignment.id
-      }`
+    ? `/classrooms/${classroomSlug}/classwork/${material.linkedAssignment.slug ?? material.linkedAssignment.id}`
     : null;
+
+  const hasBody = material.description &&
+    material.description !== "<p></p>" &&
+    material.description.trim() !== "";
 
   return (
     <div className="flex min-h-screen bg-background">
       <ModernSidebar />
       <div className="flex-1 md:ml-[228px] overflow-auto">
         <div className="max-w-3xl mx-auto px-4 sm:px-8 pt-20 pb-20 md:pt-10">
+
           {/* Back */}
           <button
             type="button"
@@ -649,79 +625,80 @@ function ReadView({
             Back to {classroom.name}
           </button>
 
-          {/* Title + meta */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-foreground leading-tight mb-1">
+          {/* Title block */}
+          <div className="mb-8 pb-6 border-b border-border">
+            <h1 className="text-3xl font-bold text-foreground leading-tight mb-3">
               {material.title}
             </h1>
-            <p className="text-sm text-muted-foreground">
-              {classroom.name} · {classroom.subject} ·{" "}
-              {new Date(material.uploadedAt).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
+            {/* Meta chips */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <GraduationCap className="h-3.5 w-3.5" />
+                <span>{classroom.name}</span>
+                {classroom.subject && (
+                  <><span className="text-border">·</span><span>{classroom.subject}</span></>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>
+                  {new Date(material.uploadedAt).toLocaleDateString("en-US", {
+                    month: "long", day: "numeric", year: "numeric",
+                  })}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Rich text body */}
-          {material.description &&
-            material.description !== "<p></p>" &&
-            material.description.trim() !== "" && (
-              <div className="mb-8">
-                <RichContent html={material.description} />
-              </div>
-            )}
+          {/* Body */}
+          {hasBody && (
+            <div className="mb-10">
+              <RichContent html={material.description!} />
+            </div>
+          )}
 
-          {/* Attachments: PDF or external link */}
+          {/* Attachment card */}
           {(urlKind === "pdf" || urlKind === "link") && material.url && (
-            <div className="mb-6 rounded-xl border border-border bg-muted/20 p-4 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Attachments
-              </p>
-              {urlKind === "pdf" ? (
+            <div className="mb-6 rounded-2xl border border-border bg-card p-4 flex items-center gap-3 shadow-sm">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${urlKind === "pdf" ? "bg-red-50 text-red-600" : "bg-sky-50 text-sky-600"}`}>
+                {urlKind === "pdf"
+                  ? <FileText className="h-4 w-4" />
+                  : <Paperclip className="h-4 w-4" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
+                  {urlKind === "pdf" ? "PDF Attachment" : "Link"}
+                </p>
                 <a
                   href={material.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline font-medium"
+                  className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
                 >
-                  <FileText className="h-4 w-4 shrink-0" />
-                  Open PDF
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  {urlKind === "pdf" ? "Open PDF" : "View attachment"}
+                  <ExternalLink className="h-3 w-3" />
                 </a>
-              ) : (
-                <a
-                  href={material.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline font-medium"
-                >
-                  <Paperclip className="h-4 w-4 shrink-0" />
-                  View attachment
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              )}
+              </div>
             </div>
           )}
 
           {/* Linked assignment CTA */}
           {assignmentHref && (
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-0.5">
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
                   Linked Assignment
                 </p>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-base font-semibold text-foreground leading-snug truncate">
                   {material.linkedAssignment!.title}
                 </p>
               </div>
               <Button
                 size="sm"
-                className="gap-1.5 shrink-0"
+                className="gap-1.5 shrink-0 h-9 px-4"
                 onClick={() => navigate(assignmentHref)}
               >
-                Go to assignment <ArrowRight className="h-3.5 w-3.5" />
+                Start <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </div>
           )}
@@ -731,14 +708,12 @@ function ReadView({
   );
 }
 
-// ─── Root component ──────────────────────────────────────────────────────────
+// ─── Root ────────────────────────────────────────────────────────────────────
 
 export default function ClassroomMaterialPage() {
   const [matchNew, paramsNew] = useRoute("/classrooms/:slug/materials/new");
   const [matchEdit, paramsEdit] = useRoute("/classrooms/:slug/materials/:materialSlug/edit");
-  const [matchMaterial, paramsMaterial] = useRoute(
-    "/classrooms/:slug/materials/:materialSlug",
-  );
+  const [matchMaterial, paramsMaterial] = useRoute("/classrooms/:slug/materials/:materialSlug");
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
@@ -763,8 +738,7 @@ export default function ClassroomMaterialPage() {
 
   const { data: material, isLoading: materialLoading } = useQuery<ClassroomMaterial>({
     queryKey: ["/api/classrooms", classroomId, "materials", "slug", materialSlug],
-    queryFn: () =>
-      apiRequest(`/api/classrooms/${classroomId}/materials/slug/${materialSlug}`),
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials/slug/${materialSlug}`),
     enabled: !!classroomId && !isNew && !!materialSlug,
   });
 
@@ -787,9 +761,7 @@ export default function ClassroomMaterialPage() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-sm text-muted-foreground">Classroom not found.</p>
-          <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")}>
-            Back to Dashboard
-          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
         </div>
       </div>
     );
@@ -801,11 +773,7 @@ export default function ClassroomMaterialPage() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-sm text-muted-foreground">Classwork not found.</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/classrooms/${classroomSlug}?tab=classwork`)}
-          >
+          <Button variant="outline" size="sm" onClick={() => navigate(`/classrooms/${classroomSlug}?tab=classwork`)}>
             Back to {classroom.name}
           </Button>
         </div>
@@ -817,10 +785,7 @@ export default function ClassroomMaterialPage() {
   const isParent = user?.role === "parent";
 
   if (isNew || isEdit) {
-    if (!isTeacher) {
-      navigate(`/classrooms/${classroomSlug}`);
-      return null;
-    }
+    if (!isTeacher) { navigate(`/classrooms/${classroomSlug}`); return null; }
     return (
       <TeacherEditor
         classroomSlug={classroomSlug}
