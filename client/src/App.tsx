@@ -122,6 +122,9 @@ function AppRoutes() {
       <Route path="/classrooms/:slug/materials/new">
         <ProtectedRoute component={ClassroomMaterialPage} />
       </Route>
+      <Route path="/classrooms/:slug/materials/:materialSlug/edit">
+        <ProtectedRoute component={ClassroomMaterialPage} />
+      </Route>
       <Route path="/classrooms/:slug/materials/:materialSlug">
         <ProtectedRoute component={ClassroomMaterialPage} />
       </Route>

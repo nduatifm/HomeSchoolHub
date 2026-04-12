@@ -37,19 +37,11 @@ import {
   ArrowRight,
   BookOpen,
   ImageIcon,
+  Minus,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import type { Classroom, ClassroomAssignment, ClassroomMaterial } from "@shared/schema";
-
-// ─── Attachment kind detection ───────────────────────────────────────────────
-
-export function getAttachmentKind(url: string): "image" | "pdf" | "link" {
-  if (url.includes("/image/upload/")) return "image";
-  if (url.includes("/raw/upload/") || /\.pdf(\?|$)/i.test(url)) return "pdf";
-  const lower = url.toLowerCase();
-  if (/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/.test(lower)) return "image";
-  return "link";
-}
+import { getAttachmentKind } from "@/lib/classroomUtils";
 
 // ─── Sanitize HTML for safe rendering ───────────────────────────────────────
 
@@ -101,6 +93,7 @@ function Toolbar({
       {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), <ListOrdered className="h-3.5 w-3.5" />, "Numbered list")}
       <div className="w-px h-4 bg-border mx-1" />
       {btn(editor.isActive("link"), onInsertLink, <Link2 className="h-3.5 w-3.5" />, "Insert link")}
+      {btn(false, () => editor.chain().focus().setHorizontalRule().run(), <Minus className="h-3.5 w-3.5" />, "Divider")}
     </div>
   );
 }
@@ -118,10 +111,28 @@ function RichContent({ html }: { html: string }) {
         prose-strong:font-semibold prose-strong:text-foreground
         prose-em:text-foreground/80
         prose-a:text-primary prose-a:underline
+        prose-hr:border-border prose-hr:my-6
         prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
       dangerouslySetInnerHTML={{ __html: sanitize(html) }}
     />
   );
+}
+
+// ─── Upload image file to Cloudinary and return the URL ─────────────────────
+
+async function uploadImageToCloudinary(file: File): Promise<string> {
+  const token = localStorage.getItem("sessionId");
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("folder", "classwork-images");
+  const r = await fetch("/api/upload", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  const data = await r.json();
+  if (!r.ok || !data.url) throw new Error(data.error ?? "Image upload failed");
+  return data.url as string;
 }
 
 // ─── Teacher editor ──────────────────────────────────────────────────────────
@@ -144,8 +155,6 @@ function TeacherEditor({
   const [assignmentId, setAssignmentId] = useState(
     initial?.assignmentId ? String(initial.assignmentId) : "",
   );
-
-  // Attachment state — separate external URL from uploaded file
   const [showUrl, setShowUrl] = useState(
     !!(initial?.url && getAttachmentKind(initial.url) === "link"),
   );
@@ -154,6 +163,7 @@ function TeacherEditor({
   );
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Link insertion dialog
@@ -197,12 +207,8 @@ function TeacherEditor({
     if (!linkDialogUrl.trim()) {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
     } else {
-      editor
-        .chain()
-        .focus()
-        .extendMarkRange("link")
-        .setLink({ href: linkDialogUrl.trim() })
-        .run();
+      editor.chain().focus().extendMarkRange("link")
+        .setLink({ href: linkDialogUrl.trim() }).run();
     }
     setShowLinkDialog(false);
     setLinkDialogUrl("");
@@ -218,12 +224,22 @@ function TeacherEditor({
     setFile(f);
   }
 
-  function handleInsertImage() {
+  async function handleInsertImage() {
     if (!file || !editor) return;
-    const objectUrl = URL.createObjectURL(file);
-    editor.chain().focus().setImage({ src: objectUrl }).run();
-    setFile(null);
-    if (fileRef.current) fileRef.current.value = "";
+    const kind = getAttachmentKind(file.name);
+    if (kind !== "image") return;
+    setIsUploadingImage(true);
+    try {
+      const url = await uploadImageToCloudinary(file);
+      editor.chain().focus().setImage({ src: url }).run();
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      toast({ title: "Image upload failed", description: msg, type: "error" });
+    } finally {
+      setIsUploadingImage(false);
+    }
   }
 
   const saveMutation = useMutation({
@@ -269,21 +285,17 @@ function TeacherEditor({
         }),
       }) as Promise<ClassroomMaterial>;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/classrooms", classroomId, "materials"],
       });
-      queryClient.invalidateQueries({
-        queryKey: ["/api/classrooms", classroomId, "materials", "slug", data.slug],
-      });
       toast({ title: isEdit ? "Classwork updated" : "Classwork created", type: "success" });
-      const slug = data.slug ?? data.id;
-      navigate(`/classrooms/${classroomSlug}/materials/${slug}`);
+      navigate(`/classrooms/${classroomSlug}?tab=classwork`);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
   });
 
-  const canSave = title.trim().length > 0 && !saveMutation.isPending;
+  const canSave = title.trim().length > 0 && !saveMutation.isPending && !isUploadingImage;
   const existingPdfUrl =
     initial?.url && getAttachmentKind(initial.url) === "pdf" ? initial.url : null;
   const fileKind = file ? getAttachmentKind(file.name) : null;
@@ -479,8 +491,13 @@ function TeacherEditor({
                     variant="outline"
                     className="w-full gap-1.5 h-8 text-xs"
                     onClick={handleInsertImage}
+                    disabled={isUploadingImage}
                   >
-                    <ImageIcon className="h-3.5 w-3.5" /> Insert into content
+                    {isUploadingImage ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                    ) : (
+                      <><ImageIcon className="h-3.5 w-3.5" /> Insert into content</>
+                    )}
                   </Button>
                 )}
                 {fileKind === "pdf" && (
@@ -519,7 +536,7 @@ function TeacherEditor({
                     Drop a file or <span className="text-primary">browse</span>
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Images embed in content · PDFs appear as attachments · Max 10 MB
+                    Images upload to content · PDFs appear as attachments · Max 10 MB
                   </p>
                 </div>
               </div>
@@ -696,19 +713,23 @@ function ReadView({
 
 export default function ClassroomMaterialPage() {
   const [matchNew, paramsNew] = useRoute("/classrooms/:slug/materials/new");
+  const [matchEdit, paramsEdit] = useRoute("/classrooms/:slug/materials/:materialSlug/edit");
   const [matchMaterial, paramsMaterial] = useRoute(
     "/classrooms/:slug/materials/:materialSlug",
   );
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
-  const classroomSlug =
-    (matchNew ? paramsNew?.slug : paramsMaterial?.slug) ?? "";
-  const materialSlug = matchMaterial ? (paramsMaterial?.materialSlug ?? "") : "";
   const isNew = !!matchNew;
+  const isEdit = !!matchEdit;
 
-  const sp = new URLSearchParams(window.location.search);
-  const isEdit = sp.get("edit") === "true";
+  const classroomSlug =
+    (matchNew ? paramsNew?.slug : matchEdit ? paramsEdit?.slug : paramsMaterial?.slug) ?? "";
+  const materialSlug = matchEdit
+    ? (paramsEdit?.materialSlug ?? "")
+    : matchMaterial
+    ? (paramsMaterial?.materialSlug ?? "")
+    : "";
 
   const { data: classroom, isLoading: classroomLoading } = useQuery<Classroom>({
     queryKey: ["/api/classrooms", classroomSlug],

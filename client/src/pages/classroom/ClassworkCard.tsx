@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { ClassroomAssignment, ClassroomMaterial, ClassroomSubmission } from "@shared/schema";
 import { classifyAssignment } from "@/lib/classroomNotifications";
-import { getAttachmentKind } from "@/pages/ClassroomMaterialPage";
+import { getAttachmentKind } from "@/lib/classroomUtils";
 
 export default function ClassworkCard({
   item,
@@ -70,7 +70,7 @@ export default function ClassworkCard({
   })();
 
   const materialHref = `/classrooms/${classroomSlug}/materials/${item.slug ?? item.id}`;
-  const editHref = `${materialHref}?edit=true`;
+  const editHref = `${materialHref}/edit`;
 
   const urlKind = item.url ? getAttachmentKind(item.url) : null;
 
