@@ -34,7 +34,7 @@ Icons are provided by Lucide React. The profile management features a modern tab
     - **Cloudinary Integration**: All file uploads (assignments, materials, profile pictures) use Cloudinary storage
     - **Supported Formats**: Images (JPEG, JPG, PNG, GIF, WEBP) and PDFs with MIME type validation
     - **Assignment Files**: Optional file attachment during assignment creation (max 10MB)
-    - **Material Files**: Required file upload for study materials (max 10MB)
+    - **Material Files**: Multiple PDF attachments per classwork material — `attachments String[]` column in DB; teacher can add/remove individually; all popups and ReadView show each as its own numbered card (backward-compat: old single `url` PDF shown alongside new array)
     - **apiUpload Helper**: Dedicated FormData upload helper in `client/src/lib/queryClient.ts` that maintains consistent auth headers (Bearer token + session cookies) and error handling across all file upload operations
     - **UX Features**: File preview with name/size display, remove/clear buttons, automatic state reset on dialog close
     - **API Endpoints**: `/api/assignments/with-file` and `/api/materials/with-file` for multipart uploads

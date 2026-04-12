@@ -1934,6 +1934,7 @@ class PrismaStorage implements IStorage {
       title: m.title,
       description: m.description,
       url: m.url ?? null,
+      attachments: m.attachments ?? [],
       assignmentId: m.assignmentId ?? null,
       slug: m.slug ?? null,
       uploadedAt: m.uploadedAt instanceof Date ? m.uploadedAt.toISOString() : m.uploadedAt,

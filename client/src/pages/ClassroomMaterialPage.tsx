@@ -71,18 +71,18 @@ function RichContent({ html }: { html: string }) {
 
 // ─── Upload image ────────────────────────────────────────────────────────────
 
-async function uploadImageToCloudinary(file: File): Promise<string> {
+async function uploadFileToCloudinary(file: File, folder = "classwork"): Promise<string> {
   const token = localStorage.getItem("sessionId");
   const fd = new FormData();
   fd.append("file", file);
-  fd.append("folder", "classwork-images");
+  fd.append("folder", folder);
   const r = await fetch("/api/upload", {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: fd,
   });
   const data = await r.json();
-  if (!r.ok || !data.url) throw new Error(data.error ?? "Image upload failed");
+  if (!r.ok || !data.url) throw new Error(data.error ?? "Upload failed");
   return data.url as string;
 }
 
@@ -111,13 +111,22 @@ function TeacherEditor({
   const [externalUrl, setExternalUrl] = useState(
     initialUrlKind === "link" ? (initial?.url ?? "") : "",
   );
-  const [keepExistingPdf, setKeepExistingPdf] = useState(initialUrlKind === "pdf");
+
+  // All saved PDF attachment URLs — seeded from the new attachments[] array,
+  // plus the legacy single `url` field if it was a PDF (backward compat).
+  const [existingAttachments, setExistingAttachments] = useState<string[]>(() => {
+    const saved = initial?.attachments ?? [];
+    if (initial?.url && getAttachmentKind(initial.url) === "pdf") {
+      return [initial.url, ...saved.filter((u) => u !== initial!.url)];
+    }
+    return saved;
+  });
+  // Files the teacher has staged locally (not yet uploaded).
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Force a re-render whenever the editor selection or content changes so
   // toolbar active-state highlights (bold, italic, heading, link…) stay current.
   const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
@@ -194,26 +203,28 @@ function TeacherEditor({
     setLinkDialogUrl("");
   };
 
-  function pickFile(f: File | null) {
-    if (!f) return;
-    if (f.size > 10 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Max 10 MB.", type: "error" });
-      if (fileRef.current) fileRef.current.value = "";
-      return;
+  function addFiles(fileList: FileList | null) {
+    if (!fileList) return;
+    const toAdd: File[] = [];
+    for (let i = 0; i < fileList.length; i++) {
+      const f = fileList[i];
+      if (f.size > 10 * 1024 * 1024) {
+        toast({ title: "File too large", description: `${f.name} exceeds 10 MB.`, type: "error" });
+        continue;
+      }
+      toAdd.push(f);
     }
-    setFile(f);
+    if (toAdd.length > 0) setPendingFiles((prev) => [...prev, ...toAdd]);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
-  async function handleInsertImage() {
-    if (!file || !editor) return;
-    const kind = getAttachmentKind(file.name);
-    if (kind !== "image") return;
+  async function handleInsertImage(imgFile: File) {
+    if (!editor) return;
     setIsUploadingImage(true);
     try {
-      const url = await uploadImageToCloudinary(file);
+      const url = await uploadFileToCloudinary(imgFile, "classwork-images");
       editor.chain().focus().setImage({ src: url }).run();
-      setFile(null);
-      if (fileRef.current) fileRef.current.value = "";
+      setPendingFiles((prev) => prev.filter((f) => f !== imgFile));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Upload failed";
       toast({ title: "Image upload failed", description: msg, type: "error" });
@@ -224,39 +235,22 @@ function TeacherEditor({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const token = localStorage.getItem("sessionId");
       const rawHtml = editor?.getHTML() ?? "";
       const description = sanitize(rawHtml);
 
-      if (file) {
-        const kind = getAttachmentKind(file.name);
-        if (kind === "image") {
-          throw new Error("Please use 'Insert into content' before saving the image.");
-        }
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("title", title);
-        fd.append("description", description);
-        if (showUrl && externalUrl) fd.append("url", externalUrl);
-        if (assignmentId) fd.append("assignmentId", assignmentId);
-        const endpoint = isEdit
-          ? `/api/classrooms/${classroomId}/materials/${initial!.id}/with-file`
-          : `/api/classrooms/${classroomId}/materials/with-file`;
-        const r = await fetch(endpoint, {
-          method: isEdit ? "PATCH" : "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: fd,
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error ?? "Upload failed");
-        return d as ClassroomMaterial;
+      // Validate: any staged images must be inserted into content before saving.
+      const stagedImages = pendingFiles.filter((f) => getAttachmentKind(f.name) === "image");
+      if (stagedImages.length > 0) {
+        throw new Error("Please insert staged images into the content before saving.");
       }
 
-      const resolvedUrl = showUrl && externalUrl
-        ? externalUrl
-        : keepExistingPdf && initial?.url
-        ? initial.url
-        : null;
+      // Upload all pending PDF files in parallel.
+      const newUrls = await Promise.all(
+        pendingFiles.map((f) => uploadFileToCloudinary(f, "classwork")),
+      );
+      const attachments = [...existingAttachments, ...newUrls];
+
+      const resolvedUrl = showUrl && externalUrl ? externalUrl : null;
 
       const endpoint = isEdit
         ? `/api/classrooms/${classroomId}/materials/${initial!.id}`
@@ -267,6 +261,7 @@ function TeacherEditor({
           title,
           description,
           url: resolvedUrl,
+          attachments,
           assignmentId: assignmentId ? Number(assignmentId) : null,
         }),
       }) as Promise<ClassroomMaterial>;
@@ -280,8 +275,6 @@ function TeacherEditor({
   });
 
   const canSave = title.trim().length > 0 && !saveMutation.isPending && !isUploadingImage;
-  const existingPdfUrl = keepExistingPdf && initial?.url ? initial.url : null;
-  const fileKind = file ? getAttachmentKind(file.name) : null;
 
   return (
     <div className="min-h-screen bg-white dark:bg-background">
@@ -406,26 +399,10 @@ function TeacherEditor({
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-0.5 hover:bg-muted/50 transition-colors">
                     <Plus className="h-3 w-3" /><Upload className="h-3 w-3" />
                   </button>
-                  <input ref={fileRef} type="file" className="hidden"
-                    onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+                  <input ref={fileRef} type="file" multiple className="hidden"
+                    onChange={(e) => addFiles(e.target.files)} />
                 </div>
               </div>
-
-              {/* Existing PDF */}
-              {existingPdfUrl && !file && (
-                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
-                  <FileText className="h-4 w-4 text-primary shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground">Attached PDF</p>
-                    <a href={existingPdfUrl} target="_blank" rel="noopener noreferrer"
-                      className="text-[11px] text-primary hover:underline">Open PDF</a>
-                  </div>
-                  <button type="button" onClick={() => setKeepExistingPdf(false)}
-                    className="shrink-0 h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
 
               {/* External URL */}
               {showUrl && (
@@ -445,48 +422,66 @@ function TeacherEditor({
                 </div>
               )}
 
-              {/* Staged file */}
-              {file && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
-                    {fileKind === "pdf"
-                      ? <FileText className="h-4 w-4 text-primary shrink-0" />
-                      : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
-                      <p className="text-[11px] text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(1)} MB</p>
-                    </div>
-                    <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}
-                      className="shrink-0 h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+              {/* Saved attachments */}
+              {existingAttachments.map((url, i) => (
+                <div key={url} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground">PDF {existingAttachments.length > 1 ? i + 1 : ""}</p>
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] text-primary hover:underline">Open PDF</a>
                   </div>
-                  {fileKind === "image" && (
-                    <Button size="sm" variant="outline" className="w-full gap-1.5 h-7 text-xs"
-                      onClick={handleInsertImage} disabled={isUploadingImage}>
-                      {isUploadingImage
-                        ? <><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</>
-                        : <><ImageIcon className="h-3 w-3" /> Insert into content</>}
-                    </Button>
-                  )}
-                  {fileKind === "pdf" && (
-                    <p className="text-[11px] text-muted-foreground">Will appear as an attachment for students.</p>
-                  )}
+                  <button type="button"
+                    onClick={() => setExistingAttachments((prev) => prev.filter((_, j) => j !== i))}
+                    className="shrink-0 h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-              )}
+              ))}
 
-              {/* Drop zone */}
-              {!showUrl && !file && !existingPdfUrl && (
+              {/* Pending (staged) files */}
+              {pendingFiles.map((f, i) => {
+                const kind = getAttachmentKind(f.name);
+                return (
+                  <div key={i} className="space-y-2">
+                    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
+                      {kind === "pdf"
+                        ? <FileText className="h-4 w-4 text-primary shrink-0" />
+                        : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{f.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{(f.size / (1024 * 1024)).toFixed(1)} MB</p>
+                      </div>
+                      <button type="button"
+                        onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
+                        className="shrink-0 h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {kind === "image" && (
+                      <Button size="sm" variant="outline" className="w-full gap-1.5 h-7 text-xs"
+                        onClick={() => handleInsertImage(f)} disabled={isUploadingImage}>
+                        {isUploadingImage
+                          ? <><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</>
+                          : <><ImageIcon className="h-3 w-3" /> Insert into content</>}
+                      </Button>
+                    )}
+                    {kind === "pdf" && (
+                      <p className="text-[11px] text-muted-foreground">Will be saved as an attachment.</p>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Drop zone — shown when no files are staged and no saved attachments */}
+              {existingAttachments.length === 0 && pendingFiles.length === 0 && !showUrl && (
                 <div
-                  className={`w-full flex flex-col items-center gap-1.5 px-3 py-5 rounded-xl border-2 border-dashed transition-all text-center cursor-pointer ${
-                    isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/20"
-                  }`}
+                  className="w-full flex flex-col items-center gap-1.5 px-3 py-5 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-muted/20 transition-all text-center cursor-pointer"
                   onClick={() => fileRef.current?.click()}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
                 >
-                  <Upload className={`h-4 w-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                  <Upload className="h-4 w-4 text-muted-foreground" />
                   <p className="text-xs text-muted-foreground">
                     Drop or <span className="text-primary">browse</span>
                   </p>
@@ -540,38 +535,53 @@ function TeacherEditor({
                 )}
                 <button type="button" onClick={() => fileRef.current?.click()}
                   className="flex-1 flex items-center justify-center gap-1.5 text-xs border border-border rounded-lg py-2 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
-                  <Upload className="h-3.5 w-3.5" /> Upload file
+                  <Upload className="h-3.5 w-3.5" /> Attach file
                 </button>
               </div>
               {showUrl && (
-                <Input type="url" placeholder="https://…" value={externalUrl}
-                  onChange={(e) => setExternalUrl(e.target.value)}
-                  className="h-9 font-mono text-sm" />
-              )}
-              {file && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
-                    {fileKind === "pdf"
-                      ? <FileText className="h-4 w-4 text-primary shrink-0" />
-                      : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
-                    <p className="text-sm flex-1 truncate">{file.name}</p>
-                    <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; }}>
-                      <X className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                  {fileKind === "image" && (
-                    <Button size="sm" variant="outline" className="w-full gap-1.5 h-8 text-xs"
-                      onClick={handleInsertImage} disabled={isUploadingImage}>
-                      {isUploadingImage
-                        ? <><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</>
-                        : <><ImageIcon className="h-3 w-3" /> Insert into content</>}
-                    </Button>
-                  )}
-                  {fileKind === "pdf" && (
-                    <p className="text-[11px] text-muted-foreground">Will appear as an attachment for students.</p>
-                  )}
+                <div className="space-y-1">
+                  <Input type="url" placeholder="https://…" value={externalUrl}
+                    onChange={(e) => setExternalUrl(e.target.value)}
+                    className="h-9 font-mono text-sm" />
+                  <button type="button" onClick={() => { setShowUrl(false); setExternalUrl(""); }}
+                    className="text-xs text-muted-foreground hover:text-foreground">Remove URL</button>
                 </div>
               )}
+              {existingAttachments.map((url, i) => (
+                <div key={url} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <p className="text-sm flex-1 truncate">PDF {existingAttachments.length > 1 ? i + 1 : ""}</p>
+                  <button type="button"
+                    onClick={() => setExistingAttachments((prev) => prev.filter((_, j) => j !== i))}>
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+              ))}
+              {pendingFiles.map((f, i) => {
+                const kind = getAttachmentKind(f.name);
+                return (
+                  <div key={i} className="space-y-2">
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
+                      {kind === "pdf"
+                        ? <FileText className="h-4 w-4 text-primary shrink-0" />
+                        : <ImageIcon className="h-4 w-4 text-primary shrink-0" />}
+                      <p className="text-sm flex-1 truncate">{f.name}</p>
+                      <button type="button"
+                        onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}>
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                    {kind === "image" && (
+                      <Button size="sm" variant="outline" className="w-full gap-1.5 h-8 text-xs"
+                        onClick={() => handleInsertImage(f)} disabled={isUploadingImage}>
+                        {isUploadingImage
+                          ? <><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</>
+                          : <><ImageIcon className="h-3 w-3" /> Insert into content</>}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
               {assignments.length > 0 && (
                 <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
                   <SelectTrigger className="h-9 gap-2">
@@ -656,6 +666,14 @@ function ReadView({
     material.description !== "<p></p>" &&
     material.description.trim() !== "";
 
+  // Combine the new attachments[] with the legacy single url field (if PDF),
+  // deduplicating so old materials that get edited don't show the same PDF twice.
+  const legacyPdfUrl = urlKind === "pdf" ? material.url ?? null : null;
+  const newAttachments = material.attachments ?? [];
+  const allPdfAttachments = legacyPdfUrl && !newAttachments.includes(legacyPdfUrl)
+    ? [legacyPdfUrl, ...newAttachments]
+    : newAttachments;
+
   return (
     <div className="flex min-h-screen bg-background">
       <ModernSidebar />
@@ -704,25 +722,48 @@ function ReadView({
             </div>
           )}
 
-          {/* Attachment card */}
-          {(urlKind === "pdf" || urlKind === "link") && material.url && (
+          {/* PDF attachment cards — one per entry in allPdfAttachments */}
+          {allPdfAttachments.length > 0 && (
+            <div className="mb-6 space-y-3">
+              {allPdfAttachments.map((pdfUrl, i) => (
+                <div key={pdfUrl} className="rounded-2xl border border-border bg-card p-4 flex items-center gap-3 shadow-sm">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-red-50 text-red-600">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
+                      {allPdfAttachments.length > 1 ? `PDF Attachment ${i + 1}` : "PDF Attachment"}
+                    </p>
+                    <a
+                      href={pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+                    >
+                      Open PDF
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* External link card */}
+          {urlKind === "link" && material.url && (
             <div className="mb-6 rounded-2xl border border-border bg-card p-4 flex items-center gap-3 shadow-sm">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${urlKind === "pdf" ? "bg-red-50 text-red-600" : "bg-sky-50 text-sky-600"}`}>
-                {urlKind === "pdf"
-                  ? <FileText className="h-4 w-4" />
-                  : <Paperclip className="h-4 w-4" />}
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-sky-50 text-sky-600">
+                <Paperclip className="h-4 w-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
-                  {urlKind === "pdf" ? "PDF Attachment" : "Link"}
-                </p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Link</p>
                 <a
                   href={material.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
                 >
-                  {urlKind === "pdf" ? "Open PDF" : "View attachment"}
+                  View attachment
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>

@@ -507,6 +507,7 @@ model ClassroomMaterial {
   title        String
   description  String
   url          String?
+  attachments  String[]
   assignmentId Int?
   slug         String?
   uploadedAt   DateTime @default(now())

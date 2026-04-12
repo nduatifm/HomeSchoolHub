@@ -4738,6 +4738,7 @@ export function registerRoutes(app: Express) {
         title: z.string().min(1),
         description: z.string().default(""),
         url: z.string().url().optional().nullable(),
+        attachments: z.array(z.string().url()).optional(),
         assignmentId: z.number().int().positive().optional().nullable(),
       }).parse(req.body);
       if (data.assignmentId) {
@@ -4814,6 +4815,7 @@ export function registerRoutes(app: Express) {
       res.json({
         id: material.id, classroomId: material.classroomId, title: material.title,
         description: material.description, url: material.url ?? null,
+        attachments: material.attachments ?? [],
         assignmentId: material.assignmentId ?? null, slug: material.slug ?? null,
         uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
         linkedAssignment: material.assignment
@@ -4840,6 +4842,7 @@ export function registerRoutes(app: Express) {
       res.json({
         id: material.id, classroomId: material.classroomId, title: material.title,
         description: material.description, url: material.url ?? null,
+        attachments: material.attachments ?? [],
         assignmentId: material.assignmentId ?? null, slug: material.slug ?? null,
         uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
         linkedAssignment: material.assignment
@@ -4864,6 +4867,7 @@ export function registerRoutes(app: Express) {
         title: z.string().min(1).optional(),
         description: z.string().optional(),
         url: z.string().url().optional().nullable(),
+        attachments: z.array(z.string().url()).optional(),
         assignmentId: z.number().int().positive().optional().nullable(),
       }).parse(req.body);
       if (data.assignmentId) {

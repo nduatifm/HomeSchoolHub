@@ -494,6 +494,7 @@ export const classroomMaterialSchema = z.object({
   title: z.string(),
   description: z.string(),
   url: z.string().nullable().optional(),
+  attachments: z.array(z.string()).optional(),
   assignmentId: z.number().nullable().optional(),
   slug: z.string().nullable().optional(),
   uploadedAt: z.string(),

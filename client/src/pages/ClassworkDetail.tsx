@@ -449,7 +449,14 @@ export default function ClassworkDetail() {
                           <p className="font-medium text-sm text-foreground">{material.title}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {new Date(material.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            {material.url ? ` · ${getAttachmentKind(material.url) === "pdf" ? "PDF" : getAttachmentKind(material.url) === "image" ? "Image" : "Link"} attached` : ""}
+                            {(() => {
+                              const atts = material.attachments ?? [];
+                              const urlKind = material.url ? getAttachmentKind(material.url) : null;
+                              const pdfCount = atts.length + (urlKind === "pdf" && !atts.includes(material.url!) ? 1 : 0);
+                              if (pdfCount > 0) return ` · ${pdfCount} PDF${pdfCount > 1 ? "s" : ""} attached`;
+                              if (urlKind === "link") return " · Link attached";
+                              return "";
+                            })()}
                           </p>
                         </div>
                         <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -503,52 +510,54 @@ export default function ClassworkDetail() {
               />
             )}
 
-            {materialDialogOpen?.url && (() => {
-              const kind = getAttachmentKind(materialDialogOpen.url!);
-              if (kind === "image") {
-                return (
-                  <img
-                    src={materialDialogOpen.url}
-                    alt={materialDialogOpen.title}
-                    className="rounded-xl max-w-full border border-border"
-                  />
-                );
-              }
-              if (kind === "pdf") {
-                return (
-                  <a
-                    href={materialDialogOpen.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
-                  >
-                    <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
-                      <FileText className="h-4 w-4 text-red-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">Open PDF</p>
-                      <p className="text-xs text-muted-foreground truncate">{materialDialogOpen.url}</p>
-                    </div>
-                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
-                  </a>
-                );
-              }
+            {materialDialogOpen && (() => {
+              const urlKind = materialDialogOpen.url ? getAttachmentKind(materialDialogOpen.url) : null;
+              const legacyPdf = urlKind === "pdf" ? materialDialogOpen.url! : null;
+              const savedAtts = materialDialogOpen.attachments ?? [];
+              const allPdfs = legacyPdf && !savedAtts.includes(legacyPdf)
+                ? [legacyPdf, ...savedAtts]
+                : savedAtts;
               return (
-                <a
-                  href={materialDialogOpen.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
-                >
-                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <ExternalLink className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">Open link</p>
-                    <p className="text-xs text-muted-foreground truncate">{materialDialogOpen.url}</p>
-                  </div>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
-                </a>
+                <>
+                  {/* Multiple PDF attachments */}
+                  {allPdfs.map((pdfUrl, i) => (
+                    <a
+                      key={pdfUrl}
+                      href={pdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                        <FileText className="h-4 w-4 text-red-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {allPdfs.length > 1 ? `Open PDF ${i + 1}` : "Open PDF"}
+                        </p>
+                      </div>
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                    </a>
+                  ))}
+                  {/* External link */}
+                  {urlKind === "link" && materialDialogOpen.url && (
+                    <a
+                      href={materialDialogOpen.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <ExternalLink className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">Open link</p>
+                        <p className="text-xs text-muted-foreground truncate">{materialDialogOpen.url}</p>
+                      </div>
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                    </a>
+                  )}
+                </>
               );
             })()}
           </div>
