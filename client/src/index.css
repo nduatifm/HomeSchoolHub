@@ -184,3 +184,12 @@
 .prose .ProseMirror {
   max-width: none;
 }
+
+/* TextAlign extension — ensure inline text-align styles aren't reset */
+.ProseMirror p[style*="text-align"],
+.ProseMirror h1[style*="text-align"],
+.ProseMirror h2[style*="text-align"],
+.ProseMirror h3[style*="text-align"],
+.ProseMirror h4[style*="text-align"] {
+  text-align: revert;
+}

@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import LinkExtension from "@tiptap/extension-link";
 import ImageExtension from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
+import TextAlign from "@tiptap/extension-text-align";
 import DOMPurify from "dompurify";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,11 +23,12 @@ import { toast } from "@/hooks/use-toast";
 import {
   Loader2,
   ChevronLeft,
+  ChevronDown,
   Bold,
   Italic,
+  Strikethrough,
   List,
   ListOrdered,
-  Heading2,
   Link2,
   Paperclip,
   FileText,
@@ -40,6 +42,12 @@ import {
   Minus,
   Calendar,
   GraduationCap,
+  Undo2,
+  Redo2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import type { Classroom, ClassroomAssignment, ClassroomMaterial } from "@shared/schema";
@@ -56,7 +64,9 @@ function RichContent({ html }: { html: string }) {
     <div
       className="prose prose-sm max-w-none text-foreground
         prose-headings:font-semibold prose-headings:text-foreground
+        prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
         prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
+        prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-1.5
         prose-p:leading-relaxed prose-p:my-2 prose-p:text-foreground/90
         prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
         prose-strong:font-semibold prose-strong:text-foreground
@@ -69,7 +79,7 @@ function RichContent({ html }: { html: string }) {
   );
 }
 
-// ─── Upload image ────────────────────────────────────────────────────────────
+// ─── Upload helper ───────────────────────────────────────────────────────────
 
 async function uploadFileToCloudinary(file: File, folder = "classwork"): Promise<string> {
   const token = localStorage.getItem("sessionId");
@@ -106,11 +116,6 @@ function TeacherEditor({
   const [assignmentId, setAssignmentId] = useState(
     initial?.assignmentId ? String(initial.assignmentId) : "",
   );
-  const initialUrlKind = initial?.url ? getAttachmentKind(initial.url) : null;
-  const [showUrl, setShowUrl] = useState(initialUrlKind === "link");
-  const [externalUrl, setExternalUrl] = useState(
-    initialUrlKind === "link" ? (initial?.url ?? "") : "",
-  );
 
   // All saved PDF attachment URLs — seeded from the new attachments[] array,
   // plus the legacy single `url` field if it was a PDF (backward compat).
@@ -124,11 +129,17 @@ function TeacherEditor({
   // Files the teacher has staged locally (not yet uploaded).
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
+  // Toolbar dropdown state
+  const [showStyleMenu, setShowStyleMenu] = useState(false);
+  const [showAlignMenu, setShowAlignMenu] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
   // Force a re-render whenever the editor selection or content changes so
-  // toolbar active-state highlights (bold, italic, heading, link…) stay current.
+  // toolbar active-state highlights stay current.
   const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);   // PDF / any attachment
+  const imageRef = useRef<HTMLInputElement>(null);  // toolbar image-only picker
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [linkDialogUrl, setLinkDialogUrl] = useState("");
 
@@ -140,6 +151,7 @@ function TeacherEditor({
   const editor = useEditor({
     extensions: [
       StarterKit,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
       LinkExtension.configure({
         openOnClick: false,
         HTMLAttributes: { class: "text-primary underline" },
@@ -159,8 +171,7 @@ function TeacherEditor({
     },
   });
 
-  // Wire up selection/update listeners using stable references so the editor
-  // is never re-initialized. forceUpdate from useReducer is a stable fn ref.
+  // Wire up selection/update listeners so toolbar highlights stay current.
   useEffect(() => {
     if (!editor) return;
     editor.on("selectionUpdate", forceUpdate);
@@ -171,6 +182,46 @@ function TeacherEditor({
     };
   }, [editor, forceUpdate]);
 
+  // Close toolbar dropdowns when clicking outside the toolbar
+  useEffect(() => {
+    if (!showStyleMenu && !showAlignMenu) return;
+    const close = (e: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setShowStyleMenu(false);
+        setShowAlignMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [showStyleMenu, showAlignMenu]);
+
+  // ── Style / alignment helpers ──────────────────────────────────────────────
+
+  function getCurrentStyle() {
+    if (!editor) return "Normal";
+    if (editor.isActive("heading", { level: 1 })) return "H1";
+    if (editor.isActive("heading", { level: 2 })) return "H2";
+    if (editor.isActive("heading", { level: 3 })) return "H3";
+    return "Normal";
+  }
+
+  function getCurrentAlign() {
+    if (!editor) return "left";
+    if (editor.isActive({ textAlign: "center" })) return "center";
+    if (editor.isActive({ textAlign: "right" })) return "right";
+    if (editor.isActive({ textAlign: "justify" })) return "justify";
+    return "left";
+  }
+
+  const alignIcons: Record<string, JSX.Element> = {
+    left: <AlignLeft className="h-3.5 w-3.5" />,
+    center: <AlignCenter className="h-3.5 w-3.5" />,
+    right: <AlignRight className="h-3.5 w-3.5" />,
+    justify: <AlignJustify className="h-3.5 w-3.5" />,
+  };
+
+  // ── Link dialog ────────────────────────────────────────────────────────────
+
   const handleInsertLink = useCallback(() => {
     setLinkDialogUrl(editor?.getAttributes("link").href ?? "");
     setShowLinkDialog(true);
@@ -179,19 +230,14 @@ function TeacherEditor({
   const applyLink = () => {
     if (!editor) return;
     const url = linkDialogUrl.trim();
-
     if (!url) {
-      // Clear any existing link mark
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
     } else {
       const { from, to } = editor.state.selection;
       const hasSelection = from !== to;
-
       if (hasSelection) {
-        // Wrap the selected text in a link
         editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
       } else {
-        // No text selected — insert the URL as visible link text
         editor.chain().focus().insertContent({
           type: "text",
           marks: [{ type: "link", attrs: { href: url } }],
@@ -202,6 +248,8 @@ function TeacherEditor({
     setShowLinkDialog(false);
     setLinkDialogUrl("");
   };
+
+  // ── File helpers ───────────────────────────────────────────────────────────
 
   function addFiles(fileList: FileList | null) {
     if (!fileList) return;
@@ -233,12 +281,29 @@ function TeacherEditor({
     }
   }
 
+  async function handleToolbarImage(imgFile: File) {
+    if (!editor) return;
+    setIsUploadingImage(true);
+    try {
+      const url = await uploadFileToCloudinary(imgFile, "classwork-images");
+      editor.chain().focus().setImage({ src: url }).run();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      toast({ title: "Image upload failed", description: msg, type: "error" });
+    } finally {
+      setIsUploadingImage(false);
+      if (imageRef.current) imageRef.current.value = "";
+    }
+  }
+
+  // ── Save ───────────────────────────────────────────────────────────────────
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const rawHtml = editor?.getHTML() ?? "";
       const description = sanitize(rawHtml);
 
-      // Validate: any staged images must be inserted into content before saving.
+      // Validate: any staged images must be inserted before saving.
       const stagedImages = pendingFiles.filter((f) => getAttachmentKind(f.name) === "image");
       if (stagedImages.length > 0) {
         throw new Error("Please insert staged images into the content before saving.");
@@ -250,8 +315,6 @@ function TeacherEditor({
       );
       const attachments = [...existingAttachments, ...newUrls];
 
-      const resolvedUrl = showUrl && externalUrl ? externalUrl : null;
-
       const endpoint = isEdit
         ? `/api/classrooms/${classroomId}/materials/${initial!.id}`
         : `/api/classrooms/${classroomId}/materials`;
@@ -260,7 +323,7 @@ function TeacherEditor({
         body: JSON.stringify({
           title,
           description,
-          url: resolvedUrl,
+          url: null,
           attachments,
           assignmentId: assignmentId ? Number(assignmentId) : null,
         }),
@@ -276,66 +339,187 @@ function TeacherEditor({
 
   const canSave = title.trim().length > 0 && !saveMutation.isPending && !isUploadingImage;
 
+  // ── Shared toolbar button class ────────────────────────────────────────────
+
+  const tbBtn = (active: boolean) =>
+    `h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${
+      active
+        ? "bg-foreground text-background"
+        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+    }`;
+
+  const sep = <div className="w-px h-4 bg-border mx-0.5" />;
+
   return (
     <div className="min-h-screen bg-white dark:bg-background">
 
-      {/* ── Minimal top bar — full width, no sidebar ── */}
+      {/* ── Top bar ── */}
       <div className="fixed top-0 left-0 right-0 z-20 bg-white/95 dark:bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+
           {/* Left: back crumb */}
           <button
             type="button"
             onClick={() => navigate(`/classrooms/${classroomSlug}?tab=classwork`)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
             <ChevronLeft className="h-4 w-4" />
             <span className="hidden sm:inline font-medium">{classroom.name}</span>
             <span className="sm:hidden font-medium">Back</span>
           </button>
 
-          {/* Center: floating toolbar */}
-          <div className="flex-1 flex justify-center">
-            <div className="flex items-center gap-0.5 bg-muted/50 rounded-xl px-2 py-1.5">
+          {/* Center: toolbar */}
+          <div className="flex-1 flex justify-center overflow-x-auto">
+            <div
+              ref={toolbarRef}
+              className="flex items-center gap-0.5 bg-muted/50 rounded-xl px-2 py-1.5 shrink-0"
+            >
               {editor && <>
-                {[
-                  { active: editor.isActive("bold"), fn: () => editor.chain().focus().toggleBold().run(), icon: <Bold className="h-3.5 w-3.5" />, title: "Bold" },
-                  { active: editor.isActive("italic"), fn: () => editor.chain().focus().toggleItalic().run(), icon: <Italic className="h-3.5 w-3.5" />, title: "Italic" },
-                ].map((b, i) => (
-                  <button key={i} type="button" title={b.title}
-                    onMouseDown={(e) => { e.preventDefault(); b.fn(); }}
-                    className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${b.active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
-                    {b.icon}
+                {/* Undo / Redo */}
+                <button type="button" title="Undo"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().undo().run(); }}
+                  className={tbBtn(false)}>
+                  <Undo2 className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" title="Redo"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().redo().run(); }}
+                  className={tbBtn(false)}>
+                  <Redo2 className="h-3.5 w-3.5" />
+                </button>
+
+                {sep}
+
+                {/* Style dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    title="Text style"
+                    onMouseDown={(e) => { e.preventDefault(); setShowAlignMenu(false); setShowStyleMenu((v) => !v); }}
+                    className="h-7 flex items-center gap-1 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    {getCurrentStyle()}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
                   </button>
-                ))}
-                <div className="w-px h-4 bg-border mx-1" />
-                {[
-                  { active: editor.isActive("heading", { level: 2 }), fn: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), icon: <Heading2 className="h-3.5 w-3.5" />, title: "Heading" },
-                  { active: editor.isActive("bulletList"), fn: () => editor.chain().focus().toggleBulletList().run(), icon: <List className="h-3.5 w-3.5" />, title: "Bullet list" },
-                  { active: editor.isActive("orderedList"), fn: () => editor.chain().focus().toggleOrderedList().run(), icon: <ListOrdered className="h-3.5 w-3.5" />, title: "Numbered list" },
-                ].map((b, i) => (
-                  <button key={i} type="button" title={b.title}
-                    onMouseDown={(e) => { e.preventDefault(); b.fn(); }}
-                    className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${b.active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
-                    {b.icon}
+                  {showStyleMenu && (
+                    <div className="absolute top-full left-0 mt-1 bg-white dark:bg-background border border-border rounded-xl shadow-lg z-50 py-1 min-w-[130px]">
+                      {([
+                        { label: "Normal", fn: () => editor.chain().focus().setParagraph().run(), active: getCurrentStyle() === "Normal" },
+                        { label: "Heading 1", fn: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), active: getCurrentStyle() === "H1" },
+                        { label: "Heading 2", fn: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), active: getCurrentStyle() === "H2" },
+                        { label: "Heading 3", fn: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), active: getCurrentStyle() === "H3" },
+                      ] as { label: string; fn: () => void; active: boolean }[]).map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); item.fn(); setShowStyleMenu(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-muted/60 ${item.active ? "text-primary font-medium" : "text-foreground"}`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {sep}
+
+                {/* Bold / Italic / Strikethrough */}
+                <button type="button" title="Bold"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
+                  className={tbBtn(editor.isActive("bold"))}>
+                  <Bold className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" title="Italic"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
+                  className={tbBtn(editor.isActive("italic"))}>
+                  <Italic className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" title="Strikethrough"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }}
+                  className={tbBtn(editor.isActive("strike"))}>
+                  <Strikethrough className="h-3.5 w-3.5" />
+                </button>
+
+                {sep}
+
+                {/* Link / Image / Divider */}
+                <button type="button" title="Link"
+                  onMouseDown={(e) => { e.preventDefault(); handleInsertLink(); }}
+                  className={tbBtn(editor.isActive("link"))}>
+                  <Link2 className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" title="Insert image"
+                  onMouseDown={(e) => { e.preventDefault(); imageRef.current?.click(); }}
+                  disabled={isUploadingImage}
+                  className={tbBtn(false)}>
+                  {isUploadingImage
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <ImageIcon className="h-3.5 w-3.5" />}
+                </button>
+                <button type="button" title="Divider"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().setHorizontalRule().run(); }}
+                  className={tbBtn(false)}>
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+
+                {sep}
+
+                {/* Bullet / Numbered */}
+                <button type="button" title="Bullet list"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBulletList().run(); }}
+                  className={tbBtn(editor.isActive("bulletList"))}>
+                  <List className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" title="Numbered list"
+                  onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleOrderedList().run(); }}
+                  className={tbBtn(editor.isActive("orderedList"))}>
+                  <ListOrdered className="h-3.5 w-3.5" />
+                </button>
+
+                {sep}
+
+                {/* Alignment dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    title="Text alignment"
+                    onMouseDown={(e) => { e.preventDefault(); setShowStyleMenu(false); setShowAlignMenu((v) => !v); }}
+                    className="h-7 flex items-center gap-0.5 rounded-lg px-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    {alignIcons[getCurrentAlign()]}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
                   </button>
-                ))}
-                <div className="w-px h-4 bg-border mx-1" />
-                {[
-                  { active: editor.isActive("link"), fn: handleInsertLink, icon: <Link2 className="h-3.5 w-3.5" />, title: "Link" },
-                  { active: false, fn: () => editor.chain().focus().setHorizontalRule().run(), icon: <Minus className="h-3.5 w-3.5" />, title: "Divider" },
-                ].map((b, i) => (
-                  <button key={i} type="button" title={b.title}
-                    onMouseDown={(e) => { e.preventDefault(); b.fn(); }}
-                    className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors ${b.active ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
-                    {b.icon}
-                  </button>
-                ))}
+                  {showAlignMenu && (
+                    <div className="absolute top-full right-0 mt-1 bg-white dark:bg-background border border-border rounded-xl shadow-lg z-50 py-1">
+                      {([
+                        { align: "left", label: "Left", icon: <AlignLeft className="h-3.5 w-3.5" /> },
+                        { align: "center", label: "Center", icon: <AlignCenter className="h-3.5 w-3.5" /> },
+                        { align: "right", label: "Right", icon: <AlignRight className="h-3.5 w-3.5" /> },
+                        { align: "justify", label: "Justify", icon: <AlignJustify className="h-3.5 w-3.5" /> },
+                      ] as { align: string; label: string; icon: JSX.Element }[]).map((item) => (
+                        <button
+                          key={item.align}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor.chain().focus().setTextAlign(item.align).run();
+                            setShowAlignMenu(false);
+                          }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors hover:bg-muted/60 ${getCurrentAlign() === item.align ? "text-primary font-medium" : "text-foreground"}`}
+                        >
+                          {item.icon}
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>}
             </div>
           </div>
 
-          {/* Right: save state + publish */}
-          <div className="flex items-center gap-3">
+          {/* Right: save */}
+          <div className="flex items-center gap-3 shrink-0">
             {saveMutation.isPending && (
               <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <Loader2 className="h-3 w-3 animate-spin" /> Saving…
@@ -352,10 +536,14 @@ function TeacherEditor({
         </div>
       </div>
 
-      {/* ── Page body: writing canvas + right panel ── */}
+      {/* Hidden file inputs */}
+      <input ref={imageRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleToolbarImage(f); }} />
+
+      {/* ── Page body ── */}
       <div className="pt-14 flex min-h-screen">
 
-        {/* Writing canvas — centered, Substack-width */}
+        {/* Writing canvas */}
         <main className="flex-1 flex justify-center">
           <div className="w-full max-w-[680px] px-5 sm:px-8 pt-16 pb-40">
 
@@ -369,13 +557,14 @@ function TeacherEditor({
               autoFocus={!isEdit}
             />
 
-            {/* Thin divider */}
             <div className="border-t border-border mb-8" />
 
-            {/* Body — no border, no card, just text */}
+            {/* Body */}
             <div className="prose prose-sm max-w-none text-foreground
               prose-headings:font-semibold prose-headings:text-foreground
+              prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
               prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
+              prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-1.5
               prose-p:leading-relaxed prose-p:my-2 prose-p:text-foreground/90
               prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
               prose-strong:font-semibold prose-strong:text-foreground
@@ -388,50 +577,23 @@ function TeacherEditor({
           </div>
         </main>
 
-        {/* Right settings panel — sticky, Substack-style */}
+        {/* Right settings panel */}
         <aside className="hidden lg:flex flex-col w-72 xl:w-80 shrink-0 border-l border-border bg-background/60 min-h-screen sticky top-14 self-start max-h-[calc(100vh-3.5rem)] overflow-y-auto">
           <div className="px-5 py-6 space-y-6">
 
-            {/* Panel header */}
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Settings</p>
 
             {/* Attachments */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-foreground">Attachments</p>
-                <div className="flex items-center gap-1.5">
-                  {!showUrl && (
-                    <button type="button" onClick={() => setShowUrl(true)}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-0.5 hover:bg-muted/50 transition-colors">
-                      <Plus className="h-3 w-3" /><Link2 className="h-3 w-3" />
-                    </button>
-                  )}
-                  <button type="button" onClick={() => fileRef.current?.click()}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-0.5 hover:bg-muted/50 transition-colors">
-                    <Plus className="h-3 w-3" /><Upload className="h-3 w-3" />
-                  </button>
-                  <input ref={fileRef} type="file" multiple className="hidden"
-                    onChange={(e) => addFiles(e.target.files)} />
-                </div>
+                <button type="button" onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-0.5 hover:bg-muted/50 transition-colors">
+                  <Plus className="h-3 w-3" /><Upload className="h-3 w-3" />
+                </button>
+                <input ref={fileRef} type="file" multiple className="hidden"
+                  onChange={(e) => addFiles(e.target.files)} />
               </div>
-
-              {/* External URL */}
-              {showUrl && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                      <Link2 className="h-3 w-3 text-primary" /> URL link
-                    </span>
-                    <button type="button" onClick={() => { setShowUrl(false); setExternalUrl(""); }}
-                      className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <Input type="url" placeholder="https://…" value={externalUrl}
-                    onChange={(e) => setExternalUrl(e.target.value)}
-                    className="h-8 font-mono text-xs" />
-                </div>
-              )}
 
               {/* Saved attachments */}
               {existingAttachments.map((url, i) => (
@@ -484,8 +646,8 @@ function TeacherEditor({
                 );
               })}
 
-              {/* Drop zone — shown when no files are staged and no saved attachments */}
-              {existingAttachments.length === 0 && pendingFiles.length === 0 && !showUrl && (
+              {/* Drop zone */}
+              {existingAttachments.length === 0 && pendingFiles.length === 0 && (
                 <div
                   className="w-full flex flex-col items-center gap-1.5 px-3 py-5 rounded-xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-muted/20 transition-all text-center cursor-pointer"
                   onClick={() => fileRef.current?.click()}
@@ -501,7 +663,6 @@ function TeacherEditor({
               )}
             </div>
 
-            {/* Divider */}
             <div className="border-t border-border" />
 
             {/* Link to assignment */}
@@ -525,7 +686,7 @@ function TeacherEditor({
           </div>
         </aside>
 
-        {/* Mobile settings — bottom sheet feel, shown below canvas */}
+        {/* Mobile settings — bottom sheet */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-border bg-background/95 backdrop-blur-sm px-4 py-3">
           <details className="group">
             <summary className="flex items-center justify-between text-sm font-medium text-foreground cursor-pointer list-none">
@@ -536,28 +697,10 @@ function TeacherEditor({
               <ChevronLeft className="h-4 w-4 text-muted-foreground rotate-[-90deg] group-open:rotate-90 transition-transform" />
             </summary>
             <div className="pt-4 pb-2 space-y-4">
-              {/* Mobile: URL + File buttons */}
-              <div className="flex gap-2">
-                {!showUrl && (
-                  <button type="button" onClick={() => setShowUrl(true)}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs border border-border rounded-lg py-2 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
-                    <Link2 className="h-3.5 w-3.5" /> Add URL
-                  </button>
-                )}
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  className="flex-1 flex items-center justify-center gap-1.5 text-xs border border-border rounded-lg py-2 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
-                  <Upload className="h-3.5 w-3.5" /> Attach file
-                </button>
-              </div>
-              {showUrl && (
-                <div className="space-y-1">
-                  <Input type="url" placeholder="https://…" value={externalUrl}
-                    onChange={(e) => setExternalUrl(e.target.value)}
-                    className="h-9 font-mono text-sm" />
-                  <button type="button" onClick={() => { setShowUrl(false); setExternalUrl(""); }}
-                    className="text-xs text-muted-foreground hover:text-foreground">Remove URL</button>
-                </div>
-              )}
+              <button type="button" onClick={() => fileRef.current?.click()}
+                className="w-full flex items-center justify-center gap-1.5 text-xs border border-border rounded-lg py-2 hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground">
+                <Upload className="h-3.5 w-3.5" /> Attach file
+              </button>
               {existingAttachments.map((url, i) => (
                 <div key={url} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
                   <FileText className="h-4 w-4 text-primary shrink-0" />
@@ -677,8 +820,6 @@ function ReadView({
     material.description !== "<p></p>" &&
     material.description.trim() !== "";
 
-  // Combine the new attachments[] with the legacy single url field (if PDF),
-  // deduplicating so old materials that get edited don't show the same PDF twice.
   const legacyPdfUrl = urlKind === "pdf" ? material.url ?? null : null;
   const newAttachments = material.attachments ?? [];
   const allPdfAttachments = legacyPdfUrl && !newAttachments.includes(legacyPdfUrl)
@@ -691,7 +832,6 @@ function ReadView({
       <div className="flex-1 md:ml-[228px] overflow-auto">
         <div className="max-w-3xl mx-auto px-4 sm:px-8 pt-20 pb-20 md:pt-10">
 
-          {/* Back */}
           <button
             type="button"
             onClick={() => navigate(backHref)}
@@ -701,12 +841,10 @@ function ReadView({
             Back to {classroom.name}
           </button>
 
-          {/* Title block */}
           <div className="mb-8 pb-6 border-b border-border">
             <h1 className="text-3xl font-bold text-foreground leading-tight mb-3">
               {material.title}
             </h1>
-            {/* Meta chips */}
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <GraduationCap className="h-3.5 w-3.5" />
@@ -726,14 +864,12 @@ function ReadView({
             </div>
           </div>
 
-          {/* Body */}
           {hasBody && (
             <div className="mb-10">
               <RichContent html={material.description!} />
             </div>
           )}
 
-          {/* PDF attachment cards — one per entry in allPdfAttachments */}
           {allPdfAttachments.length > 0 && (
             <div className="mb-6 space-y-3">
               {allPdfAttachments.map((pdfUrl, i) => (
@@ -760,7 +896,6 @@ function ReadView({
             </div>
           )}
 
-          {/* External link card */}
           {urlKind === "link" && material.url && (
             <div className="mb-6 rounded-2xl border border-border bg-card p-4 flex items-center gap-3 shadow-sm">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-sky-50 text-sky-600">
@@ -781,7 +916,6 @@ function ReadView({
             </div>
           )}
 
-          {/* Linked assignment CTA */}
           {assignmentHref && (
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5 flex items-center justify-between gap-4">
               <div className="min-w-0">
