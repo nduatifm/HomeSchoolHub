@@ -215,7 +215,7 @@ export default function ClassroomDetail() {
 
   const teacherTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
-    { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" /> },
+    { value: "assignments", label: "Assignments & Test", icon: <BookOpen className="h-3.5 w-3.5" /> },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
     { value: "students", label: "Students", icon: <Users className="h-3.5 w-3.5" /> },
