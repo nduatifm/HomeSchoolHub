@@ -222,7 +222,7 @@ export default function ClassroomDetail() {
   ];
   const studentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
-    { value: "assignments", label: "Assignments", icon: <BookOpen className="h-3.5 w-3.5" />, badge: assignmentsBadge || undefined },
+    { value: "assignments", label: "Assignments & Test", icon: <BookOpen className="h-3.5 w-3.5" />, badge: assignmentsBadge || undefined },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
   ];
   const parentTabs = [
