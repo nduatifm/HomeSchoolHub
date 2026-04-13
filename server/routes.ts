@@ -4622,49 +4622,31 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/classrooms/:classroomId/assignments/:assignmentId — teacher edits assignment (multipart/form-data)
-  app.patch(
-    "/api/classrooms/:classroomId/assignments/:assignmentId",
-    requireAuth,
-    memoryUpload.single("file"),
-    async (req, res) => {
-      try {
-        const classroom = await requireClassroomOwner(req, res);
-        if (!classroom) return;
-        if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit assignments in an archived classroom" });
-        const assignmentId = parseInt(req.params.assignmentId);
-        if (isNaN(assignmentId)) return res.status(400).json({ error: "Invalid assignment ID" });
-        const existing = await prisma.classroomAssignment.findFirst({ where: { id: assignmentId, classroomId: classroom.id } });
-        if (!existing) return res.status(404).json({ error: "Assignment not found" });
+  // PATCH /api/classrooms/:classroomId/assignments/:assignmentId — teacher edits assignment (JSON)
+  app.patch("/api/classrooms/:classroomId/assignments/:assignmentId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit assignments in an archived classroom" });
+      const assignmentId = parseInt(req.params.assignmentId);
+      if (isNaN(assignmentId)) return res.status(400).json({ error: "Invalid assignment ID" });
+      const existing = await prisma.classroomAssignment.findFirst({ where: { id: assignmentId, classroomId: classroom.id } });
+      if (!existing) return res.status(404).json({ error: "Assignment not found" });
 
-        const data = z.object({
-          title: z.string().min(1).optional(),
-          description: z.string().optional(),
-          dueDate: z.string().min(1).optional(),
-          points: z.preprocess((v) => (v !== undefined && v !== "" ? parseInt(v as string, 10) : undefined), z.number().int().min(1).max(10000).optional()),
-          clearFile: z.string().optional(),
-        }).parse(req.body);
+      const data = z.object({
+        title: z.string().min(1).optional(),
+        description: z.string().optional(),
+        dueDate: z.string().min(1).optional(),
+        points: z.number().int().min(1).max(10000).optional(),
+        fileUrl: z.string().url().nullable().optional(),
+      }).parse(req.body);
 
-        let fileUrl: string | null | undefined = undefined;
-        if (req.file) {
-          const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-assignments");
-          if (!uploadResult.success || !uploadResult.url) return res.status(500).json({ error: uploadResult.error ?? "File upload failed" });
-          fileUrl = uploadResult.url;
-        } else if (data.clearFile === "true") {
-          fileUrl = null;
-        }
-
-        const { clearFile, ...rest } = data;
-        const updated = await storage.updateClassroomAssignment(assignmentId, {
-          ...rest,
-          ...(fileUrl !== undefined ? { fileUrl } : {}),
-        });
-        res.json(updated);
-      } catch (error: any) {
-        res.status(400).json({ error: error.message });
-      }
-    },
-  );
+      const updated = await storage.updateClassroomAssignment(assignmentId, data);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
 
   // DELETE /api/classrooms/:classroomId/assignments/:assignmentId — teacher deletes assignment
   app.delete("/api/classrooms/:classroomId/assignments/:assignmentId", requireAuth, async (req, res) => {

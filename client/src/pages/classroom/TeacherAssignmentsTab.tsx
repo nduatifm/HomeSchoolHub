@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -190,26 +190,26 @@ function EditAssignmentDialog({
   const [clearFile, setClearFile] = useState(false);
 
   const editMutation = useMutation({
-    mutationFn: () => {
-      const fd = new FormData();
-      fd.append("title", form.title);
-      fd.append("description", form.description);
-      fd.append("dueDate", form.dueDate);
-      fd.append("points", form.points);
+    mutationFn: async () => {
+      let fileUrl: string | null | undefined = undefined;
       if (newFile) {
+        const fd = new FormData();
         fd.append("file", newFile);
+        fd.append("folder", "classroom-assignments");
+        const uploaded = await apiUpload("/api/upload", fd);
+        fileUrl = uploaded.url as string;
       } else if (clearFile) {
-        fd.append("clearFile", "true");
+        fileUrl = null;
       }
-      const token = localStorage.getItem("sessionId");
-      return fetch(`/api/classrooms/${classroomId}/assignments/${assignment.id}`, {
+      return apiRequest(`/api/classrooms/${classroomId}/assignments/${assignment.id}`, {
         method: "PATCH",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: fd,
-      }).then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error ?? "Update failed");
-        return data;
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          dueDate: form.dueDate,
+          points: parseInt(form.points, 10),
+          ...(fileUrl !== undefined ? { fileUrl } : {}),
+        }),
       });
     },
     onSuccess: () => {
