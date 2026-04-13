@@ -322,6 +322,7 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
       queryKey: ["/api/classrooms", classroomId, "assignments", a.id, "submissions"],
       queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments/${a.id}/submissions`) as Promise<SubmissionWithName[]>,
       enabled: assignments.length > 0,
+      refetchInterval: 30000,
     })),
   });
   const subCountMap: Record<number, number> = {};
