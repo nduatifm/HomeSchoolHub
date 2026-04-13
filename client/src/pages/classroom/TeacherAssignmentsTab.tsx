@@ -326,7 +326,7 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
   });
   const subCountMap: Record<number, number> = {};
   allSubResults.forEach((q, i) => {
-    if (assignments[i]) subCountMap[assignments[i].id] = (q.data ?? []).filter((s) => s.status !== "pending").length;
+    if (assignments[i]) subCountMap[assignments[i].id] = (q.data ?? []).filter((s) => s.status === "submitted" || s.status === "late").length;
   });
 
   const { data: expandedSubs = [], isLoading: loadingSubs } = useQuery<SubmissionWithName[]>({
