@@ -11,7 +11,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -333,15 +332,10 @@ function EditAssignmentDialog({
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { classroomId: number; classroomSlug: string | number; isArchived: boolean }) {
-  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [modalSub, setModalSub] = useState<SubmissionWithName | null>(null);
   const [modalAssignment, setModalAssignment] = useState<ClassroomAssignment | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<ClassroomAssignment | null>(null);
-  const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
-  const [createFormQuestions, setCreateFormQuestions] = useState<FormQuestion[]>([]);
-  const [showCreateFormBuilder, setShowCreateFormBuilder] = useState(false);
   const [, navigate] = useLocation();
 
   const openModal = (sub: SubmissionWithName, assignment: ClassroomAssignment) => {
@@ -378,40 +372,6 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
     enabled: expanded !== null,
   });
 
-  const createMutation = useMutation({
-    mutationFn: () => {
-      const fd = new FormData();
-      fd.append("title", form.title);
-      fd.append("description", form.description);
-      fd.append("dueDate", form.dueDate);
-      fd.append("points", form.points);
-      if (attachedFile) fd.append("file", attachedFile);
-      if (showCreateFormBuilder && createFormQuestions.length > 0) {
-        fd.append("formSchema", JSON.stringify(createFormQuestions));
-      }
-      const token = localStorage.getItem("sessionId");
-      return fetch(`/api/classrooms/${classroomId}/assignments/with-file`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: fd,
-      }).then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error ?? "Upload failed");
-        return data;
-      });
-    },
-    onSuccess: () => {
-      setOpen(false);
-      setForm({ title: "", description: "", dueDate: "", points: "100" });
-      setAttachedFile(null);
-      setCreateFormQuestions([]);
-      setShowCreateFormBuilder(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
-      toast({ title: "Assignment created", type: "success" });
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (assignmentId: number) =>
       apiRequest(`/api/classrooms/${classroomId}/assignments/${assignmentId}`, { method: "DELETE" }),
@@ -427,54 +387,9 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
     <div className="space-y-4">
       {!isArchived && (
         <div className="flex justify-end">
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5"><Plus className="h-3.5 w-3.5" />New Assignment</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Create Assignment</DialogTitle></DialogHeader>
-              <div className="space-y-3 pt-2">
-                <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-                <div><Label>Description <span className="text-muted-foreground font-normal">(optional)</span></Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Due Date</Label><Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></div>
-                  <div><Label>Points</Label><Input type="number" min={1} value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} /></div>
-                </div>
-                <div>
-                  <Label>Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                  <Input type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="mt-1 cursor-pointer" onChange={(e) => setAttachedFile(e.target.files?.[0] ?? null)} />
-                  {attachedFile && <p className="text-xs text-muted-foreground mt-1">Selected: {attachedFile.name}</p>}
-                </div>
-                <div className="border-t border-border pt-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-medium">Form Questions <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                    </div>
-                    <Button
-                      type="button"
-                      variant={showCreateFormBuilder ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs px-2.5"
-                      onClick={() => {
-                        setShowCreateFormBuilder(!showCreateFormBuilder);
-                        if (!showCreateFormBuilder && createFormQuestions.length === 0) setCreateFormQuestions([{ id: Math.random().toString(36).slice(2, 10), type: "short", label: "", required: false }]);
-                      }}
-                    >
-                      {showCreateFormBuilder ? "Remove Form" : "Add Form"}
-                    </Button>
-                  </div>
-                  {showCreateFormBuilder && (
-                    <FormBuilder questions={createFormQuestions} onChange={setCreateFormQuestions} />
-                  )}
-                </div>
-                <Button className="w-full" disabled={!form.title || !form.dueDate || createMutation.isPending} onClick={() => createMutation.mutate()}>
-                  {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Create Assignment
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/classrooms/${classroomSlug}/assignments/new`)}>
+            <Plus className="h-3.5 w-3.5" />New Assignment
+          </Button>
         </div>
       )}
 

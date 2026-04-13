@@ -14,6 +14,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import ClassroomDetail from "./pages/ClassroomDetail";
 import ClassworkDetail from "./pages/ClassworkDetail";
 import ClassroomMaterialPage from "./pages/ClassroomMaterialPage";
+import NewAssignmentPage from "./pages/classroom/NewAssignmentPage";
 import Landing from "./pages/Landing";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminUsers from "./pages/AdminUsers";
@@ -115,6 +116,9 @@ function AppRoutes() {
       </Route>
       <Route path="/notifications">
         <ProtectedRoute component={NotificationsPage} />
+      </Route>
+      <Route path="/classrooms/:slug/assignments/new">
+        <ProtectedRoute component={NewAssignmentPage} />
       </Route>
       <Route path="/classrooms/:slug/classwork/:classworkSlug">
         <ProtectedRoute component={ClassworkDetail} />
