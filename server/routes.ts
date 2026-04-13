@@ -31,6 +31,7 @@ import {
   resendVerificationSchema,
   studentSignupSchema,
   studentGoogleSignupSchema,
+  formQuestionSchema,
 } from "@shared/schema";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -4587,9 +4588,13 @@ export function registerRoutes(app: Express) {
         points: z.preprocess((v) => parseInt(v as string, 10), z.number().int().min(1).max(10000)),
       }).parse(req.body);
 
-      let formSchema: any[] | undefined;
+      let formSchema: z.infer<typeof formQuestionSchema>[] | undefined;
       if (rawFormSchema) {
-        try { formSchema = JSON.parse(rawFormSchema); } catch { formSchema = undefined; }
+        try {
+          const parsed = JSON.parse(rawFormSchema);
+          const validated = z.array(formQuestionSchema).safeParse(parsed);
+          formSchema = validated.success ? validated.data : undefined;
+        } catch { formSchema = undefined; }
       }
 
       let fileUrl: string | undefined;
@@ -4732,7 +4737,7 @@ export function registerRoutes(app: Express) {
       const student = await storage.getStudentByUserId(user.id);
       if (!student) return res.status(403).json({ error: "Student profile not found" });
       const { content, formAnswers: formAnswersRaw } = z.object({
-        content: z.string(),
+        content: z.string().optional().default(""),
         formAnswers: z.string().optional(),
       }).parse(req.body);
       const assignments = await storage.getClassroomAssignments(classroomId);

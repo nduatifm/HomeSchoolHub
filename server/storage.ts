@@ -1647,7 +1647,7 @@ class PrismaStorage implements IStorage {
       points: a.points,
       fileUrl: a.fileUrl ?? null,
       slug: a.slug ?? null,
-      formSchema: Array.isArray(a.formSchema) ? a.formSchema : (a.formSchema ? null : null),
+      formSchema: Array.isArray(a.formSchema) ? a.formSchema : null,
       createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
     };
   }
