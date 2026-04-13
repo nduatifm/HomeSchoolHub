@@ -458,6 +458,15 @@ export const insertClassroomPostSchema = classroomPostSchema.omit({ id: true, cr
 export type ClassroomPost = z.infer<typeof classroomPostSchema>;
 export type InsertClassroomPost = z.infer<typeof insertClassroomPostSchema>;
 
+export const formQuestionSchema = z.object({
+  id: z.string(),
+  type: z.enum(["short", "paragraph", "multiple_choice", "checkbox"]),
+  label: z.string(),
+  required: z.boolean().default(false),
+  options: z.array(z.string()).optional(),
+});
+export type FormQuestion = z.infer<typeof formQuestionSchema>;
+
 export const classroomAssignmentSchema = z.object({
   id: z.number(),
   classroomId: z.number(),
@@ -467,6 +476,7 @@ export const classroomAssignmentSchema = z.object({
   points: z.number(),
   fileUrl: z.string().nullable().optional(),
   slug: z.string().nullable().optional(),
+  formSchema: z.array(formQuestionSchema).nullable().optional(),
   createdAt: z.string(),
 });
 export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true });
@@ -479,6 +489,7 @@ export const classroomSubmissionSchema = z.object({
   studentId: z.number(),
   content: z.string().nullable(),
   fileUrl: z.string().nullable(),
+  formAnswers: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
   status: z.enum(["pending", "submitted", "graded", "late"]),
   submittedAt: z.string().nullable(),
   grade: z.number().nullable(),

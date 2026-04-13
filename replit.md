@@ -91,6 +91,15 @@ Icons are provided by Lucide React. The profile management features a modern tab
   - Classroom submission graded → notify student
 - **Sidebar bell**: "Notifications" nav item in `ModernSidebar` with unread badge; clicking opens a floating panel showing the last 50 notifications with timestamps, unread dot indicators, and "Mark all read" button
 
+### Assignment Form Builder
+- **`ClassroomAssignment.formSchema`** (JSONB, nullable): Array of `FormQuestion` objects (`{ id, type, label, required, options? }`). Supported types: `short`, `paragraph`, `multiple_choice`, `checkbox`.
+- **`ClassroomSubmission.formAnswers`** (JSONB, nullable): Record mapping question `id` → answer (`string` or `string[]` for checkboxes).
+- **Teacher UX**: "Add Form" toggle in Create/Edit assignment dialogs opens a `FormBuilder` (reusable component at `client/src/components/FormBuilder.tsx`) with add/remove questions, type selector, options editor, and required toggle.
+- **Student UX**: When an assignment has `formSchema`, the submit dialog (in `StudentAssignmentsTab`) shows a `FormResponse` component instead of the free-text textarea. Students can still attach a file. `ClassworkDetail.tsx` student panel also uses `FormResponse` for form-based assignments.
+- **Grading UX**: Teacher grading modal in `TeacherAssignmentsTab` shows `FormResponse` (read-only) when form answers exist. `ClassworkDetail` teacher panel likewise.
+- **Indicators**: "N form questions" pill badge (violet) on assignment cards in teacher and student tabs, and in the assignment header on `ClassworkDetail`.
+- **Backward compatible**: Assignments without `formSchema` behave exactly as before. No `type` field on assignments.
+
 ### Slug System
 - **`shared/slugify.ts`**: `slugify(text, id)` generates URL-safe slugs in format `<sanitized-title>-<id>` (e.g. `biology-101-3`). The ID suffix guarantees global uniqueness without any retry loop.
 - **DB fields**: `slug` column added to `User`, `Assignment`, `Material`, `Classroom` (`@unique`), and scoped `@@unique([classroomId, slug])` on `ClassroomAssignment` and `ClassroomMaterial`.

@@ -4557,6 +4557,13 @@ export function registerRoutes(app: Express) {
         description: z.string().min(1),
         dueDate: z.string().min(1),
         points: z.number().int().min(1).max(10000),
+        formSchema: z.array(z.object({
+          id: z.string(),
+          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox"]),
+          label: z.string(),
+          required: z.boolean().default(false),
+          options: z.array(z.string()).optional(),
+        })).nullable().optional(),
       }).parse(req.body);
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data });
 
@@ -4572,12 +4579,18 @@ export function registerRoutes(app: Express) {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
+      const rawFormSchema = req.body.formSchema;
       const data = z.object({
         title: z.string().min(1),
         description: z.string(),
         dueDate: z.string().min(1),
         points: z.preprocess((v) => parseInt(v as string, 10), z.number().int().min(1).max(10000)),
       }).parse(req.body);
+
+      let formSchema: any[] | undefined;
+      if (rawFormSchema) {
+        try { formSchema = JSON.parse(rawFormSchema); } catch { formSchema = undefined; }
+      }
 
       let fileUrl: string | undefined;
       if (req.file) {
@@ -4586,7 +4599,7 @@ export function registerRoutes(app: Express) {
         fileUrl = uploadResult.url;
       }
 
-      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl });
+      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl, ...(formSchema !== undefined ? { formSchema } : {}) });
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -4639,6 +4652,13 @@ export function registerRoutes(app: Express) {
         dueDate: z.string().min(1).optional(),
         points: z.number().int().min(1).max(10000).optional(),
         fileUrl: z.string().url().nullable().optional(),
+        formSchema: z.array(z.object({
+          id: z.string(),
+          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox"]),
+          label: z.string(),
+          required: z.boolean().default(false),
+          options: z.array(z.string()).optional(),
+        })).nullable().optional(),
       }).parse(req.body);
 
       const updated = await storage.updateClassroomAssignment(assignmentId, data);
@@ -4711,7 +4731,10 @@ export function registerRoutes(app: Express) {
       if (!user || user.role !== "student") return res.status(403).json({ error: "Students only" });
       const student = await storage.getStudentByUserId(user.id);
       if (!student) return res.status(403).json({ error: "Student profile not found" });
-      const { content } = z.object({ content: z.string() }).parse(req.body);
+      const { content, formAnswers: formAnswersRaw } = z.object({
+        content: z.string(),
+        formAnswers: z.string().optional(),
+      }).parse(req.body);
       const assignments = await storage.getClassroomAssignments(classroomId);
       const assignment = assignments.find((a) => a.id === assignmentId);
       if (!assignment) return res.status(404).json({ error: "Assignment not found" });
@@ -4721,8 +4744,13 @@ export function registerRoutes(app: Express) {
         const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-submissions");
         fileUrl = uploadResult.secure_url;
       }
+
+      let formAnswers: Record<string, string | string[]> | undefined;
+      if (formAnswersRaw) {
+        try { formAnswers = JSON.parse(formAnswersRaw); } catch { formAnswers = undefined; }
+      }
       
-      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl);
+      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers);
 
       res.json(submission);
     } catch (error: any) {

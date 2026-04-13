@@ -15,12 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink } from "lucide-react";
+import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList } from "lucide-react";
 import DOMPurify from "dompurify";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
 import { getAttachmentKind } from "@/lib/classroomUtils";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
+import FormResponse from "@/components/FormResponse";
 
 type SubmissionWithName = ClassroomSubmission & { studentName: string };
 
@@ -92,11 +93,23 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                 </div>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-3">
-                {sub.content && (
+                {assignment.formSchema && assignment.formSchema.length > 0 && sub.formAnswers ? (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Form Responses</p>
+                    <div className="bg-gray-50 rounded p-3">
+                      <FormResponse
+                        questions={assignment.formSchema}
+                        answers={sub.formAnswers as Record<string, string | string[]>}
+                        onChange={() => {}}
+                        disabled
+                      />
+                    </div>
+                  </div>
+                ) : sub.content ? (
                   <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">
                     {sub.content}
                   </div>
-                )}
+                ) : null}
                 {sub.fileUrl && (
                   <a href={sub.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
                     <FileText className="h-3.5 w-3.5" />View attached file
@@ -163,6 +176,7 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
 function StudentPanel({ assignment, classroomId, studentId }: { assignment: ClassroomAssignment; classroomId: number; studentId: number }) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
 
   const { data: submissions = [] } = useQuery<ClassroomSubmission[]>({
     queryKey: ["/api/classrooms", classroomId, "my-submissions"],
@@ -172,17 +186,23 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
 
   const mySubmission = submissions.find((s) => s.assignmentId === assignment.id);
 
+  const hasFormSchema = !!(assignment.formSchema && assignment.formSchema.length > 0);
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       const formData = new FormData();
       formData.append("content", text);
       if (file) formData.append("file", file);
+      if (hasFormSchema && Object.keys(formAnswers).length > 0) {
+        formData.append("formAnswers", JSON.stringify(formAnswers));
+      }
       return apiUpload(`/api/classrooms/${classroomId}/assignments/${assignment.id}/submit`, formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       setText("");
       setFile(null);
+      setFormAnswers({});
       toast({ title: "Submitted!", type: "success" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
@@ -201,9 +221,18 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-2">
-            {mySubmission.content && (
+            {hasFormSchema && mySubmission.formAnswers ? (
+              <div className="bg-gray-50 rounded p-3">
+                <FormResponse
+                  questions={assignment.formSchema!}
+                  answers={mySubmission.formAnswers as Record<string, string | string[]>}
+                  onChange={() => {}}
+                  disabled
+                />
+              </div>
+            ) : mySubmission.content ? (
               <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
-            )}
+            ) : null}
             {mySubmission.fileUrl && (
               <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
                 <FileText className="h-3.5 w-3.5" />View your file
@@ -225,16 +254,30 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
             <CardTitle className="text-sm font-semibold">Submit Your Work</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-3">
-            <div>
-              <Label className="text-xs text-gray-500 mb-1.5 block">Response</Label>
-              <Textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Type your answer or notes here…"
-                rows={5}
-                className="resize-none text-sm"
-              />
-            </div>
+            {hasFormSchema ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <ClipboardList className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assignment Form</p>
+                </div>
+                <FormResponse
+                  questions={assignment.formSchema!}
+                  answers={formAnswers}
+                  onChange={setFormAnswers}
+                />
+              </div>
+            ) : (
+              <div>
+                <Label className="text-xs text-gray-500 mb-1.5 block">Response</Label>
+                <Textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Type your answer or notes here…"
+                  rows={5}
+                  className="resize-none text-sm"
+                />
+              </div>
+            )}
             <div>
               <Label className="text-xs text-gray-500 mb-1.5 block">Attach File (optional)</Label>
               <label className="flex items-center gap-2 cursor-pointer border border-dashed rounded px-3 py-2 text-sm text-gray-500 hover:border-primary/50 hover:text-primary transition-colors">
@@ -245,7 +288,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
             </div>
             <Button
               className="w-full"
-              disabled={submitMutation.isPending || (!text.trim() && !file)}
+              disabled={submitMutation.isPending || (!hasFormSchema && !text.trim() && !file)}
               onClick={() => submitMutation.mutate()}
             >
               {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -394,6 +437,11 @@ export default function ClassworkDetail() {
             <div className="flex items-start gap-2 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
               {classroom.status === "archived" && <Badge variant="secondary" className="text-xs">Archived</Badge>}
+              {assignment.formSchema && assignment.formSchema.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full font-medium self-center">
+                  <ClipboardList className="h-3 w-3" />{assignment.formSchema.length} form {assignment.formSchema.length === 1 ? "question" : "questions"}
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-500">{classroom.name} · {classroom.subject}</p>
             <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">

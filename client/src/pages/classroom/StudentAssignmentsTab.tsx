@@ -15,12 +15,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, BarChart2, ChevronRight, BookOpen, FileText, ExternalLink } from "lucide-react";
+import { Loader2, BarChart2, ChevronRight, BookOpen, FileText, ExternalLink, ClipboardList } from "lucide-react";
 import DOMPurify from "dompurify";
 import type { ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
 import { classifyAssignment } from "@/lib/classroomNotifications";
 import { getAttachmentKind } from "@/lib/classroomUtils";
 import StatusBadge from "./StatusBadge";
+import FormResponse from "@/components/FormResponse";
 
 export default function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchived }: {
   classroomId: number; classroomSlug: string | number; studentId: number; isArchived: boolean;
@@ -28,6 +29,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   const [submitOpen, setSubmitOpen] = useState<number | null>(null);
   const [submissionText, setSubmissionText] = useState("");
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
   const [materialOpen, setMaterialOpen] = useState<ClassroomMaterial | null>(null);
   const [, navigate] = useLocation();
 
@@ -45,10 +47,13 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   });
 
   const submitMutation = useMutation({
-    mutationFn: (assignmentId: number) => {
+    mutationFn: ({ assignmentId, hasForm }: { assignmentId: number; hasForm: boolean }) => {
       const fd = new FormData();
       fd.append("content", submissionText);
       if (submissionFile) fd.append("file", submissionFile);
+      if (hasForm && Object.keys(formAnswers).length > 0) {
+        fd.append("formAnswers", JSON.stringify(formAnswers));
+      }
       const token = localStorage.getItem("sessionId");
       return fetch(`/api/classrooms/${classroomId}/assignments/${assignmentId}/submit`, {
         method: "POST",
@@ -57,7 +62,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
       }).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error ?? "Submission failed"); return d; });
     },
     onSuccess: () => {
-      setSubmitOpen(null); setSubmissionText(""); setSubmissionFile(null);
+      setSubmitOpen(null); setSubmissionText(""); setSubmissionFile(null); setFormAnswers({});
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       toast({ title: "Submitted!", type: "success" });
     },
@@ -138,6 +143,11 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
                     <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
+                    {a.formSchema && a.formSchema.length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full font-medium">
+                        <ClipboardList className="h-2.5 w-2.5" />Form
+                      </span>
+                    )}
                     {sub && <StatusBadge status={sub.status} />}
                     {sub?.grade !== null && sub?.grade !== undefined && (
                       <span className="text-xs font-semibold text-green-700">{sub.grade}/{a.points}</span>
@@ -161,27 +171,45 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                   {(!sub || sub.status === "pending") && !isArchived ? (
                     <Dialog
                       open={submitOpen === a.id}
-                      onOpenChange={(v) => { setSubmitOpen(v ? a.id : null); if (!v) { setSubmissionText(""); setSubmissionFile(null); } }}
+                      onOpenChange={(v) => { setSubmitOpen(v ? a.id : null); if (!v) { setSubmissionText(""); setSubmissionFile(null); setFormAnswers({}); } }}
                     >
                       <DialogTrigger asChild>
                         <Button size="sm" className="text-xs h-9 px-4 font-semibold">Submit</Button>
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                         <DialogHeader><DialogTitle>Submit: {a.title}</DialogTitle></DialogHeader>
                         <div className="space-y-3 pt-2">
                           <p className="text-xs text-muted-foreground">Due {a.dueDate} · {a.points} pts</p>
-                          <div>
-                            <Label>Your answer or link</Label>
-                            <Textarea placeholder="Write your answer or paste a link…" value={submissionText}
-                              onChange={(e) => setSubmissionText(e.target.value)} rows={4} />
-                          </div>
+                          {a.formSchema && a.formSchema.length > 0 ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <ClipboardList className="h-3.5 w-3.5 text-primary" />
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assignment Form</p>
+                              </div>
+                              <FormResponse
+                                questions={a.formSchema}
+                                answers={formAnswers}
+                                onChange={setFormAnswers}
+                              />
+                            </div>
+                          ) : (
+                            <div>
+                              <Label>Your answer or link</Label>
+                              <Textarea placeholder="Write your answer or paste a link…" value={submissionText}
+                                onChange={(e) => setSubmissionText(e.target.value)} rows={4} />
+                            </div>
+                          )}
                           <div>
                             <Label>Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
                             <Input type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="mt-1 cursor-pointer"
                               onChange={(e) => setSubmissionFile(e.target.files?.[0] ?? null)} />
                           </div>
-                          <Button className="w-full" disabled={!submissionText.trim() || submitMutation.isPending}
-                            onClick={() => submitMutation.mutate(a.id)}>
+                          <Button className="w-full"
+                            disabled={
+                              submitMutation.isPending ||
+                              ((!a.formSchema || a.formSchema.length === 0) && !submissionText.trim() && !submissionFile)
+                            }
+                            onClick={() => submitMutation.mutate({ assignmentId: a.id, hasForm: !!(a.formSchema && a.formSchema.length > 0) })}>
                             {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Submit
                           </Button>
                         </div>

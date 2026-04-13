@@ -472,6 +472,7 @@ model ClassroomAssignment {
   points      Int      @default(100)
   fileUrl     String?
   slug        String?
+  formSchema  Json?
   createdAt   DateTime @default(now())
 
   classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
@@ -488,6 +489,7 @@ model ClassroomSubmission {
   studentId    Int
   content      String?
   fileUrl      String?
+  formAnswers  Json?
   status       String  @default("pending")
   submittedAt  String?
   grade        Int?

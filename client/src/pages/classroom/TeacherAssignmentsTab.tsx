@@ -24,10 +24,13 @@ import {
   ChevronUp,
   Paperclip,
   X,
+  ClipboardList,
 } from "lucide-react";
-import type { ClassroomAssignment } from "@shared/schema";
+import type { ClassroomAssignment, FormQuestion } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
 import type { SubmissionWithName } from "./types";
+import FormBuilder from "@/components/FormBuilder";
+import FormResponse from "@/components/FormResponse";
 
 // ─── Grading modal ────────────────────────────────────────────────────────────
 
@@ -94,7 +97,19 @@ function GradingModal({
               {assignment?.points && <span>{assignment.points} points</span>}
             </div>
 
-            {sub.content ? (
+            {assignment?.formSchema && assignment.formSchema.length > 0 && sub.formAnswers ? (
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Form Responses</p>
+                <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 space-y-3">
+                  <FormResponse
+                    questions={assignment.formSchema}
+                    answers={sub.formAnswers as Record<string, string | string[]>}
+                    onChange={() => {}}
+                    disabled
+                  />
+                </div>
+              </div>
+            ) : sub.content ? (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Student Answer</p>
                 <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
@@ -188,6 +203,8 @@ function EditAssignmentDialog({
   });
   const [newFile, setNewFile] = useState<File | null>(null);
   const [clearFile, setClearFile] = useState(false);
+  const [formQuestions, setFormQuestions] = useState<FormQuestion[]>(assignment.formSchema ?? []);
+  const [showFormBuilder, setShowFormBuilder] = useState((assignment.formSchema?.length ?? 0) > 0);
 
   const editMutation = useMutation({
     mutationFn: async () => {
@@ -209,6 +226,7 @@ function EditAssignmentDialog({
           dueDate: form.dueDate,
           points: parseInt(form.points, 10),
           ...(fileUrl !== undefined ? { fileUrl } : {}),
+          formSchema: showFormBuilder && formQuestions.length > 0 ? formQuestions : null,
         }),
       });
     },
@@ -224,7 +242,7 @@ function EditAssignmentDialog({
 
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Edit Assignment</DialogTitle></DialogHeader>
         <div className="space-y-3 pt-2">
           <div>
@@ -277,6 +295,28 @@ function EditAssignmentDialog({
             {newFile && <p className="text-xs text-muted-foreground mt-1">New file: {newFile.name}</p>}
           </div>
 
+          {/* Form Builder */}
+          <div className="border-t border-border pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">Form Questions <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              </div>
+              <Button
+                type="button"
+                variant={showFormBuilder ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-xs px-2.5"
+                onClick={() => { setShowFormBuilder(!showFormBuilder); if (!showFormBuilder && formQuestions.length === 0) setFormQuestions([{ id: Math.random().toString(36).slice(2, 10), type: "short", label: "", required: false }]); }}
+              >
+                {showFormBuilder ? "Remove Form" : "Add Form"}
+              </Button>
+            </div>
+            {showFormBuilder && (
+              <FormBuilder questions={formQuestions} onChange={setFormQuestions} />
+            )}
+          </div>
+
           <div className="flex gap-2 justify-end pt-1">
             <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
             <Button size="sm" disabled={!canSave} onClick={() => editMutation.mutate()}>
@@ -300,6 +340,8 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
   const [editingAssignment, setEditingAssignment] = useState<ClassroomAssignment | null>(null);
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [createFormQuestions, setCreateFormQuestions] = useState<FormQuestion[]>([]);
+  const [showCreateFormBuilder, setShowCreateFormBuilder] = useState(false);
   const [, navigate] = useLocation();
 
   const openModal = (sub: SubmissionWithName, assignment: ClassroomAssignment) => {
@@ -344,6 +386,9 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
       fd.append("dueDate", form.dueDate);
       fd.append("points", form.points);
       if (attachedFile) fd.append("file", attachedFile);
+      if (showCreateFormBuilder && createFormQuestions.length > 0) {
+        fd.append("formSchema", JSON.stringify(createFormQuestions));
+      }
       const token = localStorage.getItem("sessionId");
       return fetch(`/api/classrooms/${classroomId}/assignments/with-file`, {
         method: "POST",
@@ -359,6 +404,8 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
       setOpen(false);
       setForm({ title: "", description: "", dueDate: "", points: "100" });
       setAttachedFile(null);
+      setCreateFormQuestions([]);
+      setShowCreateFormBuilder(false);
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment created", type: "success" });
     },
@@ -384,7 +431,7 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1.5"><Plus className="h-3.5 w-3.5" />New Assignment</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Create Assignment</DialogTitle></DialogHeader>
               <div className="space-y-3 pt-2">
                 <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
@@ -397,6 +444,29 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
                   <Label>Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <Input type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="mt-1 cursor-pointer" onChange={(e) => setAttachedFile(e.target.files?.[0] ?? null)} />
                   {attachedFile && <p className="text-xs text-muted-foreground mt-1">Selected: {attachedFile.name}</p>}
+                </div>
+                <div className="border-t border-border pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm font-medium">Form Questions <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    </div>
+                    <Button
+                      type="button"
+                      variant={showCreateFormBuilder ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs px-2.5"
+                      onClick={() => {
+                        setShowCreateFormBuilder(!showCreateFormBuilder);
+                        if (!showCreateFormBuilder && createFormQuestions.length === 0) setCreateFormQuestions([{ id: Math.random().toString(36).slice(2, 10), type: "short", label: "", required: false }]);
+                      }}
+                    >
+                      {showCreateFormBuilder ? "Remove Form" : "Add Form"}
+                    </Button>
+                  </div>
+                  {showCreateFormBuilder && (
+                    <FormBuilder questions={createFormQuestions} onChange={setCreateFormQuestions} />
+                  )}
                 </div>
                 <Button className="w-full" disabled={!form.title || !form.dueDate || createMutation.isPending} onClick={() => createMutation.mutate()}>
                   {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -428,6 +498,11 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
                     <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
+                    {a.formSchema && a.formSchema.length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full font-medium">
+                        <ClipboardList className="h-2.5 w-2.5" />{a.formSchema.length} form {a.formSchema.length === 1 ? "question" : "questions"}
+                      </span>
+                    )}
                     {a.fileUrl && (
                       <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
                         <Paperclip className="h-2.5 w-2.5" />Attachment

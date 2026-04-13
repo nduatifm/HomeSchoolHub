@@ -283,12 +283,12 @@ export interface IStorage {
   getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]>;
   getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null>;
   getClassroomAssignmentById(classroomId: number, id: number): Promise<ClassroomAssignment | null>;
-  updateClassroomAssignment(id: number, data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl">>): Promise<ClassroomAssignment>;
+  updateClassroomAssignment(id: number, data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl" | "formSchema">>): Promise<ClassroomAssignment>;
   deleteClassroomAssignment(id: number): Promise<void>;
 
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
   getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
-  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string): Promise<ClassroomSubmission>;
+  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>): Promise<ClassroomSubmission>;
   gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
 
   createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
@@ -1647,6 +1647,7 @@ class PrismaStorage implements IStorage {
       points: a.points,
       fileUrl: a.fileUrl ?? null,
       slug: a.slug ?? null,
+      formSchema: Array.isArray(a.formSchema) ? a.formSchema : (a.formSchema ? null : null),
       createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
     };
   }
@@ -1687,9 +1688,9 @@ class PrismaStorage implements IStorage {
 
   async updateClassroomAssignment(
     id: number,
-    data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl">>,
+    data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl" | "formSchema">>,
   ): Promise<ClassroomAssignment> {
-    const updated = await prisma.classroomAssignment.update({ where: { id }, data });
+    const updated = await prisma.classroomAssignment.update({ where: { id }, data: data as any });
     return this.mapClassroomAssignment(updated);
   }
 
@@ -1709,6 +1710,7 @@ class PrismaStorage implements IStorage {
       studentId: r.studentId,
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
+      formAnswers: (r as any).formAnswers ?? null,
       status: r.status as any,
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
@@ -1729,6 +1731,7 @@ class PrismaStorage implements IStorage {
       studentId: r.studentId,
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
+      formAnswers: (r as any).formAnswers ?? null,
       status: r.status as any,
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
@@ -1895,10 +1898,11 @@ class PrismaStorage implements IStorage {
     return result;
   }
 
-  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string): Promise<ClassroomSubmission> {
+  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>): Promise<ClassroomSubmission> {
     const now = new Date().toISOString();
     const isLate = now > dueDate;
-    const submitData = { content, fileUrl: fileUrl ?? null, status: isLate ? "late" : "submitted", submittedAt: now };
+    const submitData: any = { content, fileUrl: fileUrl ?? null, status: isLate ? "late" : "submitted", submittedAt: now };
+    if (formAnswers !== undefined) submitData.formAnswers = formAnswers;
     const updated = await prisma.classroomSubmission.upsert({
       where: { assignmentId_studentId: { assignmentId, studentId } },
       update: submitData,
@@ -1910,6 +1914,7 @@ class PrismaStorage implements IStorage {
       studentId: updated.studentId,
       content: updated.content ?? null,
       fileUrl: updated.fileUrl ?? null,
+      formAnswers: (updated as any).formAnswers ?? null,
       status: updated.status as any,
       submittedAt: updated.submittedAt ?? null,
       grade: updated.grade ?? null,
