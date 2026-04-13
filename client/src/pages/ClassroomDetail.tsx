@@ -97,6 +97,14 @@ export default function ClassroomDetail() {
   const [localSeenMaterials, setLocalSeenMaterials] = useState<Set<number>>(new Set());
   const [localSeenAssignments, setLocalSeenAssignments] = useState<Set<number>>(new Set());
 
+  // Ungraded submission count for the teacher's "Assignments & Test" tab badge
+  const { data: _teacherStats = {} } = useQuery<Record<number, { toGradeCount: number }>>({
+    queryKey: ["/api/teacher/classroom-stats"],
+    queryFn: () => apiRequest("/api/teacher/classroom-stats"),
+    enabled: user?.role === "teacher" && classroomId > 0,
+    refetchInterval: 30000,
+  });
+
   // Badge counts for student/parent tab pills — share cache with child component queries
   const { data: _badgeAssignments = [] } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
@@ -213,9 +221,10 @@ export default function ClassroomDetail() {
     ? _badgePosts.filter((p) => !seenPostIds.has(p.id)).length
     : 0;
 
+  const teacherToGrade = _teacherStats[classroomId]?.toGradeCount ?? 0;
   const teacherTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
-    { value: "assignments", label: "Assignments & Test", icon: <BookOpen className="h-3.5 w-3.5" /> },
+    { value: "assignments", label: "Assignments & Test", icon: <BookOpen className="h-3.5 w-3.5" />, badge: teacherToGrade || undefined },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
     { value: "students", label: "Students", icon: <Users className="h-3.5 w-3.5" /> },
