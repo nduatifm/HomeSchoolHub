@@ -287,6 +287,7 @@ export interface IStorage {
   deleteClassroomAssignment(id: number): Promise<void>;
 
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
+  getClassroomSubmissionById(submissionId: number): Promise<(ClassroomSubmission & { studentName: string; assignment: ClassroomAssignment }) | null>;
   getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
   submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>): Promise<ClassroomSubmission>;
   gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
@@ -1721,6 +1722,31 @@ class PrismaStorage implements IStorage {
       feedback: r.feedback ?? null,
       studentName: r.student?.name ?? "Unknown",
     }));
+  }
+
+  async getClassroomSubmissionById(submissionId: number): Promise<(ClassroomSubmission & { studentName: string; assignment: ClassroomAssignment }) | null> {
+    const r = await prisma.classroomSubmission.findUnique({
+      where: { id: submissionId },
+      include: {
+        student: { select: { name: true } },
+        assignment: true,
+      },
+    });
+    if (!r) return null;
+    return {
+      id: r.id,
+      assignmentId: r.assignmentId,
+      studentId: r.studentId,
+      content: r.content ?? null,
+      fileUrl: r.fileUrl ?? null,
+      formAnswers: r.formAnswers ?? null,
+      status: r.status as ClassroomSubmission["status"],
+      submittedAt: r.submittedAt ?? null,
+      grade: r.grade ?? null,
+      feedback: r.feedback ?? null,
+      studentName: r.student?.name ?? "Unknown",
+      assignment: this.mapClassroomAssignment(r.assignment),
+    };
   }
 
   async getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]> {

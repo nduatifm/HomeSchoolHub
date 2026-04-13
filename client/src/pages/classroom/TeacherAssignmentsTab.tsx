@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
@@ -29,159 +29,6 @@ import type { ClassroomAssignment, FormQuestion } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
 import type { SubmissionWithName } from "./types";
 import FormBuilder from "@/components/FormBuilder";
-import FormResponse from "@/components/FormResponse";
-
-// ─── Grading modal ────────────────────────────────────────────────────────────
-
-function GradingModal({
-  sub,
-  assignment,
-  classroomId,
-  expandedAssignmentId,
-  onClose,
-}: {
-  sub: SubmissionWithName | null;
-  assignment: ClassroomAssignment | null;
-  classroomId: number;
-  expandedAssignmentId: number | null;
-  onClose: () => void;
-}) {
-  const [gradeVal, setGradeVal] = useState("");
-  const [feedbackVal, setFeedbackVal] = useState("");
-
-  useEffect(() => {
-    if (sub) {
-      setGradeVal(sub.grade !== null && sub.grade !== undefined ? String(sub.grade) : "");
-      setFeedbackVal(sub.feedback ?? "");
-    }
-  }, [sub?.id]);
-
-  const gradeMutation = useMutation({
-    mutationFn: ({ submissionId }: { submissionId: number }) =>
-      apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/grade`, {
-        method: "PATCH",
-        body: JSON.stringify({ grade: parseInt(gradeVal), feedback: feedbackVal || null }),
-      }),
-    onSuccess: () => {
-      if (expandedAssignmentId) queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", expandedAssignmentId, "submissions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/classroom-notifications/total"] });
-      toast({ title: "Graded", type: "success" });
-      onClose();
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
-  });
-
-  return (
-    <Dialog open={!!sub} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{assignment?.title ?? "Submission"}</DialogTitle>
-          {sub && (
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {sub.studentName} · <StatusBadge status={sub.status} />
-              {sub.grade !== null && sub.grade !== undefined && (
-                <span className="ml-2 text-xs font-semibold text-green-700">
-                  {sub.grade}/{assignment?.points} pts
-                </span>
-              )}
-            </p>
-          )}
-        </DialogHeader>
-
-        {sub && (
-          <div className="space-y-4 pt-1">
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              {assignment?.dueDate && <span>Due: {assignment.dueDate}</span>}
-              {assignment?.points && <span>{assignment.points} points</span>}
-            </div>
-
-            {assignment?.formSchema && assignment.formSchema.length > 0 && sub.formAnswers ? (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Form Responses</p>
-                <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 space-y-3">
-                  <FormResponse
-                    questions={assignment.formSchema}
-                    answers={sub.formAnswers as Record<string, string | string[]>}
-                    onChange={() => {}}
-                    disabled
-                  />
-                </div>
-              </div>
-            ) : sub.content ? (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Student Answer</p>
-                <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
-                  {sub.content}
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground italic">No text answer submitted.</p>
-            )}
-
-            {sub.fileUrl && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Submitted File</p>
-                <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline font-medium">
-                  <Paperclip className="h-4 w-4" />View submission file<ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            )}
-
-            {sub.feedback && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Previous Feedback</p>
-                <p className="text-sm text-muted-foreground italic">"{sub.feedback}"</p>
-              </div>
-            )}
-
-            <div className="border-t border-border pt-4 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                {sub.status === "graded" ? "Update Grade" : "Grade Submission"}
-              </p>
-              <div className="flex gap-3 items-start">
-                <div className="w-28 shrink-0">
-                  <Label className="text-xs">Score (0–{assignment?.points ?? 100})</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={assignment?.points ?? 100}
-                    placeholder={`0–${assignment?.points ?? 100}`}
-                    value={gradeVal}
-                    onChange={(e) => setGradeVal(e.target.value)}
-                    className="mt-1 h-8 text-sm"
-                  />
-                </div>
-                <div className="flex-1">
-                  <Label className="text-xs">Feedback <span className="font-normal text-muted-foreground">(optional)</span></Label>
-                  <Textarea
-                    placeholder="Leave feedback for the student…"
-                    value={feedbackVal}
-                    onChange={(e) => setFeedbackVal(e.target.value)}
-                    rows={3}
-                    className="mt-1 text-sm resize-none"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-                <Button
-                  size="sm"
-                  disabled={gradeVal === "" || gradeMutation.isPending}
-                  onClick={() => gradeMutation.mutate({ submissionId: sub.id })}
-                >
-                  {gradeMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-                  Save Grade
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ─── Edit dialog ──────────────────────────────────────────────────────────────
 
@@ -333,20 +180,8 @@ function EditAssignmentDialog({
 
 export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { classroomId: number; classroomSlug: string | number; isArchived: boolean }) {
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [modalSub, setModalSub] = useState<SubmissionWithName | null>(null);
-  const [modalAssignment, setModalAssignment] = useState<ClassroomAssignment | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<ClassroomAssignment | null>(null);
   const [, navigate] = useLocation();
-
-  const openModal = (sub: SubmissionWithName, assignment: ClassroomAssignment) => {
-    setModalSub(sub);
-    setModalAssignment(assignment);
-  };
-
-  const closeModal = () => {
-    setModalSub(null);
-    setModalAssignment(null);
-  };
 
   const { data: assignments = [], isLoading } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
@@ -496,7 +331,7 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
                             {(sub.status === "submitted" || sub.status === "late" || sub.status === "graded") && (
                               <div className="shrink-0">
                                 <Button size="sm" variant="outline" className="text-xs h-8"
-                                  onClick={() => openModal(sub, a)}>
+                                  onClick={() => navigate(`/classrooms/${classroomSlug}/submissions/${sub.id}/review`)}>
                                   {sub.status === "graded" ? "Edit Grade" : "Review"}
                                 </Button>
                               </div>
@@ -512,14 +347,6 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
           );
         })}
       </div>
-
-      <GradingModal
-        sub={modalSub}
-        assignment={modalAssignment}
-        classroomId={classroomId}
-        expandedAssignmentId={expanded}
-        onClose={closeModal}
-      />
 
       {editingAssignment && (
         <EditAssignmentDialog

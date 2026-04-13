@@ -4780,6 +4780,20 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/classrooms/:classroomId/submissions/:submissionId — teacher views single submission
+  app.get("/api/classrooms/:classroomId/submissions/:submissionId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const submissionId = parseInt(req.params.submissionId);
+      const sub = await storage.getClassroomSubmissionById(submissionId);
+      if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
+      res.json(sub);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // PATCH /api/classrooms/:classroomId/submissions/:submissionId/grade — teacher grades
   app.patch("/api/classrooms/:classroomId/submissions/:submissionId/grade", requireAuth, async (req, res) => {
     try {

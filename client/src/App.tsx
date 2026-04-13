@@ -15,6 +15,7 @@ import ClassroomDetail from "./pages/ClassroomDetail";
 import ClassworkDetail from "./pages/ClassworkDetail";
 import ClassroomMaterialPage from "./pages/ClassroomMaterialPage";
 import NewAssignmentPage from "./pages/classroom/NewAssignmentPage";
+import SubmissionReviewPage from "./pages/classroom/SubmissionReviewPage";
 import Landing from "./pages/Landing";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminUsers from "./pages/AdminUsers";
@@ -119,6 +120,9 @@ function AppRoutes() {
       </Route>
       <Route path="/classrooms/:slug/assignments/new">
         <ProtectedRoute component={NewAssignmentPage} />
+      </Route>
+      <Route path="/classrooms/:slug/submissions/:submissionId/review">
+        <ProtectedRoute component={SubmissionReviewPage} />
       </Route>
       <Route path="/classrooms/:slug/classwork/:classworkSlug">
         <ProtectedRoute component={ClassworkDetail} />
