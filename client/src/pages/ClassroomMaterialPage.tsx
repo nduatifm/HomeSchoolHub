@@ -329,8 +329,14 @@ function TeacherEditor({
         }),
       }) as Promise<ClassroomMaterial>;
     },
-    onSuccess: () => {
+    onSuccess: (saved: ClassroomMaterial) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "materials"] });
+      const slug = saved.slug ?? initial?.slug;
+      if (slug) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/classrooms", classroomId, "materials", "slug", slug],
+        });
+      }
       toast({ title: isEdit ? "Classwork updated" : "Classwork created", type: "success" });
       navigate(`/classrooms/${classroomSlug}?tab=classwork`);
     },
@@ -676,7 +682,11 @@ function TeacherEditor({
                 <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
                   <SelectTrigger className="h-9 gap-2 text-sm">
                     <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <SelectValue placeholder="None" />
+                    <span className="flex-1 truncate text-left">
+                      {assignmentId
+                        ? (assignments.find((a) => String(a.id) === assignmentId)?.title ?? "Loading…")
+                        : "None"}
+                    </span>
                   </SelectTrigger>
                   <SelectContent side="top">
                     <SelectItem value="none">No linked assignment</SelectItem>
@@ -746,7 +756,11 @@ function TeacherEditor({
                 <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
                   <SelectTrigger className="h-9 gap-2">
                     <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <SelectValue placeholder="No linked assignment" />
+                    <span className="flex-1 truncate text-left text-sm">
+                      {assignmentId
+                        ? (assignments.find((a) => String(a.id) === assignmentId)?.title ?? "Loading…")
+                        : "No linked assignment"}
+                    </span>
                   </SelectTrigger>
                   <SelectContent side="top">
                     <SelectItem value="none">No linked assignment</SelectItem>
