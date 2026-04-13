@@ -1690,7 +1690,11 @@ class PrismaStorage implements IStorage {
     id: number,
     data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl" | "formSchema">>,
   ): Promise<ClassroomAssignment> {
-    const updated = await prisma.classroomAssignment.update({ where: { id }, data: data as any });
+    const { formSchema, ...rest } = data;
+    const updated = await prisma.classroomAssignment.update({
+      where: { id },
+      data: formSchema !== undefined ? { ...rest, formSchema } : rest,
+    });
     return this.mapClassroomAssignment(updated);
   }
 
@@ -1710,12 +1714,12 @@ class PrismaStorage implements IStorage {
       studentId: r.studentId,
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
-      formAnswers: (r as any).formAnswers ?? null,
-      status: r.status as any,
+      formAnswers: r.formAnswers ?? null,
+      status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
-      studentName: (r as any).student?.name ?? "Unknown",
+      studentName: r.student?.name ?? "Unknown",
     }));
   }
 
@@ -1731,8 +1735,8 @@ class PrismaStorage implements IStorage {
       studentId: r.studentId,
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
-      formAnswers: (r as any).formAnswers ?? null,
-      status: r.status as any,
+      formAnswers: r.formAnswers ?? null,
+      status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
@@ -1901,12 +1905,17 @@ class PrismaStorage implements IStorage {
   async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>): Promise<ClassroomSubmission> {
     const now = new Date().toISOString();
     const isLate = now > dueDate;
-    const submitData: any = { content, fileUrl: fileUrl ?? null, status: isLate ? "late" : "submitted", submittedAt: now };
-    if (formAnswers !== undefined) submitData.formAnswers = formAnswers;
+    const baseData = {
+      content,
+      fileUrl: fileUrl ?? null,
+      status: isLate ? "late" : "submitted",
+      submittedAt: now,
+      ...(formAnswers !== undefined ? { formAnswers } : {}),
+    } as const;
     const updated = await prisma.classroomSubmission.upsert({
       where: { assignmentId_studentId: { assignmentId, studentId } },
-      update: submitData,
-      create: { assignmentId, studentId, grade: null, feedback: null, ...submitData },
+      update: baseData,
+      create: { assignmentId, studentId, grade: null, feedback: null, ...baseData },
     });
     return {
       id: updated.id,
@@ -1914,8 +1923,8 @@ class PrismaStorage implements IStorage {
       studentId: updated.studentId,
       content: updated.content ?? null,
       fileUrl: updated.fileUrl ?? null,
-      formAnswers: (updated as any).formAnswers ?? null,
-      status: updated.status as any,
+      formAnswers: updated.formAnswers ?? null,
+      status: updated.status as ClassroomSubmission["status"],
       submittedAt: updated.submittedAt ?? null,
       grade: updated.grade ?? null,
       feedback: updated.feedback ?? null,
@@ -1934,7 +1943,7 @@ class PrismaStorage implements IStorage {
       studentId: updated.studentId,
       content: updated.content ?? null,
       fileUrl: updated.fileUrl ?? null,
-      status: updated.status as any,
+      status: updated.status as ClassroomSubmission["status"],
       submittedAt: updated.submittedAt ?? null,
       grade: updated.grade ?? null,
       feedback: updated.feedback ?? null,

@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, GripVertical, X } from "lucide-react";
+import { Plus, Trash2, X, ChevronUp, ChevronDown } from "lucide-react";
 import type { FormQuestion } from "@shared/schema";
 
 function generateId() {
@@ -33,12 +33,16 @@ function QuestionEditor({
   total,
   onChange,
   onRemove,
+  onMoveUp,
+  onMoveDown,
 }: {
   question: FormQuestion;
   index: number;
   total: number;
   onChange: (q: FormQuestion) => void;
   onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   const hasOptions = question.type === "multiple_choice" || question.type === "checkbox";
 
@@ -61,7 +65,26 @@ function QuestionEditor({
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       <div className="flex items-start gap-2">
-        <GripVertical className="h-4 w-4 text-muted-foreground/40 mt-2.5 shrink-0" />
+        <div className="flex flex-col gap-0.5 mt-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={index === 0}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Move up"
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={index === total - 1}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Move down"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <div className="flex-1 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground w-5 shrink-0">Q{index + 1}</span>
@@ -73,7 +96,13 @@ function QuestionEditor({
             />
             <Select
               value={question.type}
-              onValueChange={(v) => onChange({ ...question, type: v as FormQuestion["type"], options: v === "multiple_choice" || v === "checkbox" ? (question.options?.length ? question.options : [""]) : undefined })}
+              onValueChange={(v) => onChange({
+                ...question,
+                type: v as FormQuestion["type"],
+                options: v === "multiple_choice" || v === "checkbox"
+                  ? (question.options?.length ? question.options : [""])
+                  : undefined,
+              })}
             >
               <SelectTrigger className="w-40 h-8 text-xs shrink-0">
                 <SelectValue />
@@ -155,6 +184,14 @@ export default function FormBuilder({ questions, onChange }: FormBuilderProps) {
     onChange(next);
   }
 
+  function moveQuestion(i: number, direction: "up" | "down") {
+    const next = [...questions];
+    const target = direction === "up" ? i - 1 : i + 1;
+    if (target < 0 || target >= next.length) return;
+    [next[i], next[target]] = [next[target], next[i]];
+    onChange(next);
+  }
+
   return (
     <div className="space-y-2.5">
       {questions.map((q, i) => (
@@ -165,6 +202,8 @@ export default function FormBuilder({ questions, onChange }: FormBuilderProps) {
           total={questions.length}
           onChange={(updated) => updateQuestion(i, updated)}
           onRemove={() => removeQuestion(i)}
+          onMoveUp={() => moveQuestion(i, "up")}
+          onMoveDown={() => moveQuestion(i, "down")}
         />
       ))}
       <Button

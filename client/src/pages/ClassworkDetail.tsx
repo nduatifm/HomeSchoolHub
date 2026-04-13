@@ -188,6 +188,15 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
 
   const hasFormSchema = !!(assignment.formSchema && assignment.formSchema.length > 0);
 
+  const missingRequiredQuestions = hasFormSchema
+    ? (assignment.formSchema ?? []).filter((q) => {
+        if (!q.required) return false;
+        const answer = formAnswers[q.id];
+        if (q.type === "checkbox") return !Array.isArray(answer) || answer.length === 0;
+        return !answer || (typeof answer === "string" && !answer.trim());
+      })
+    : [];
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       const formData = new FormData();
@@ -286,9 +295,19 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
                 <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
               </label>
             </div>
+            {missingRequiredQuestions.length > 0 && (
+              <p className="text-xs text-red-500">
+                Please answer required question{missingRequiredQuestions.length > 1 ? "s" : ""}:{" "}
+                {missingRequiredQuestions.map((q) => q.label || "Untitled").join(", ")}
+              </p>
+            )}
             <Button
               className="w-full"
-              disabled={submitMutation.isPending || (!hasFormSchema && !text.trim() && !file)}
+              disabled={
+                submitMutation.isPending ||
+                missingRequiredQuestions.length > 0 ||
+                (!hasFormSchema && !text.trim() && !file)
+              }
               onClick={() => submitMutation.mutate()}
             >
               {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

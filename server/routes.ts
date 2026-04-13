@@ -4749,7 +4749,24 @@ export function registerRoutes(app: Express) {
       if (formAnswersRaw) {
         try { formAnswers = JSON.parse(formAnswersRaw); } catch { formAnswers = undefined; }
       }
-      
+
+      // Validate required questions server-side
+      if (Array.isArray(assignment.formSchema) && assignment.formSchema.length > 0) {
+        const answers = formAnswers ?? {};
+        const missingLabels: string[] = [];
+        for (const q of assignment.formSchema as Array<{ id: string; label: string; type: string; required: boolean }>) {
+          if (!q.required) continue;
+          const answer = answers[q.id];
+          const empty = q.type === "checkbox"
+            ? !Array.isArray(answer) || answer.length === 0
+            : !answer || (typeof answer === "string" && !answer.trim());
+          if (empty) missingLabels.push(q.label || "Untitled question");
+        }
+        if (missingLabels.length > 0) {
+          return res.status(422).json({ error: `Required question${missingLabels.length > 1 ? "s" : ""} not answered: ${missingLabels.join(", ")}` });
+        }
+      }
+
       const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers);
 
       res.json(submission);
