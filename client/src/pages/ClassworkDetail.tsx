@@ -41,6 +41,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssignment; classroomId: number }) {
   const [gradeInputs, setGradeInputs] = useState<Record<number, { grade: string; feedback: string }>>({});
+  const [showFormPreview, setShowFormPreview] = useState(false);
 
   const { data: submissions = [], isLoading } = useQuery<SubmissionWithName[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"],
@@ -67,6 +68,41 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
 
   return (
     <div className="space-y-4">
+      {assignment.formSchema && assignment.formSchema.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2 px-4 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-violet-500" />
+                <CardTitle className="text-sm font-semibold">Form Preview</CardTitle>
+                <span className="text-[11px] text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-full font-medium">
+                  {assignment.formSchema.length} {assignment.formSchema.length === 1 ? "question" : "questions"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFormPreview((v) => !v)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showFormPreview ? "Hide" : "Show form"}
+              </button>
+            </div>
+          </CardHeader>
+          {showFormPreview && (
+            <CardContent className="px-4 pb-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <FormResponse
+                  questions={assignment.formSchema}
+                  answers={{}}
+                  onChange={() => {}}
+                  disabled
+                />
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       <h2 className="text-base font-semibold text-gray-800">Student Submissions ({submissions.length})</h2>
       {submissions.length === 0 ? (
         <p className="text-sm text-gray-400 py-6 text-center">No submissions yet.</p>
@@ -343,9 +379,19 @@ function ParentPanel({ assignment, classroomId, studentId }: { assignment: Class
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-2">
-            {mySubmission.content && (
+            {assignment.formSchema && assignment.formSchema.length > 0 && mySubmission.formAnswers ? (
+              <div className="bg-gray-50 rounded p-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Form Responses</p>
+                <FormResponse
+                  questions={assignment.formSchema}
+                  answers={mySubmission.formAnswers as Record<string, string | string[]>}
+                  onChange={() => {}}
+                  disabled
+                />
+              </div>
+            ) : mySubmission.content ? (
               <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
-            )}
+            ) : null}
             {mySubmission.fileUrl && (
               <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
                 <FileText className="h-3.5 w-3.5" />View file
