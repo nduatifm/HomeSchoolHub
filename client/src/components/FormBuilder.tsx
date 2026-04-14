@@ -404,7 +404,7 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
               </div>
             </div>
 
-            <div className="mt-auto pt-2">
+            <div className="border-t border-border pt-4">
               <button
                 type="button"
                 onClick={() => deleteQuestion(activeQuestion.id)}
