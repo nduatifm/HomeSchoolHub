@@ -110,7 +110,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
 
           const dueSoonDays = (() => {
             if (urgency !== "due-soon" || !a.dueDate) return 0;
-            const due = new Date(a.dueDate);
+            const due = new Date(a.dueDate + "T00:00:00");
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             due.setHours(0, 0, 0, 0);

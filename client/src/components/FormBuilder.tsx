@@ -91,7 +91,7 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
 
   function addQuestion(type: QType) {
     const newQ: FormQuestion = {
-      id: Math.random().toString(36).slice(2, 10),
+      id: crypto.randomUUID(),
       type,
       label: "",
       required: false,

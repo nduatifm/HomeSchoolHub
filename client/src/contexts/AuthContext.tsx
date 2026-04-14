@@ -66,6 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [sessionId]);
 
+  useEffect(() => {
+    function handleExpired() {
+      localStorage.removeItem("sessionId");
+      setSessionId(null);
+      setUser(null);
+      setStudent(null);
+    }
+    window.addEventListener("lyra:auth:expired", handleExpired);
+    return () => window.removeEventListener("lyra:auth:expired", handleExpired);
+  }, []);
+
   async function fetchCurrentUser() {
     try {
       const data = await apiRequest("/api/auth/me");

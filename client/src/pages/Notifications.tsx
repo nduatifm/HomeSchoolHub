@@ -114,6 +114,7 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
+    onError: (e: Error) => toast({ title: "Could not mark as read", description: e.message, type: "error" }),
   });
 
   const markAllReadMutation = useMutation({
@@ -123,6 +124,7 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
+    onError: (e: Error) => toast({ title: "Could not mark all as read", description: e.message, type: "error" }),
   });
 
   const handleNotificationClick = async (n: Notification) => {

@@ -63,7 +63,7 @@ export default function ClassworkCard({
 
   const dueSoonDays = (() => {
     if (urgency !== "due-soon" || !linkedFullAssignment?.dueDate) return 0;
-    const due = new Date(linkedFullAssignment.dueDate);
+    const due = new Date(linkedFullAssignment.dueDate + "T00:00:00");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     due.setHours(0, 0, 0, 0);

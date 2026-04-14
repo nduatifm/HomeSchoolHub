@@ -68,6 +68,7 @@ export default function FeedTab({
   const { data: posts = [], isLoading } = useQuery<PostWithAuthor[]>({
     queryKey: ["/api/classrooms", classroomId, "posts"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/posts`),
+    refetchInterval: 30000,
   });
 
   const postMutation = useMutation({

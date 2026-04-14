@@ -547,6 +547,7 @@ function TeacherEditMaterialDialog({
       toast({ title: "Material updated!", type: "success" });
       onClose();
     },
+    onError: (e: Error) => toast({ title: "Failed to update material", description: e.message, type: "error" }),
   });
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -591,6 +592,7 @@ function TeacherCreateScheduleDialog({
       form.reset();
       onClose();
     },
+    onError: (e: Error) => toast({ title: "Failed to create schedule", description: e.message, type: "error" }),
   });
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -658,6 +660,7 @@ function TeacherEditScheduleDialog({
       toast({ title: "Schedule updated!", type: "success" });
       onClose();
     },
+    onError: (e: Error) => toast({ title: "Failed to update schedule", description: e.message, type: "error" }),
   });
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -716,6 +719,7 @@ function TeacherMarkAttendanceDialog({
       form.reset();
       onClose();
     },
+    onError: (e: Error) => toast({ title: "Failed to mark attendance", description: e.message, type: "error" }),
   });
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -781,6 +785,7 @@ function TeacherCreateReportDialog({
       setForm({ studentId: 0, period: defaultPeriod, overallGrade: "", comments: "", strengths: "", improvements: "" });
       onClose();
     },
+    onError: (e: Error) => toast({ title: "Failed to create progress report", description: e.message, type: "error" }),
   });
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -832,6 +837,7 @@ function TeacherGiveFeedbackDialog({
       form.reset();
       onClose();
     },
+    onError: (e: Error) => toast({ title: "Failed to send feedback", description: e.message, type: "error" }),
   });
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -966,6 +972,7 @@ function TeacherSendMessageDialog({
       toast({ title: "Message sent!", type: "success" });
       onClose();
     },
+    onError: (e: Error) => toast({ title: "Failed to send message", description: e.message, type: "error" }),
   });
 
   return (

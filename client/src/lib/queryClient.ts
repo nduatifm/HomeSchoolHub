@@ -34,6 +34,9 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: "Request failed" }));
+    if (response.status === 401) {
+      window.dispatchEvent(new Event("lyra:auth:expired"));
+    }
     throw new ApiError(errorData.error || "Request failed", {
       requiresRole: errorData.requiresRole,
       requiresVerification: errorData.requiresVerification,
