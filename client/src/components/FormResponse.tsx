@@ -120,6 +120,34 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
             })}
           </div>
         )}
+
+        {q.type === "true_false" && (
+          <div className="flex gap-3">
+            {["True", "False"].map((opt) => {
+              const selected = (answers[q.id] as string) === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => !disabled && setAnswer(q.id, opt)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                    selected
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-muted/20 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    selected ? "border-primary" : "border-border"
+                  }`}>
+                    {selected && <div className="w-2 h-2 rounded-full bg-primary" />}
+                  </div>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }

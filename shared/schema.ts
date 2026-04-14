@@ -460,7 +460,7 @@ export type InsertClassroomPost = z.infer<typeof insertClassroomPostSchema>;
 
 export const formQuestionSchema = z.object({
   id: z.string(),
-  type: z.enum(["short", "paragraph", "multiple_choice", "checkbox"]),
+  type: z.enum(["short", "paragraph", "multiple_choice", "checkbox", "true_false"]),
   label: z.string(),
   required: z.boolean().default(false),
   options: z.array(z.string()).optional(),
