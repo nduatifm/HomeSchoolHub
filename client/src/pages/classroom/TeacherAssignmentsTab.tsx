@@ -1,17 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import {
   Loader2,
@@ -22,165 +13,16 @@ import {
   ChevronDown,
   ChevronUp,
   Paperclip,
-  X,
   ClipboardList,
 } from "lucide-react";
-import type { ClassroomAssignment, FormQuestion } from "@shared/schema";
+import type { ClassroomAssignment } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
 import type { SubmissionWithName } from "./types";
-import FormBuilder from "@/components/FormBuilder";
-
-// ─── Edit dialog ──────────────────────────────────────────────────────────────
-
-function EditAssignmentDialog({
-  assignment,
-  classroomId,
-  onClose,
-}: {
-  assignment: ClassroomAssignment;
-  classroomId: number;
-  onClose: () => void;
-}) {
-  const [form, setForm] = useState({
-    title: assignment.title,
-    description: assignment.description,
-    dueDate: assignment.dueDate,
-    points: String(assignment.points),
-  });
-  const [newFile, setNewFile] = useState<File | null>(null);
-  const [clearFile, setClearFile] = useState(false);
-  const [formQuestions, setFormQuestions] = useState<FormQuestion[]>(assignment.formSchema ?? []);
-  const [showFormBuilder, setShowFormBuilder] = useState((assignment.formSchema?.length ?? 0) > 0);
-
-  const editMutation = useMutation({
-    mutationFn: async () => {
-      let fileUrl: string | null | undefined = undefined;
-      if (newFile) {
-        const fd = new FormData();
-        fd.append("file", newFile);
-        fd.append("folder", "classroom-assignments");
-        const uploaded = await apiUpload("/api/upload", fd);
-        fileUrl = uploaded.url as string;
-      } else if (clearFile) {
-        fileUrl = null;
-      }
-      return apiRequest(`/api/classrooms/${classroomId}/assignments/${assignment.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description,
-          dueDate: form.dueDate,
-          points: parseInt(form.points, 10),
-          ...(fileUrl !== undefined ? { fileUrl } : {}),
-          formSchema: showFormBuilder && formQuestions.length > 0 ? formQuestions : null,
-        }),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
-      toast({ title: "Assignment updated", type: "success" });
-      onClose();
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
-  });
-
-  const canSave = form.title.trim().length > 0 && form.dueDate.length > 0 && !editMutation.isPending;
-
-  return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Edit Assignment</DialogTitle></DialogHeader>
-        <div className="space-y-3 pt-2">
-          <div>
-            <Label>Title</Label>
-            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1" />
-          </div>
-          <div>
-            <Label>Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="mt-1 resize-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Due Date</Label>
-              <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="mt-1" />
-            </div>
-            <div>
-              <Label>Points</Label>
-              <Input type="number" min={1} value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} className="mt-1" />
-            </div>
-          </div>
-
-          {/* Attachment */}
-          <div>
-            <Label>Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            {assignment.fileUrl && !clearFile && !newFile && (
-              <div className="mt-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30">
-                <Paperclip className="h-3.5 w-3.5 text-primary shrink-0" />
-                <a href={assignment.fileUrl} target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex-1 truncate">
-                  Current attachment
-                </a>
-                <button type="button" onClick={() => setClearFile(true)}
-                  className="text-muted-foreground hover:text-red-500 transition-colors">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-            {clearFile && !newFile && (
-              <p className="mt-1 text-xs text-muted-foreground">Attachment will be removed on save.</p>
-            )}
-            <Input
-              type="file"
-              accept="image/*,.pdf,.doc,.docx,.txt"
-              className="mt-1 cursor-pointer"
-              onChange={(e) => {
-                setClearFile(false);
-                setNewFile(e.target.files?.[0] ?? null);
-              }}
-            />
-            {newFile && <p className="text-xs text-muted-foreground mt-1">New file: {newFile.name}</p>}
-          </div>
-
-          {/* Form Builder */}
-          <div className="border-t border-border pt-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                <Label className="text-sm font-medium">Form Questions <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              </div>
-              <Button
-                type="button"
-                variant={showFormBuilder ? "default" : "outline"}
-                size="sm"
-                className="h-7 text-xs px-2.5"
-                onClick={() => { setShowFormBuilder(!showFormBuilder); if (!showFormBuilder && formQuestions.length === 0) setFormQuestions([{ id: Math.random().toString(36).slice(2, 10), type: "short", label: "", required: false }]); }}
-              >
-                {showFormBuilder ? "Remove Form" : "Add Form"}
-              </Button>
-            </div>
-            {showFormBuilder && (
-              <FormBuilder questions={formQuestions} onChange={setFormQuestions} />
-            )}
-          </div>
-
-          <div className="flex gap-2 justify-end pt-1">
-            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" disabled={!canSave} onClick={() => editMutation.mutate()}>
-              {editMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 
 export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { classroomId: number; classroomSlug: string | number; isArchived: boolean }) {
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [editingAssignment, setEditingAssignment] = useState<ClassroomAssignment | null>(null);
   const [, navigate] = useLocation();
 
   const { data: assignments = [], isLoading } = useQuery<ClassroomAssignment[]>({
@@ -281,7 +123,7 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
                   {!isArchived && (
                     <>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditingAssignment(a)}>
+                        onClick={() => window.open(`/classrooms/${classroomSlug}/assignments/${a.slug ?? a.id}/edit`, "_blank")}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
@@ -348,13 +190,6 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
         })}
       </div>
 
-      {editingAssignment && (
-        <EditAssignmentDialog
-          assignment={editingAssignment}
-          classroomId={classroomId}
-          onClose={() => setEditingAssignment(null)}
-        />
-      )}
     </div>
   );
 }
