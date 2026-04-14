@@ -39,18 +39,6 @@ export default function NewAssignmentPage() {
   // Track whether the teacher has entered anything worth warning about
   const isDirty = !!(form.title.trim() || form.description.trim() || form.dueDate || attachedFile || formQuestions.length > 0);
 
-  // Warn on browser/tab close
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty && !didSubmit) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty, didSubmit]);
-
   // Auto-grow title textarea
   function autoGrowTitle() {
     const el = titleRef.current;
@@ -72,14 +60,6 @@ export default function NewAssignmentPage() {
     if (diffDays < 0) return `Overdue · ${formatted}`;
     if (diffDays <= 7) return `In ${diffDays} days · ${formatted}`;
     return formatted;
-  }
-
-  // Warn on in-app navigation (Cancel / back)
-  function safeNavigate(url: string) {
-    if (isDirty && !didSubmit) {
-      if (!window.confirm("You have unsaved changes. Leave without creating the assignment?")) return;
-    }
-    navigate(url);
   }
 
   // Question type labels for preview
@@ -132,6 +112,26 @@ export default function NewAssignmentPage() {
   const didSubmit = createMutation.isSuccess;
   const canSave = !!form.title.trim() && !!form.dueDate && !createMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}`;
+
+  // Warn on browser/tab close
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty && !didSubmit) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty, didSubmit]);
+
+  // Warn on in-app navigation (Cancel / back)
+  function safeNavigate(url: string) {
+    if (isDirty && !didSubmit) {
+      if (!window.confirm("You have unsaved changes. Leave without creating the assignment?")) return;
+    }
+    navigate(url);
+  }
 
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault();
