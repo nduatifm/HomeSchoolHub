@@ -471,6 +471,7 @@ model ClassroomAssignment {
   dueDate     String
   points      Int      @default(100)
   fileUrl     String?
+  linkUrl     String?
   slug        String?
   formSchema  Json?
   createdAt   DateTime @default(now())

@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Paperclip,
   ClipboardList,
+  Link2,
 } from "lucide-react";
 import type { ClassroomAssignment } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
@@ -98,6 +99,11 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
                     {a.fileUrl && (
                       <a href={a.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
                         <Paperclip className="h-2.5 w-2.5" />Attachment
+                      </a>
+                    )}
+                    {a.linkUrl && (
+                      <a href={a.linkUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline">
+                        <Link2 className="h-2.5 w-2.5" />Link
                       </a>
                     )}
                   </div>

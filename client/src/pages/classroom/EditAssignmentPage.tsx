@@ -17,6 +17,7 @@ import {
   Calendar,
   Trophy,
   ExternalLink,
+  Link2,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
@@ -51,6 +52,7 @@ export default function EditAssignmentPage() {
   const assignmentSlug = params?.assignmentSlug ?? "";
 
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
+  const [linkUrl, setLinkUrl] = useState("");
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [clearFile, setClearFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -105,6 +107,7 @@ export default function EditAssignmentPage() {
       dueDate: assignment.dueDate,
       points: String(assignment.points),
     });
+    setLinkUrl(assignment.linkUrl ?? "");
     const existing = (assignment.formSchema as FormQuestion[] | null) ?? [];
     setFormQuestions(existing);
     localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(existing));
@@ -162,6 +165,7 @@ export default function EditAssignmentPage() {
           dueDate: form.dueDate,
           points: parseInt(form.points, 10),
           ...(fileUrl !== undefined ? { fileUrl } : {}),
+          linkUrl: linkUrl.trim() || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
         }),
       });
@@ -332,6 +336,48 @@ export default function EditAssignmentPage() {
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-4 lg:hidden">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
+                </div>
+
+                {/* ── Link card ── */}
+                <div className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                      <Link2 className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Link</p>
+                      <p className="text-xs text-muted-foreground">Optional — a URL students can open alongside this assignment</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="url"
+                      value={linkUrl}
+                      onChange={(e) => setLinkUrl(e.target.value)}
+                      placeholder="https://…"
+                      className="text-sm h-9"
+                    />
+                    {linkUrl.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setLinkUrl("")}
+                        className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {linkUrl.trim() && (
+                    <a
+                      href={linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Preview link
+                    </a>
+                  )}
                 </div>
 
                 {/* ── Form Questions card ── */}

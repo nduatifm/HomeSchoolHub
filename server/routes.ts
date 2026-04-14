@@ -4586,6 +4586,7 @@ export function registerRoutes(app: Express) {
         description: z.string(),
         dueDate: z.string().min(1),
         points: z.preprocess((v) => parseInt(v as string, 10), z.number().int().min(1).max(10000)),
+        linkUrl: z.string().url().optional().or(z.literal("")),
       }).parse(req.body);
 
       let formSchema: z.infer<typeof formQuestionSchema>[] | undefined;
@@ -4604,7 +4605,8 @@ export function registerRoutes(app: Express) {
         fileUrl = uploadResult.url;
       }
 
-      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl, ...(formSchema !== undefined ? { formSchema } : {}) });
+      const linkUrl = data.linkUrl || undefined;
+      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl, linkUrl, ...(formSchema !== undefined ? { formSchema } : {}) });
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -4657,9 +4659,10 @@ export function registerRoutes(app: Express) {
         dueDate: z.string().min(1).optional(),
         points: z.number().int().min(1).max(10000).optional(),
         fileUrl: z.string().url().nullable().optional(),
+        linkUrl: z.string().url().nullable().optional(),
         formSchema: z.array(z.object({
           id: z.string(),
-          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox"]),
+          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox", "true_false"]),
           label: z.string(),
           required: z.boolean().default(false),
           options: z.array(z.string()).optional(),

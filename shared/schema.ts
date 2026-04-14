@@ -475,6 +475,7 @@ export const classroomAssignmentSchema = z.object({
   dueDate: z.string(),
   points: z.number(),
   fileUrl: z.string().nullable().optional(),
+  linkUrl: z.string().nullable().optional(),
   slug: z.string().nullable().optional(),
   formSchema: z.array(formQuestionSchema).nullable().optional(),
   createdAt: z.string(),

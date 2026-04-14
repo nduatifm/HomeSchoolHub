@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList } from "lucide-react";
+import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
@@ -533,6 +533,31 @@ export default function ClassworkDetail() {
                     <FileText className="h-3.5 w-3.5" />View attached resource
                   </a>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Assignment Link */}
+          {assignment.linkUrl && (
+            <Card>
+              <CardContent className="px-4 py-3">
+                <a
+                  href={assignment.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 group"
+                >
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                    <Link2 className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground group-hover:text-blue-600 transition-colors truncate">
+                      {assignment.linkUrl}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Opens in a new tab</p>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-blue-600 transition-colors" />
+                </a>
               </CardContent>
             </Card>
           )}
