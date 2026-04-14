@@ -59,11 +59,21 @@ export default function NewAssignmentPage() {
     return formatted;
   }
 
+  // Matches TYPE_META labels and pills in FormBuilder
   const typeLabel: Record<string, string> = {
     short: "Short answer",
     paragraph: "Paragraph",
     multiple_choice: "Multiple choice",
     checkbox: "Checkboxes",
+    true_false: "True / False",
+  };
+
+  const typePill: Record<string, string> = {
+    short: "bg-sky-100 text-sky-700",
+    paragraph: "bg-violet-100 text-violet-700",
+    multiple_choice: "bg-emerald-100 text-emerald-700",
+    checkbox: "bg-amber-100 text-amber-700",
+    true_false: "bg-pink-100 text-pink-700",
   };
 
   const { data: classroom, isLoading: classroomLoading } = useQuery<Classroom>({
@@ -156,12 +166,12 @@ export default function NewAssignmentPage() {
   if (user?.role !== "teacher") { navigate(backUrl); return null; }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-background">
       <ModernSidebar />
       <div className="flex-1 md:ml-[228px] flex flex-col">
 
         {/* ── Sticky top bar ── */}
-        <div className="sticky top-0 z-20 bg-white border-b border-border px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <button
             onClick={() => safeNavigate(backUrl)}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -216,7 +226,7 @@ export default function NewAssignmentPage() {
               <div className="flex-1 min-w-0 space-y-4">
 
                 {/* Title + Instructions */}
-                <div className="rounded-2xl border border-border bg-white p-6 space-y-5">
+                <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
                   <div className="space-y-1.5">
                     <Label htmlFor="title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Title <span className="text-destructive">*</span>
@@ -251,16 +261,18 @@ export default function NewAssignmentPage() {
                   </div>
                 </div>
 
-                {/* Due date + points — shown inline on mobile, sidebar on lg+ */}
-                <div className="rounded-2xl border border-border bg-white p-5 space-y-4 lg:hidden">
+                {/* Due date + points — mobile only */}
+                <div className="rounded-2xl border border-border bg-card p-5 space-y-4 lg:hidden">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
                 </div>
 
-                {/* Form builder */}
-                {/* NOTE: no overflow-hidden here — the type Select dropdown is position:absolute
-                    and overflow-hidden on a parent clips it */}
-                <div className="rounded-2xl border border-border bg-white">
+                {/* ── Form builder card ──
+                    No overflow-hidden: the FormBuilder's type menu is position:absolute
+                    and must escape the card boundary to render above other content. */}
+                <div className="rounded-2xl border border-border bg-card">
+
+                  {/* Card header */}
                   <div className="px-6 py-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
@@ -278,7 +290,7 @@ export default function NewAssignmentPage() {
 
                     <Button
                       type="button"
-                      variant={showFormBuilder ? "destructive" : "outline"}
+                      variant={showFormBuilder ? "secondary" : "outline"}
                       size="sm"
                       className="h-8 gap-1.5 shrink-0"
                       onClick={() => {
@@ -290,29 +302,30 @@ export default function NewAssignmentPage() {
                             required: false,
                           }]);
                         }
-                        setShowFormBuilder(!showFormBuilder);
+                        setShowFormBuilder((v) => !v);
                       }}
                     >
                       {showFormBuilder
-                        ? <><X className="h-3.5 w-3.5" />Close</>
-                        : <><Plus className="h-3.5 w-3.5" />Add Form</>}
+                        ? <><X className="h-3.5 w-3.5" />Collapse</>
+                        : formQuestions.length > 0
+                          ? <><ClipboardList className="h-3.5 w-3.5" />Edit Form</>
+                          : <><Plus className="h-3.5 w-3.5" />Add Form</>}
                     </Button>
                   </div>
 
-                  {/* Collapsed preview */}
+                  {/* Collapsed question preview */}
                   {!showFormBuilder && formQuestions.length > 0 && (
                     <div className="border-t border-border px-6 py-4 space-y-1.5">
                       {formQuestions.map((q, i) => (
                         <div key={q.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40">
-                          <span className="text-[10px] font-semibold text-muted-foreground w-4 shrink-0 tabular-nums">{i + 1}</span>
+                          <span className="text-[10px] font-semibold text-muted-foreground w-4 shrink-0 tabular-nums">
+                            {i + 1}
+                          </span>
                           <span className="text-xs text-foreground flex-1 truncate">
                             {q.label || <span className="italic text-muted-foreground">Untitled question</span>}
                           </span>
                           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${
-                            q.type === "short" ? "bg-sky-100 text-sky-700" :
-                            q.type === "paragraph" ? "bg-violet-100 text-violet-700" :
-                            q.type === "multiple_choice" ? "bg-emerald-100 text-emerald-700" :
-                            "bg-amber-100 text-amber-700"
+                            typePill[q.type] ?? "bg-muted text-muted-foreground"
                           }`}>
                             {typeLabel[q.type] ?? q.type}
                           </span>
@@ -328,19 +341,20 @@ export default function NewAssignmentPage() {
                     </div>
                   )}
 
+                  {/* Typeform-style builder — flush to card border, no extra padding */}
                   {showFormBuilder && (
-                    <div className="border-t border-border px-6 py-5 bg-muted/20">
+                    <div className="border-t border-border rounded-b-2xl overflow-hidden">
                       <FormBuilder questions={formQuestions} onChange={setFormQuestions} />
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* ── Right sidebar ── */}
-              <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col gap-4">
+              {/* ── Right sidebar — desktop only ── */}
+              <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col gap-4 sticky top-20 self-start">
 
                 {/* Due date + points */}
-                <div className="rounded-2xl border border-border bg-white p-5 space-y-4">
+                <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
 
                   <div className="space-y-1.5">
@@ -353,10 +367,12 @@ export default function NewAssignmentPage() {
                       type="date"
                       value={form.dueDate}
                       onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     {form.dueDate && (
-                      <p className="text-xs text-muted-foreground">{formatDueDate(form.dueDate)}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {formatDueDate(form.dueDate)}
+                      </p>
                     )}
                   </div>
 
@@ -377,7 +393,7 @@ export default function NewAssignmentPage() {
                 </div>
 
                 {/* Attachment */}
-                <div className="rounded-2xl border border-border bg-white p-5 space-y-3">
+                <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Attachment
                     <span className="normal-case font-normal tracking-normal ml-1.5 text-muted-foreground/60 text-xs">optional</span>
@@ -388,7 +404,9 @@ export default function NewAssignmentPage() {
                       <Paperclip className="h-4 w-4 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{attachedFile.name}</p>
-                        <p className="text-xs text-muted-foreground">{(attachedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(attachedFile.size / (1024 * 1024)).toFixed(1)} MB
+                        </p>
                       </div>
                       <button
                         type="button"
@@ -401,7 +419,9 @@ export default function NewAssignmentPage() {
                   ) : (
                     <label
                       className={`flex flex-col items-center gap-2 px-4 py-5 rounded-xl border-2 border-dashed cursor-pointer transition-all text-center ${
-                        isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/30"
+                        isDragging
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/40 hover:bg-muted/30"
                       }`}
                       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                       onDragLeave={() => setIsDragging(false)}
@@ -409,7 +429,9 @@ export default function NewAssignmentPage() {
                     >
                       <Paperclip className={`h-5 w-5 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                       <div>
-                        <p className="text-sm font-medium text-foreground">Drop a file or <span className="text-primary">browse</span></p>
+                        <p className="text-sm font-medium text-foreground">
+                          Drop a file or <span className="text-primary">browse</span>
+                        </p>
                         <p className="text-xs text-muted-foreground mt-0.5">PDF, image, Word, or text</p>
                       </div>
                       <input
@@ -422,8 +444,9 @@ export default function NewAssignmentPage() {
                   )}
                 </div>
 
+                {/* Validation nudge */}
                 {!form.dueDate && (
-                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                     A due date is required to create the assignment.
                   </p>
                 )}
@@ -435,6 +458,8 @@ export default function NewAssignmentPage() {
     </div>
   );
 }
+
+// ── Mobile details component ──────────────────────────────────────────────────
 
 function MobileDetails({
   form,
@@ -463,7 +488,6 @@ function MobileDetails({
           <p className="text-xs text-muted-foreground">{formatDueDate(form.dueDate)}</p>
         )}
       </div>
-
       <div className="space-y-1.5">
         <Label htmlFor="pointsMobile" className="text-sm font-medium flex items-center gap-1.5">
           <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
