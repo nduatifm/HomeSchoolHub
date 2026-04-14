@@ -16,11 +16,31 @@ import {
   Plus,
   Calendar,
   Trophy,
+  ExternalLink,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, FormQuestion } from "@shared/schema";
-import FormBuilder from "@/components/FormBuilder";
+
+const typeLabel: Record<string, string> = {
+  short: "Short answer",
+  paragraph: "Paragraph",
+  multiple_choice: "Multiple choice",
+  checkbox: "Checkboxes",
+  true_false: "True / False",
+};
+
+const typePill: Record<string, string> = {
+  short: "bg-sky-100 text-sky-700",
+  paragraph: "bg-violet-100 text-violet-700",
+  multiple_choice: "bg-emerald-100 text-emerald-700",
+  checkbox: "bg-amber-100 text-amber-700",
+  true_false: "bg-pink-100 text-pink-700",
+};
+
+function getDraftKey(draftId: string) {
+  return `lyra_form_draft_${draftId}`;
+}
 
 export default function NewAssignmentPage() {
   const [, params] = useRoute("/classrooms/:slug/assignments/new");
@@ -33,8 +53,8 @@ export default function NewAssignmentPage() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
-  const [showFormBuilder, setShowFormBuilder] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const draftId = useRef(Math.random().toString(36).slice(2, 14));
 
   const isDirty = !!(form.title.trim() || form.description.trim() || form.dueDate || attachedFile || formQuestions.length > 0);
 
@@ -59,23 +79,6 @@ export default function NewAssignmentPage() {
     return formatted;
   }
 
-  // Matches TYPE_META labels and pills in FormBuilder
-  const typeLabel: Record<string, string> = {
-    short: "Short answer",
-    paragraph: "Paragraph",
-    multiple_choice: "Multiple choice",
-    checkbox: "Checkboxes",
-    true_false: "True / False",
-  };
-
-  const typePill: Record<string, string> = {
-    short: "bg-sky-100 text-sky-700",
-    paragraph: "bg-violet-100 text-violet-700",
-    multiple_choice: "bg-emerald-100 text-emerald-700",
-    checkbox: "bg-amber-100 text-amber-700",
-    true_false: "bg-pink-100 text-pink-700",
-  };
-
   const { data: classroom, isLoading: classroomLoading } = useQuery<Classroom>({
     queryKey: ["/api/classrooms", classroomSlug],
     queryFn: () => apiRequest(`/api/classrooms/${classroomSlug}`),
@@ -83,6 +86,32 @@ export default function NewAssignmentPage() {
   });
 
   const classroomId = classroom?.id ?? 0;
+
+  // Write formQuestions to localStorage whenever they change so FormBuilderPage can read them
+  useEffect(() => {
+    localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(formQuestions));
+  }, [formQuestions]);
+
+  // Listen for storage events from the FormBuilderPage tab
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key !== getDraftKey(draftId.current)) return;
+      try {
+        const updated = JSON.parse(e.newValue ?? "[]") as FormQuestion[];
+        setFormQuestions(updated);
+      } catch {
+        // ignore parse errors
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  function openFormBuilder() {
+    const label = classroom ? `${classroom.name} · ${form.title || "New Assignment"}` : "New Assignment";
+    const url = `/form-builder?draft=${draftId.current}&label=${encodeURIComponent(label)}`;
+    window.open(url, "_blank");
+  }
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -92,7 +121,7 @@ export default function NewAssignmentPage() {
       fd.append("dueDate", form.dueDate);
       fd.append("points", form.points);
       if (attachedFile) fd.append("file", attachedFile);
-      if (showFormBuilder && formQuestions.length > 0) {
+      if (formQuestions.length > 0) {
         fd.append("formSchema", JSON.stringify(formQuestions));
       }
       const token = localStorage.getItem("sessionId");
@@ -107,6 +136,7 @@ export default function NewAssignmentPage() {
       });
     },
     onSuccess: () => {
+      localStorage.removeItem(getDraftKey(draftId.current));
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment created", type: "success" });
       navigate(`/classrooms/${classroomSlug}`);
@@ -267,9 +297,7 @@ export default function NewAssignmentPage() {
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
                 </div>
 
-                {/* ── Form builder card ──
-                    No overflow-hidden: the FormBuilder's type menu is position:absolute
-                    and must escape the card boundary to render above other content. */}
+                {/* ── Form Questions card ── */}
                 <div className="rounded-2xl border border-border bg-card">
 
                   {/* Card header */}
@@ -281,7 +309,7 @@ export default function NewAssignmentPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">Form Questions</p>
                         <p className="text-xs text-muted-foreground">
-                          {!showFormBuilder && formQuestions.length > 0
+                          {formQuestions.length > 0
                             ? `${formQuestions.length} question${formQuestions.length === 1 ? "" : "s"} added`
                             : "Optional — students answer directly in LyraPrep"}
                         </p>
@@ -290,31 +318,19 @@ export default function NewAssignmentPage() {
 
                     <Button
                       type="button"
-                      variant={showFormBuilder ? "secondary" : "outline"}
+                      variant="outline"
                       size="sm"
                       className="h-8 gap-1.5 shrink-0"
-                      onClick={() => {
-                        if (!showFormBuilder && formQuestions.length === 0) {
-                          setFormQuestions([{
-                            id: Math.random().toString(36).slice(2, 10),
-                            type: "short",
-                            label: "",
-                            required: false,
-                          }]);
-                        }
-                        setShowFormBuilder((v) => !v);
-                      }}
+                      onClick={openFormBuilder}
                     >
-                      {showFormBuilder
-                        ? <><X className="h-3.5 w-3.5" />Collapse</>
-                        : formQuestions.length > 0
-                          ? <><ClipboardList className="h-3.5 w-3.5" />Edit Form</>
-                          : <><Plus className="h-3.5 w-3.5" />Add Form</>}
+                      {formQuestions.length > 0
+                        ? <><ClipboardList className="h-3.5 w-3.5" />Edit Form<ExternalLink className="h-3 w-3 ml-0.5 opacity-60" /></>
+                        : <><Plus className="h-3.5 w-3.5" />Add Form<ExternalLink className="h-3 w-3 ml-0.5 opacity-60" /></>}
                     </Button>
                   </div>
 
-                  {/* Collapsed question preview */}
-                  {!showFormBuilder && formQuestions.length > 0 && (
+                  {/* Question list */}
+                  {formQuestions.length > 0 && (
                     <div className="border-t border-border px-6 py-4 space-y-1.5">
                       {formQuestions.map((q, i) => (
                         <div key={q.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40">
@@ -333,18 +349,11 @@ export default function NewAssignmentPage() {
                       ))}
                       <button
                         type="button"
-                        onClick={() => setShowFormBuilder(true)}
+                        onClick={openFormBuilder}
                         className="text-xs text-primary hover:underline pt-0.5"
                       >
                         Edit questions
                       </button>
-                    </div>
-                  )}
-
-                  {/* Typeform-style builder — flush to card border, no extra padding */}
-                  {showFormBuilder && (
-                    <div className="border-t border-border rounded-b-2xl overflow-hidden">
-                      <FormBuilder questions={formQuestions} onChange={setFormQuestions} />
                     </div>
                   )}
                 </div>

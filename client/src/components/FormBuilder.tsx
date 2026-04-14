@@ -51,9 +51,10 @@ const ALL_TYPES: QType[] = ["short", "paragraph", "multiple_choice", "checkbox",
 interface Props {
   questions: FormQuestion[];
   onChange: (questions: FormQuestion[]) => void;
+  fullPage?: boolean;
 }
 
-export default function FormBuilder({ questions, onChange }: Props) {
+export default function FormBuilder({ questions, onChange, fullPage = false }: Props) {
   const [activeId, setActiveId] = useState<string | null>(
     questions[0]?.id ?? null,
   );
@@ -146,7 +147,7 @@ export default function FormBuilder({ questions, onChange }: Props) {
   }
 
   return (
-    <div className="flex bg-card" style={{ height: "520px" }}>
+    <div className="flex bg-card" style={fullPage ? { height: "100%" } : { height: "520px" }}>
 
       {/* ── Left panel — question list ── */}
       <div className="w-52 shrink-0 flex flex-col border-r border-border bg-muted/30">
