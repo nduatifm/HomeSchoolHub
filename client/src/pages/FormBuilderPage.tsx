@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import FormBuilder from "@/components/FormBuilder";
 import { Button } from "@/components/ui/button";
-import { Check, X, ClipboardList, Loader2 } from "lucide-react";
+import { Check, ArrowLeft, ClipboardList, Loader2 } from "lucide-react";
 import type { FormQuestion } from "@shared/schema";
 
 function getDraftKey(draftId: string) {
@@ -26,7 +25,6 @@ function saveDraft(draftId: string, questions: FormQuestion[]) {
 
 export default function FormBuilderPage() {
   const { user, isLoading } = useAuth();
-  const [, navigate] = useLocation();
 
   const params = new URLSearchParams(window.location.search);
   const draftId = params.get("draft") ?? "";
@@ -45,7 +43,7 @@ export default function FormBuilderPage() {
     if (window.opener) {
       window.close();
     } else {
-      navigate(-1);
+      window.history.back();
     }
   }
 
@@ -58,7 +56,7 @@ export default function FormBuilderPage() {
   }
 
   if (!user) {
-    navigate("/login");
+    window.location.href = "/login";
     return null;
   }
 
@@ -77,6 +75,15 @@ export default function FormBuilderPage() {
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-4 sm:px-6 h-14 flex items-center justify-between gap-4 shrink-0">
 
         <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            title="Close tab"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="w-px h-5 bg-border shrink-0" />
           <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
             <ClipboardList className="h-3.5 w-3.5 text-emerald-700" />
           </div>
@@ -90,28 +97,19 @@ export default function FormBuilderPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           <span className="text-xs text-muted-foreground hidden sm:inline">
             {questions.length === 0
               ? "No questions yet"
               : `${questions.length} question${questions.length === 1 ? "" : "s"}`}
           </span>
           <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
-            onClick={handleClose}
-          >
-            <X className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Discard</span>
-          </Button>
-          <Button
             size="sm"
             className="h-8 gap-1.5"
             onClick={handleClose}
           >
             <Check className="h-3.5 w-3.5" />
-            Done
+            Done — close tab
           </Button>
         </div>
       </div>
