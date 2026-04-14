@@ -24,7 +24,7 @@ function saveDraft(draftId: string, questions: FormQuestion[]) {
 }
 
 export default function FormBuilderPage() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   const params = new URLSearchParams(window.location.search);
   const draftId = params.get("draft") ?? "";
@@ -53,11 +53,6 @@ export default function FormBuilderPage() {
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
-  }
-
-  if (!user) {
-    window.location.href = "/login";
-    return null;
   }
 
   if (!draftId) {

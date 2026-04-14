@@ -160,6 +160,7 @@ export default function NewAssignmentPage() {
     if (isDirty && !didSubmit) {
       if (!window.confirm("You have unsaved changes. Leave without creating the assignment?")) return;
     }
+    localStorage.removeItem(getDraftKey(draftId.current));
     navigate(url);
   }
 
