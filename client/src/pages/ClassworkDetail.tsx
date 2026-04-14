@@ -273,6 +273,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
                   questions={assignment.formSchema!}
                   answers={formAnswers}
                   onChange={setFormAnswers}
+                  stepByStep
                 />
               </div>
             ) : (
