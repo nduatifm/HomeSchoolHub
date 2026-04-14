@@ -38,7 +38,6 @@ export default function NewAssignmentPage() {
 
   // Track whether the teacher has entered anything worth warning about
   const isDirty = !!(form.title.trim() || form.description.trim() || form.dueDate || attachedFile || formQuestions.length > 0);
-  const didSubmit = createMutation.isSuccess;
 
   // Warn on browser/tab close
   useEffect(() => {
@@ -130,6 +129,7 @@ export default function NewAssignmentPage() {
     onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
   });
 
+  const didSubmit = createMutation.isSuccess;
   const canSave = !!form.title.trim() && !!form.dueDate && !createMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}`;
 
