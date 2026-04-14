@@ -348,36 +348,16 @@ export default function NewAssignmentPage() {
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                       Due Date <span className="text-destructive text-xs">*</span>
                     </Label>
-                    <label
-                      htmlFor="dueDate"
-                      className={`flex items-center gap-2 h-9 px-3 rounded-lg border cursor-pointer transition-colors ${
-                        form.dueDate
-                          ? "border-border bg-card hover:border-primary/40"
-                          : "border-dashed border-border hover:border-primary/40 hover:bg-muted/20"
-                      }`}
-                    >
-                      {form.dueDate ? (
-                        <span className="text-sm text-foreground flex-1 leading-none">{formatDueDate(form.dueDate)}</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground flex-1">Pick a date…</span>
-                      )}
-                      {form.dueDate && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); setForm({ ...form, dueDate: "" }); }}
-                          className="shrink-0 h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </label>
                     <input
                       id="dueDate"
                       type="date"
                       value={form.dueDate}
                       onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                      className="sr-only"
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     />
+                    {form.dueDate && (
+                      <p className="text-xs text-muted-foreground">{formatDueDate(form.dueDate)}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -472,21 +452,16 @@ function MobileDetails({
           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
           Due Date <span className="text-destructive text-xs">*</span>
         </Label>
-        <label
-          htmlFor="dueDateMobile"
-          className={`flex items-center gap-2 h-9 px-3 rounded-lg border cursor-pointer transition-colors text-sm ${
-            form.dueDate ? "border-border" : "border-dashed border-border text-muted-foreground"
-          }`}
-        >
-          {form.dueDate ? formatDueDate(form.dueDate) : "Pick a date…"}
-        </label>
         <input
           id="dueDateMobile"
           type="date"
           value={form.dueDate}
           onChange={(e) => setForm((f: any) => ({ ...f, dueDate: e.target.value }))}
-          className="sr-only"
+          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
+        {form.dueDate && (
+          <p className="text-xs text-muted-foreground">{formatDueDate(form.dueDate)}</p>
+        )}
       </div>
 
       <div className="space-y-1.5">
