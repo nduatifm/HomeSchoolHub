@@ -4747,7 +4747,10 @@ export function registerRoutes(app: Express) {
       let fileUrl: string | undefined;
       if (req.file) {
         const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-submissions");
-        fileUrl = uploadResult.secure_url;
+        if (!uploadResult.success || !uploadResult.url) {
+          return res.status(500).json({ error: uploadResult.error ?? "File upload failed" });
+        }
+        fileUrl = uploadResult.url;
       }
 
       let formAnswers: Record<string, string | string[]> | undefined;
