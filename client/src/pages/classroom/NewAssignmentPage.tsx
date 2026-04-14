@@ -36,10 +36,8 @@ export default function NewAssignmentPage() {
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
-  // Track whether the teacher has entered anything worth warning about
   const isDirty = !!(form.title.trim() || form.description.trim() || form.dueDate || attachedFile || formQuestions.length > 0);
 
-  // Auto-grow title textarea
   function autoGrowTitle() {
     const el = titleRef.current;
     if (!el) return;
@@ -47,7 +45,6 @@ export default function NewAssignmentPage() {
     el.style.height = `${el.scrollHeight}px`;
   }
 
-  // Friendly due date display
   function formatDueDate(dateStr: string): string {
     if (!dateStr) return "";
     const d = new Date(dateStr + "T00:00:00");
@@ -62,13 +59,11 @@ export default function NewAssignmentPage() {
     return formatted;
   }
 
-  // Question type labels for preview
   const typeLabel: Record<string, string> = {
     short: "Short answer",
     paragraph: "Paragraph",
     multiple_choice: "Multiple choice",
     checkbox: "Checkboxes",
-    true_false: "True / False",
   };
 
   const { data: classroom, isLoading: classroomLoading } = useQuery<Classroom>({
@@ -113,19 +108,14 @@ export default function NewAssignmentPage() {
   const canSave = !!form.title.trim() && !!form.dueDate && !createMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}`;
 
-  // Warn on browser/tab close
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty && !didSubmit) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
+      if (isDirty && !didSubmit) { e.preventDefault(); e.returnValue = ""; }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty, didSubmit]);
 
-  // Warn on in-app navigation (Cancel / back)
   function safeNavigate(url: string) {
     if (isDirty && !didSubmit) {
       if (!window.confirm("You have unsaved changes. Leave without creating the assignment?")) return;
@@ -157,26 +147,21 @@ export default function NewAssignmentPage() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-muted-foreground text-sm">Classroom not found.</p>
-          <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")}>
-            Back to Dashboard
-          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
         </div>
       </div>
     );
   }
 
-  if (user?.role !== "teacher") {
-    navigate(backUrl);
-    return null;
-  }
+  if (user?.role !== "teacher") { navigate(backUrl); return null; }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-gray-50">
       <ModernSidebar />
       <div className="flex-1 md:ml-[228px] flex flex-col">
 
         {/* ── Sticky top bar ── */}
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        <div className="sticky top-0 z-20 bg-white border-b border-border px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <button
             onClick={() => safeNavigate(backUrl)}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -207,35 +192,35 @@ export default function NewAssignmentPage() {
               onClick={() => createMutation.mutate()}
               className="h-8 px-5"
             >
-              Create Assignment
+              {createMutation.isPending
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Creating…</>
+                : "Create Assignment"}
             </Button>
           </div>
         </div>
 
         {/* ── Page body ── */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-16">
 
-            {/* Page title */}
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-foreground">New Assignment</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {classroom.name} · {classroom.subject}
-              </p>
+            {/* Page heading */}
+            <div className="mb-7">
+              <h1 className="text-xl font-bold text-foreground">New Assignment</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">{classroom.name} · {classroom.subject}</p>
             </div>
 
             {/* ── Two-column layout ── */}
             <div className="flex flex-col lg:flex-row gap-6 items-start">
 
-              {/* Left — main content */}
-              <div className="flex-1 min-w-0 space-y-5">
+              {/* ── Left — main content ── */}
+              <div className="flex-1 min-w-0 space-y-4">
 
-                {/* Title + Instructions card */}
-                <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
-                  <div className="space-y-1">
-                    <label htmlFor="title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {/* Title + Instructions */}
+                <div className="rounded-2xl border border-border bg-white p-6 space-y-5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Title <span className="text-destructive">*</span>
-                    </label>
+                    </Label>
                     <textarea
                       ref={titleRef}
                       id="title"
@@ -245,15 +230,15 @@ export default function NewAssignmentPage() {
                       placeholder="Assignment title…"
                       rows={1}
                       autoFocus
-                      className="w-full text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none resize-none leading-snug overflow-hidden"
-                      style={{ minHeight: "2.25rem" }}
+                      className="w-full text-xl font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none resize-none leading-snug overflow-hidden"
+                      style={{ minHeight: "2rem" }}
                     />
                   </div>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="description" className="text-sm font-medium">
                       Instructions
-                      <span className="text-muted-foreground font-normal ml-1.5">optional</span>
+                      <span className="text-muted-foreground font-normal ml-1.5 text-xs">(optional)</span>
                     </Label>
                     <Textarea
                       id="description"
@@ -266,9 +251,16 @@ export default function NewAssignmentPage() {
                   </div>
                 </div>
 
-                {/* Form builder card */}
-                <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                  {/* Header — always visible */}
+                {/* Due date + points — shown inline on mobile, sidebar on lg+ */}
+                <div className="rounded-2xl border border-border bg-white p-5 space-y-4 lg:hidden">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
+                  <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
+                </div>
+
+                {/* Form builder */}
+                {/* NOTE: no overflow-hidden here — the type Select dropdown is position:absolute
+                    and overflow-hidden on a parent clips it */}
+                <div className="rounded-2xl border border-border bg-white">
                   <div className="px-6 py-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
@@ -277,9 +269,9 @@ export default function NewAssignmentPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">Form Questions</p>
                         <p className="text-xs text-muted-foreground">
-                          {showFormBuilder || formQuestions.length === 0
-                            ? "Optional — students answer directly in LyraPrep"
-                            : `${formQuestions.length} question${formQuestions.length === 1 ? "" : "s"}`}
+                          {!showFormBuilder && formQuestions.length > 0
+                            ? `${formQuestions.length} question${formQuestions.length === 1 ? "" : "s"} added`
+                            : "Optional — students answer directly in LyraPrep"}
                         </p>
                       </div>
                     </div>
@@ -301,22 +293,18 @@ export default function NewAssignmentPage() {
                         setShowFormBuilder(!showFormBuilder);
                       }}
                     >
-                      {showFormBuilder ? (
-                        <><X className="h-3.5 w-3.5" /> Remove</>
-                      ) : (
-                        <><Plus className="h-3.5 w-3.5" /> Add Form</>
-                      )}
+                      {showFormBuilder
+                        ? <><X className="h-3.5 w-3.5" />Close</>
+                        : <><Plus className="h-3.5 w-3.5" />Add Form</>}
                     </Button>
                   </div>
 
-                  {/* Collapsed preview — show question titles when builder is hidden */}
+                  {/* Collapsed preview */}
                   {!showFormBuilder && formQuestions.length > 0 && (
-                    <div className="px-6 pb-4 space-y-1.5">
+                    <div className="border-t border-border px-6 py-4 space-y-1.5">
                       {formQuestions.map((q, i) => (
                         <div key={q.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted/40">
-                          <span className="text-[10px] font-semibold text-muted-foreground w-4 shrink-0 tabular-nums">
-                            {i + 1}
-                          </span>
+                          <span className="text-[10px] font-semibold text-muted-foreground w-4 shrink-0 tabular-nums">{i + 1}</span>
                           <span className="text-xs text-foreground flex-1 truncate">
                             {q.label || <span className="italic text-muted-foreground">Untitled question</span>}
                           </span>
@@ -324,8 +312,7 @@ export default function NewAssignmentPage() {
                             q.type === "short" ? "bg-sky-100 text-sky-700" :
                             q.type === "paragraph" ? "bg-violet-100 text-violet-700" :
                             q.type === "multiple_choice" ? "bg-emerald-100 text-emerald-700" :
-                            q.type === "checkbox" ? "bg-amber-100 text-amber-700" :
-                            "bg-pink-100 text-pink-700"
+                            "bg-amber-100 text-amber-700"
                           }`}>
                             {typeLabel[q.type] ?? q.type}
                           </span>
@@ -341,7 +328,6 @@ export default function NewAssignmentPage() {
                     </div>
                   )}
 
-                  {/* Builder — conditionally shown */}
                   {showFormBuilder && (
                     <div className="border-t border-border px-6 py-5 bg-muted/20">
                       <FormBuilder questions={formQuestions} onChange={setFormQuestions} />
@@ -350,21 +336,18 @@ export default function NewAssignmentPage() {
                 </div>
               </div>
 
-              {/* Right — metadata sidebar */}
-              <div className="w-full lg:w-72 xl:w-80 shrink-0 space-y-4">
+              {/* ── Right sidebar ── */}
+              <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col gap-4">
 
                 {/* Due date + points */}
-                <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Details
-                  </p>
+                <div className="rounded-2xl border border-border bg-white p-5 space-y-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="dueDate" className="text-sm font-medium flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                      Due Date <span className="text-destructive">*</span>
+                      Due Date <span className="text-destructive text-xs">*</span>
                     </Label>
-                    {/* Friendly date display — clicking opens the native date picker */}
                     <label
                       htmlFor="dueDate"
                       className={`flex items-center gap-2 h-9 px-3 rounded-lg border cursor-pointer transition-colors ${
@@ -374,9 +357,7 @@ export default function NewAssignmentPage() {
                       }`}
                     >
                       {form.dueDate ? (
-                        <span className="text-sm text-foreground flex-1 leading-none">
-                          {formatDueDate(form.dueDate)}
-                        </span>
+                        <span className="text-sm text-foreground flex-1 leading-none">{formatDueDate(form.dueDate)}</span>
                       ) : (
                         <span className="text-sm text-muted-foreground flex-1">Pick a date…</span>
                       )}
@@ -416,21 +397,18 @@ export default function NewAssignmentPage() {
                 </div>
 
                 {/* Attachment */}
-                <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+                <div className="rounded-2xl border border-border bg-white p-5 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Attachment
-                    <span className="normal-case font-normal tracking-normal ml-1.5 text-muted-foreground/60">optional</span>
+                    <span className="normal-case font-normal tracking-normal ml-1.5 text-muted-foreground/60 text-xs">optional</span>
                   </p>
 
                   {attachedFile ? (
-                    /* File selected — pill display */
                     <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/30">
                       <Paperclip className="h-4 w-4 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{attachedFile.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(attachedFile.size / (1024 * 1024)).toFixed(1)} MB
-                        </p>
+                        <p className="text-xs text-muted-foreground">{(attachedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
                       </div>
                       <button
                         type="button"
@@ -441,12 +419,9 @@ export default function NewAssignmentPage() {
                       </button>
                     </div>
                   ) : (
-                    /* Drop zone */
                     <label
                       className={`flex flex-col items-center gap-2 px-4 py-5 rounded-xl border-2 border-dashed cursor-pointer transition-all text-center ${
-                        isDragging
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/40 hover:bg-muted/30"
+                        isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/30"
                       }`}
                       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                       onDragLeave={() => setIsDragging(false)}
@@ -454,12 +429,8 @@ export default function NewAssignmentPage() {
                     >
                       <Paperclip className={`h-5 w-5 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                       <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Drop a file or <span className="text-primary">browse</span>
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          PDF, image, Word, or text
-                        </p>
+                        <p className="text-sm font-medium text-foreground">Drop a file or <span className="text-primary">browse</span></p>
+                        <p className="text-xs text-muted-foreground mt-0.5">PDF, image, Word, or text</p>
                       </div>
                       <input
                         type="file"
@@ -471,16 +442,66 @@ export default function NewAssignmentPage() {
                   )}
                 </div>
 
-                {/* Validation hint */}
                 {!form.dueDate && (
-                  <p className="text-xs text-muted-foreground px-1">
-                    A due date is required before you can create the assignment.
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    A due date is required to create the assignment.
                   </p>
                 )}
               </div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileDetails({
+  form,
+  setForm,
+  formatDueDate,
+}: {
+  form: { dueDate: string; points: string };
+  setForm: (f: any) => void;
+  formatDueDate: (s: string) => string;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="dueDateMobile" className="text-sm font-medium flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+          Due Date <span className="text-destructive text-xs">*</span>
+        </Label>
+        <label
+          htmlFor="dueDateMobile"
+          className={`flex items-center gap-2 h-9 px-3 rounded-lg border cursor-pointer transition-colors text-sm ${
+            form.dueDate ? "border-border" : "border-dashed border-border text-muted-foreground"
+          }`}
+        >
+          {form.dueDate ? formatDueDate(form.dueDate) : "Pick a date…"}
+        </label>
+        <input
+          id="dueDateMobile"
+          type="date"
+          value={form.dueDate}
+          onChange={(e) => setForm((f: any) => ({ ...f, dueDate: e.target.value }))}
+          className="sr-only"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="pointsMobile" className="text-sm font-medium flex items-center gap-1.5">
+          <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
+          Points
+        </Label>
+        <Input
+          id="pointsMobile"
+          type="number"
+          min={1}
+          value={form.points}
+          onChange={(e) => setForm((f: any) => ({ ...f, points: e.target.value }))}
+          className="h-9 text-sm"
+        />
       </div>
     </div>
   );
