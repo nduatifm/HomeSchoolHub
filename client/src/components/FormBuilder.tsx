@@ -197,7 +197,7 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
           <button
             type="button"
             onClick={() => setShowTypeMenu((v) => !v)}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-background transition-all"
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-sky-400 text-xs font-semibold text-white bg-sky-500 hover:bg-sky-600 hover:border-sky-600 active:scale-[0.98] transition-all"
           >
             <Plus className="h-3.5 w-3.5" />
             Add question
