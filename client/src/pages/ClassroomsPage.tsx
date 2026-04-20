@@ -475,25 +475,26 @@ export default function ClassroomsPage() {
               </p>
             </div>
             {isTeacher && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setNewFolderOpen(true)}
-                >
-                  <FolderOpen className="h-4 w-4" />
-                  New Grade Folder
-                </Button>
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => openNewClassroom(null)}
-                >
-                  <Plus className="h-4 w-4" />
-                  New Classroom
-                </Button>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="gap-1.5">
+                    <Plus className="h-4 w-4" />
+                    New
+                    <ChevronDown className="h-3.5 w-3.5 ml-0.5 opacity-70" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem className="gap-2" onClick={() => openNewClassroom(null)}>
+                    <School className="h-4 w-4 text-muted-foreground shrink-0" />
+                    Add Subject
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="gap-2" onClick={() => setNewFolderOpen(true)}>
+                    <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                    New Grade Folder
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 
@@ -876,8 +877,8 @@ export default function ClassroomsPage() {
           <DialogHeader>
             <DialogTitle>
               {newClassroomFolderId
-                ? `New Classroom in "${folders.find(f => f.id === newClassroomFolderId)?.name ?? "Folder"}"`
-                : "New Classroom"
+                ? `New Subject in "${folders.find(f => f.id === newClassroomFolderId)?.name ?? "Folder"}"`
+                : "Add Subject"
               }
             </DialogTitle>
           </DialogHeader>
