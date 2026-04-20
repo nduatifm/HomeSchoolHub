@@ -99,6 +99,9 @@ export default function ClassroomsPage() {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [editClassroomForm, setEditClassroomForm] = useState({ name: "", subject: "", description: "" });
 
+  const [deleteClassroomOpen, setDeleteClassroomOpen] = useState(false);
+  const [deletingClassroom, setDeletingClassroom] = useState<Classroom | null>(null);
+
   const createFolderMutation = useMutation({
     mutationFn: () => apiRequest("/api/grade-folders", { method: "POST", body: JSON.stringify({ name: newFolderName }) }),
     onSuccess: () => {
@@ -227,6 +230,18 @@ export default function ClassroomsPage() {
     onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
   });
 
+  const deleteClassroomMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
+      toast({ title: "Classroom deleted." });
+      setDeleteClassroomOpen(false);
+      setDeletingClassroom(null);
+    },
+    onError: (e: any) => toast({ title: "Failed to delete classroom", description: e.message, type: "error" }),
+  });
+
   const openEditClassroom = (c: Classroom) => {
     setEditingClassroom(c);
     setEditClassroomForm({ name: c.name, subject: c.subject ?? "", description: c.description ?? "" });
@@ -343,6 +358,14 @@ export default function ClassroomsPage() {
                     ))}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2 text-sm text-destructive focus:text-destructive"
+                  onClick={() => { setDeletingClassroom(c); setDeleteClassroomOpen(true); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                  Delete
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -569,6 +592,39 @@ export default function ClassroomsPage() {
               {renameFolderMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Save
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Classroom confirmation dialog */}
+      <Dialog open={deleteClassroomOpen} onOpenChange={(v) => { if (!v) { setDeleteClassroomOpen(false); setDeletingClassroom(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Delete Classroom</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-1">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to permanently delete{" "}
+              <span className="font-semibold text-foreground">{deletingClassroom?.name}</span>?
+              All classroom data — posts, assignments, and grades — will be removed and cannot be recovered.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setDeleteClassroomOpen(false); setDeletingClassroom(null); }}
+                disabled={deleteClassroomMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleteClassroomMutation.isPending}
+                onClick={() => deletingClassroom && deleteClassroomMutation.mutate(deletingClassroom.id)}
+              >
+                {deleteClassroomMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Delete Classroom
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
