@@ -85,7 +85,7 @@ export default function ClassroomsPage() {
     queryKey: ["/api/classrooms"],
   });
 
-  const { data: deletedClassrooms = [], isLoading: trashLoading } = useQuery<DeletedClassroom[]>({
+  const { data: deletedClassrooms = [] } = useQuery<DeletedClassroom[]>({
     queryKey: ["/api/classrooms/trash"],
     enabled: isTeacher,
     refetchInterval: 60_000,
@@ -383,6 +383,7 @@ export default function ClassroomsPage() {
                   <Pencil className="h-3.5 w-3.5 shrink-0" />
                   Edit
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="gap-2 text-sm"
                   onClick={() =>
@@ -654,28 +655,30 @@ export default function ClassroomsPage() {
               {/* Recently Deleted section — teacher only, hidden when empty */}
               {isTeacher && deletedClassrooms.length > 0 && (
                 <div className="border border-border rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setCollapsedTrash(prev => !prev)}
-                    className="flex items-center gap-2 px-4 py-3 bg-muted/30 w-full text-left group"
-                  >
-                    {collapsedTrash
-                      ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    }
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      Recently Deleted
-                    </span>
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">
-                      {deletedClassrooms.length}
-                    </Badge>
-                  </button>
+                  <div className="bg-muted/30">
+                    <button
+                      onClick={() => setCollapsedTrash(prev => !prev)}
+                      className="flex items-center gap-2 px-4 py-3 w-full text-left group"
+                    >
+                      {collapsedTrash
+                        ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      }
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-semibold text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                        Recently Deleted
+                      </span>
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">
+                        {deletedClassrooms.length}
+                      </Badge>
+                    </button>
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground px-4 pb-2.5">
+                      <Info className="h-3.5 w-3.5 shrink-0" />
+                      Classrooms here are permanently deleted after 30 days.
+                    </p>
+                  </div>
                   {!collapsedTrash && (
                     <div className="p-4 border-t border-border space-y-2">
-                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
-                        <Info className="h-3.5 w-3.5 shrink-0" />
-                        Classrooms here are permanently deleted after 30 days.
-                      </p>
                       {deletedClassrooms.map(c => {
                         const isRestoring = restoringId === c.id;
                         const isPermanentDeleting = permanentDeletingId === c.id;
