@@ -360,10 +360,10 @@ export default function FolderDetailPage() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
       <div className="md:ml-[228px]">
-        <main className="p-4 sm:p-6 pt-20 md:pt-6 max-w-5xl mx-auto">
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+        {/* Sticky header */}
+        <div className="sticky top-14 md:top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 max-w-5xl mx-auto">
             <div className="flex items-center gap-3 min-w-0">
               <Button
                 variant="ghost"
@@ -429,7 +429,10 @@ export default function FolderDetailPage() {
               </div>
             )}
           </div>
+        </div>
 
+        {/* Page content */}
+        <main className="p-4 sm:p-6 max-w-5xl mx-auto">
           {isLoading && (
             <div className="flex justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -487,7 +490,6 @@ export default function FolderDetailPage() {
               )}
             </div>
           )}
-
         </main>
       </div>
 
