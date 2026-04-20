@@ -37,6 +37,7 @@ interface SidebarItem {
   icon: React.ReactNode;
   label: string;
   hash: string;
+  href?: string;
   badge?: number;
   badgeCap?: number;
 }
@@ -95,7 +96,7 @@ export default function ModernSidebar() {
   };
 
   const teacherItems: SidebarItem[] = [
-    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
     { icon: <User className="w-4 h-4" />, label: "Students", hash: "students" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Tutor Requests", hash: "requests" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
@@ -125,15 +126,17 @@ export default function ModernSidebar() {
 
   const items = getItems();
 
-  const isActive = (hash: string) =>
-    location === `/dashboard/${hash}` || (location === "/dashboard" && hash === defaultTab);
+  const isActive = (item: SidebarItem) => {
+    if (item.href) return location === item.href || location.startsWith(item.href + "/");
+    return location === `/dashboard/${item.hash}` || (location === "/dashboard" && item.hash === defaultTab);
+  };
 
   // ── Nav item ──────────────────────────────────────────────────────────────
   const NavItem = ({ item }: { item: SidebarItem }) => {
-    const active = isActive(item.hash);
+    const active = isActive(item);
     return (
       <button
-        onClick={() => handleNavigation(item.hash)}
+        onClick={() => item.href ? setLocation(item.href) : handleNavigation(item.hash)}
         data-testid={`sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
         className={`
           w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm

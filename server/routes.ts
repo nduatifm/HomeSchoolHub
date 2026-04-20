@@ -4377,6 +4377,64 @@ export function registerRoutes(app: Express) {
     return null;
   }
 
+  // ─── Grade Folders ────────────────────────────────────────────────────────
+
+  // GET /api/grade-folders — list teacher's grade folders
+  app.get("/api/grade-folders", requireAuth, async (req, res) => {
+    try {
+      const actor = await storage.getUserById(req.session.userId!);
+      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      const folders = await storage.getGradeFoldersByTeacher(actor.id);
+      res.json(folders);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/grade-folders — create a grade folder
+  app.post("/api/grade-folders", requireAuth, async (req, res) => {
+    try {
+      const actor = await storage.getUserById(req.session.userId!);
+      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+      const folder = await storage.createGradeFolder(actor.id, name);
+      res.json(folder);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/grade-folders/:id — rename a grade folder
+  app.patch("/api/grade-folders/:id", requireAuth, async (req, res) => {
+    try {
+      const actor = await storage.getUserById(req.session.userId!);
+      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      const folderId = parseInt(req.params.id);
+      const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+      const folders = await storage.getGradeFoldersByTeacher(actor.id);
+      if (!folders.find(f => f.id === folderId)) return res.status(403).json({ error: "Not your folder" });
+      const updated = await storage.updateGradeFolder(folderId, name);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/grade-folders/:id — delete a grade folder (classrooms become ungrouped)
+  app.delete("/api/grade-folders/:id", requireAuth, async (req, res) => {
+    try {
+      const actor = await storage.getUserById(req.session.userId!);
+      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      const folderId = parseInt(req.params.id);
+      const folders = await storage.getGradeFoldersByTeacher(actor.id);
+      if (!folders.find(f => f.id === folderId)) return res.status(403).json({ error: "Not your folder" });
+      await storage.deleteGradeFolder(folderId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // POST /api/classrooms — teacher creates a classroom
   app.post("/api/classrooms", requireAuth, async (req, res) => {
     try {
@@ -4388,6 +4446,7 @@ export function registerRoutes(app: Express) {
         name: z.string().min(1),
         subject: z.string().min(1),
         description: z.string().optional(),
+        gradeFolderId: z.number().nullable().optional(),
       }).parse(req.body);
       const classroom = await storage.createClassroom({
         name: data.name,
@@ -4395,6 +4454,7 @@ export function registerRoutes(app: Express) {
         description: data.description ?? null,
         teacherId: req.session.userId!,
         status: "active",
+        gradeFolderId: data.gradeFolderId ?? null,
       });
       res.status(201).json(classroom);
     } catch (error: any) {
@@ -4448,7 +4508,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/classrooms/:id — teacher updates classroom (name, subject, description, status)
+  // PATCH /api/classrooms/:id — teacher updates classroom (name, subject, description, status, gradeFolderId)
   app.patch("/api/classrooms/:id", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomOwner(req, res);
@@ -4458,6 +4518,7 @@ export function registerRoutes(app: Express) {
         subject: z.string().min(1).optional(),
         description: z.string().nullable().optional(),
         status: z.enum(["active", "archived"]).optional(),
+        gradeFolderId: z.number().nullable().optional(),
       }).parse(req.body);
       const updated = await storage.updateClassroom(classroom.id, data);
       res.json(updated);

@@ -250,7 +250,7 @@ export default function ClassroomDetail() {
 
           {/* Back nav */}
           <button
-            onClick={() => navigate("/dashboard/classrooms")}
+            onClick={() => navigate(user?.role === "teacher" ? "/classrooms" : "/dashboard/classrooms")}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronLeft className="h-3.5 w-3.5" />Back to Classrooms

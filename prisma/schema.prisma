@@ -67,6 +67,7 @@ model User {
   teacherStudentAssignments  TeacherStudentAssignment[]
   authSessions               AuthSession[]
   teacherClassrooms          Classroom[]                 @relation("TeacherClassrooms")
+  teacherGradeFolders        GradeFolder[]               @relation("TeacherGradeFolders")
   classroomPosts             ClassroomPost[]             @relation("ClassroomPostAuthor")
   notifications              Notification[]
   seenContent                ClassroomContentSeen[]
@@ -415,17 +416,32 @@ model AuthSession {
 
 // ─── Classrooms ────────────────────────────────────────────────────────────
 
+model GradeFolder {
+  id        Int        @id @default(autoincrement())
+  name      String
+  teacherId Int
+  slug      String?    @unique
+  createdAt DateTime   @default(now())
+
+  teacher    User        @relation("TeacherGradeFolders", fields: [teacherId], references: [id], onDelete: Cascade)
+  classrooms Classroom[]
+
+  @@index([teacherId])
+}
+
 model Classroom {
-  id          Int      @id @default(autoincrement())
-  name        String
-  subject     String
-  description String?
-  teacherId   Int
-  status      String   @default("active")
-  slug        String?  @unique
-  createdAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  name          String
+  subject       String
+  description   String?
+  teacherId     Int
+  status        String   @default("active")
+  slug          String?  @unique
+  createdAt     DateTime @default(now())
+  gradeFolderId Int?
 
   teacher     User                  @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
+  gradeFolder GradeFolder?          @relation(fields: [gradeFolderId], references: [id], onDelete: SetNull)
   enrollments ClassroomEnrollment[]
   posts       ClassroomPost[]
   assignments ClassroomAssignment[]
@@ -433,6 +449,7 @@ model Classroom {
 
   @@index([teacherId])
   @@index([slug])
+  @@index([gradeFolderId])
 }
 
 model ClassroomEnrollment {

@@ -43,6 +43,7 @@ import type {
   InsertSystemSettings,
   TeacherStudentAssignment,
   InsertTeacherStudentAssignment,
+  GradeFolder,
   Classroom,
   InsertClassroom,
   ClassroomEnrollment,
@@ -261,6 +262,12 @@ export interface IStorage {
 
   getThreadLabel(teacherUserId: number, studentId: number): Promise<string | null>;
   setThreadLabel(teacherUserId: number, studentId: number, name: string | null): Promise<void>;
+
+  // ─── Grade Folders ───────────────────────────────────────────────────────
+  createGradeFolder(teacherId: number, name: string): Promise<GradeFolder>;
+  getGradeFoldersByTeacher(teacherId: number): Promise<GradeFolder[]>;
+  updateGradeFolder(id: number, name: string): Promise<GradeFolder>;
+  deleteGradeFolder(id: number): Promise<void>;
 
   // ─── Classrooms ──────────────────────────────────────────────────────────
   createClassroom(data: InsertClassroom): Promise<Classroom>;
@@ -1517,29 +1524,76 @@ class PrismaStorage implements IStorage {
       createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
       slug: c.slug ?? null,
       teacherName: c.teacher?.name ?? null,
+      gradeFolderId: c.gradeFolderId ?? null,
+      gradeFolderName: c.gradeFolder?.name ?? null,
     };
+  }
+
+  private mapGradeFolder(f: any): GradeFolder {
+    return {
+      id: f.id,
+      name: f.name,
+      teacherId: f.teacherId,
+      slug: f.slug ?? null,
+      createdAt: f.createdAt instanceof Date ? f.createdAt.toISOString() : f.createdAt,
+    };
+  }
+
+  async createGradeFolder(teacherId: number, name: string): Promise<GradeFolder> {
+    const f = await prisma.gradeFolder.create({ data: { name, teacherId } });
+    const slug = slugify(name, f.id);
+    const updated = await prisma.gradeFolder.update({ where: { id: f.id }, data: { slug } });
+    return this.mapGradeFolder(updated);
+  }
+
+  async getGradeFoldersByTeacher(teacherId: number): Promise<GradeFolder[]> {
+    const rows = await prisma.gradeFolder.findMany({
+      where: { teacherId },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(this.mapGradeFolder.bind(this));
+  }
+
+  async updateGradeFolder(id: number, name: string): Promise<GradeFolder> {
+    const f = await prisma.gradeFolder.update({ where: { id }, data: { name } });
+    return this.mapGradeFolder(f);
+  }
+
+  async deleteGradeFolder(id: number): Promise<void> {
+    await prisma.gradeFolder.delete({ where: { id } });
   }
 
   async createClassroom(data: InsertClassroom): Promise<Classroom> {
     const c = await prisma.classroom.create({ data });
     const slug = slugify(c.name, c.id);
-    const updated = await prisma.classroom.update({ where: { id: c.id }, data: { slug } });
+    const updated = await prisma.classroom.update({
+      where: { id: c.id },
+      data: { slug },
+      include: { gradeFolder: { select: { name: true } } },
+    });
     return this.mapClassroom(updated);
   }
 
   async getClassroomBySlug(slug: string): Promise<Classroom | null> {
-    const c = await prisma.classroom.findUnique({ where: { slug } });
+    const c = await prisma.classroom.findUnique({
+      where: { slug },
+      include: { gradeFolder: { select: { name: true } } },
+    });
     return c ? this.mapClassroom(c) : null;
   }
 
   async getClassroomById(id: number): Promise<Classroom | null> {
-    const c = await prisma.classroom.findUnique({ where: { id } });
+    const c = await prisma.classroom.findUnique({
+      where: { id },
+      include: { gradeFolder: { select: { name: true } } },
+    });
     return c ? this.mapClassroom(c) : null;
   }
 
   async getClassroomsByTeacher(teacherId: number): Promise<Classroom[]> {
     const rows = await prisma.classroom.findMany({
       where: { teacherId },
+      include: { gradeFolder: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(this.mapClassroom.bind(this));
@@ -1548,7 +1602,7 @@ class PrismaStorage implements IStorage {
   async getClassroomsForStudent(studentId: number): Promise<Classroom[]> {
     const enrollments = await prisma.classroomEnrollment.findMany({
       where: { studentId },
-      include: { classroom: { include: { teacher: { select: { name: true } } } } },
+      include: { classroom: { include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } } } },
       orderBy: { enrolledAt: "desc" },
     });
     return enrollments.map((e) => this.mapClassroom(e.classroom));
@@ -1559,7 +1613,11 @@ class PrismaStorage implements IStorage {
   }
 
   async updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom> {
-    const c = await prisma.classroom.update({ where: { id }, data });
+    const c = await prisma.classroom.update({
+      where: { id },
+      data,
+      include: { gradeFolder: { select: { name: true } } },
+    });
     return this.mapClassroom(c);
   }
 

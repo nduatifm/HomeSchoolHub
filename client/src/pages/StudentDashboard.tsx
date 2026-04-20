@@ -319,18 +319,53 @@ export default function StudentDashboard() {
                 <div className="text-center py-10 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
                   You have not been enrolled in any classrooms yet.
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {classrooms.map(c => (
-                    <ClassroomCard
-                      key={c.id}
-                      classroom={c}
-                      href={`/classrooms/${c.slug ?? c.id}`}
-                      notification={notifMap[c.id] ?? null}
-                    />
-                  ))}
-                </div>
-              )}
+              ) : (() => {
+                const grouped: Record<string, Classroom[]> = {};
+                const ungrouped: Classroom[] = [];
+                for (const c of classrooms) {
+                  if (c.gradeFolderName) {
+                    if (!grouped[c.gradeFolderName]) grouped[c.gradeFolderName] = [];
+                    grouped[c.gradeFolderName].push(c);
+                  } else {
+                    ungrouped.push(c);
+                  }
+                }
+                const hasGroups = Object.keys(grouped).length > 0;
+                return (
+                  <div className="space-y-6">
+                    {Object.entries(grouped).map(([folderName, group]) => (
+                      <div key={folderName}>
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">{folderName}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {group.map(c => (
+                            <ClassroomCard
+                              key={c.id}
+                              classroom={c}
+                              href={`/classrooms/${c.slug ?? c.id}`}
+                              notification={notifMap[c.id] ?? null}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {ungrouped.length > 0 && (
+                      <div>
+                        {hasGroups && <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Other</h3>}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {ungrouped.map(c => (
+                            <ClassroomCard
+                              key={c.id}
+                              classroom={c}
+                              href={`/classrooms/${c.slug ?? c.id}`}
+                              notification={notifMap[c.id] ?? null}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

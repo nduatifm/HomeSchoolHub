@@ -422,6 +422,17 @@ export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
 
 // ─── Classroom schemas ─────────────────────────────────────────────────────
 
+export const gradeFolderSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  teacherId: z.number(),
+  slug: z.string().nullable().optional(),
+  createdAt: z.string(),
+});
+export const insertGradeFolderSchema = gradeFolderSchema.omit({ id: true, createdAt: true });
+export type GradeFolder = z.infer<typeof gradeFolderSchema>;
+export type InsertGradeFolder = z.infer<typeof insertGradeFolderSchema>;
+
 export const classroomSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -432,8 +443,10 @@ export const classroomSchema = z.object({
   createdAt: z.string(),
   slug: z.string().nullable().optional(),
   teacherName: z.string().nullable().optional(),
+  gradeFolderId: z.number().nullable().optional(),
+  gradeFolderName: z.string().nullable().optional(),
 });
-export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true, teacherName: true });
+export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true, teacherName: true, gradeFolderName: true });
 export type Classroom = z.infer<typeof classroomSchema>;
 export type InsertClassroom = z.infer<typeof insertClassroomSchema>;
 

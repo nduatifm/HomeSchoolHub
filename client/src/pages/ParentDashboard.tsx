@@ -951,24 +951,58 @@ export default function ParentDashboard() {
                   {students.map((child, i) => {
                     const childClassrooms = (childClassroomQueries[i]?.data ?? []) as Classroom[];
                     const childNotifMap = (childNotificationQueries[i]?.data ?? {}) as ClassroomNotificationsMap;
+                    const grouped: Record<string, Classroom[]> = {};
+                    const ungrouped: Classroom[] = [];
+                    for (const c of childClassrooms) {
+                      if (c.gradeFolderName) {
+                        if (!grouped[c.gradeFolderName]) grouped[c.gradeFolderName] = [];
+                        grouped[c.gradeFolderName].push(c);
+                      } else {
+                        ungrouped.push(c);
+                      }
+                    }
+                    const hasGroups = Object.keys(grouped).length > 0;
                     return (
-                      <div key={child.id} className="space-y-3">
+                      <div key={child.id} className="space-y-4">
                         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                           <GraduationCap className="h-4 w-4 text-gray-400" />{child.name}
                         </h3>
                         {childClassrooms.length === 0 ? (
                           <p className="text-xs text-gray-400 pl-5">No classrooms yet for this student.</p>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {childClassrooms.map(c => (
-                              <ClassroomCard
-                                key={c.id}
-                                classroom={c}
-                                href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
-                                ctaLabel="View Grades"
-                                notification={childNotifMap[c.id] ?? null}
-                              />
+                          <div className="space-y-4 pl-0">
+                            {Object.entries(grouped).map(([folderName, group]) => (
+                              <div key={folderName}>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{folderName}</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {group.map(c => (
+                                    <ClassroomCard
+                                      key={c.id}
+                                      classroom={c}
+                                      href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
+                                      ctaLabel="View Grades"
+                                      notification={childNotifMap[c.id] ?? null}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
                             ))}
+                            {ungrouped.length > 0 && (
+                              <div>
+                                {hasGroups && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Other</p>}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {ungrouped.map(c => (
+                                    <ClassroomCard
+                                      key={c.id}
+                                      classroom={c}
+                                      href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
+                                      ctaLabel="View Grades"
+                                      notification={childNotifMap[c.id] ?? null}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
