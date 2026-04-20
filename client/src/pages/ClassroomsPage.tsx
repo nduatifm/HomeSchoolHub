@@ -39,6 +39,7 @@ import {
   ChevronRight,
   Users,
   Check,
+  Archive,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Classroom, GradeFolder } from "@shared/schema";
@@ -93,6 +94,10 @@ export default function ClassroomsPage() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
   const [studentSearch, setStudentSearch] = useState("");
   const [movingClassroomId, setMovingClassroomId] = useState<number | null>(null);
+
+  const [editClassroomOpen, setEditClassroomOpen] = useState(false);
+  const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
+  const [editClassroomForm, setEditClassroomForm] = useState({ name: "", subject: "", description: "" });
 
   const createFolderMutation = useMutation({
     mutationFn: () => apiRequest("/api/grade-folders", { method: "POST", body: JSON.stringify({ name: newFolderName }) }),
@@ -194,6 +199,40 @@ export default function ClassroomsPage() {
     },
   });
 
+  const editClassroomMutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/classrooms/${editingClassroom!.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(editClassroomForm),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      toast({ title: "Classroom updated!" });
+      setEditClassroomOpen(false);
+      setEditingClassroom(null);
+    },
+    onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
+  });
+
+  const archiveClassroomMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      apiRequest(`/api/classrooms/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
+    onSuccess: (_, { status }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      toast({ title: status === "archived" ? "Classroom archived." : "Classroom restored to active." });
+    },
+    onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
+  });
+
+  const openEditClassroom = (c: Classroom) => {
+    setEditingClassroom(c);
+    setEditClassroomForm({ name: c.name, subject: c.subject ?? "", description: c.description ?? "" });
+    setEditClassroomOpen(true);
+  };
+
   const openNewClassroom = (folderId: number | null) => {
     setNewClassroomFolderId(folderId);
     setNewClassroomForm({ name: "", subject: "", description: "" });
@@ -249,6 +288,23 @@ export default function ClassroomsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem className="gap-2 text-sm" onClick={() => openEditClassroom(c)}>
+                  <Pencil className="h-3.5 w-3.5 shrink-0" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2 text-sm"
+                  onClick={() =>
+                    archiveClassroomMutation.mutate({
+                      id: c.id,
+                      status: c.status === "archived" ? "active" : "archived",
+                    })
+                  }
+                >
+                  <Archive className="h-3.5 w-3.5 shrink-0" />
+                  {c.status === "archived" ? "Unarchive" : "Archive"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="gap-2 text-sm">
                     <FolderInput className="h-3.5 w-3.5 shrink-0" />
@@ -512,6 +568,49 @@ export default function ClassroomsPage() {
             >
               {renameFolderMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Classroom dialog */}
+      <Dialog open={editClassroomOpen} onOpenChange={(v) => { if (!v) { setEditClassroomOpen(false); setEditingClassroom(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Edit Classroom</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div>
+              <p className="text-sm font-medium mb-1">Name</p>
+              <Input
+                value={editClassroomForm.name}
+                onChange={e => setEditClassroomForm({ ...editClassroomForm, name: e.target.value })}
+                placeholder="e.g. Algebra II – Period 3"
+                autoFocus
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-1">Subject</p>
+              <Input
+                value={editClassroomForm.subject}
+                onChange={e => setEditClassroomForm({ ...editClassroomForm, subject: e.target.value })}
+                placeholder="e.g. Mathematics"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-1">Description <span className="text-muted-foreground font-normal">(optional)</span></p>
+              <Textarea
+                value={editClassroomForm.description}
+                onChange={e => setEditClassroomForm({ ...editClassroomForm, description: e.target.value })}
+                rows={2}
+                placeholder="Brief description…"
+              />
+            </div>
+            <Button
+              className="w-full"
+              disabled={!editClassroomForm.name.trim() || !editClassroomForm.subject.trim() || editClassroomMutation.isPending}
+              onClick={() => editClassroomMutation.mutate()}
+            >
+              {editClassroomMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Save Changes
             </Button>
           </div>
         </DialogContent>
