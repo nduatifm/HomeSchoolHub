@@ -89,7 +89,7 @@ function TeacherRoute({ component: Component }: { component: React.ComponentType
   }
 
   if (!user) return <Redirect to="/login" />;
-  if (!user.roles?.includes("teacher")) return <Redirect to="/dashboard" />;
+  if (user.role !== "teacher" && !user.roles?.includes("teacher")) return <Redirect to="/dashboard" />;
 
   return <Component />;
 }

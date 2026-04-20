@@ -348,7 +348,7 @@ export default function ClassroomsPage() {
                     {folders.length > 0 && (
                       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
                         <Folder className="h-3.5 w-3.5" />
-                        {isTeacher ? "Ungrouped Classrooms" : "All Classes"}
+                        {isTeacher ? "Other Classrooms" : "All Classes"}
                       </h2>
                     )}
                     {ungrouped.length === 0 && isTeacher ? (
