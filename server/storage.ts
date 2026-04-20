@@ -1537,6 +1537,16 @@ class PrismaStorage implements IStorage {
       teacherId: f.teacherId,
       slug: f.slug ?? null,
       createdAt: f.createdAt instanceof Date ? f.createdAt.toISOString() : f.createdAt,
+      classrooms: f.classrooms
+        ? f.classrooms.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            subject: c.subject,
+            description: c.description ?? null,
+            slug: c.slug ?? null,
+            status: c.status as "active" | "archived",
+          }))
+        : undefined,
     };
   }
 
@@ -1551,6 +1561,11 @@ class PrismaStorage implements IStorage {
     const rows = await prisma.gradeFolder.findMany({
       where: { teacherId },
       orderBy: { createdAt: "asc" },
+      include: {
+        classrooms: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
     });
     return rows.map(this.mapGradeFolder.bind(this));
   }

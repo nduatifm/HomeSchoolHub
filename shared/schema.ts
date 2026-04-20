@@ -428,8 +428,16 @@ export const gradeFolderSchema = z.object({
   teacherId: z.number(),
   slug: z.string().nullable().optional(),
   createdAt: z.string(),
+  classrooms: z.array(z.object({
+    id: z.number(),
+    name: z.string(),
+    subject: z.string(),
+    description: z.string().nullable(),
+    slug: z.string().nullable().optional(),
+    status: z.enum(["active", "archived"]),
+  })).optional(),
 });
-export const insertGradeFolderSchema = gradeFolderSchema.omit({ id: true, createdAt: true });
+export const insertGradeFolderSchema = gradeFolderSchema.omit({ id: true, createdAt: true, classrooms: true });
 export type GradeFolder = z.infer<typeof gradeFolderSchema>;
 export type InsertGradeFolder = z.infer<typeof insertGradeFolderSchema>;
 
