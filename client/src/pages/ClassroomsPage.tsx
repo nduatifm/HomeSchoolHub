@@ -57,9 +57,9 @@ export default function ClassroomsPage() {
     enabled: isTeacher,
   });
 
-  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<number>>(new Set());
   const toggleFolder = (id: number) =>
-    setExpandedFolders(prev => {
+    setCollapsedFolders(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -104,9 +104,9 @@ export default function ClassroomsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grade-folders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: "Folder deleted. Classrooms moved to ungrouped." });
+      toast({ title: "Grade folder deleted." });
     },
-    onError: (e: any) => toast({ title: "Failed to delete folder", description: e.message, type: "error" }),
+    onError: (e: any) => toast({ title: "Cannot delete folder", description: e.message, type: "error" }),
   });
 
   const createClassroomMutation = useMutation({
@@ -216,7 +216,7 @@ export default function ClassroomsPage() {
               {/* Grade folders */}
               {folders.map(folder => {
                 const folderClassrooms = classroomsByFolder[folder.id] ?? [];
-                const isExpanded = expandedFolders.has(folder.id) || folderClassrooms.length === 0;
+                const isExpanded = !collapsedFolders.has(folder.id);
                 return (
                   <div key={folder.id} className="border border-border rounded-xl overflow-hidden">
                     {/* Folder header */}
@@ -225,7 +225,7 @@ export default function ClassroomsPage() {
                         onClick={() => toggleFolder(folder.id)}
                         className="flex items-center gap-2 flex-1 text-left group"
                       >
-                        {expandedFolders.has(folder.id)
+                        {isExpanded
                           ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                           : <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         }
@@ -260,7 +260,7 @@ export default function ClassroomsPage() {
                               <DropdownMenuItem
                                 className="gap-2 text-destructive focus:text-destructive"
                                 onClick={() => {
-                                  if (window.confirm(`Delete folder "${folder.name}"? Classrooms inside will become ungrouped.`)) {
+                                  if (window.confirm(`Delete folder "${folder.name}"? This will fail if any classrooms are still inside it.`)) {
                                     deleteFolderMutation.mutate(folder.id);
                                   }
                                 }}
@@ -274,7 +274,7 @@ export default function ClassroomsPage() {
                     </div>
 
                     {/* Folder content */}
-                    {(expandedFolders.has(folder.id) || true) && (
+                    {isExpanded && (
                       <div className="p-4">
                         {folderClassrooms.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground text-sm">

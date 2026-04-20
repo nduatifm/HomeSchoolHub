@@ -53,6 +53,8 @@ import {
   Trash2,
   GraduationCap,
   ChevronRight,
+  ChevronDown,
+  Folder,
   School,
   Plus,
   Loader2,
@@ -276,6 +278,14 @@ export default function ParentDashboard() {
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students/parent"],
   });
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   // Dialog state
   const [inviteStudentOpen, setInviteStudentOpen] = useState(false);
@@ -970,26 +980,45 @@ export default function ParentDashboard() {
                         {childClassrooms.length === 0 ? (
                           <p className="text-xs text-gray-400 pl-5">No classrooms yet for this student.</p>
                         ) : (
-                          <div className="space-y-4 pl-0">
-                            {Object.entries(grouped).map(([folderName, group]) => (
-                              <div key={folderName}>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{folderName}</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {group.map(c => (
-                                    <ClassroomCard
-                                      key={c.id}
-                                      classroom={c}
-                                      href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
-                                      ctaLabel="View Grades"
-                                      notification={childNotifMap[c.id] ?? null}
-                                    />
-                                  ))}
+                          <div className="space-y-3 pl-0">
+                            {Object.entries(grouped).map(([folderName, group]) => {
+                              const key = `${child.id}:${folderName}`;
+                              const isExpanded = !collapsedGroups.has(key);
+                              return (
+                                <div key={folderName} className="border border-border rounded-xl overflow-hidden">
+                                  <button
+                                    onClick={() => toggleGroup(key)}
+                                    className="w-full flex items-center gap-2 px-4 py-3 bg-muted/40 text-left hover:bg-muted/60 transition-colors"
+                                  >
+                                    {isExpanded
+                                      ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                      : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    }
+                                    <Folder className="h-4 w-4 text-primary shrink-0" />
+                                    <span className="font-semibold text-sm text-foreground flex-1">{folderName}</span>
+                                    <span className="text-xs text-muted-foreground">{group.length} {group.length === 1 ? "class" : "classes"}</span>
+                                  </button>
+                                  {isExpanded && (
+                                    <div className="p-4">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {group.map(c => (
+                                          <ClassroomCard
+                                            key={c.id}
+                                            classroom={c}
+                                            href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
+                                            ctaLabel="View Grades"
+                                            notification={childNotifMap[c.id] ?? null}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                             {ungrouped.length > 0 && (
                               <div>
-                                {hasGroups && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Other</p>}
+                                {hasGroups && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-2">Other</p>}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                   {ungrouped.map(c => (
                                     <ClassroomCard

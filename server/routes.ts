@@ -4420,7 +4420,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // DELETE /api/grade-folders/:id — delete a grade folder (classrooms become ungrouped)
+  // DELETE /api/grade-folders/:id — delete a grade folder (blocked if classrooms are still linked)
   app.delete("/api/grade-folders/:id", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
@@ -4428,6 +4428,11 @@ export function registerRoutes(app: Express) {
       const folderId = parseInt(req.params.id);
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
       if (!folders.find(f => f.id === folderId)) return res.status(403).json({ error: "Not your folder" });
+      // Block delete if classrooms are still assigned to this folder
+      const linked = await prisma.classroom.count({ where: { gradeFolderId: folderId } });
+      if (linked > 0) {
+        return res.status(409).json({ error: `Cannot delete: ${linked} classroom${linked === 1 ? "" : "s"} still in this folder. Move or reassign them first.` });
+      }
       await storage.deleteGradeFolder(folderId);
       res.json({ success: true });
     } catch (error: any) {
@@ -4448,6 +4453,13 @@ export function registerRoutes(app: Express) {
         description: z.string().optional(),
         gradeFolderId: z.number().nullable().optional(),
       }).parse(req.body);
+      // Validate folder ownership if gradeFolderId provided
+      if (data.gradeFolderId) {
+        const teacherFolders = await storage.getGradeFoldersByTeacher(actor.id);
+        if (!teacherFolders.find(f => f.id === data.gradeFolderId)) {
+          return res.status(403).json({ error: "That grade folder does not belong to you" });
+        }
+      }
       const classroom = await storage.createClassroom({
         name: data.name,
         subject: data.subject,
@@ -4520,6 +4532,16 @@ export function registerRoutes(app: Express) {
         status: z.enum(["active", "archived"]).optional(),
         gradeFolderId: z.number().nullable().optional(),
       }).parse(req.body);
+      // Validate folder ownership when assigning
+      if (data.gradeFolderId) {
+        const actor = await storage.getUserById(req.session.userId!);
+        if (actor) {
+          const teacherFolders = await storage.getGradeFoldersByTeacher(actor.id);
+          if (!teacherFolders.find(f => f.id === data.gradeFolderId)) {
+            return res.status(403).json({ error: "That grade folder does not belong to you" });
+          }
+        }
+      }
       const updated = await storage.updateClassroom(classroom.id, data);
       res.json(updated);
     } catch (error: any) {

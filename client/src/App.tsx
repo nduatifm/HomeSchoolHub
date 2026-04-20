@@ -74,6 +74,26 @@ function DashboardRouter() {
   return <Redirect to="/login" />;
 }
 
+function TeacherRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return <Redirect to="/login" />;
+  if (!user.roles?.includes("teacher")) return <Redirect to="/dashboard" />;
+
+  return <Component />;
+}
+
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
 
@@ -149,7 +169,7 @@ function AppRoutes() {
         <ProtectedRoute component={ClassroomDetail} />
       </Route>
       <Route path="/classrooms">
-        <ProtectedRoute component={ClassroomsPage} />
+        <TeacherRoute component={ClassroomsPage} />
       </Route>
       <Route path="/dashboard/:tab">
         <DashboardRouter />
