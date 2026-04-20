@@ -534,14 +534,6 @@ export default function ClassroomsPage() {
                               className="absolute top-2 right-2 z-20 opacity-0 group-hover/folder:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-1"
                               onClick={e => e.stopPropagation()}
                             >
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs gap-1 bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm rounded-full text-muted-foreground hover:text-foreground"
-                                onClick={() => openNewClassroom(folder.id)}
-                              >
-                                <Plus className="h-3 w-3" />Add Subject
-                              </Button>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button
