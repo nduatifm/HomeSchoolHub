@@ -4517,7 +4517,7 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const isTeacher = (user as any).roles?.includes("teacher") || (user as any).role === "teacher";
+      const isTeacher = user.role === "teacher" || user.roles.includes("teacher");
       if (!isTeacher) return res.status(403).json({ error: "Teacher access required" });
       const deleted = await storage.getDeletedClassroomsByTeacher(user.id);
       res.json(deleted);
