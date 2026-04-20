@@ -265,7 +265,7 @@ export default function ClassroomsPage() {
                       }}
                     >
                       <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="flex-1">Other Classrooms</span>
+                      <span className="flex-1">No folder (Other Classrooms)</span>
                       {c.gradeFolderId === null && <Check className="h-3 w-3 text-primary shrink-0" />}
                     </DropdownMenuItem>
                     {folders.length > 0 && <DropdownMenuSeparator />}
