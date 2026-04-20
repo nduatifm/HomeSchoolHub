@@ -279,6 +279,7 @@ export interface IStorage {
   updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom>;
   softDeleteClassroom(id: number): Promise<void>;
   getSoftDeletedClassroomById(id: number): Promise<(Classroom & { deletedAt: Date | null }) | null>;
+  getDeletedClassroomsByTeacher(teacherId: number): Promise<(Classroom & { deletedAt: Date })[]>;
   restoreClassroom(id: number): Promise<void>;
   hardDeleteClassroom(id: number): Promise<void>;
   purgeExpiredSoftDeletes(cutoffDate: Date): Promise<void>;
@@ -1618,6 +1619,15 @@ class PrismaStorage implements IStorage {
     });
     if (!c || c.deletedAt === null) return null;
     return { ...this.mapClassroom(c), deletedAt: c.deletedAt };
+  }
+
+  async getDeletedClassroomsByTeacher(teacherId: number): Promise<(Classroom & { deletedAt: Date })[]> {
+    const rows = await prisma.classroom.findMany({
+      where: { teacherId, deletedAt: { not: null } },
+      include: { gradeFolder: { select: { name: true } } },
+      orderBy: { deletedAt: "desc" },
+    });
+    return rows.map(c => ({ ...this.mapClassroom(c), deletedAt: c.deletedAt! }));
   }
 
   async getClassroomsByTeacher(teacherId: number): Promise<Classroom[]> {

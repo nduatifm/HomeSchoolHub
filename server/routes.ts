@@ -4511,6 +4511,21 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/classrooms/trash — teacher views their soft-deleted classrooms (within 30-day grace window)
+  // Must be registered before /api/classrooms/:id to avoid "trash" being matched as an :id param.
+  app.get("/api/classrooms/trash", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      const isTeacher = (user as any).roles?.includes("teacher") || (user as any).role === "teacher";
+      if (!isTeacher) return res.status(403).json({ error: "Teacher access required" });
+      const deleted = await storage.getDeletedClassroomsByTeacher(user.id);
+      res.json(deleted);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/classrooms/:id — get classroom detail (teacher or enrolled member only)
   app.get("/api/classrooms/:id", requireAuth, async (req, res) => {
     try {
@@ -4551,14 +4566,11 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Grace period (ms) for classroom undo-deletion
-  const CLASSROOM_DELETE_GRACE_MS = 30_000;
+  // Grace period (ms) for classroom recovery — 30 days
+  const CLASSROOM_DELETE_GRACE_MS = 2_592_000_000;
 
-  // In-memory map to cancel in-process timers quickly (best-effort; not required for correctness)
-  const pendingDeletionTimers = new Map<number, ReturnType<typeof setTimeout>>();
-
-  // DB-driven cleanup: permanently delete any classroom whose deletedAt is past the grace window.
-  // Runs on startup and every 10 seconds to survive server restarts during the grace period.
+  // DB-driven cleanup: permanently delete any classroom whose deletedAt is past the 30-day grace window.
+  // Runs on startup and every hour to handle expired deletions durably across server restarts.
   const runExpiredDeletionPurge = async () => {
     try {
       const cutoff = new Date(Date.now() - CLASSROOM_DELETE_GRACE_MS);
@@ -4568,52 +4580,48 @@ export function registerRoutes(app: Express) {
     }
   };
   runExpiredDeletionPurge();
-  setInterval(runExpiredDeletionPurge, 10_000);
+  setInterval(runExpiredDeletionPurge, 3_600_000);
 
-  // DELETE /api/classrooms/:id — teacher soft-deletes classroom (30s grace period)
+  // DELETE /api/classrooms/:id — teacher soft-deletes classroom (30-day grace period)
   app.delete("/api/classrooms/:id", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
       await storage.softDeleteClassroom(classroom.id);
-      // Also schedule an in-process timer for low-latency deletion when the server stays running
-      const existing = pendingDeletionTimers.get(classroom.id);
-      if (existing) clearTimeout(existing);
-      const timer = setTimeout(async () => {
-        pendingDeletionTimers.delete(classroom.id);
-        try {
-          // hardDeleteClassroom uses a conditional deleteMany (only when deletedAt IS NOT NULL),
-          // so this is safe even if a restore ran concurrently.
-          await storage.hardDeleteClassroom(classroom.id);
-        } catch (err) {
-          console.error(`[classroom-delete] Failed to hard-delete classroom ${classroom.id}:`, err);
-        }
-      }, CLASSROOM_DELETE_GRACE_MS);
-      pendingDeletionTimers.set(classroom.id, timer);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // POST /api/classrooms/:id/restore — teacher restores a soft-deleted classroom within grace period
+  // POST /api/classrooms/:id/restore — teacher restores a soft-deleted classroom within 30-day grace period
   app.post("/api/classrooms/:id/restore", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid classroom id" });
-      // getSoftDeletedClassroomById only returns classrooms that are currently soft-deleted
       const classroom = await storage.getSoftDeletedClassroomById(id);
       if (!classroom) return res.status(404).json({ error: "Classroom not found or already permanently deleted" });
       if (classroom.teacherId !== req.session.userId) return res.status(403).json({ error: "Not your classroom" });
-      // Enforce the grace window based on persisted deletedAt (survives server restarts)
       const deletedAt = classroom.deletedAt instanceof Date ? classroom.deletedAt : new Date(classroom.deletedAt!);
       if (Date.now() - deletedAt.getTime() > CLASSROOM_DELETE_GRACE_MS) {
-        return res.status(409).json({ error: "Undo window has expired" });
+        return res.status(409).json({ error: "Recovery window has expired" });
       }
-      // Cancel any in-process timer
-      const timer = pendingDeletionTimers.get(id);
-      if (timer) { clearTimeout(timer); pendingDeletionTimers.delete(id); }
       await storage.restoreClassroom(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:id/permanent — teacher immediately hard-deletes a soft-deleted classroom
+  app.delete("/api/classrooms/:id/permanent", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid classroom id" });
+      const classroom = await storage.getSoftDeletedClassroomById(id);
+      if (!classroom) return res.status(404).json({ error: "Classroom not found or not in trash" });
+      if (classroom.teacherId !== req.session.userId) return res.status(403).json({ error: "Not your classroom" });
+      await storage.hardDeleteClassroom(id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

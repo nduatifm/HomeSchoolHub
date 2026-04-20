@@ -40,12 +40,39 @@ import {
   Users,
   Check,
   Archive,
+  RotateCcw,
+  Info,
+  Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Classroom, GradeFolder } from "@shared/schema";
 import type { ClassroomNotification } from "@/lib/classroomNotifications";
 
 type TeacherStudent = { id: number; name: string; email: string; gradeLevel?: string | null };
+type DeletedClassroom = Classroom & { deletedAt: string };
+
+const GRACE_DAYS = 30;
+const GRACE_MS = GRACE_DAYS * 24 * 60 * 60 * 1000;
+
+function formatTimeRemaining(deletedAt: string): string {
+  const expiresAt = new Date(deletedAt).getTime() + GRACE_MS;
+  const msLeft = expiresAt - Date.now();
+  if (msLeft <= 0) return "Expiring soon";
+  const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
+  if (daysLeft >= 1) return `Permanently deleted in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+  const hoursLeft = Math.floor(msLeft / (1000 * 60 * 60));
+  if (hoursLeft >= 1) return `Permanently deleted in ${hoursLeft} hour${hoursLeft === 1 ? "" : "s"}`;
+  return "Permanently deleted in less than an hour";
+}
+
+function formatDeletedAgo(deletedAt: string): string {
+  const ms = Date.now() - new Date(deletedAt).getTime();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (days >= 1) return `Deleted ${days} day${days === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  if (hours >= 1) return `Deleted ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  return "Deleted just now";
+}
 
 export default function ClassroomsPage() {
   const { user } = useAuth();
@@ -56,6 +83,12 @@ export default function ClassroomsPage() {
 
   const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({
     queryKey: ["/api/classrooms"],
+  });
+
+  const { data: deletedClassrooms = [], isLoading: trashLoading } = useQuery<DeletedClassroom[]>({
+    queryKey: ["/api/classrooms/trash"],
+    enabled: isTeacher,
+    refetchInterval: 60_000,
   });
 
   const { data: teacherStudents = [] } = useQuery<TeacherStudent[]>({
@@ -81,6 +114,9 @@ export default function ClassroomsPage() {
       return next;
     });
 
+  const [collapsedArchived, setCollapsedArchived] = useState(true);
+  const [collapsedTrash, setCollapsedTrash] = useState(false);
+
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
@@ -101,6 +137,9 @@ export default function ClassroomsPage() {
 
   const [deleteClassroomOpen, setDeleteClassroomOpen] = useState(false);
   const [deletingClassroom, setDeletingClassroom] = useState<Classroom | null>(null);
+
+  const [restoringId, setRestoringId] = useState<number | null>(null);
+  const [permanentDeletingId, setPermanentDeletingId] = useState<number | null>(null);
 
   const createFolderMutation = useMutation({
     mutationFn: () => apiRequest("/api/grade-folders", { method: "POST", body: JSON.stringify({ name: newFolderName }) }),
@@ -144,7 +183,6 @@ export default function ClassroomsPage() {
           gradeFolderId: newClassroomFolderId ?? null,
         }),
       }) as Classroom;
-      // Enroll selected students sequentially — track failures
       const enrollIds = Array.from(selectedStudentIds);
       let failedCount = 0;
       for (const studentId of enrollIds) {
@@ -230,43 +268,51 @@ export default function ClassroomsPage() {
     onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
   });
 
-  const restoreClassroomMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}/restore`, { method: "POST" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
-      toast({ title: "Classroom restored." });
-    },
-    onError: (e: any) => toast({ title: "Failed to restore classroom", description: e.message, type: "error" }),
-  });
-
   const deleteClassroomMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}`, { method: "DELETE" }),
-    onSuccess: (_, id) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms/trash"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
       setDeleteClassroomOpen(false);
       setDeletingClassroom(null);
-      const { dismiss } = toast({
-        title: "Classroom deleted.",
-        description: "Click Undo to restore it before it is permanently removed.",
-        action: (
-          <Button
-            size="sm"
-            variant="outline"
-            className="ml-2 shrink-0"
-            onClick={() => {
-              restoreClassroomMutation.mutate(id);
-              dismiss();
-            }}
-          >
-            Undo
-          </Button>
-        ),
+      toast({
+        title: "Classroom moved to Recently Deleted.",
+        description: "It will be permanently removed after 30 days. You can restore it from the Recently Deleted section.",
       });
-      setTimeout(dismiss, 8_000);
+      setCollapsedTrash(false);
     },
     onError: (e: any) => toast({ title: "Failed to delete classroom", description: e.message, type: "error" }),
+  });
+
+  const trashRestoreMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}/restore`, { method: "POST" }),
+    onMutate: (id) => setRestoringId(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms/trash"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
+      toast({ title: "Classroom restored." });
+      setRestoringId(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Failed to restore classroom", description: e.message, type: "error" });
+      setRestoringId(null);
+    },
+  });
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}/permanent`, { method: "DELETE" }),
+    onMutate: (id) => setPermanentDeletingId(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms/trash"] });
+      toast({ title: "Classroom permanently deleted." });
+      setPermanentDeletingId(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Failed to permanently delete classroom", description: e.message, type: "error" });
+      setPermanentDeletingId(null);
+    },
   });
 
   const openEditClassroom = (c: Classroom) => {
@@ -287,8 +333,11 @@ export default function ClassroomsPage() {
     setEditFolderOpen(true);
   };
 
+  const activeClassrooms = classrooms.filter(c => c.status !== "archived");
+  const archivedClassrooms = classrooms.filter(c => c.status === "archived");
+
   const classroomsByFolder: Record<number | "none", Classroom[]> = { none: [] };
-  for (const c of classrooms) {
+  for (const c of activeClassrooms) {
     const key = c.gradeFolderId ?? "none";
     if (!classroomsByFolder[key]) classroomsByFolder[key] = [];
     classroomsByFolder[key].push(c);
@@ -300,7 +349,7 @@ export default function ClassroomsPage() {
     return { pendingCount: stats.toGradeCount, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount };
   };
 
-  const renderCard = (c: Classroom) => {
+  const renderCard = (c: Classroom, isArchived = false) => {
     const isMoving = movingClassroomId === c.id;
     return (
       <div key={c.id} className="relative group/card">
@@ -339,52 +388,56 @@ export default function ClassroomsPage() {
                   onClick={() =>
                     archiveClassroomMutation.mutate({
                       id: c.id,
-                      status: c.status === "archived" ? "active" : "archived",
+                      status: isArchived ? "active" : "archived",
                     })
                   }
                 >
                   <Archive className="h-3.5 w-3.5 shrink-0" />
-                  {c.status === "archived" ? "Unarchive" : "Archive"}
+                  {isArchived ? "Unarchive" : "Archive"}
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="gap-2 text-sm">
-                    <FolderInput className="h-3.5 w-3.5 shrink-0" />
-                    Move to…
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuItem
-                      className="gap-2"
-                      disabled={c.gradeFolderId === null}
-                      onClick={() => {
-                        if (c.gradeFolderId !== null) {
-                          moveClassroomMutation.mutate({ classroomId: c.id, folderId: null });
-                        }
-                      }}
-                    >
-                      <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="flex-1">No folder (Other Classrooms)</span>
-                      {c.gradeFolderId === null && <Check className="h-3 w-3 text-primary shrink-0" />}
-                    </DropdownMenuItem>
-                    {folders.length > 0 && <DropdownMenuSeparator />}
-                    {folders.map(f => (
-                      <DropdownMenuItem
-                        key={f.id}
-                        className="gap-2"
-                        disabled={c.gradeFolderId === f.id}
-                        onClick={() => {
-                          if (c.gradeFolderId !== f.id) {
-                            moveClassroomMutation.mutate({ classroomId: c.id, folderId: f.id });
-                          }
-                        }}
-                      >
-                        <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span className="flex-1 truncate">{f.name}</span>
-                        {c.gradeFolderId === f.id && <Check className="h-3 w-3 text-primary shrink-0" />}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
+                {!isArchived && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="gap-2 text-sm">
+                        <FolderInput className="h-3.5 w-3.5 shrink-0" />
+                        Move to…
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem
+                          className="gap-2"
+                          disabled={c.gradeFolderId === null}
+                          onClick={() => {
+                            if (c.gradeFolderId !== null) {
+                              moveClassroomMutation.mutate({ classroomId: c.id, folderId: null });
+                            }
+                          }}
+                        >
+                          <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="flex-1">No folder (Other Classrooms)</span>
+                          {c.gradeFolderId === null && <Check className="h-3 w-3 text-primary shrink-0" />}
+                        </DropdownMenuItem>
+                        {folders.length > 0 && <DropdownMenuSeparator />}
+                        {folders.map(f => (
+                          <DropdownMenuItem
+                            key={f.id}
+                            className="gap-2"
+                            disabled={c.gradeFolderId === f.id}
+                            onClick={() => {
+                              if (c.gradeFolderId !== f.id) {
+                                moveClassroomMutation.mutate({ classroomId: c.id, folderId: f.id });
+                              }
+                            }}
+                          >
+                            <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="flex-1 truncate">{f.name}</span>
+                            {c.gradeFolderId === f.id && <Check className="h-3 w-3 text-primary shrink-0" />}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="gap-2 text-sm text-destructive focus:text-destructive"
@@ -451,7 +504,7 @@ export default function ClassroomsPage() {
 
           {!isLoading && (
             <div className="space-y-6">
-              {/* Grade folders */}
+              {/* Grade folders — only active classrooms */}
               {folders.map(folder => {
                 const folderClassrooms = classroomsByFolder[folder.id] ?? [];
                 const isExpanded = !collapsedFolders.has(folder.id);
@@ -537,7 +590,7 @@ export default function ClassroomsPage() {
                 );
               })}
 
-              {/* Ungrouped classrooms */}
+              {/* Ungrouped active classrooms */}
               {(() => {
                 const ungrouped = classroomsByFolder["none"] ?? [];
                 if (!isTeacher && ungrouped.length === 0 && folders.length === 0) return null;
@@ -568,6 +621,122 @@ export default function ClassroomsPage() {
                   </div>
                 );
               })()}
+
+              {/* Archived Classrooms section — teacher only, hidden when empty */}
+              {isTeacher && archivedClassrooms.length > 0 && (
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setCollapsedArchived(prev => !prev)}
+                    className="flex items-center gap-2 px-4 py-3 bg-muted/30 w-full text-left group"
+                  >
+                    {collapsedArchived
+                      ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    }
+                    <Archive className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                      Archived Classrooms
+                    </span>
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">
+                      {archivedClassrooms.length}
+                    </Badge>
+                  </button>
+                  {!collapsedArchived && (
+                    <div className="p-4 border-t border-border">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {archivedClassrooms.map(c => renderCard(c, true))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Recently Deleted section — teacher only, hidden when empty */}
+              {isTeacher && deletedClassrooms.length > 0 && (
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setCollapsedTrash(prev => !prev)}
+                    className="flex items-center gap-2 px-4 py-3 bg-muted/30 w-full text-left group"
+                  >
+                    {collapsedTrash
+                      ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    }
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                      Recently Deleted
+                    </span>
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">
+                      {deletedClassrooms.length}
+                    </Badge>
+                  </button>
+                  {!collapsedTrash && (
+                    <div className="p-4 border-t border-border space-y-2">
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
+                        <Info className="h-3.5 w-3.5 shrink-0" />
+                        Classrooms here are permanently deleted after 30 days.
+                      </p>
+                      {deletedClassrooms.map(c => {
+                        const isRestoring = restoringId === c.id;
+                        const isPermanentDeleting = permanentDeletingId === c.id;
+                        const isBusy = isRestoring || isPermanentDeleting;
+                        return (
+                          <div
+                            key={c.id}
+                            className="flex items-center gap-3 py-3 px-3 rounded-lg border border-border bg-muted/20"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-foreground truncate">{c.name}</p>
+                              {c.subject && (
+                                <p className="text-xs text-muted-foreground truncate">{c.subject}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {formatDeletedAgo(c.deletedAt)}
+                              </p>
+                              <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 mt-0.5 font-medium">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                {formatTimeRemaining(c.deletedAt)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5"
+                                disabled={isBusy}
+                                onClick={() => trashRestoreMutation.mutate(c.id)}
+                              >
+                                {isRestoring
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <RotateCcw className="h-3 w-3" />
+                                }
+                                Restore
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                disabled={isBusy}
+                                onClick={() => {
+                                  if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
+                                    permanentDeleteMutation.mutate(c.id);
+                                  }
+                                }}
+                              >
+                                {isPermanentDeleting
+                                  ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  : null
+                                }
+                                Delete permanently
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -629,9 +798,8 @@ export default function ClassroomsPage() {
           <DialogHeader><DialogTitle>Delete Classroom</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-1">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to permanently delete{" "}
-              <span className="font-semibold text-foreground">{deletingClassroom?.name}</span>?
-              All classroom data — posts, assignments, and grades — will be removed and cannot be recovered.
+              <span className="font-semibold text-foreground">{deletingClassroom?.name}</span>{" "}
+              will be moved to Recently Deleted. You can restore it within 30 days before it is permanently removed.
             </p>
             <div className="flex gap-2 justify-end">
               <Button
@@ -649,7 +817,7 @@ export default function ClassroomsPage() {
                 onClick={() => deletingClassroom && deleteClassroomMutation.mutate(deletingClassroom.id)}
               >
                 {deleteClassroomMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Delete Classroom
+                Move to Recently Deleted
               </Button>
             </div>
           </div>
