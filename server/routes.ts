@@ -4379,11 +4379,13 @@ export function registerRoutes(app: Express) {
 
   // ─── Grade Folders ────────────────────────────────────────────────────────
 
+  const isActorTeacher = (actor: any) => actor?.role === "teacher" || actor?.roles?.includes("teacher");
+
   // GET /api/grade-folders — list teacher's grade folders
   app.get("/api/grade-folders", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
       res.json(folders);
     } catch (error: any) {
@@ -4395,7 +4397,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/grade-folders", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
       const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
       const folder = await storage.createGradeFolder(actor.id, name);
       res.json(folder);
@@ -4408,7 +4410,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/grade-folders/:id", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
       const folderId = parseInt(req.params.id);
       const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
@@ -4424,7 +4426,7 @@ export function registerRoutes(app: Express) {
   app.delete("/api/grade-folders/:id", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !actor.roles.includes("teacher")) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
       const folderId = parseInt(req.params.id);
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
       if (!folders.find(f => f.id === folderId)) return res.status(403).json({ error: "Not your folder" });
@@ -4444,7 +4446,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/classrooms", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !actor.roles.includes("teacher")) {
+      if (!actor || !isActorTeacher(actor)) {
         return res.status(403).json({ error: "Only teachers can create classrooms" });
       }
       const data = z.object({

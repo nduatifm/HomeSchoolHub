@@ -130,8 +130,9 @@ export default function ClassroomsPage() {
           gradeFolderId: newClassroomFolderId ?? null,
         }),
       }) as Classroom;
-      // Enroll selected students sequentially
+      // Enroll selected students sequentially — track failures
       const enrollIds = Array.from(selectedStudentIds);
+      let failedCount = 0;
       for (const studentId of enrollIds) {
         try {
           await apiRequest(`/api/classrooms/${classroom.id}/enroll`, {
@@ -139,15 +140,26 @@ export default function ClassroomsPage() {
             body: JSON.stringify({ studentId }),
           });
         } catch {
-          // skip if already enrolled or error for individual student
+          failedCount++;
         }
       }
-      return classroom;
+      return { classroom, failedCount };
     },
-    onSuccess: () => {
+    onSuccess: ({ failedCount }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
-      toast({ title: "Classroom created!" });
+      const enrolled = selectedStudentIds.size - failedCount;
+      if (failedCount === 0 && enrolled > 0) {
+        toast({ title: `Classroom created & ${enrolled} student${enrolled === 1 ? "" : "s"} enrolled!` });
+      } else if (failedCount > 0) {
+        toast({
+          title: "Classroom created",
+          description: `${enrolled} enrolled; ${failedCount} student${failedCount === 1 ? "" : "s"} could not be enrolled (already enrolled or error).`,
+          type: "error",
+        });
+      } else {
+        toast({ title: "Classroom created!" });
+      }
       setNewClassroomOpen(false);
       setNewClassroomForm({ name: "", subject: "", description: "" });
       setNewClassroomFolderId(null);
