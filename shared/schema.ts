@@ -445,8 +445,9 @@ export const classroomSchema = z.object({
   teacherName: z.string().nullable().optional(),
   gradeFolderId: z.number().nullable().optional(),
   gradeFolderName: z.string().nullable().optional(),
+  gradeFolder: z.object({ id: z.number(), name: z.string() }).nullable().optional(),
 });
-export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true, teacherName: true, gradeFolderName: true });
+export const insertClassroomSchema = classroomSchema.omit({ id: true, createdAt: true, teacherName: true, gradeFolderName: true, gradeFolder: true });
 export type Classroom = z.infer<typeof classroomSchema>;
 export type InsertClassroom = z.infer<typeof insertClassroomSchema>;
 

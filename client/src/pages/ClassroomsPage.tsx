@@ -8,6 +8,7 @@ import ClassroomCard from "@/components/ClassroomCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -31,10 +32,14 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
+  Users,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Classroom, GradeFolder } from "@shared/schema";
 import type { ClassroomNotification } from "@/lib/classroomNotifications";
+
+type TeacherStudent = { id: number; name: string; email: string; gradeLevel?: string | null };
 
 export default function ClassroomsPage() {
   const { user } = useAuth();
@@ -45,6 +50,11 @@ export default function ClassroomsPage() {
 
   const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({
     queryKey: ["/api/classrooms"],
+  });
+
+  const { data: teacherStudents = [] } = useQuery<TeacherStudent[]>({
+    queryKey: ["/api/students/teacher"],
+    enabled: isTeacher,
   });
 
   const { data: folders = [], isLoading: foldersLoading } = useQuery<GradeFolder[]>({
@@ -75,6 +85,8 @@ export default function ClassroomsPage() {
   const [newClassroomOpen, setNewClassroomOpen] = useState(false);
   const [newClassroomFolderId, setNewClassroomFolderId] = useState<number | null>(null);
   const [newClassroomForm, setNewClassroomForm] = useState({ name: "", subject: "", description: "" });
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+  const [studentSearch, setStudentSearch] = useState("");
 
   const createFolderMutation = useMutation({
     mutationFn: () => apiRequest("/api/grade-folders", { method: "POST", body: JSON.stringify({ name: newFolderName }) }),
@@ -110,13 +122,28 @@ export default function ClassroomsPage() {
   });
 
   const createClassroomMutation = useMutation({
-    mutationFn: () => apiRequest("/api/classrooms", {
-      method: "POST",
-      body: JSON.stringify({
-        ...newClassroomForm,
-        gradeFolderId: newClassroomFolderId ?? null,
-      }),
-    }),
+    mutationFn: async () => {
+      const classroom = await apiRequest("/api/classrooms", {
+        method: "POST",
+        body: JSON.stringify({
+          ...newClassroomForm,
+          gradeFolderId: newClassroomFolderId ?? null,
+        }),
+      }) as Classroom;
+      // Enroll selected students sequentially
+      const enrollIds = Array.from(selectedStudentIds);
+      for (const studentId of enrollIds) {
+        try {
+          await apiRequest(`/api/classrooms/${classroom.id}/enroll`, {
+            method: "POST",
+            body: JSON.stringify({ studentId }),
+          });
+        } catch {
+          // skip if already enrolled or error for individual student
+        }
+      }
+      return classroom;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
@@ -124,6 +151,8 @@ export default function ClassroomsPage() {
       setNewClassroomOpen(false);
       setNewClassroomForm({ name: "", subject: "", description: "" });
       setNewClassroomFolderId(null);
+      setSelectedStudentIds(new Set());
+      setStudentSearch("");
     },
     onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, type: "error" }),
   });
@@ -402,7 +431,7 @@ export default function ClassroomsPage() {
       </Dialog>
 
       {/* New Classroom dialog */}
-      <Dialog open={newClassroomOpen} onOpenChange={(v) => { if (!v) { setNewClassroomOpen(false); } }}>
+      <Dialog open={newClassroomOpen} onOpenChange={(v) => { if (!v) { setNewClassroomOpen(false); setSelectedStudentIds(new Set()); setStudentSearch(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -454,13 +483,66 @@ export default function ClassroomsPage() {
               </div>
             )}
 
+            {/* Student enrollment */}
+            <div>
+              <p className="text-sm font-medium mb-1 flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                Enroll Students
+                <span className="text-muted-foreground font-normal">(optional)</span>
+                {selectedStudentIds.size > 0 && (
+                  <Badge variant="secondary" className="ml-auto text-xs">{selectedStudentIds.size} selected</Badge>
+                )}
+              </p>
+              {teacherStudents.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No students available. Students can join using an invite code after the classroom is created.</p>
+              ) : (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="p-2 border-b border-border">
+                    <Input
+                      placeholder="Search students…"
+                      value={studentSearch}
+                      onChange={e => setStudentSearch(e.target.value)}
+                      className="h-7 text-sm"
+                    />
+                  </div>
+                  <div className="max-h-36 overflow-y-auto">
+                    {teacherStudents
+                      .filter(s => !studentSearch || s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.email.toLowerCase().includes(studentSearch.toLowerCase()))
+                      .map(s => {
+                        const isSelected = selectedStudentIds.has(s.id);
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedStudentIds(prev => {
+                                const next = new Set(prev);
+                                isSelected ? next.delete(s.id) : next.add(s.id);
+                                return next;
+                              });
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-muted/60 transition-colors ${isSelected ? "bg-primary/5" : ""}`}
+                          >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
+                              {isSelected && <Check className="h-3 w-3 text-white" />}
+                            </div>
+                            <span className="flex-1 font-medium">{s.name}</span>
+                            {s.gradeLevel && <span className="text-xs text-muted-foreground shrink-0">{s.gradeLevel}</span>}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Button
               className="w-full"
               disabled={!newClassroomForm.name || !newClassroomForm.subject || createClassroomMutation.isPending}
               onClick={() => createClassroomMutation.mutate()}
             >
               {createClassroomMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Create Classroom
+              Create Classroom{selectedStudentIds.size > 0 ? ` & Enroll ${selectedStudentIds.size} Student${selectedStudentIds.size === 1 ? "" : "s"}` : ""}
             </Button>
           </div>
         </DialogContent>

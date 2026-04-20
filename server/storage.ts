@@ -1526,6 +1526,7 @@ class PrismaStorage implements IStorage {
       teacherName: c.teacher?.name ?? null,
       gradeFolderId: c.gradeFolderId ?? null,
       gradeFolderName: c.gradeFolder?.name ?? null,
+      gradeFolder: c.gradeFolderId && c.gradeFolder ? { id: c.gradeFolderId, name: c.gradeFolder.name } : null,
     };
   }
 
