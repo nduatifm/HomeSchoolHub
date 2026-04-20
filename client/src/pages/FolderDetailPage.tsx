@@ -225,7 +225,7 @@ export default function FolderDetailPage() {
       setDeletingClassroom(null);
       toast({
         title: "Classroom moved to Recently Deleted.",
-        description: "Restore it from the main Classrooms page within 30 days.",
+        description: "You can restore it from the Recently Deleted section on the Classrooms page within 30 days.",
       });
     },
     onError: (e: any) => toast({ title: "Failed to delete classroom", description: e.message, type: "error" }),
@@ -351,7 +351,7 @@ export default function FolderDetailPage() {
 
   const isLoading = classroomsLoading || foldersLoading;
 
-  if (!isLoading && !folder && !isNaN(folderId)) {
+  if (!isLoading && !folder) {
     navigate("/classrooms");
     return null;
   }
@@ -409,8 +409,14 @@ export default function FolderDetailPage() {
                       <DropdownMenuItem
                         className="gap-2 text-destructive focus:text-destructive"
                         onClick={() => {
-                          if (window.confirm(`Delete folder "${folder.name}"? This will fail if any classrooms are still inside it.`)) {
+                          const hasContent = folderClassrooms.length > 0;
+                          const msg = hasContent
+                            ? `"${folder.name}" still has ${folderClassrooms.length} subject${folderClassrooms.length === 1 ? "" : "s"}. Move or delete them first, then try again.`
+                            : `Delete folder "${folder.name}"? This cannot be undone.`;
+                          if (!hasContent && window.confirm(msg)) {
                             deleteFolderMutation.mutate();
+                          } else if (hasContent) {
+                            window.alert(msg);
                           }
                         }}
                       >

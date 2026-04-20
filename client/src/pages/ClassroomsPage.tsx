@@ -552,7 +552,9 @@ export default function ClassroomsPage() {
                                   <DropdownMenuItem
                                     className="gap-2 text-destructive focus:text-destructive"
                                     onClick={() => {
-                                      if (window.confirm(`Delete folder "${folder.name}"? This will fail if any classrooms are still inside it.`)) {
+                                      if (subjectCount > 0) {
+                                        window.alert(`"${folder.name}" still has ${subjectCount} subject${subjectCount === 1 ? "" : "s"}. Move or delete them first, then try again.`);
+                                      } else if (window.confirm(`Delete folder "${folder.name}"? This cannot be undone.`)) {
                                         deleteFolderMutation.mutate(folder.id);
                                       }
                                     }}

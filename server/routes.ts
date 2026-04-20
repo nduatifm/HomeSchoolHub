@@ -4430,8 +4430,8 @@ export function registerRoutes(app: Express) {
       const folderId = parseInt(req.params.id);
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
       if (!folders.find(f => f.id === folderId)) return res.status(403).json({ error: "Not your folder" });
-      // Block delete if classrooms are still assigned to this folder
-      const linked = await prisma.classroom.count({ where: { gradeFolderId: folderId } });
+      // Block delete if active or archived (but not soft-deleted) classrooms are still in this folder
+      const linked = await prisma.classroom.count({ where: { gradeFolderId: folderId, deletedAt: null } });
       if (linked > 0) {
         return res.status(409).json({ error: `Cannot delete: ${linked} classroom${linked === 1 ? "" : "s"} still in this folder. Move or reassign them first.` });
       }
