@@ -46,7 +46,7 @@ export default function ClassroomsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const isTeacher = user?.role === "teacher";
+  const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
 
   const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({
     queryKey: ["/api/classrooms"],
@@ -155,16 +155,6 @@ export default function ClassroomsPage() {
       setStudentSearch("");
     },
     onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, type: "error" }),
-  });
-
-  const moveClassroomMutation = useMutation({
-    mutationFn: ({ classroomId, gradeFolderId }: { classroomId: number; gradeFolderId: number | null }) =>
-      apiRequest(`/api/classrooms/${classroomId}`, { method: "PATCH", body: JSON.stringify({ gradeFolderId }) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: "Classroom moved!" });
-    },
-    onError: (e: any) => toast({ title: "Failed to move classroom", description: e.message, type: "error" }),
   });
 
   const openNewClassroom = (folderId: number | null) => {
