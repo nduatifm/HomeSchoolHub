@@ -23,6 +23,7 @@ import AdminUsers from "./pages/AdminUsers";
 import NotificationsPage from "./pages/Notifications";
 import FormBuilderPage from "./pages/FormBuilderPage";
 import ClassroomsPage from "./pages/ClassroomsPage";
+import FolderDetailPage from "./pages/FolderDetailPage";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -164,6 +165,9 @@ function AppRoutes() {
       </Route>
       <Route path="/classrooms/:slug/materials/:materialSlug">
         <ProtectedRoute component={ClassroomMaterialPage} />
+      </Route>
+      <Route path="/classrooms/folders/:folderId">
+        <ProtectedRoute component={FolderDetailPage} />
       </Route>
       <Route path="/classrooms/:slug">
         <ProtectedRoute component={ClassroomDetail} />

@@ -106,14 +106,6 @@ export default function ClassroomsPage() {
     enabled: isTeacher,
   });
 
-  const [collapsedFolders, setCollapsedFolders] = useState<Set<number>>(new Set());
-  const toggleFolder = (id: number) =>
-    setCollapsedFolders(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
   const [collapsedArchived, setCollapsedArchived] = useState(true);
   const [collapsedTrash, setCollapsedTrash] = useState(false);
 
@@ -506,91 +498,85 @@ export default function ClassroomsPage() {
 
           {!isLoading && (
             <div className="space-y-6">
-              {/* Grade folders — only active classrooms */}
-              {folders.map(folder => {
-                const folderClassrooms = classroomsByFolder[folder.id] ?? [];
-                const isExpanded = !collapsedFolders.has(folder.id);
-                return (
-                  <div key={folder.id} className="border border-border rounded-xl overflow-hidden">
-                    {/* Folder header */}
-                    <div className="flex items-center gap-2 px-4 py-3 bg-muted/40 border-b border-border">
-                      <button
-                        onClick={() => toggleFolder(folder.id)}
-                        className="flex items-center gap-2 flex-1 text-left group"
-                      >
-                        {isExpanded
-                          ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        }
-                        <Folder className="h-4 w-4 text-primary" />
-                        <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                          {folder.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {folderClassrooms.length} {folderClassrooms.length === 1 ? "class" : "classes"}
-                        </span>
-                      </button>
-                      {isTeacher && (
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => openNewClassroom(folder.id)}
+              {/* Grade folder cards grid */}
+              {folders.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    Grade Folders
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {folders.map(folder => {
+                      const folderClassrooms = classroomsByFolder[folder.id] ?? [];
+                      const subjectCount = folderClassrooms.length;
+                      return (
+                        <div key={folder.id} className="relative group/folder">
+                          <button
+                            onClick={() => navigate(`/classrooms/folders/${folder.id}`)}
+                            className="w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
                           >
-                            <Plus className="h-3.5 w-3.5" />Add Subject
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditFolder(folder)} className="gap-2">
-                                <Pencil className="h-3.5 w-3.5" />Rename
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="gap-2 text-destructive focus:text-destructive"
-                                onClick={() => {
-                                  if (window.confirm(`Delete folder "${folder.name}"? This will fail if any classrooms are still inside it.`)) {
-                                    deleteFolderMutation.mutate(folder.id);
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Folder content */}
-                    {isExpanded && (
-                      <div className="p-4">
-                        {folderClassrooms.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground text-sm">
-                            No subjects yet.{" "}
-                            {isTeacher && (
-                              <button
+                            <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
+                              <Folder className="h-10 w-10 text-primary opacity-70" />
+                            </div>
+                            <div className="px-4 py-3 flex flex-col gap-1 flex-1">
+                              <h3 className="font-bold text-sm text-foreground leading-snug">{folder.name}</h3>
+                              <span className="text-xs text-muted-foreground">
+                                {subjectCount} {subjectCount === 1 ? "subject" : "subjects"}
+                              </span>
+                              <div className="mt-auto pt-3 flex items-center justify-between">
+                                <span className="text-xs font-semibold text-primary group-hover/folder:underline">Open Folder</span>
+                                <ChevronRight className="h-3.5 w-3.5 text-primary opacity-60 group-hover/folder:opacity-100 transition-opacity" />
+                              </div>
+                            </div>
+                          </button>
+                          {isTeacher && (
+                            <div
+                              className="absolute top-2 right-2 z-20 opacity-0 group-hover/folder:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-1"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs gap-1 bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm rounded-full text-muted-foreground hover:text-foreground"
                                 onClick={() => openNewClassroom(folder.id)}
-                                className="text-primary hover:underline font-medium"
                               >
-                                Add a subject
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {folderClassrooms.map(c => renderCard(c))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                                <Plus className="h-3 w-3" />Add Subject
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm rounded-full"
+                                  >
+                                    <MoreVertical className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditFolder(folder)} className="gap-2">
+                                    <Pencil className="h-3.5 w-3.5" />Rename
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="gap-2 text-destructive focus:text-destructive"
+                                    onClick={() => {
+                                      if (window.confirm(`Delete folder "${folder.name}"? This will fail if any classrooms are still inside it.`)) {
+                                        deleteFolderMutation.mutate(folder.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              )}
 
               {/* Ungrouped active classrooms */}
               {(() => {
