@@ -430,15 +430,16 @@ model GradeFolder {
 }
 
 model Classroom {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   name          String
   subject       String
   description   String?
   teacherId     Int
-  status        String   @default("active")
-  slug          String?  @unique
-  createdAt     DateTime @default(now())
+  status        String    @default("active")
+  slug          String?   @unique
+  createdAt     DateTime  @default(now())
   gradeFolderId Int?
+  deletedAt     DateTime?
 
   teacher     User                  @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
   gradeFolder GradeFolder?          @relation(fields: [gradeFolderId], references: [id], onDelete: SetNull)

@@ -230,14 +230,41 @@ export default function ClassroomsPage() {
     onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
   });
 
-  const deleteClassroomMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}`, { method: "DELETE" }),
+  const restoreClassroomMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}/restore`, { method: "POST" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
-      toast({ title: "Classroom deleted." });
+      toast({ title: "Classroom restored." });
+    },
+    onError: (e: any) => toast({ title: "Failed to restore classroom", description: e.message, type: "error" }),
+  });
+
+  const deleteClassroomMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/classrooms/${id}`, { method: "DELETE" }),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
       setDeleteClassroomOpen(false);
       setDeletingClassroom(null);
+      const { dismiss } = toast({
+        title: "Classroom deleted.",
+        description: "Click Undo to restore it before it is permanently removed.",
+        action: (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-2 shrink-0"
+            onClick={() => {
+              restoreClassroomMutation.mutate(id);
+              dismiss();
+            }}
+          >
+            Undo
+          </Button>
+        ),
+      });
+      setTimeout(dismiss, 8_000);
     },
     onError: (e: any) => toast({ title: "Failed to delete classroom", description: e.message, type: "error" }),
   });

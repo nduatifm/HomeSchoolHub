@@ -277,7 +277,11 @@ export interface IStorage {
   getClassroomsForStudent(studentId: number): Promise<Classroom[]>;
   getClassroomsForParent(studentId: number): Promise<Classroom[]>;
   updateClassroom(id: number, data: Partial<InsertClassroom>): Promise<Classroom>;
-  deleteClassroom(id: number): Promise<void>;
+  softDeleteClassroom(id: number): Promise<void>;
+  getSoftDeletedClassroomById(id: number): Promise<(Classroom & { deletedAt: Date | null }) | null>;
+  restoreClassroom(id: number): Promise<void>;
+  hardDeleteClassroom(id: number): Promise<void>;
+  purgeExpiredSoftDeletes(cutoffDate: Date): Promise<void>;
 
   enrollStudent(classroomId: number, studentId: number): Promise<ClassroomEnrollment>;
   unenrollStudent(classroomId: number, studentId: number): Promise<void>;
@@ -1563,6 +1567,7 @@ class PrismaStorage implements IStorage {
       orderBy: { createdAt: "asc" },
       include: {
         classrooms: {
+          where: { deletedAt: null },
           orderBy: { createdAt: "asc" },
         },
       },
@@ -1591,24 +1596,33 @@ class PrismaStorage implements IStorage {
   }
 
   async getClassroomBySlug(slug: string): Promise<Classroom | null> {
-    const c = await prisma.classroom.findUnique({
-      where: { slug },
+    const c = await prisma.classroom.findFirst({
+      where: { slug, deletedAt: null },
       include: { gradeFolder: { select: { name: true } } },
     });
     return c ? this.mapClassroom(c) : null;
   }
 
   async getClassroomById(id: number): Promise<Classroom | null> {
-    const c = await prisma.classroom.findUnique({
-      where: { id },
+    const c = await prisma.classroom.findFirst({
+      where: { id, deletedAt: null },
       include: { gradeFolder: { select: { name: true } } },
     });
     return c ? this.mapClassroom(c) : null;
   }
 
+  async getSoftDeletedClassroomById(id: number): Promise<(Classroom & { deletedAt: Date | null }) | null> {
+    const c = await prisma.classroom.findUnique({
+      where: { id },
+      include: { gradeFolder: { select: { name: true } } },
+    });
+    if (!c || c.deletedAt === null) return null;
+    return { ...this.mapClassroom(c), deletedAt: c.deletedAt };
+  }
+
   async getClassroomsByTeacher(teacherId: number): Promise<Classroom[]> {
     const rows = await prisma.classroom.findMany({
-      where: { teacherId },
+      where: { teacherId, deletedAt: null },
       include: { gradeFolder: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -1617,7 +1631,7 @@ class PrismaStorage implements IStorage {
 
   async getClassroomsForStudent(studentId: number): Promise<Classroom[]> {
     const enrollments = await prisma.classroomEnrollment.findMany({
-      where: { studentId },
+      where: { studentId, classroom: { deletedAt: null } },
       include: { classroom: { include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } } } },
       orderBy: { enrolledAt: "desc" },
     });
@@ -1637,8 +1651,24 @@ class PrismaStorage implements IStorage {
     return this.mapClassroom(c);
   }
 
-  async deleteClassroom(id: number): Promise<void> {
-    await prisma.classroom.delete({ where: { id } });
+  async softDeleteClassroom(id: number): Promise<void> {
+    await prisma.classroom.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  async restoreClassroom(id: number): Promise<void> {
+    await prisma.classroom.update({ where: { id }, data: { deletedAt: null } });
+  }
+
+  async hardDeleteClassroom(id: number): Promise<void> {
+    // Conditional delete: only removes the classroom if it is still soft-deleted,
+    // avoiding a race between the timer callback and a near-simultaneous restore.
+    await prisma.classroom.deleteMany({ where: { id, deletedAt: { not: null } } });
+  }
+
+  async purgeExpiredSoftDeletes(cutoffDate: Date): Promise<void> {
+    await prisma.classroom.deleteMany({
+      where: { deletedAt: { not: null, lte: cutoffDate } },
+    });
   }
 
   async enrollStudent(classroomId: number, studentId: number): Promise<ClassroomEnrollment> {

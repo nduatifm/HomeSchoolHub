@@ -4551,12 +4551,69 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // DELETE /api/classrooms/:id — teacher deletes classroom
+  // Grace period (ms) for classroom undo-deletion
+  const CLASSROOM_DELETE_GRACE_MS = 30_000;
+
+  // In-memory map to cancel in-process timers quickly (best-effort; not required for correctness)
+  const pendingDeletionTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  // DB-driven cleanup: permanently delete any classroom whose deletedAt is past the grace window.
+  // Runs on startup and every 10 seconds to survive server restarts during the grace period.
+  const runExpiredDeletionPurge = async () => {
+    try {
+      const cutoff = new Date(Date.now() - CLASSROOM_DELETE_GRACE_MS);
+      await storage.purgeExpiredSoftDeletes(cutoff);
+    } catch (err) {
+      console.error("[classroom-purge] Failed to purge expired soft-deletes:", err);
+    }
+  };
+  runExpiredDeletionPurge();
+  setInterval(runExpiredDeletionPurge, 10_000);
+
+  // DELETE /api/classrooms/:id — teacher soft-deletes classroom (30s grace period)
   app.delete("/api/classrooms/:id", requireAuth, async (req, res) => {
     try {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
-      await storage.deleteClassroom(classroom.id);
+      await storage.softDeleteClassroom(classroom.id);
+      // Also schedule an in-process timer for low-latency deletion when the server stays running
+      const existing = pendingDeletionTimers.get(classroom.id);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(async () => {
+        pendingDeletionTimers.delete(classroom.id);
+        try {
+          // hardDeleteClassroom uses a conditional deleteMany (only when deletedAt IS NOT NULL),
+          // so this is safe even if a restore ran concurrently.
+          await storage.hardDeleteClassroom(classroom.id);
+        } catch (err) {
+          console.error(`[classroom-delete] Failed to hard-delete classroom ${classroom.id}:`, err);
+        }
+      }, CLASSROOM_DELETE_GRACE_MS);
+      pendingDeletionTimers.set(classroom.id, timer);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:id/restore — teacher restores a soft-deleted classroom within grace period
+  app.post("/api/classrooms/:id/restore", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid classroom id" });
+      // getSoftDeletedClassroomById only returns classrooms that are currently soft-deleted
+      const classroom = await storage.getSoftDeletedClassroomById(id);
+      if (!classroom) return res.status(404).json({ error: "Classroom not found or already permanently deleted" });
+      if (classroom.teacherId !== req.session.userId) return res.status(403).json({ error: "Not your classroom" });
+      // Enforce the grace window based on persisted deletedAt (survives server restarts)
+      const deletedAt = classroom.deletedAt instanceof Date ? classroom.deletedAt : new Date(classroom.deletedAt!);
+      if (Date.now() - deletedAt.getTime() > CLASSROOM_DELETE_GRACE_MS) {
+        return res.status(409).json({ error: "Undo window has expired" });
+      }
+      // Cancel any in-process timer
+      const timer = pendingDeletionTimers.get(id);
+      if (timer) { clearTimeout(timer); pendingDeletionTimers.delete(id); }
+      await storage.restoreClassroom(id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
