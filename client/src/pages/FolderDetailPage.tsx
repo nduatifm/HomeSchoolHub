@@ -48,7 +48,6 @@ type TeacherStudent = { id: number; name: string; email: string; gradeLevel?: st
 
 export default function FolderDetailPage() {
   const { folderId: folderIdParam } = useParams<{ folderId: string }>();
-  const folderId = parseInt(folderIdParam ?? "");
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -74,7 +73,11 @@ export default function FolderDetailPage() {
     enabled: isTeacher,
   });
 
-  const folder = folders.find(f => f.id === folderId) ?? null;
+  // Resolve folder by slug (preferred) or numeric id (backward-compatible)
+  const folder = folders.find(f =>
+    f.slug === folderIdParam || String(f.id) === folderIdParam
+  ) ?? null;
+  const folderId = folder?.id ?? -1;
 
   const folderClassrooms = classrooms.filter(c => c.gradeFolderId === folderId);
   const activeClassrooms = folderClassrooms.filter(c => c.status !== "archived");

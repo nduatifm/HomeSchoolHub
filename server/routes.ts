@@ -193,18 +193,23 @@ export function registerRoutes(app: Express) {
   // Regenerate all slugs with new slug format
   (async () => {
     try {
-      const [classrooms, classroomAssignments, classroomMaterials, users, assignments, materials] = await Promise.all([
+      const [classrooms, classroomAssignments, classroomMaterials, users, assignments, materials, gradeFolders] = await Promise.all([
         prisma.classroom.findMany({ select: { id: true, name: true } }),
         prisma.classroomAssignment.findMany({ select: { id: true, title: true } }),
         prisma.classroomMaterial.findMany({ select: { id: true, title: true } }),
         prisma.user.findMany({ select: { id: true, name: true } }),
         prisma.assignment.findMany({ select: { id: true, title: true } }),
         prisma.material.findMany({ select: { id: true, title: true } }),
+        prisma.gradeFolder.findMany({ select: { id: true, name: true } }),
       ]);
       const work: Promise<unknown>[] = [];
       if (classrooms.length > 0) {
         work.push(...classrooms.map((r) => prisma.classroom.update({ where: { id: r.id }, data: { slug: slugify(r.name, r.id) } })));
         console.log(`[slugs] Regenerated ${classrooms.length} classroom slug(s)`);
+      }
+      if (gradeFolders.length > 0) {
+        work.push(...gradeFolders.map((r) => prisma.gradeFolder.update({ where: { id: r.id }, data: { slug: slugify(r.name, r.id) } })));
+        console.log(`[slugs] Regenerated ${gradeFolders.length} grade folder slug(s)`);
       }
       if (classroomAssignments.length > 0) {
         work.push(...classroomAssignments.map((r) => prisma.classroomAssignment.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));

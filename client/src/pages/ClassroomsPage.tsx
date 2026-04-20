@@ -512,7 +512,7 @@ export default function ClassroomsPage() {
                       return (
                         <div key={folder.id} className="relative group/folder">
                           <button
-                            onClick={() => navigate(`/classrooms/folders/${folder.id}`)}
+                            onClick={() => navigate(`/classrooms/folders/${folder.slug ?? folder.id}`)}
                             className="w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
                           >
                             <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
