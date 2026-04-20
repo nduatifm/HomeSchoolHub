@@ -19,12 +19,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   School,
   FolderOpen,
   Folder,
+  FolderInput,
   Plus,
   Loader2,
   MoreVertical,
@@ -87,6 +92,7 @@ export default function ClassroomsPage() {
   const [newClassroomForm, setNewClassroomForm] = useState({ name: "", subject: "", description: "" });
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
   const [studentSearch, setStudentSearch] = useState("");
+  const [movingClassroomId, setMovingClassroomId] = useState<number | null>(null);
 
   const createFolderMutation = useMutation({
     mutationFn: () => apiRequest("/api/grade-folders", { method: "POST", body: JSON.stringify({ name: newFolderName }) }),
@@ -169,6 +175,25 @@ export default function ClassroomsPage() {
     onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, type: "error" }),
   });
 
+  const moveClassroomMutation = useMutation({
+    mutationFn: ({ classroomId, folderId }: { classroomId: number; folderId: number | null }) =>
+      apiRequest(`/api/classrooms/${classroomId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ gradeFolderId: folderId }),
+      }),
+    onMutate: ({ classroomId }) => setMovingClassroomId(classroomId),
+    onSuccess: (_, { folderId }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
+      const folderName = folderId !== null ? folders.find(f => f.id === folderId)?.name : null;
+      toast({ title: folderName ? `Moved to ${folderName}` : "Moved to Other Classrooms" });
+      setMovingClassroomId(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Failed to move classroom", description: e.message, type: "error" });
+      setMovingClassroomId(null);
+    },
+  });
+
   const openNewClassroom = (folderId: number | null) => {
     setNewClassroomFolderId(folderId);
     setNewClassroomForm({ name: "", subject: "", description: "" });
@@ -192,6 +217,82 @@ export default function ClassroomsPage() {
     const stats = classroomStats[c.id];
     if (!stats || stats.toGradeCount === 0) return null;
     return { pendingCount: stats.toGradeCount, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount };
+  };
+
+  const renderCard = (c: Classroom) => {
+    const isMoving = movingClassroomId === c.id;
+    return (
+      <div key={c.id} className="relative group/card">
+        <ClassroomCard
+          classroom={c}
+          href={`/classrooms/${c.slug ?? c.id}`}
+          ctaLabel={isTeacher ? "Open Classroom" : undefined}
+          notification={notifForClassroom(c)}
+        />
+        {isTeacher && (
+          <div
+            className="absolute top-2 right-2 z-20 opacity-0 group-hover/card:opacity-100 focus-within:opacity-100 transition-opacity"
+            onClick={e => e.stopPropagation()}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 bg-white/80 backdrop-blur-sm hover:bg-white shadow-sm rounded-full"
+                  disabled={isMoving}
+                >
+                  {isMoving
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <MoreVertical className="h-3.5 w-3.5" />
+                  }
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="gap-2 text-sm">
+                    <FolderInput className="h-3.5 w-3.5 shrink-0" />
+                    Move to…
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem
+                      className="gap-2"
+                      disabled={c.gradeFolderId === null}
+                      onClick={() => {
+                        if (c.gradeFolderId !== null) {
+                          moveClassroomMutation.mutate({ classroomId: c.id, folderId: null });
+                        }
+                      }}
+                    >
+                      <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1">Other Classrooms</span>
+                      {c.gradeFolderId === null && <Check className="h-3 w-3 text-primary shrink-0" />}
+                    </DropdownMenuItem>
+                    {folders.length > 0 && <DropdownMenuSeparator />}
+                    {folders.map(f => (
+                      <DropdownMenuItem
+                        key={f.id}
+                        className="gap-2"
+                        disabled={c.gradeFolderId === f.id}
+                        onClick={() => {
+                          if (c.gradeFolderId !== f.id) {
+                            moveClassroomMutation.mutate({ classroomId: c.id, folderId: f.id });
+                          }
+                        }}
+                      >
+                        <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="flex-1 truncate">{f.name}</span>
+                        {c.gradeFolderId === f.id && <Check className="h-3 w-3 text-primary shrink-0" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const isLoading = classroomsLoading || foldersLoading;
@@ -321,15 +422,7 @@ export default function ClassroomsPage() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {folderClassrooms.map(c => (
-                              <ClassroomCard
-                                key={c.id}
-                                classroom={c}
-                                href={`/classrooms/${c.slug ?? c.id}`}
-                                ctaLabel="Open Classroom"
-                                notification={notifForClassroom(c)}
-                              />
-                            ))}
+                            {folderClassrooms.map(c => renderCard(c))}
                           </div>
                         )}
                       </div>
@@ -363,15 +456,7 @@ export default function ClassroomsPage() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {ungrouped.map(c => (
-                          <ClassroomCard
-                            key={c.id}
-                            classroom={c}
-                            href={`/classrooms/${c.slug ?? c.id}`}
-                            ctaLabel={isTeacher ? "Open Classroom" : undefined}
-                            notification={notifForClassroom(c)}
-                          />
-                        ))}
+                        {ungrouped.map(c => renderCard(c))}
                       </div>
                     )}
                   </div>
