@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -351,10 +351,13 @@ export default function FolderDetailPage() {
 
   const isLoading = classroomsLoading || foldersLoading;
 
-  if (!isLoading && !folder) {
-    navigate("/classrooms");
-    return null;
-  }
+  useEffect(() => {
+    if (!isLoading && !folder) {
+      navigate("/classrooms");
+    }
+  }, [isLoading, folder, navigate]);
+
+  if (!isLoading && !folder) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -385,6 +388,7 @@ export default function FolderDetailPage() {
                 <Button
                   size="sm"
                   className="gap-1.5"
+                  disabled={!folder}
                   onClick={() => setNewClassroomOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
