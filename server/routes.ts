@@ -4849,7 +4849,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional(),
         dueDate: z.string().min(1).optional(),
         points: z.number().int().min(1).max(10000).optional().nullable().transform((v) => (v == null ? undefined : v)),
-        fileUrl: z.string().nullable().optional(),
+        fileUrl: z.string().url().nullable().optional(),
         linkUrl: z.string().nullable().optional().transform((v) => {
           if (!v || !v.trim()) return null;
           const trimmed = v.trim();
