@@ -2096,7 +2096,7 @@ class PrismaStorage implements IStorage {
       studentId: updated.studentId,
       content: updated.content ?? null,
       fileUrl: updated.fileUrl ?? null,
-      formAnswers: (updated.formAnswers as any) ?? null,
+      formAnswers: (updated.formAnswers as Record<string, string | string[]> | null) ?? null,
       status: updated.status as ClassroomSubmission["status"],
       submittedAt: updated.submittedAt ?? null,
       grade: updated.grade ?? null,

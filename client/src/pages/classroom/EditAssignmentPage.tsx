@@ -200,7 +200,8 @@ export default function EditAssignmentPage() {
   });
 
   const didSave = saveMutation.isSuccess;
-  const pointsValid = !!form.points && !isNaN(parseInt(form.points, 10)) && parseInt(form.points, 10) >= 1;
+  const pointsNum = parseInt(form.points, 10);
+  const pointsValid = !!form.points && !isNaN(pointsNum) && pointsNum >= 1 && pointsNum <= 10000;
   const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !!assignment && !saveMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}`;
 
