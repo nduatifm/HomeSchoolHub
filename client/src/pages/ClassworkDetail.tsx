@@ -273,7 +273,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
                   answers={mySubmission.formAnswers as Record<string, string | string[]>}
                   onChange={() => {}}
                   disabled
-                  answerKey={mySubmission.status === "graded" || mySubmission.grade !== null
+                  answerKey={mySubmission.status !== "pending"
                     ? (assignment.answerKey ?? undefined)
                     : undefined}
                   hideNeedsReview

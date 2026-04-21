@@ -4775,7 +4775,8 @@ export function registerRoutes(app: Express) {
       if (rawAnswerKey) {
         try {
           const parsed = JSON.parse(rawAnswerKey);
-          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) answerKey = parsed;
+          const validated = z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional().safeParse(parsed);
+          if (validated.success && validated.data) answerKey = validated.data;
         } catch { answerKey = undefined; }
       }
 
