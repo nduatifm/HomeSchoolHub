@@ -297,7 +297,7 @@ export default function Profile() {
     if (yearsExperience) {
       const n = parseInt(yearsExperience);
       if (isNaN(n) || n < 0 || n > 100) {
-        toast({ title: "Invalid input", description: "Must be 0–100", type: "error" }); return;
+        toast({ title: "Years of experience must be between 0 and 100.", type: "warning" }); return;
       }
       updateDetailsMutation.mutate(detailsPayload({ yearsExperience: n }));
     } else {
@@ -314,10 +314,10 @@ export default function Profile() {
 
   const handlePasswordSave = () => {
     if (newPassword !== confirmPassword) {
-      toast({ title: "Passwords don't match", description: "New password and confirm must match", type: "error" }); return;
+      toast({ title: "Passwords don't match — re-enter to confirm.", type: "warning" }); return;
     }
     if (newPassword.length < 8) {
-      toast({ title: "Password too short", description: "Must be at least 8 characters", type: "error" }); return;
+      toast({ title: "Password must be at least 8 characters.", type: "warning" }); return;
     }
     changePasswordMutation.mutate({ currentPassword, newPassword });
   };
@@ -326,8 +326,8 @@ export default function Profile() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { toast({ title: "Invalid file", description: "Please select an image", type: "error" }); return; }
-    if (file.size > 5 * 1024 * 1024) { toast({ title: "Too large", description: "Max 5 MB", type: "error" }); return; }
+    if (!file.type.startsWith("image/")) { toast({ title: "Please select an image file.", type: "warning" }); return; }
+    if (file.size > 5 * 1024 * 1024) { toast({ title: "Photo must be under 5 MB.", type: "warning" }); return; }
 
     setUploadingImage(true);
     try {

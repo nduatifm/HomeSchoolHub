@@ -45,7 +45,7 @@ export default function Login() {
       setLocation("/dashboard");
     } catch (error: any) {
       setIsLoading(false);
-      toast({ title: "Login failed — check your credentials and try again.", type: "error" });
+      toast({ title: "Login failed — check your credentials and try again.", type: "error", duration: 5000 });
     }
   }
 
