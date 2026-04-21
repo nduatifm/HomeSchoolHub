@@ -2039,7 +2039,7 @@ class PrismaStorage implements IStorage {
         assignments: {
           include: {
             submissions: {
-              where: { status: { in: ["submitted", "late"] }, grade: null },
+              where: { status: { in: ["submitted", "late"] } },
               select: { id: true },
             },
           },

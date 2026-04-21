@@ -4971,17 +4971,17 @@ export function registerRoutes(app: Express) {
         typeof answerKeyRaw === "object" &&
         !Array.isArray(answerKeyRaw) &&
         Array.isArray(assignment.formSchema) &&
-        assignment.formSchema.length > 0 &&
-        formAnswers
+        assignment.formSchema.length > 0
       ) {
         const answerKey = answerKeyRaw as Record<string, string | string[]>;
+        const effectiveAnswers = formAnswers ?? {};
         const keyedQuestions = (assignment.formSchema as Array<{ id: string; type: string }>).filter((q) => answerKey[q.id] !== undefined);
         const keyedTotal = keyedQuestions.length;
         if (keyedTotal > 0) {
           let correct = 0;
           for (const q of keyedQuestions) {
             const correct_answer = answerKey[q.id];
-            const student_answer = formAnswers[q.id];
+            const student_answer = effectiveAnswers[q.id];
             if (q.type === "checkbox") {
               const expected = (Array.isArray(correct_answer) ? correct_answer : [correct_answer]).map((v) => v.trim().toLowerCase()).sort();
               const actual = (Array.isArray(student_answer) ? student_answer : [student_answer ?? ""]).map((v) => v.trim().toLowerCase()).sort();
