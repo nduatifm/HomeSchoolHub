@@ -1771,8 +1771,6 @@ class PrismaStorage implements IStorage {
 
   async createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment> {
     const { answerKey, formSchema, ...rest } = data;
-    console.log("[createClassroomAssignment] rest:", JSON.stringify(rest));
-    console.log("[createClassroomAssignment] formSchema present:", formSchema !== undefined, "answerKey present:", answerKey !== undefined);
     const safeFormSchema = formSchema !== undefined ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : undefined;
     const safeAnswerKey = answerKey !== undefined ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : undefined;
     const a = await prisma.classroomAssignment.create({
@@ -1782,7 +1780,6 @@ class PrismaStorage implements IStorage {
         ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey } : {}),
       },
     });
-    console.log("[createClassroomAssignment] created id:", a.id);
     const slug = slugify(a.title, a.id);
     const updated = await prisma.classroomAssignment.update({ where: { id: a.id }, data: { slug } });
     // Auto-create pending submissions for all currently enrolled students
