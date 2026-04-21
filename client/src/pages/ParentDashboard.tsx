@@ -163,8 +163,7 @@ function ParentRequestTutorDialog({
       onClose();
     },
     onError: (err: any) => {
-      const msg = err?.message || "Failed to send request. Please try again.";
-      toast({ title: "Could not send request", description: msg, type: "error" });
+      toast({ title: "Couldn't send request — try again.", type: "error" });
     },
   });
 

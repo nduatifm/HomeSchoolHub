@@ -4,6 +4,7 @@ import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   Loader2,
   Plus,
@@ -24,6 +25,7 @@ import type { SubmissionWithName } from "./types";
 
 export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isArchived }: { classroomId: number; classroomSlug: string | number; isArchived: boolean }) {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
   const { data: assignments = [], isLoading } = useQuery<ClassroomAssignment[]>({
@@ -58,7 +60,7 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment deleted", type: "success" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't delete — try again.", type: "error" }),
   });
 
   return (
@@ -133,7 +135,7 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
-                        onClick={() => { if (confirm("Delete this assignment and all its submissions?")) deleteMutation.mutate(a.id); }}
+                        onClick={() => setConfirmDeleteId(a.id)}
                         disabled={deleteMutation.isPending}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -196,6 +198,13 @@ export default function TeacherAssignmentsTab({ classroomId, classroomSlug, isAr
         })}
       </div>
 
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete this assignment?"
+        description="All student submissions will also be removed."
+        onConfirm={() => { deleteMutation.mutate(confirmDeleteId!); setConfirmDeleteId(null); }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

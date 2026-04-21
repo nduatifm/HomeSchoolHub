@@ -77,7 +77,7 @@ export default function SubmissionReviewPage() {
       toast({ title: "Grade saved", type: "success" });
       navigate(`/classrooms/${classroomSlug}?tab=assignments`);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't save the grade — try again.", type: "error" }),
   });
 
   const assignment = submission?.assignment;

@@ -342,7 +342,7 @@ function TeacherEditor({
       toast({ title: isEdit ? "Classwork updated" : "Classwork created", type: "success" });
       navigate(`/classrooms/${classroomSlug}?tab=classwork`);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
   });
 
   const canSave = title.trim().length > 0 && !saveMutation.isPending && !isUploadingImage;

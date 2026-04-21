@@ -21,6 +21,7 @@ import {
   Link2,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, FormQuestion } from "@shared/schema";
 
@@ -63,6 +64,8 @@ export default function NewAssignmentPage() {
   const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>({});
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const draftId = useRef(Math.random().toString(36).slice(2, 14));
+  const pendingLeave = useRef<(() => void) | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
   const isDirty = !!(form.title.trim() || form.description.trim() || form.dueDate || attachedFile || formQuestions.length > 0 || linkUrl.trim());
 
@@ -158,7 +161,7 @@ export default function NewAssignmentPage() {
       toast({ title: "Assignment created", type: "success" });
       navigate(`/classrooms/${classroomSlug}?tab=assignments`);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
   });
 
   const didSubmit = createMutation.isSuccess;
@@ -178,7 +181,13 @@ export default function NewAssignmentPage() {
 
   function safeNavigate() {
     if (isDirty && !didSubmit) {
-      if (!window.confirm("You have unsaved changes. Leave without creating the assignment?")) return;
+      pendingLeave.current = () => {
+        localStorage.removeItem(getDraftKey(draftId.current));
+        localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+        goBack();
+      };
+      setLeaveDialogOpen(true);
+      return;
     }
     localStorage.removeItem(getDraftKey(draftId.current));
     localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
@@ -218,6 +227,7 @@ export default function NewAssignmentPage() {
   if (user?.role !== "teacher") { navigate(backUrl); return null; }
 
   return (
+    <>
     <div className="flex min-h-screen bg-background">
       <ModernSidebar />
       <div className="flex-1 md:ml-[228px] flex flex-col">
@@ -534,6 +544,18 @@ export default function NewAssignmentPage() {
         </div>
       </div>
     </div>
+
+    <ConfirmDialog
+      open={leaveDialogOpen}
+      title="Leave without saving?"
+      description="Your changes will be lost."
+      confirmLabel="Leave"
+      cancelLabel="Keep editing"
+      destructive={false}
+      onConfirm={() => { setLeaveDialogOpen(false); pendingLeave.current?.(); }}
+      onCancel={() => setLeaveDialogOpen(false)}
+    />
+    </>
   );
 }
 

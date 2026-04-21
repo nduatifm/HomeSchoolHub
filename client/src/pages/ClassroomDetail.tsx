@@ -152,7 +152,7 @@ export default function ClassroomDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       toast({ title: classroom?.status === "active" ? "Classroom archived" : "Classroom reactivated", type: "success" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't update the classroom — try again.", type: "error" }),
   });
 
   if (isLoading) {

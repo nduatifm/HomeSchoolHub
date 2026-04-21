@@ -82,7 +82,7 @@ export default function FeedTab({
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "posts"] });
       toast({ title: "Posted", type: "success" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't post the announcement — try again.", type: "error" }),
   });
 
   const unseenCount = !isTeacher && seenPostIds

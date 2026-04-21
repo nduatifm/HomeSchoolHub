@@ -178,7 +178,7 @@ export default function MessageThread({
       if (textareaRef.current) textareaRef.current.style.height = "auto";
     },
     onError: () => {
-      toast({ title: "Failed to send message", variant: "destructive" });
+      toast({ title: "Couldn't send — try again.", type: "error" });
     },
   });
 
@@ -195,7 +195,7 @@ export default function MessageThread({
       queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
     },
     onError: () => {
-      toast({ title: "Failed to rename thread", variant: "destructive" });
+      toast({ title: "Couldn't rename — try again.", type: "error" });
     },
   });
 

@@ -23,6 +23,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Logo } from "@/components/Logo";
 import {
@@ -76,13 +77,14 @@ export default function ModernSidebar() {
       toast({ title: "Context switched", description: `Now viewing as ${data.user.role}.`, type: "success" });
       setTimeout(() => { window.location.href = "/dashboard"; }, 300);
     },
-    onError: (error: any) =>
-      toast({ title: "Failed to switch", description: error.message || "Something went wrong", type: "error" }),
+    onError: () =>
+      toast({ title: "Couldn't switch role — try again.", type: "error" }),
   });
 
   const otherRoles = (user?.roles ?? []).filter((r) => r !== user?.role);
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [resetDbOpen, setResetDbOpen] = useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -234,16 +236,7 @@ export default function ModernSidebar() {
         {/* Dev-only: Reset Database button */}
         {import.meta.env.DEV && (
           <button
-            onClick={async () => {
-              if (!window.confirm("Reset the database? This will delete ALL users and data permanently.")) return;
-              try {
-                await apiRequest("/api/dev/reset-db", { method: "POST" });
-                toast({ title: "Database reset", description: "All data cleared. Reloading…", type: "success" });
-                setTimeout(() => { window.location.href = "/"; }, 800);
-              } catch (err: any) {
-                toast({ title: "Reset failed", description: err?.message || "Unknown error", type: "error" });
-              }
-            }}
+            onClick={() => setResetDbOpen(true)}
             className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors duration-100"
             data-testid="sidebar-reset-db"
           >
@@ -389,6 +382,24 @@ export default function ModernSidebar() {
       >
         <SidebarContent />
       </aside>
+
+      <ConfirmDialog
+        open={resetDbOpen}
+        title="Reset the database?"
+        description="All users and data will be permanently deleted."
+        confirmLabel="Reset"
+        onConfirm={async () => {
+          setResetDbOpen(false);
+          try {
+            await apiRequest("/api/dev/reset-db", { method: "POST" });
+            toast({ title: "Database reset.", description: "All data cleared. Reloading…", type: "success" });
+            setTimeout(() => { window.location.href = "/"; }, 2000);
+          } catch {
+            toast({ title: "Reset failed — try again.", type: "error" });
+          }
+        }}
+        onCancel={() => setResetDbOpen(false)}
+      />
     </>
   );
 }

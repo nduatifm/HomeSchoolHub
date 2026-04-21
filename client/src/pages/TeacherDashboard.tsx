@@ -148,9 +148,9 @@ function TeacherClassroomsTab() {
       setForm({ name: "", subject: "", description: "" });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
-      toast({ title: "Classroom created!" });
+      toast({ title: "Classroom created!", type: "success" });
     },
-    onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't create classroom — try again.", type: "error" }),
   });
   return (
     <Card>
@@ -231,11 +231,11 @@ function TeacherGradeDialog({
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/student-submissions/teacher"] });
-      toast({ title: "Assignment graded successfully!" });
+      toast({ title: "Assignment graded!", type: "success" });
       onClose();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to grade assignment", description: error.message, type: "error" });
+      toast({ title: "Couldn't save the grade — try again.", type: "error" });
     },
   });
 
@@ -338,7 +338,7 @@ function TeacherGiveFeedbackDialog({
       form.reset();
       onClose();
     },
-    onError: (e: Error) => toast({ title: "Failed to send feedback", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't send feedback — try again.", type: "error" }),
   });
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -473,7 +473,7 @@ function TeacherSendMessageDialog({
       toast({ title: "Message sent!", type: "success" });
       onClose();
     },
-    onError: (e: Error) => toast({ title: "Failed to send message", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't send message — try again.", type: "error" }),
   });
 
   return (

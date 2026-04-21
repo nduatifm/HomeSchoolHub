@@ -61,7 +61,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       toast({ title: "Submitted!", type: "success" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't submit — try again.", type: "error" }),
   });
 
   const subMap = Object.fromEntries(mySubmissions.map((s) => [s.assignmentId, s]));

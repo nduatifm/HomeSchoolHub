@@ -45,12 +45,7 @@ export default function Login() {
       setLocation("/dashboard");
     } catch (error: any) {
       setIsLoading(false);
-      toast({
-        title: "Login failed",
-        description: error.message || "Please check your credentials and try again",
-        type: "error",
-        duration: 5000,
-      });
+      toast({ title: "Login failed — check your credentials and try again.", type: "error" });
     }
   }
 
@@ -67,7 +62,7 @@ export default function Login() {
       if (apiError.requiresRole) {
         setShowRoleDialog(true);
       } else {
-        toast({ title: "Google Sign In failed", description: apiError.message, type: "error" });
+        toast({ title: "Google Sign In failed — try again.", type: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -82,7 +77,7 @@ export default function Login() {
       toast({ title: "Welcome back!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Google Sign In failed", description: error.message, type: "error" });
+      toast({ title: "Google Sign In failed — try again.", type: "error" });
     } finally {
       setIsLoading(false);
       setShowRoleDialog(false);

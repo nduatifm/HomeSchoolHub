@@ -49,7 +49,7 @@ export default function ClassworkCard({
       });
       toast({ title: "Classwork removed", type: "success" });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't delete — try again.", type: "error" }),
   });
 
   const linkedFullAssignment = item.linkedAssignment

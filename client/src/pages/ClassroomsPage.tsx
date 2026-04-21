@@ -45,6 +45,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Classroom, GradeFolder } from "@shared/schema";
 import type { ClassroomNotification } from "@/lib/classroomNotifications";
 
@@ -132,28 +133,30 @@ export default function ClassroomsPage() {
 
   const [restoringId, setRestoringId] = useState<number | null>(null);
   const [permanentDeletingId, setPermanentDeletingId] = useState<number | null>(null);
+  const [deletingFolderId, setDeletingFolderId] = useState<number | null>(null);
+  const [permanentDeleteId, setPermanentDeleteId] = useState<number | null>(null);
 
   const createFolderMutation = useMutation({
     mutationFn: () => apiRequest("/api/grade-folders", { method: "POST", body: JSON.stringify({ name: newFolderName }) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grade-folders"] });
-      toast({ title: "Grade folder created!" });
+      toast({ title: "Folder created.", type: "success" });
       setNewFolderOpen(false);
       setNewFolderName("");
     },
-    onError: (e: any) => toast({ title: "Failed to create folder", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't create the folder — try again.", type: "error" }),
   });
 
   const renameFolderMutation = useMutation({
     mutationFn: () => apiRequest(`/api/grade-folders/${editingFolder!.id}`, { method: "PATCH", body: JSON.stringify({ name: editFolderName }) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grade-folders"] });
-      toast({ title: "Folder renamed!" });
+      toast({ title: "Folder renamed.", type: "success" });
       setEditFolderOpen(false);
       setEditingFolder(null);
       setEditFolderName("");
     },
-    onError: (e: any) => toast({ title: "Failed to rename folder", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't rename — try again.", type: "error" }),
   });
 
   const deleteFolderMutation = useMutation({
@@ -161,9 +164,9 @@ export default function ClassroomsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grade-folders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: "Grade folder deleted." });
+      toast({ title: "Folder deleted.", type: "success" });
     },
-    onError: (e: any) => toast({ title: "Cannot delete folder", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't delete the folder — try again.", type: "error" }),
   });
 
   const createClassroomMutation = useMutation({
@@ -194,7 +197,7 @@ export default function ClassroomsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
       const enrolled = selectedStudentIds.size - failedCount;
       if (failedCount === 0 && enrolled > 0) {
-        toast({ title: `Classroom created & ${enrolled} student${enrolled === 1 ? "" : "s"} enrolled!` });
+        toast({ title: `Classroom created & ${enrolled} student${enrolled === 1 ? "" : "s"} enrolled!`, type: "success" });
       } else if (failedCount > 0) {
         toast({
           title: "Classroom created",
@@ -202,7 +205,7 @@ export default function ClassroomsPage() {
           type: "error",
         });
       } else {
-        toast({ title: "Classroom created!" });
+        toast({ title: "Classroom created!", type: "success" });
       }
       setNewClassroomOpen(false);
       setNewClassroomForm({ name: "", subject: "", description: "" });
@@ -210,7 +213,7 @@ export default function ClassroomsPage() {
       setSelectedStudentIds(new Set());
       setStudentSearch("");
     },
-    onError: (e: any) => toast({ title: "Failed to create classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't create the classroom — try again.", type: "error" }),
   });
 
   const moveClassroomMutation = useMutation({
@@ -223,11 +226,11 @@ export default function ClassroomsPage() {
     onSuccess: (_, { folderId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       const folderName = folderId !== null ? folders.find(f => f.id === folderId)?.name : null;
-      toast({ title: folderName ? `Moved to ${folderName}` : "Moved to Other Classrooms" });
+      toast({ title: folderName ? `Moved to ${folderName}` : "Moved to Other Classrooms", type: "success" });
       setMovingClassroomId(null);
     },
-    onError: (e: any) => {
-      toast({ title: "Failed to move classroom", description: e.message, type: "error" });
+    onError: () => {
+      toast({ title: "Couldn't move the classroom — try again.", type: "error" });
       setMovingClassroomId(null);
     },
   });
@@ -240,11 +243,11 @@ export default function ClassroomsPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: "Classroom updated!" });
+      toast({ title: "Classroom updated!", type: "success" });
       setEditClassroomOpen(false);
       setEditingClassroom(null);
     },
-    onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't update — try again.", type: "error" }),
   });
 
   const archiveClassroomMutation = useMutation({
@@ -255,9 +258,9 @@ export default function ClassroomsPage() {
       }),
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: status === "archived" ? "Classroom archived." : "Classroom restored to active." });
+      toast({ title: status === "archived" ? "Classroom archived." : "Classroom restored to active.", type: "success" });
     },
-    onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't update — try again.", type: "error" }),
   });
 
   const deleteClassroomMutation = useMutation({
@@ -271,10 +274,11 @@ export default function ClassroomsPage() {
       toast({
         title: "Classroom moved to Recently Deleted.",
         description: "It will be permanently removed after 30 days. You can restore it from the Recently Deleted section.",
+        type: "success",
       });
       setCollapsedTrash(false);
     },
-    onError: (e: any) => toast({ title: "Failed to delete classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't delete — try again.", type: "error" }),
   });
 
   const trashRestoreMutation = useMutation({
@@ -284,11 +288,11 @@ export default function ClassroomsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms/trash"] });
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
-      toast({ title: "Classroom restored." });
+      toast({ title: "Classroom restored.", type: "success" });
       setRestoringId(null);
     },
-    onError: (e: any) => {
-      toast({ title: "Failed to restore classroom", description: e.message, type: "error" });
+    onError: () => {
+      toast({ title: "Couldn't restore — try again.", type: "error" });
       setRestoringId(null);
     },
   });
@@ -298,11 +302,11 @@ export default function ClassroomsPage() {
     onMutate: (id) => setPermanentDeletingId(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms/trash"] });
-      toast({ title: "Classroom permanently deleted." });
+      toast({ title: "Classroom permanently deleted.", type: "success" });
       setPermanentDeletingId(null);
     },
-    onError: (e: any) => {
-      toast({ title: "Failed to permanently delete classroom", description: e.message, type: "error" });
+    onError: () => {
+      toast({ title: "Couldn't delete — try again.", type: "error" });
       setPermanentDeletingId(null);
     },
   });
@@ -553,9 +557,9 @@ export default function ClassroomsPage() {
                                     className="gap-2 text-destructive focus:text-destructive"
                                     onClick={() => {
                                       if (subjectCount > 0) {
-                                        window.alert(`"${folder.name}" still has ${subjectCount} subject${subjectCount === 1 ? "" : "s"}. Move or delete them first, then try again.`);
-                                      } else if (window.confirm(`Delete folder "${folder.name}"? This cannot be undone.`)) {
-                                        deleteFolderMutation.mutate(folder.id);
+                                        toast({ title: `"${folder.name}" still has subjects — move or delete them before deleting the folder.`, type: "warning" });
+                                      } else {
+                                        setDeletingFolderId(folder.id);
                                       }
                                     }}
                                   >
@@ -701,11 +705,7 @@ export default function ClassroomsPage() {
                                 variant="ghost"
                                 className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                                 disabled={isBusy}
-                                onClick={() => {
-                                  if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
-                                    permanentDeleteMutation.mutate(c.id);
-                                  }
-                                }}
+                                onClick={() => setPermanentDeleteId(c.id)}
                               >
                                 {isPermanentDeleting
                                   ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
@@ -968,6 +968,23 @@ export default function ClassroomsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deletingFolderId !== null}
+        title="Delete this folder?"
+        description="This cannot be undone."
+        onConfirm={() => { deleteFolderMutation.mutate(deletingFolderId!); setDeletingFolderId(null); }}
+        onCancel={() => setDeletingFolderId(null)}
+      />
+
+      <ConfirmDialog
+        open={permanentDeleteId !== null}
+        title="Permanently delete this classroom?"
+        description="This cannot be undone. All assignments and submissions will be lost."
+        confirmLabel="Delete permanently"
+        onConfirm={() => { permanentDeleteMutation.mutate(permanentDeleteId!); setPermanentDeleteId(null); }}
+        onCancel={() => setPermanentDeleteId(null)}
+      />
     </div>
   );
 }

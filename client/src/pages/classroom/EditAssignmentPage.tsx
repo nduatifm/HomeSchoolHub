@@ -21,6 +21,7 @@ import {
   Link2,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, ClassroomAssignment, FormQuestion } from "@shared/schema";
 
@@ -66,6 +67,8 @@ export default function EditAssignmentPage() {
   const [initialized, setInitialized] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const draftId = useRef(Math.random().toString(36).slice(2, 14));
+  const pendingLeave = useRef<(() => void) | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
   const isDirty = initialized;
 
@@ -197,7 +200,7 @@ export default function EditAssignmentPage() {
       toast({ title: "Assignment updated", type: "success" });
       navigate(`/classrooms/${classroomSlug}?tab=assignments`);
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
   });
 
   const didSave = saveMutation.isSuccess;
@@ -217,7 +220,13 @@ export default function EditAssignmentPage() {
 
   function safeNavigate() {
     if (isDirty && !didSave) {
-      if (!window.confirm("You have unsaved changes. Leave without saving?")) return;
+      pendingLeave.current = () => {
+        localStorage.removeItem(getDraftKey(draftId.current));
+        localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+        goBack();
+      };
+      setLeaveDialogOpen(true);
+      return;
     }
     localStorage.removeItem(getDraftKey(draftId.current));
     localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
@@ -262,6 +271,7 @@ export default function EditAssignmentPage() {
   const showExistingFile = !!existingFileUrl && !clearFile && !attachedFile;
 
   return (
+    <>
     <div className="flex min-h-screen bg-background">
       <ModernSidebar />
       <div className="flex-1 md:ml-[228px] flex flex-col">
@@ -622,6 +632,18 @@ export default function EditAssignmentPage() {
         </div>
       </div>
     </div>
+
+    <ConfirmDialog
+      open={leaveDialogOpen}
+      title="Leave without saving?"
+      description="Your changes will be lost."
+      confirmLabel="Leave"
+      cancelLabel="Keep editing"
+      destructive={false}
+      onConfirm={() => { setLeaveDialogOpen(false); pendingLeave.current?.(); }}
+      onCancel={() => setLeaveDialogOpen(false)}
+    />
+    </>
   );
 }
 

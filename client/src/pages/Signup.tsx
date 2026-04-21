@@ -64,7 +64,7 @@ export default function Signup() {
         setUnverifiedEmail(error.email || email);
         setShowResendDialog(true);
       } else {
-        toast({ title: "Signup failed", description: error.message, type: "error" });
+        toast({ title: "Signup failed — try again.", type: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -85,7 +85,7 @@ export default function Signup() {
       });
       setShowResendDialog(false);
     } catch (error: any) {
-      toast({ title: "Failed to resend", description: error.message, type: "error" });
+      toast({ title: "Couldn't resend verification — try again.", type: "error" });
     } finally {
       setIsResending(false);
     }
@@ -104,7 +104,7 @@ export default function Signup() {
       if (apiError.requiresRole) {
         setShowRoleDialog(true);
       } else {
-        toast({ title: "Google Sign Up failed", description: apiError.message, type: "error" });
+        toast({ title: "Google Sign Up failed — try again.", type: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -119,7 +119,7 @@ export default function Signup() {
       toast({ title: "Account created!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Google Sign Up failed", description: error.message, type: "error" });
+      toast({ title: "Google Sign Up failed — try again.", type: "error" });
     } finally {
       setIsLoading(false);
       setShowRoleDialog(false);

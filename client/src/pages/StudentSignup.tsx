@@ -49,7 +49,7 @@ export default function StudentSignup() {
       toast({ title: "Welcome to the platform!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Signup failed", description: error.message, type: "error" });
+      toast({ title: "Signup failed — try again.", type: "error" });
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +63,7 @@ export default function StudentSignup() {
       toast({ title: "Welcome to the platform!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Google signup failed", description: error.message, type: "error" });
+      toast({ title: "Google signup failed — try again.", type: "error" });
     } finally {
       setIsLoading(false);
     }

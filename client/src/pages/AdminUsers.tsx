@@ -129,11 +129,11 @@ export default function AdminUsers() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Role updated successfully" });
+      toast({ title: "Role updated", type: "success" });
       setRoleDialogOpen(false);
       setNewParentId(0);
     },
-    onError: (e: any) => toast({ title: "Failed to update role", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't update role — try again.", type: "error" }),
   });
 
   const toggleAdminMutation = useMutation({
@@ -144,9 +144,9 @@ export default function AdminUsers() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Admin status updated" });
+      toast({ title: "Admin status updated", type: "success" });
     },
-    onError: (e: any) => toast({ title: "Failed to update admin status", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't update admin status — try again.", type: "error" }),
   });
 
   const deleteUserMutation = useMutation({
@@ -154,12 +154,12 @@ export default function AdminUsers() {
       apiRequest(`/api/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "User deleted", description: `${userToDelete?.name} has been permanently removed.` });
+      toast({ title: "User deleted", type: "success" });
       setDeleteDialogOpen(false);
       setUserToDelete(null);
       setDeleteConfirmName("");
     },
-    onError: (e: any) => toast({ title: "Failed to delete user", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't delete user — try again.", type: "error" }),
   });
 
   const filtered = users.filter((u) => {

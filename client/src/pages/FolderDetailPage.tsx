@@ -42,6 +42,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Classroom, GradeFolder } from "@shared/schema";
 import type { ClassroomNotification } from "@/lib/classroomNotifications";
 
@@ -110,6 +111,7 @@ export default function FolderDetailPage() {
   const archivedClassrooms = folderClassrooms.filter(c => c.status === "archived");
 
   const [collapsedArchived, setCollapsedArchived] = useState(true);
+  const [deleteFolderOpen, setDeleteFolderOpen] = useState(false);
 
   const [editFolderOpen, setEditFolderOpen] = useState(false);
   const [editFolderName, setEditFolderName] = useState("");
@@ -136,11 +138,11 @@ export default function FolderDetailPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grade-folders"] });
-      toast({ title: "Folder renamed!" });
+      toast({ title: "Folder renamed.", type: "success" });
       setEditFolderOpen(false);
       setEditFolderName("");
     },
-    onError: (e: any) => toast({ title: "Failed to rename folder", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't rename — try again.", type: "error" }),
   });
 
   const deleteFolderMutation = useMutation({
@@ -148,10 +150,10 @@ export default function FolderDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grade-folders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: "Grade folder deleted." });
+      toast({ title: "Folder deleted.", type: "success" });
       navigate("/classrooms");
     },
-    onError: (e: any) => toast({ title: "Cannot delete folder", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't delete the folder — try again.", type: "error" }),
   });
 
   const createClassroomMutation = useMutation({
@@ -179,7 +181,7 @@ export default function FolderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
       const enrolled = selectedStudentIds.size - failedCount;
       if (failedCount === 0 && enrolled > 0) {
-        toast({ title: `Subject created & ${enrolled} student${enrolled === 1 ? "" : "s"} enrolled!` });
+        toast({ title: `Subject created & ${enrolled} student${enrolled === 1 ? "" : "s"} enrolled!`, type: "success" });
       } else if (failedCount > 0) {
         toast({
           title: "Subject created",
@@ -187,14 +189,14 @@ export default function FolderDetailPage() {
           type: "error",
         });
       } else {
-        toast({ title: "Subject created!" });
+        toast({ title: "Subject created!", type: "success" });
       }
       setNewClassroomOpen(false);
       setNewClassroomForm({ name: "", subject: "", description: "" });
       setSelectedStudentIds(new Set());
       setStudentSearch("");
     },
-    onError: (e: any) => toast({ title: "Failed to create subject", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't create the subject — try again.", type: "error" }),
   });
 
   const moveClassroomMutation = useMutation({
@@ -207,11 +209,11 @@ export default function FolderDetailPage() {
     onSuccess: (_, { targetFolderId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
       const folderName = targetFolderId !== null ? folders.find(f => f.id === targetFolderId)?.name : null;
-      toast({ title: folderName ? `Moved to ${folderName}` : "Moved to Other Classrooms" });
+      toast({ title: folderName ? `Moved to ${folderName}` : "Moved to Other Classrooms", type: "success" });
       setMovingClassroomId(null);
     },
-    onError: (e: any) => {
-      toast({ title: "Failed to move classroom", description: e.message, type: "error" });
+    onError: () => {
+      toast({ title: "Couldn't move — try again.", type: "error" });
       setMovingClassroomId(null);
     },
   });
@@ -224,11 +226,11 @@ export default function FolderDetailPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: "Classroom updated!" });
+      toast({ title: "Classroom updated!", type: "success" });
       setEditClassroomOpen(false);
       setEditingClassroom(null);
     },
-    onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't update — try again.", type: "error" }),
   });
 
   const archiveClassroomMutation = useMutation({
@@ -239,9 +241,9 @@ export default function FolderDetailPage() {
       }),
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms"] });
-      toast({ title: status === "archived" ? "Classroom archived." : "Classroom restored to active." });
+      toast({ title: status === "archived" ? "Classroom archived." : "Classroom restored to active.", type: "success" });
     },
-    onError: (e: any) => toast({ title: "Failed to update classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't update — try again.", type: "error" }),
   });
 
   const deleteClassroomMutation = useMutation({
@@ -255,9 +257,10 @@ export default function FolderDetailPage() {
       toast({
         title: "Classroom moved to Recently Deleted.",
         description: "You can restore it from the Recently Deleted section on the Classrooms page within 30 days.",
+        type: "success",
       });
     },
-    onError: (e: any) => toast({ title: "Failed to delete classroom", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't delete — try again.", type: "error" }),
   });
 
   const openEditClassroom = (c: Classroom) => {
@@ -446,13 +449,10 @@ export default function FolderDetailPage() {
                         className="gap-2 text-destructive focus:text-destructive"
                         onClick={() => {
                           const hasContent = folderClassrooms.length > 0;
-                          const msg = hasContent
-                            ? `"${folder.name}" still has ${folderClassrooms.length} subject${folderClassrooms.length === 1 ? "" : "s"}. Move or delete them first, then try again.`
-                            : `Delete folder "${folder.name}"? This cannot be undone.`;
-                          if (!hasContent && window.confirm(msg)) {
-                            deleteFolderMutation.mutate();
-                          } else if (hasContent) {
-                            window.alert(msg);
+                          if (hasContent) {
+                            toast({ title: `"${folder.name}" still has subjects — move or delete them before deleting the folder.`, type: "warning" });
+                          } else {
+                            setDeleteFolderOpen(true);
                           }
                         }}
                       >
@@ -690,6 +690,14 @@ export default function FolderDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteFolderOpen}
+        title="Delete this folder?"
+        description="This cannot be undone."
+        onConfirm={() => { deleteFolderMutation.mutate(); setDeleteFolderOpen(false); }}
+        onCancel={() => setDeleteFolderOpen(false)}
+      />
 
       {/* Delete Classroom confirmation dialog */}
       <Dialog open={deleteClassroomOpen} onOpenChange={(v) => { if (!v) { setDeleteClassroomOpen(false); setDeletingClassroom(null); } }}>

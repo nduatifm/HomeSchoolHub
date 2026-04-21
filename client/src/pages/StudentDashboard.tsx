@@ -201,7 +201,7 @@ export default function StudentDashboard() {
     },
     onError: () => {
       setIsSubmitting(false);
-      toast({ title: "Failed to submit assignment", description: "Please try again" });
+      toast({ title: "Couldn't submit — try again.", type: "error" });
     },
   });
 

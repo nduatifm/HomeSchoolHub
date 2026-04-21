@@ -220,8 +220,7 @@ export default function Profile() {
       stopEditing();
       toast({ title: "Saved", description: "Your name has been updated.", type: "success" });
     },
-    onError: (error: any) =>
-      toast({ title: "Update failed", description: error.message || "Failed to update", type: "error" }),
+    onError: () => toast({ title: "Couldn't update name — try again.", type: "error" }),
   });
 
   const updateDetailsMutation = useMutation({
@@ -233,8 +232,7 @@ export default function Profile() {
       stopEditing();
       toast({ title: "Saved", description: "Your details have been updated.", type: "success" });
     },
-    onError: (error: any) =>
-      toast({ title: "Update failed", description: error.message || "Failed to update", type: "error" }),
+    onError: () => toast({ title: "Couldn't update details — try again.", type: "error" }),
   });
 
   const changePasswordMutation = useMutation({
@@ -245,8 +243,7 @@ export default function Profile() {
       stopEditing();
       toast({ title: "Password changed", description: "Your password has been updated.", type: "success" });
     },
-    onError: (error: any) =>
-      toast({ title: "Password change failed", description: error.message || "Failed to change password", type: "error" }),
+    onError: () => toast({ title: "Couldn't change password — try again.", type: "error" }),
   });
 
   const [showAddRoleConfirm, setShowAddRoleConfirm] = useState(false);
@@ -260,8 +257,7 @@ export default function Profile() {
       toast({ title: "Teacher role added!", description: "Switching you to your new teacher dashboard…", type: "success" });
       setTimeout(() => { window.location.href = "/dashboard"; }, 700);
     },
-    onError: (error: any) =>
-      toast({ title: "Failed to add role", description: error.message || "Something went wrong", type: "error" }),
+    onError: () => toast({ title: "Couldn't add teacher role — try again.", type: "error" }),
   });
 
   const switchRoleMutation = useMutation({
@@ -274,8 +270,7 @@ export default function Profile() {
       toast({ title: "Context switched", description: `Now viewing as ${data.user.role}.`, type: "success" });
       setTimeout(() => { window.location.href = "/dashboard"; }, 500);
     },
-    onError: (error: any) =>
-      toast({ title: "Failed to switch role", description: error.message || "Something went wrong", type: "error" }),
+    onError: () => toast({ title: "Couldn't switch role — try again.", type: "error" }),
   });
 
   /* Builds full details payload, merging current saved values with one override */
@@ -356,7 +351,7 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({ title: "Photo updated", description: "Your profile picture has been updated.", type: "success" });
     } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message || "Failed to upload", type: "error" });
+      toast({ title: "Couldn't upload photo — try again.", type: "error" });
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

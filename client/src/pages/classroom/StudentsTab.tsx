@@ -52,13 +52,13 @@ export default function StudentsTab({ classroomId, isArchived }: { classroomId: 
   const enrollMutation = useMutation({
     mutationFn: (studentId: number) => apiRequest(`/api/classrooms/${classroomId}/enroll`, { method: "POST", body: JSON.stringify({ studentId }) }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "enrollments"] }); toast({ title: "Student enrolled", type: "success" }); },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't enroll student — try again.", type: "error" }),
   });
 
   const removeMutation = useMutation({
     mutationFn: (studentId: number) => apiRequest(`/api/classrooms/${classroomId}/students/${studentId}`, { method: "DELETE" }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "enrollments"] }); toast({ title: "Student removed", type: "success" }); },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't remove student — try again.", type: "error" }),
   });
 
   return (

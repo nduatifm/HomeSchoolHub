@@ -60,7 +60,7 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"] });
       toast({ title: "Grade saved", type: "success" });
     },
-    onError: (e: any) => toast({ title: "Error saving grade", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't save the grade — try again.", type: "error" }),
   });
 
   if (isLoading) {
@@ -251,7 +251,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
       setFormAnswers({});
       toast({ title: "Submitted!", type: "success" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, type: "error" }),
+    onError: () => toast({ title: "Couldn't submit — try again.", type: "error" }),
   });
 
   const isSubmitted = mySubmission && (mySubmission.status === "submitted" || mySubmission.status === "graded" || mySubmission.status === "late");
