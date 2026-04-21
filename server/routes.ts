@@ -4994,7 +4994,7 @@ export function registerRoutes(app: Express) {
               if (expected && actual && expected === actual) correct++;
             }
           }
-          autoGrade = Math.round((correct / keyedTotal) * 100);
+          autoGrade = Math.round((correct / keyedTotal) * assignment.points);
         }
       }
 

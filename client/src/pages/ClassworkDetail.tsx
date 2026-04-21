@@ -287,7 +287,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
                 <FileText className="h-3.5 w-3.5" />View your file
               </a>
             )}
-            {mySubmission.grade !== null && (
+            {mySubmission.status === "graded" && mySubmission.grade !== null && (
               <div className="flex items-center gap-2 pt-1">
                 <span className="text-sm font-medium text-green-700">{mySubmission.grade}/{assignment.points} pts</span>
                 {mySubmission.feedback && <span className="text-xs text-gray-500">— {mySubmission.feedback}</span>}
@@ -401,7 +401,7 @@ function ParentPanel({ assignment, classroomId, studentId }: { assignment: Class
                 <FileText className="h-3.5 w-3.5" />View file
               </a>
             )}
-            {mySubmission.grade !== null ? (
+            {mySubmission.status === "graded" && mySubmission.grade !== null ? (
               <div className="flex items-center gap-2 pt-1">
                 <span className="text-sm font-medium text-green-700">{mySubmission.grade}/{assignment.points} pts</span>
                 {mySubmission.feedback && <span className="text-xs text-gray-500">— {mySubmission.feedback}</span>}

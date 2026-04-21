@@ -175,6 +175,7 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
                 </label>
               );
             })}
+            {renderCorrectAnswerHint(q)}
           </div>
         )}
 
@@ -209,10 +210,12 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
                 </label>
               );
             })}
+            {renderCorrectAnswerHint(q)}
           </div>
         )}
 
         {q.type === "true_false" && (
+          <div className="space-y-1">
           <div className="flex gap-3">
             {["True", "False"].map((opt) => {
               const selected = (answers[q.id] as string) === opt;
@@ -246,6 +249,8 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
                 </button>
               );
             })}
+          </div>
+          {renderCorrectAnswerHint(q)}
           </div>
         )}
       </div>
