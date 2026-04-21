@@ -457,7 +457,7 @@ export default function StudentDashboard() {
                               <table className="min-w-full text-sm">
                                 <thead className="border-b border-border bg-muted/10">
                                   <tr>
-                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assignment</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assignment / Test</th>
                                     <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Due</th>
                                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
                                     <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grade</th>
@@ -473,7 +473,15 @@ export default function StudentDashboard() {
                                         onClick={() => navigate(`/classrooms/${c.slug ?? c.id}/classwork/${a.slug ?? a.id}`)}
                                         className="hover:bg-muted/20 cursor-pointer transition-colors"
                                       >
-                                        <td className="px-4 py-2.5 font-medium text-foreground">{a.title}</td>
+                                        <td className="px-4 py-2.5 font-medium text-foreground">
+                                          <div className="flex flex-col gap-0.5">
+                                            <span>{a.title}</span>
+                                            {a.assignmentType === "test"
+                                              ? <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-orange-100 text-orange-700 self-start">Test</span>
+                                              : <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-blue-100 text-blue-700 self-start">Assignment</span>
+                                            }
+                                          </div>
+                                        </td>
                                         <td className="px-3 py-2.5 text-muted-foreground text-xs whitespace-nowrap hidden sm:table-cell">{a.dueDate}</td>
                                         <td className="px-3 py-2.5 text-center">
                                           <StatusBadge status={sub?.status ?? "pending"} />

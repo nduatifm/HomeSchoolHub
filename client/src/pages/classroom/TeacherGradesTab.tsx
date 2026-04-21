@@ -46,7 +46,7 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
                 <div className="flex items-center justify-center gap-1 mt-0.5">
                   {a.assignmentType === "test"
                     ? <span className="text-[9px] font-medium px-1 rounded-full bg-orange-100 text-orange-700">Test</span>
-                    : <span className="text-[9px] font-medium px-1 rounded-full bg-blue-100 text-blue-700">Asgmt</span>
+                    : <span className="text-[9px] font-medium px-1 rounded-full bg-blue-100 text-blue-700">Assignment</span>
                   }
                   <span className="text-muted-foreground/60 font-normal">{a.points} pts</span>
                 </div>
