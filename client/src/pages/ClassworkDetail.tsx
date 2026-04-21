@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2 } from "lucide-react";
+import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2, Info } from "lucide-react";
 import DOMPurify from "dompurify";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
@@ -286,6 +286,15 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
               <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
                 <FileText className="h-3.5 w-3.5" />View your file
               </a>
+            )}
+            {mySubmission.status !== "graded" && mySubmission.grade !== null && assignment.answerKey && (
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3.5 py-2.5 flex gap-2.5 items-start mt-2">
+                <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-blue-700">Estimated score: {mySubmission.grade}/{assignment.points} pts</p>
+                  <p className="text-[11px] text-blue-500 mt-0.5">This is a preliminary auto-score based on your answers. Your teacher will review and confirm the final grade.</p>
+                </div>
+              </div>
             )}
             {mySubmission.status === "graded" && mySubmission.grade !== null && (
               <div className="flex items-center gap-2 pt-1">
