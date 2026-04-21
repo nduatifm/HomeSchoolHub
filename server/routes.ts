@@ -4965,7 +4965,7 @@ export function registerRoutes(app: Express) {
 
       // Auto-score if answer key is present
       let autoGrade: number | null = null;
-      const answerKeyRaw = (assignment as any).answerKey;
+      const answerKeyRaw = assignment.answerKey;
       if (
         answerKeyRaw &&
         typeof answerKeyRaw === "object" &&
@@ -4976,7 +4976,8 @@ export function registerRoutes(app: Express) {
       ) {
         const answerKey = answerKeyRaw as Record<string, string | string[]>;
         const keyedQuestions = (assignment.formSchema as Array<{ id: string; type: string }>).filter((q) => answerKey[q.id] !== undefined);
-        if (keyedQuestions.length > 0) {
+        const keyedTotal = keyedQuestions.length;
+        if (keyedTotal > 0) {
           let correct = 0;
           for (const q of keyedQuestions) {
             const correct_answer = answerKey[q.id];
@@ -4991,7 +4992,7 @@ export function registerRoutes(app: Express) {
               if (expected && actual && expected === actual) correct++;
             }
           }
-          autoGrade = Math.round((correct / keyedQuestions.length) * assignment.points);
+          autoGrade = Math.round((correct / keyedTotal) * 100);
         }
       }
 

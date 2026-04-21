@@ -301,7 +301,7 @@ export interface IStorage {
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
   getClassroomSubmissionById(submissionId: number): Promise<(ClassroomSubmission & { studentName: string; assignment: ClassroomAssignment }) | null>;
   getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
-  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>): Promise<ClassroomSubmission>;
+  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null): Promise<ClassroomSubmission>;
   gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
 
   createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
@@ -1770,7 +1770,14 @@ class PrismaStorage implements IStorage {
   }
 
   async createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment> {
-    const a = await prisma.classroomAssignment.create({ data });
+    const { answerKey, formSchema, ...rest } = data;
+    const a = await prisma.classroomAssignment.create({
+      data: {
+        ...rest,
+        ...(formSchema !== undefined ? { formSchema: formSchema as Prisma.InputJsonValue } : {}),
+        ...(answerKey !== undefined ? { answerKey: answerKey as Prisma.InputJsonValue } : {}),
+      },
+    });
     const slug = slugify(a.title, a.id);
     const updated = await prisma.classroomAssignment.update({ where: { id: a.id }, data: { slug } });
     // Auto-create pending submissions for all currently enrolled students
@@ -1812,9 +1819,9 @@ class PrismaStorage implements IStorage {
       where: { id },
       data: {
         ...rest,
-        ...(formSchema !== undefined ? { formSchema } : {}),
-        ...(answerKey !== undefined ? { answerKey } : {}),
-      },
+        ...(formSchema !== undefined ? { formSchema: formSchema as Prisma.InputJsonValue | null } : {}),
+        ...(answerKey !== undefined ? { answerKey: answerKey as Prisma.InputJsonValue | null } : {}),
+      } as Prisma.ClassroomAssignmentUpdateInput,
     });
     return this.mapClassroomAssignment(updated);
   }

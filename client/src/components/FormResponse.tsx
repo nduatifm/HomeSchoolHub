@@ -13,6 +13,7 @@ interface FormResponseProps {
   disabled?: boolean;
   stepByStep?: boolean;
   answerKey?: Record<string, string | string[]>;
+  hideNeedsReview?: boolean;
 }
 
 function checkCorrect(q: FormQuestion, answer: string | string[] | undefined, key: string | string[]): boolean | null {
@@ -28,7 +29,7 @@ function checkCorrect(q: FormQuestion, answer: string | string[] | undefined, ke
   return expected === actual;
 }
 
-export default function FormResponse({ questions, answers, onChange, disabled, stepByStep, answerKey }: FormResponseProps) {
+export default function FormResponse({ questions, answers, onChange, disabled, stepByStep, answerKey, hideNeedsReview }: FormResponseProps) {
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
 
@@ -71,7 +72,7 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
     if (!disabled || !answerKey) return null;
     const hasKey = answerKey[q.id] !== undefined;
     if (!hasKey) {
-      if (q.type === "paragraph" || q.type === "short") {
+      if (!hideNeedsReview && (q.type === "paragraph" || q.type === "short")) {
         return (
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full ml-1.5">
             <HelpCircle className="h-3 w-3" />Needs review

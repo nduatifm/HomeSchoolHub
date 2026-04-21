@@ -151,7 +151,7 @@ export default function SubmissionReviewPage() {
                     answers={submission.formAnswers as Record<string, string | string[]>}
                     onChange={() => {}}
                     disabled
-                    answerKey={(assignment.answerKey as Record<string, string | string[]> | null | undefined) ?? undefined}
+                    answerKey={assignment.answerKey ?? undefined}
                   />
                 </div>
               </div>
@@ -202,10 +202,10 @@ export default function SubmissionReviewPage() {
               <p className="text-sm font-semibold text-foreground">
                 {submission.status === "graded" ? "Update Grade" : "Grade Submission"}
               </p>
-              {submission.grade !== null && submission.grade !== undefined && submission.status !== "graded" && (assignment.answerKey as any) && (
+              {submission.grade !== null && submission.grade !== undefined && submission.status !== "graded" && assignment.answerKey && (
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full">
                   <Zap className="h-3 w-3" />
-                  Auto-scored: {submission.grade}/{assignment.points} pts — review and save to confirm
+                  Auto-scored: {submission.grade}% — review and save to confirm
                 </span>
               )}
             </div>

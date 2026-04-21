@@ -274,8 +274,9 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
                   onChange={() => {}}
                   disabled
                   answerKey={mySubmission.status === "graded" || mySubmission.grade !== null
-                    ? ((assignment.answerKey as Record<string, string | string[]> | null | undefined) ?? undefined)
+                    ? (assignment.answerKey ?? undefined)
                     : undefined}
+                  hideNeedsReview
                 />
               </div>
             ) : mySubmission.content ? (
