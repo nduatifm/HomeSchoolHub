@@ -32,6 +32,7 @@ import TeacherAssignmentsTab from "./classroom/TeacherAssignmentsTab";
 import StudentAssignmentsTab from "./classroom/StudentAssignmentsTab";
 import TeacherGradesTab from "./classroom/TeacherGradesTab";
 import ParentGradesTab from "./classroom/ParentGradesTab";
+import StudentGradesTab from "./classroom/StudentGradesTab";
 import ClassworkTab from "./classroom/ClassworkTab";
 import StudentsTab from "./classroom/StudentsTab";
 
@@ -241,6 +242,7 @@ export default function ClassroomDetail() {
   const studentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
     { value: "assignments", label: "Assignments & Test", icon: <BookOpen className="h-3.5 w-3.5" />, badge: assignmentsBadge || undefined },
+    { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
   ];
   const parentTabs = [
@@ -315,6 +317,9 @@ export default function ClassroomDetail() {
           {activeTab === "assignments" && isTeacher && <TeacherAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} isArchived={isArchived} />}
           {activeTab === "assignments" && isStudent && <StudentAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} studentId={studentData?.id ?? 0} isArchived={isArchived} />}
           {activeTab === "grades" && isTeacher && <TeacherGradesTab classroomId={classroomId} />}
+          {activeTab === "grades" && isStudent && (
+            <StudentGradesTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} />
+          )}
           {activeTab === "grades" && isParent && (
             <ParentGradesTab
               classroomId={classroomId}

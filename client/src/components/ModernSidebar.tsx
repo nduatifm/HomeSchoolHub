@@ -18,6 +18,7 @@ import {
   School,
   Trash2,
   Bell,
+  BarChart2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -116,6 +117,7 @@ export default function ModernSidebar() {
 
   const studentItems: SidebarItem[] = [
     { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
+    { icon: <BarChart2 className="w-4 h-4" />, label: "Grades", hash: "grades" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
   ];
