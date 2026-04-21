@@ -112,7 +112,10 @@ function toast(props: ToastInput) {
 
   const update = (props: ToasterToast) =>
     dispatch({ type: "UPDATE_TOAST", toast: { ...props, id } })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+  const dismiss = () => {
+    dispatch({ type: "DISMISS_TOAST", toastId: id })
+    setTimeout(() => dispatch({ type: "REMOVE_TOAST", toastId: id }), 350)
+  }
 
   dispatch({
     type: "ADD_TOAST",
