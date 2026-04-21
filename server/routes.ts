@@ -4763,6 +4763,8 @@ export function registerRoutes(app: Express) {
       if (!classroom) return;
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
       const rawFormSchema = req.body.formSchema;
+      console.log("[with-file] req.body keys:", Object.keys(req.body ?? {}));
+      console.log("[with-file] raw values:", { title: req.body.title, description: req.body.description, dueDate: req.body.dueDate, points: req.body.points, linkUrl: req.body.linkUrl });
       const data = z.object({
         title: z.string().min(1),
         description: z.string().optional().default(""),
@@ -4775,6 +4777,7 @@ export function registerRoutes(app: Express) {
           return `https://${trimmed}`;
         }),
       }).parse(req.body);
+      console.log("[with-file] parsed data:", data);
 
       let formSchema: z.infer<typeof formQuestionSchema>[] | undefined;
       if (rawFormSchema) {
@@ -4811,6 +4814,8 @@ export function registerRoutes(app: Express) {
 
       res.status(201).json(assignment);
     } catch (error: any) {
+      console.error("[POST /assignments/with-file] body keys:", Object.keys(req.body ?? {}));
+      console.error("[POST /assignments/with-file] ERROR:", error.message);
       res.status(400).json({ error: error.message });
     }
   });

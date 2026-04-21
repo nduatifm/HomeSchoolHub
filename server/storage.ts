@@ -1771,13 +1771,18 @@ class PrismaStorage implements IStorage {
 
   async createClassroomAssignment(data: InsertClassroomAssignment): Promise<ClassroomAssignment> {
     const { answerKey, formSchema, ...rest } = data;
+    console.log("[createClassroomAssignment] rest:", JSON.stringify(rest));
+    console.log("[createClassroomAssignment] formSchema present:", formSchema !== undefined, "answerKey present:", answerKey !== undefined);
+    const safeFormSchema = formSchema !== undefined ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : undefined;
+    const safeAnswerKey = answerKey !== undefined ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : undefined;
     const a = await prisma.classroomAssignment.create({
       data: {
         ...rest,
-        ...(formSchema !== undefined ? { formSchema: formSchema as Prisma.InputJsonValue } : {}),
-        ...(answerKey !== undefined ? { answerKey: answerKey as Prisma.InputJsonValue } : {}),
+        ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema } : {}),
+        ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey } : {}),
       },
     });
+    console.log("[createClassroomAssignment] created id:", a.id);
     const slug = slugify(a.title, a.id);
     const updated = await prisma.classroomAssignment.update({ where: { id: a.id }, data: { slug } });
     // Auto-create pending submissions for all currently enrolled students
@@ -1815,12 +1820,14 @@ class PrismaStorage implements IStorage {
     data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>,
   ): Promise<ClassroomAssignment> {
     const { formSchema, answerKey, ...rest } = data;
+    const safeFormSchema = formSchema !== undefined && formSchema !== null ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : formSchema ?? undefined;
+    const safeAnswerKey = answerKey !== undefined && answerKey !== null ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : answerKey ?? undefined;
     const updated = await prisma.classroomAssignment.update({
       where: { id },
       data: {
         ...rest,
-        ...(formSchema !== undefined ? { formSchema: formSchema as Prisma.InputJsonValue | null } : {}),
-        ...(answerKey !== undefined ? { answerKey: answerKey as Prisma.InputJsonValue | null } : {}),
+        ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema as Prisma.InputJsonValue | null } : {}),
+        ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey as Prisma.InputJsonValue | null } : {}),
       } as Prisma.ClassroomAssignmentUpdateInput,
     });
     return this.mapClassroomAssignment(updated);
@@ -2062,7 +2069,7 @@ class PrismaStorage implements IStorage {
       fileUrl: fileUrl ?? null,
       status: "submitted",
       submittedAt: now,
-      ...(formAnswers !== undefined ? { formAnswers } : {}),
+      ...(formAnswers !== undefined ? { formAnswers: JSON.parse(JSON.stringify(formAnswers)) as Prisma.InputJsonValue } : {}),
       ...(autoGrade !== undefined && autoGrade !== null ? { grade: autoGrade } : {}),
     } as const;
     const updated = await prisma.classroomSubmission.upsert({
