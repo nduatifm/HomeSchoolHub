@@ -434,7 +434,7 @@ export default function ClassworkDetail() {
 
   const classroomSlug = params?.slug ?? "";
   const classworkSlug = params?.classworkSlug ?? "";
-  const goBack = useGoBack(`/classrooms/${classroomSlug}`);
+  const goBack = useGoBack(`/classrooms/${classroomSlug}?tab=assignments`);
 
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
