@@ -4755,10 +4755,15 @@ export function registerRoutes(app: Express) {
       const rawFormSchema = req.body.formSchema;
       const data = z.object({
         title: z.string().min(1),
-        description: z.string(),
+        description: z.string().optional().default(""),
         dueDate: z.string().min(1),
-        points: z.preprocess((v) => parseInt(v as string, 10), z.number().int().min(1).max(10000)),
-        linkUrl: z.string().url().optional().or(z.literal("")),
+        points: z.preprocess((v) => { const n = parseInt(v as string, 10); return isNaN(n) ? undefined : n; }, z.number().int().min(1).max(10000)),
+        linkUrl: z.string().optional().transform((v) => {
+          if (!v || !v.trim()) return undefined;
+          const trimmed = v.trim();
+          if (/^https?:\/\//i.test(trimmed)) return trimmed;
+          return `https://${trimmed}`;
+        }),
       }).parse(req.body);
 
       let formSchema: z.infer<typeof formQuestionSchema>[] | undefined;
@@ -4772,7 +4777,7 @@ export function registerRoutes(app: Express) {
 
       let answerKey: Record<string, string | string[]> | undefined;
       const rawAnswerKey = req.body.answerKey;
-      if (rawAnswerKey) {
+      if (rawAnswerKey && formSchema !== undefined) {
         try {
           const parsed = JSON.parse(rawAnswerKey);
           const validated = z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional().safeParse(parsed);
@@ -4839,13 +4844,18 @@ export function registerRoutes(app: Express) {
       const existing = await prisma.classroomAssignment.findFirst({ where: { id: assignmentId, classroomId: classroom.id } });
       if (!existing) return res.status(404).json({ error: "Assignment not found" });
 
-      const data = z.object({
+      const rawData = z.object({
         title: z.string().min(1).optional(),
         description: z.string().optional(),
         dueDate: z.string().min(1).optional(),
-        points: z.number().int().min(1).max(10000).optional(),
-        fileUrl: z.string().url().nullable().optional(),
-        linkUrl: z.string().url().nullable().optional(),
+        points: z.number().int().min(1).max(10000).optional().nullable().transform((v) => (v == null ? undefined : v)),
+        fileUrl: z.string().nullable().optional(),
+        linkUrl: z.string().nullable().optional().transform((v) => {
+          if (!v || !v.trim()) return null;
+          const trimmed = v.trim();
+          if (/^https?:\/\//i.test(trimmed)) return trimmed;
+          return `https://${trimmed}`;
+        }),
         formSchema: z.array(z.object({
           id: z.string(),
           type: z.enum(["short", "paragraph", "multiple_choice", "checkbox", "true_false"]),
@@ -4855,6 +4865,11 @@ export function registerRoutes(app: Express) {
         })).nullable().optional(),
         answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
       }).parse(req.body);
+
+      const data = { ...rawData };
+      if (rawData.formSchema == null && rawData.answerKey != null) {
+        data.answerKey = null;
+      }
 
       const updated = await storage.updateClassroomAssignment(assignmentId, data);
       res.json(updated);

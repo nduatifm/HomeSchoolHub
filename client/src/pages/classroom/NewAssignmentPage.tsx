@@ -161,7 +161,8 @@ export default function NewAssignmentPage() {
   });
 
   const didSubmit = createMutation.isSuccess;
-  const canSave = !!form.title.trim() && !!form.dueDate && !createMutation.isPending;
+  const pointsValid = !!form.points && !isNaN(parseInt(form.points, 10)) && parseInt(form.points, 10) >= 1;
+  const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !createMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}`;
 
   useEffect(() => {
@@ -513,10 +514,15 @@ export default function NewAssignmentPage() {
                   )}
                 </div>
 
-                {/* Validation nudge */}
+                {/* Validation nudges */}
                 {!form.dueDate && (
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
                     A due date is required to create the assignment.
+                  </p>
+                )}
+                {!pointsValid && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                    Points must be a number between 1 and 10,000.
                   </p>
                 )}
               </div>
