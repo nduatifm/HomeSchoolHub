@@ -97,6 +97,7 @@ type StudentWithParent = Student & {
   email?: string;
   parentName?: string;
   parentId?: number;
+  classrooms?: { id: number; name: string }[];
 };
 
 type ScheduleWithStudent = {
@@ -1198,51 +1199,36 @@ export default function TeacherDashboard() {
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsContent value="students">
-              <div className="space-y-4">
-                {/* Quick actions bar */}
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setCreateAssignmentOpen(true)} data-testid="button-create-assignment">
-                    + Assignment
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setUploadMaterialOpen(true)} data-testid="button-upload-material">
-                    + Material
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setCreateScheduleOpen(true)} data-testid="button-create-schedule">
-                    + Schedule
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setMarkAttendanceOpen(true)} data-testid="button-mark-attendance">
-                    Mark Attendance
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setCreateReportOpen(true)} data-testid="button-create-report">
-                    + Progress Report
-                  </Button>
-                </div>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Students</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Students</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {students.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8 text-sm">
+                      No students linked yet. Students join via a tutor request from their parent.
+                    </p>
+                  ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
                           <TableHead>Grade</TableHead>
                           <TableHead>Parent</TableHead>
+                          <TableHead>Classrooms</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {students.map((s: any) => (
-                          <TableRow
-                            key={s.id}
-                            data-testid={`row-student-${s.id}`}
-                          >
+                          <TableRow key={s.id} data-testid={`row-student-${s.id}`}>
                             <TableCell data-testid={`text-student-name-${s.id}`}>
-                              {s.name}
+                              <div>
+                                <p className="font-medium">{s.name}</p>
+                                {s.email && <p className="text-xs text-muted-foreground">{s.email}</p>}
+                              </div>
                             </TableCell>
-                            <TableCell>{s.email}</TableCell>
-                            <TableCell>{s.gradeLevel || "-"}</TableCell>
+                            <TableCell>{s.gradeLevel || <span className="text-muted-foreground/50">—</span>}</TableCell>
                             <TableCell>
                               {s.parentName ? (
                                 <span className="text-sm text-muted-foreground">{s.parentName}</span>
@@ -1251,128 +1237,43 @@ export default function TeacherDashboard() {
                               )}
                             </TableCell>
                             <TableCell>
-                              <div className="flex gap-1">
-                                {s.parentId && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 px-2 text-muted-foreground hover:text-primary"
-                                    onClick={() => {
-                                      setSendMessageReceiverId(s.parentId as number);
-                                      setSendMessageReceiverName(s.parentName ?? "");
-                                      setSendMessageOpen(true);
-                                    }}
-                                    data-testid={`button-message-parent-${s.id}`}
-                                  >
-                                    <MessageSquare className="w-3.5 h-3.5 mr-1" />
-                                    Message parent
-                                  </Button>
-                                )}
+                              {s.classrooms && s.classrooms.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {s.classrooms.map((c: { id: number; name: string }) => (
+                                    <Badge key={c.id} variant="secondary" className="text-xs font-normal">
+                                      {c.name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground/50 text-xs">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {s.parentId && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   className="h-7 px-2 text-muted-foreground hover:text-primary"
-                                  onClick={() => setCreateScheduleOpen(true)}
-                                  data-testid={`button-schedule-student-${s.id}`}
+                                  onClick={() => {
+                                    setSendMessageReceiverId(s.parentId as number);
+                                    setSendMessageReceiverName(s.parentName ?? "");
+                                    setSendMessageOpen(true);
+                                  }}
+                                  data-testid={`button-message-parent-${s.id}`}
                                 >
-                                  Schedule
+                                  <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                                  Message parent
                                 </Button>
-                              </div>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  </CardContent>
-                </Card>
-
-                {/* Assignments list — edit existing */}
-                {assignments.length > 0 && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between py-3">
-                      <CardTitle className="text-base">Assignments</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2">
-                        {(assignments as any[]).map((a: any) => (
-                          <div key={a.id} className="flex items-center justify-between p-2 rounded border border-border">
-                            <div>
-                              <p className="text-sm font-medium">{a.title}</p>
-                              <p className="text-xs text-muted-foreground">{a.subject} · Due: {a.dueDate ?? "—"}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => { setEditingAssignment(a); setEditAssignmentOpen(true); }}
-                              data-testid={`button-edit-assignment-${a.id}`}
-                            >
-                              Edit
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Materials list — edit existing */}
-                {materials.length > 0 && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between py-3">
-                      <CardTitle className="text-base">Materials</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2">
-                        {(materials as any[]).map((m: any) => (
-                          <div key={m.id} className="flex items-center justify-between p-2 rounded border border-border">
-                            <div>
-                              <p className="text-sm font-medium">{m.title}</p>
-                              <p className="text-xs text-muted-foreground">{m.subject}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => { setEditingMaterial(m); setEditMaterialOpen(true); }}
-                              data-testid={`button-edit-material-${m.id}`}
-                            >
-                              Edit
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Schedules list — edit existing */}
-                {schedules.length > 0 && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between py-3">
-                      <CardTitle className="text-base">Schedules</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2">
-                        {schedules.map((s: any) => (
-                          <div key={s.id} className="flex items-center justify-between p-2 rounded border border-border">
-                            <div>
-                              <p className="text-sm font-medium">{s.studentName ?? s.studentId} · {s.dayOfWeek}</p>
-                              <p className="text-xs text-muted-foreground">{s.startTime}–{s.endTime} · {s.subject}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => { setEditingSchedule(s); setEditScheduleOpen(true); }}
-                              data-testid={`button-edit-schedule-${s.id}`}
-                            >
-                              Edit
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="feedback">

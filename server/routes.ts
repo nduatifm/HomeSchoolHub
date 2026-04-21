@@ -1349,7 +1349,23 @@ export function registerRoutes(app: Express) {
         // When tutor request mode is OFF, show ALL students
         students = await storage.getAllStudentsForTeachers();
       }
-      res.json(students);
+
+      // Augment each student with the classrooms they are enrolled in (for this teacher)
+      const teacherClassrooms = await prisma.classroom.findMany({
+        where: { teacherId: req.session.userId!, deletedAt: null },
+        select: { id: true, name: true, enrollments: { select: { studentId: true } } },
+      });
+      const studentClassroomsMap = new Map<number, { id: number; name: string }[]>();
+      for (const c of teacherClassrooms) {
+        for (const e of c.enrollments) {
+          const list = studentClassroomsMap.get(e.studentId) ?? [];
+          list.push({ id: c.id, name: c.name });
+          studentClassroomsMap.set(e.studentId, list);
+        }
+      }
+      const augmented = students.map((s) => ({ ...s, classrooms: studentClassroomsMap.get(s.id) ?? [] }));
+
+      res.json(augmented);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
