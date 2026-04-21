@@ -4867,7 +4867,7 @@ export function registerRoutes(app: Express) {
       }).parse(req.body);
 
       const data = { ...rawData };
-      if (rawData.formSchema == null && rawData.answerKey != null) {
+      if (rawData.formSchema === null && rawData.answerKey != null) {
         data.answerKey = null;
       }
 
