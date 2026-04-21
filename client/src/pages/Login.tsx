@@ -162,7 +162,7 @@ export default function Login() {
               <div className="flex justify-center" data-testid="google-login-container">
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
-                  onError={() => toast({ title: "Google Sign In failed", description: "Please try again", type: "error" })}
+                  onError={() => toast({ title: "Google Sign In failed — try again.", type: "error" })}
                 />
               </div>
             </>

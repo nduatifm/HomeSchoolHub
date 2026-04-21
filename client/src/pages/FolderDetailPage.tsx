@@ -185,8 +185,8 @@ export default function FolderDetailPage() {
       } else if (failedCount > 0) {
         toast({
           title: "Subject created",
-          description: `${enrolled} enrolled; ${failedCount} could not be enrolled.`,
-          type: "error",
+          description: `${enrolled} enrolled; ${failedCount} could not be added.`,
+          type: "warning",
         });
       } else {
         toast({ title: "Subject created!", type: "success" });

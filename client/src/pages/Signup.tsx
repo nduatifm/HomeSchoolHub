@@ -46,7 +46,7 @@ export default function Signup() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!role) {
-      toast({ title: "Please select a role", description: "Choose whether you are a parent or a teacher.", type: "error" });
+      toast({ title: "Please choose a role — parent or teacher — before continuing.", type: "warning" });
       return;
     }
     setIsLoading(true);
@@ -213,7 +213,7 @@ export default function Signup() {
               <div className="flex justify-center" data-testid="google-signup-container">
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
-                  onError={() => toast({ title: "Google Sign Up failed", description: "Please try again", type: "error" })}
+                  onError={() => toast({ title: "Google Sign Up failed — try again.", type: "error" })}
                 />
               </div>
             </>

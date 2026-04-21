@@ -201,8 +201,8 @@ export default function ClassroomsPage() {
       } else if (failedCount > 0) {
         toast({
           title: "Classroom created",
-          description: `${enrolled} enrolled; ${failedCount} student${failedCount === 1 ? "" : "s"} could not be enrolled (already enrolled or error).`,
-          type: "error",
+          description: `${enrolled} enrolled; ${failedCount} student${failedCount === 1 ? "" : "s"} couldn't be added.`,
+          type: "warning",
         });
       } else {
         toast({ title: "Classroom created!", type: "success" });
