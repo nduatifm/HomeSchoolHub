@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -74,13 +75,14 @@ export default function SubmissionReviewPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classroom-notifications/total"] });
       toast({ title: "Grade saved", type: "success" });
-      navigate(`/classrooms/${classroomSlug}`);
+      navigate(`/classrooms/${classroomSlug}?tab=assignments`);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
   });
 
   const assignment = submission?.assignment;
-  const backUrl = `/classrooms/${classroomSlug}`;
+  const backUrl = `/classrooms/${classroomSlug}?tab=assignments`;
+  const goBack = useGoBack(backUrl);
   const isLoading = classroomLoading || submissionLoading;
 
   if (isLoading) {
@@ -100,7 +102,7 @@ export default function SubmissionReviewPage() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-gray-500 text-sm">Submission not found.</p>
-          <Button variant="outline" size="sm" onClick={() => navigate(backUrl)}>
+          <Button variant="outline" size="sm" onClick={goBack}>
             Back to Classroom
           </Button>
         </div>
@@ -118,7 +120,7 @@ export default function SubmissionReviewPage() {
           {/* Breadcrumb */}
           <div>
             <button
-              onClick={() => navigate(backUrl)}
+              onClick={goBack}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
             >
               <ChevronLeft className="h-3.5 w-3.5" />Back to {classroom.name}
@@ -249,7 +251,7 @@ export default function SubmissionReviewPage() {
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-1">
-              <Button variant="outline" onClick={() => navigate(backUrl)}>
+              <Button variant="outline" onClick={goBack}>
                 Cancel
               </Button>
               <Button disabled={!canGrade} onClick={() => gradeMutation.mutate()}>

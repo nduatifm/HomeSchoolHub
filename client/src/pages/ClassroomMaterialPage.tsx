@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useReducer } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -112,6 +113,7 @@ function TeacherEditor({
   isEdit: boolean;
 }) {
   const [, navigate] = useLocation();
+  const goBack = useGoBack(`/classrooms/${classroomSlug}?tab=classwork`);
   const [title, setTitle] = useState(initial?.title ?? "");
   const [assignmentId, setAssignmentId] = useState(
     initial?.assignmentId ? String(initial.assignmentId) : "",
@@ -366,7 +368,7 @@ function TeacherEditor({
           {/* Left: back crumb */}
           <button
             type="button"
-            onClick={() => navigate(`/classrooms/${classroomSlug}?tab=classwork`)}
+            onClick={goBack}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -825,6 +827,7 @@ function ReadView({
   const backHref = `/classrooms/${classroomSlug}?tab=classwork${
     isParent && parentStudentId ? `&studentId=${parentStudentId}` : ""
   }`;
+  const goBack = useGoBack(backHref);
 
   useEffect(() => {
     if (isTeacher) return;
@@ -854,7 +857,7 @@ function ReadView({
 
           <button
             type="button"
-            onClick={() => navigate(backHref)}
+            onClick={goBack}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -975,6 +978,7 @@ export default function ClassroomMaterialPage() {
 
   const classroomSlug =
     (matchNew ? paramsNew?.slug : matchEdit ? paramsEdit?.slug : paramsMaterial?.slug) ?? "";
+  const goBack = useGoBack(`/classrooms/${classroomSlug}?tab=classwork`);
   const materialSlug = matchEdit
     ? (paramsEdit?.materialSlug ?? "")
     : matchMaterial
@@ -1014,7 +1018,7 @@ export default function ClassroomMaterialPage() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-sm text-muted-foreground">Classroom not found.</p>
-          <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
+          <Button variant="outline" size="sm" onClick={goBack}>Back to Dashboard</Button>
         </div>
       </div>
     );
@@ -1026,7 +1030,7 @@ export default function ClassroomMaterialPage() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-sm text-muted-foreground">Classwork not found.</p>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/classrooms/${classroomSlug}?tab=classwork`)}>
+          <Button variant="outline" size="sm" onClick={goBack}>
             Back to {classroom.name}
           </Button>
         </div>

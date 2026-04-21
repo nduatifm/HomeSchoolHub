@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -95,6 +96,7 @@ function groupByType(items: Notification[]): Record<string, Notification[]> {
 
 export default function NotificationsPage() {
   const [location, setLocation] = useLocation();
+  const goBack = useGoBack("/dashboard");
   const queryClient = useQueryClient();
 
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
@@ -208,7 +210,7 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setLocation("/dashboard")}
+                onClick={goBack}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                 aria-label="Back to dashboard"
               >

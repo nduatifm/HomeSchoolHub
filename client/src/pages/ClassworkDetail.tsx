@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -433,6 +434,7 @@ export default function ClassworkDetail() {
 
   const classroomSlug = params?.slug ?? "";
   const classworkSlug = params?.classworkSlug ?? "";
+  const goBack = useGoBack(`/classrooms/${classroomSlug}`);
 
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
@@ -482,7 +484,7 @@ export default function ClassworkDetail() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-gray-500 text-sm">{!classroom ? "Classroom not found." : "Assignment not found."}</p>
-          <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")}>
+          <Button variant="outline" size="sm" onClick={goBack}>
             Back to Dashboard
           </Button>
         </div>
@@ -504,7 +506,7 @@ export default function ClassworkDetail() {
           {/* Breadcrumb */}
           <div className="space-y-1">
             <button
-              onClick={() => navigate(`/classrooms/${classroom.slug ?? classroom.id}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`)}
+              onClick={goBack}
               className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
             >
               <ChevronLeft className="h-3.5 w-3.5" />Back to {classroom.name}

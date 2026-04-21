@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -155,7 +156,7 @@ export default function NewAssignmentPage() {
       localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment created", type: "success" });
-      navigate(`/classrooms/${classroomSlug}`);
+      navigate(`/classrooms/${classroomSlug}?tab=assignments`);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, type: "error" }),
   });
@@ -164,7 +165,8 @@ export default function NewAssignmentPage() {
   const pointsNum = Number(form.points);
   const pointsValid = !!form.points && Number.isInteger(pointsNum) && pointsNum >= 1 && pointsNum <= 10000;
   const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !createMutation.isPending;
-  const backUrl = `/classrooms/${classroomSlug}`;
+  const backUrl = `/classrooms/${classroomSlug}?tab=assignments`;
+  const goBack = useGoBack(backUrl);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -174,13 +176,13 @@ export default function NewAssignmentPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty, didSubmit]);
 
-  function safeNavigate(url: string) {
+  function safeNavigate() {
     if (isDirty && !didSubmit) {
       if (!window.confirm("You have unsaved changes. Leave without creating the assignment?")) return;
     }
     localStorage.removeItem(getDraftKey(draftId.current));
     localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
-    navigate(url);
+    goBack();
   }
 
   function handleFileDrop(e: React.DragEvent) {
@@ -207,7 +209,7 @@ export default function NewAssignmentPage() {
         <ModernSidebar />
         <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
           <p className="text-muted-foreground text-sm">Classroom not found.</p>
-          <Button variant="outline" size="sm" onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
+          <Button variant="outline" size="sm" onClick={goBack}>Back to Dashboard</Button>
         </div>
       </div>
     );
@@ -223,7 +225,7 @@ export default function NewAssignmentPage() {
         {/* ── Sticky top bar ── */}
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <button
-            onClick={() => safeNavigate(backUrl)}
+            onClick={safeNavigate}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -241,7 +243,7 @@ export default function NewAssignmentPage() {
               variant="outline"
               size="sm"
               className="h-8"
-              onClick={() => safeNavigate(backUrl)}
+              onClick={safeNavigate}
               disabled={createMutation.isPending}
             >
               Cancel

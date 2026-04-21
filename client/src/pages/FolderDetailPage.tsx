@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +58,7 @@ export default function FolderDetailPage() {
 
   const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
   const isParent = user?.roles?.includes("parent") || user?.role === "parent";
+  const goBack = useGoBack(isTeacher ? "/classrooms" : "/dashboard");
 
   // Teachers and students use own classrooms; parents fetch the child's classrooms
   const { data: ownClassrooms = [], isLoading: ownClassroomsLoading } = useQuery<Classroom[]>({
@@ -383,9 +385,9 @@ export default function FolderDetailPage() {
 
   useEffect(() => {
     if (!isLoading && !folder) {
-      navigate(isTeacher ? "/classrooms" : "/dashboard");
+      goBack();
     }
-  }, [isLoading, folder, navigate, isTeacher]);
+  }, [isLoading, folder, goBack, isTeacher]);
 
   if (!isLoading && !folder) return null;
 
@@ -402,7 +404,7 @@ export default function FolderDetailPage() {
                 variant="ghost"
                 size="icon"
                 className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={() => navigate(isTeacher ? "/classrooms" : "/dashboard")}
+                onClick={goBack}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
