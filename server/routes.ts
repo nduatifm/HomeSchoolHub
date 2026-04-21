@@ -4726,9 +4726,15 @@ export function registerRoutes(app: Express) {
       if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
       const data = z.object({
         title: z.string().min(1),
-        description: z.string().min(1),
+        description: z.string().optional().default(""),
         dueDate: z.string().min(1),
         points: z.number().int().min(1).max(10000),
+        linkUrl: z.string().nullable().optional().transform((v) => {
+          if (!v || !v.trim()) return undefined;
+          const trimmed = v.trim();
+          if (/^https?:\/\//i.test(trimmed)) return trimmed;
+          return `https://${trimmed}`;
+        }),
         formSchema: z.array(z.object({
           id: z.string(),
           type: z.enum(["short", "paragraph", "multiple_choice", "checkbox", "true_false"]),
@@ -4738,7 +4744,11 @@ export function registerRoutes(app: Express) {
         })).nullable().optional(),
         answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
       }).parse(req.body);
-      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data });
+
+      const finalData = { ...data };
+      if (data.formSchema == null) finalData.answerKey = undefined;
+
+      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...finalData });
 
       res.status(201).json(assignment);
     } catch (error: any) {
