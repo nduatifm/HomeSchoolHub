@@ -291,8 +291,8 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-3.5 py-2.5 flex gap-2.5 items-start mt-2">
                 <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-semibold text-blue-700">Estimated score: {mySubmission.grade}/{assignment.points} pts</p>
-                  <p className="text-[11px] text-blue-500 mt-0.5">This is a preliminary auto-score based on your answers. Your teacher will review and confirm the final grade.</p>
+                  <p className="text-xs font-semibold text-blue-700">Your score so far: {mySubmission.grade}/{assignment.points} pts</p>
+                  <p className="text-[11px] text-blue-500 mt-0.5">This is not your final grade yet — your teacher will look at your answers and give you your real score soon.</p>
                 </div>
               </div>
             )}
