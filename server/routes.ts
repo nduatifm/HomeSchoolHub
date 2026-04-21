@@ -4982,15 +4982,15 @@ export function registerRoutes(app: Express) {
         if (keyedTotal > 0) {
           let correct = 0;
           for (const q of keyedQuestions) {
-            const correct_answer = answerKey[q.id];
-            const student_answer = effectiveAnswers[q.id];
+            const correctAnswer = answerKey[q.id];
+            const studentAnswer = effectiveAnswers[q.id];
             if (q.type === "checkbox") {
-              const expected = (Array.isArray(correct_answer) ? correct_answer : [correct_answer]).map((v) => v.trim().toLowerCase()).sort();
-              const actual = (Array.isArray(student_answer) ? student_answer : [student_answer ?? ""]).map((v) => v.trim().toLowerCase()).sort();
+              const expected = (Array.isArray(correctAnswer) ? correctAnswer : [correctAnswer]).map((v) => v.trim().toLowerCase()).sort();
+              const actual = (Array.isArray(studentAnswer) ? studentAnswer : [studentAnswer ?? ""]).map((v) => v.trim().toLowerCase()).sort();
               if (expected.length === actual.length && expected.every((v, i) => v === actual[i])) correct++;
             } else {
-              const expected = (typeof correct_answer === "string" ? correct_answer : correct_answer[0] ?? "").trim().toLowerCase();
-              const actual = (typeof student_answer === "string" ? student_answer : (Array.isArray(student_answer) ? student_answer[0] : "") ?? "").trim().toLowerCase();
+              const expected = (typeof correctAnswer === "string" ? correctAnswer : correctAnswer[0] ?? "").trim().toLowerCase();
+              const actual = (typeof studentAnswer === "string" ? studentAnswer : (Array.isArray(studentAnswer) ? studentAnswer[0] : "") ?? "").trim().toLowerCase();
               if (expected && actual && expected === actual) correct++;
             }
           }
