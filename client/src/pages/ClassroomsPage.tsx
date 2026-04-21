@@ -47,7 +47,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Classroom, GradeFolder } from "@shared/schema";
-import type { ClassroomNotification } from "@/lib/classroomNotifications";
+import type { ClassroomNotification, ClassroomNotificationsMap } from "@/lib/classroomNotifications";
 
 type TeacherStudent = { id: number; name: string; email: string; gradeLevel?: string | null };
 type DeletedClassroom = Classroom & { deletedAt: string };
@@ -81,6 +81,7 @@ export default function ClassroomsPage() {
   const [, navigate] = useLocation();
 
   const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
+  const isStudent = !isTeacher && user?.role === "student";
 
   const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({
     queryKey: ["/api/classrooms"],
@@ -105,6 +106,20 @@ export default function ClassroomsPage() {
   const { data: classroomStats = {} as Record<number, { toGradeCount: number }> } = useQuery<Record<number, { toGradeCount: number }>>({
     queryKey: ["/api/teacher/classroom-stats"],
     enabled: isTeacher,
+    refetchInterval: 30_000,
+  });
+
+  const { data: studentMe } = useQuery<{ id: number }>({
+    queryKey: ["/api/students/me"],
+    queryFn: () => apiRequest("/api/students/me"),
+    enabled: isStudent,
+  });
+
+  const { data: studentNotifMap = {} as ClassroomNotificationsMap } = useQuery<ClassroomNotificationsMap>({
+    queryKey: ["/api/students", studentMe?.id, "classroom-notifications"],
+    queryFn: () => apiRequest(`/api/students/${studentMe!.id}/classroom-notifications`),
+    enabled: isStudent && !!studentMe?.id,
+    refetchInterval: 15_000,
   });
 
   const [collapsedArchived, setCollapsedArchived] = useState(true);
@@ -340,9 +355,20 @@ export default function ClassroomsPage() {
   }
 
   const notifForClassroom = (c: Classroom): ClassroomNotification | null => {
-    const stats = classroomStats[c.id];
-    if (!stats || stats.toGradeCount === 0) return null;
-    return { pendingCount: stats.toGradeCount, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount };
+    if (isTeacher) {
+      const stats = classroomStats[c.id];
+      if (!stats || stats.toGradeCount === 0) return null;
+      return { pendingCount: stats.toGradeCount, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount };
+    }
+    return studentNotifMap[c.id] ?? null;
+  };
+
+  const folderPendingCount = (folder: GradeFolder): number => {
+    const folderClassrooms = classroomsByFolder[folder.id] ?? [];
+    return folderClassrooms.reduce((sum, c) => {
+      const stats = classroomStats[c.id];
+      return sum + (stats?.toGradeCount ?? 0);
+    }, 0);
   };
 
   const renderCard = (c: Classroom, isArchived = false) => {
@@ -517,8 +543,13 @@ export default function ClassroomsPage() {
                         <div key={folder.id} className="relative group/folder">
                           <button
                             onClick={() => navigate(`/classrooms/folders/${folder.slug ?? folder.id}`)}
-                            className="w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
+                            className="relative w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
                           >
+                            {isTeacher && folderPendingCount(folder) > 0 && (
+                              <span className="absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm bg-amber-500 group-hover/folder:opacity-0 transition-opacity">
+                                {folderPendingCount(folder) > 9 ? "9+" : folderPendingCount(folder)}
+                              </span>
+                            )}
                             <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
                               <Folder className="h-10 w-10 text-primary opacity-70" />
                             </div>

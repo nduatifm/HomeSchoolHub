@@ -44,7 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Classroom, GradeFolder } from "@shared/schema";
-import type { ClassroomNotification } from "@/lib/classroomNotifications";
+import type { ClassroomNotification, ClassroomNotificationsMap } from "@/lib/classroomNotifications";
 
 type TeacherStudent = { id: number; name: string; email: string; gradeLevel?: string | null };
 
@@ -59,6 +59,7 @@ export default function FolderDetailPage() {
 
   const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
   const isParent = user?.roles?.includes("parent") || user?.role === "parent";
+  const isStudent = !isTeacher && !isParent;
   const goBack = useGoBack(isTeacher ? "/classrooms" : "/dashboard");
 
   // Teachers and students use own classrooms; parents fetch the child's classrooms
@@ -89,6 +90,27 @@ export default function FolderDetailPage() {
   const { data: classroomStats = {} as Record<number, { toGradeCount: number }> } = useQuery<Record<number, { toGradeCount: number }>>({
     queryKey: ["/api/teacher/classroom-stats"],
     enabled: isTeacher,
+    refetchInterval: 30_000,
+  });
+
+  const { data: studentMe } = useQuery<{ id: number }>({
+    queryKey: ["/api/students/me"],
+    queryFn: () => apiRequest("/api/students/me"),
+    enabled: isStudent,
+  });
+
+  const { data: studentNotifMap = {} as ClassroomNotificationsMap } = useQuery<ClassroomNotificationsMap>({
+    queryKey: ["/api/students", studentMe?.id, "classroom-notifications"],
+    queryFn: () => apiRequest(`/api/students/${studentMe!.id}/classroom-notifications`),
+    enabled: isStudent && !!studentMe?.id,
+    refetchInterval: 15_000,
+  });
+
+  const { data: parentNotifMap = {} as ClassroomNotificationsMap } = useQuery<ClassroomNotificationsMap>({
+    queryKey: ["/api/students", parentStudentId, "classroom-notifications"],
+    queryFn: () => apiRequest(`/api/students/${parentStudentId}/classroom-notifications`),
+    enabled: isParent && !!parentStudentId,
+    refetchInterval: 15_000,
   });
 
   // Teachers: resolve folder from /api/grade-folders (supports slug or numeric id)
@@ -270,9 +292,13 @@ export default function FolderDetailPage() {
   };
 
   const notifForClassroom = (c: Classroom): ClassroomNotification | null => {
-    const stats = classroomStats[c.id];
-    if (!stats || stats.toGradeCount === 0) return null;
-    return { pendingCount: stats.toGradeCount, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount };
+    if (isTeacher) {
+      const stats = classroomStats[c.id];
+      if (!stats || stats.toGradeCount === 0) return null;
+      return { pendingCount: stats.toGradeCount, newMaterialsCount: 0, newPostsCount: 0, newCount: 0, dueCount: 0, dueSoonCount: 0, total: stats.toGradeCount };
+    }
+    if (isParent) return parentNotifMap[c.id] ?? null;
+    return studentNotifMap[c.id] ?? null;
   };
 
   const renderCard = (c: Classroom, isArchived = false) => {
