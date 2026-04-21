@@ -1,8 +1,10 @@
-import { Route, Switch, Redirect } from "wouter";
+import { useEffect, useRef } from "react";
+import { Route, Switch, Redirect, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
+import { incrementNavCount } from "./lib/navigationHistory";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import StudentSignup from "./pages/StudentSignup";
@@ -24,6 +26,16 @@ import NotificationsPage from "./pages/Notifications";
 import FormBuilderPage from "./pages/FormBuilderPage";
 import ClassroomsPage from "./pages/ClassroomsPage";
 import FolderDetailPage from "./pages/FolderDetailPage";
+
+function RouteTracker() {
+  const [location] = useLocation();
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    incrementNavCount();
+  }, [location]);
+  return null;
+}
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
@@ -47,7 +59,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 }
 
 function DashboardRouter() {
-  const { user, student, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -120,71 +132,74 @@ function AppRoutes() {
   const { user } = useAuth();
 
   return (
-    <Switch>
-      <Route path="/login">
-        {user ? <Redirect to="/dashboard" /> : <Login />}
-      </Route>
-      <Route path="/signup">
-        {user ? <Redirect to="/dashboard" /> : <Signup />}
-      </Route>
-      <Route path="/student-signup">
-        {user ? <Redirect to="/dashboard" /> : <StudentSignup />}
-      </Route>
-      <Route path="/verify-email">
-        <VerifyEmail />
-      </Route>
-      <Route path="/settings">
-        <ProtectedRoute component={Profile} />
-      </Route>
-      <Route path="/admin">
-        <AdminRoute component={AdminUsers} />
-      </Route>
-      <Route path="/notifications">
-        <ProtectedRoute component={NotificationsPage} />
-      </Route>
-      <Route path="/form-builder">
-        <ProtectedRoute component={FormBuilderPage} />
-      </Route>
-      <Route path="/classrooms/:slug/assignments/new">
-        <ProtectedRoute component={NewAssignmentPage} />
-      </Route>
-      <Route path="/classrooms/:slug/assignments/:assignmentSlug/edit">
-        <ProtectedRoute component={EditAssignmentPage} />
-      </Route>
-      <Route path="/classrooms/:slug/submissions/:submissionId/review">
-        <ProtectedRoute component={SubmissionReviewPage} />
-      </Route>
-      <Route path="/classrooms/:slug/classwork/:classworkSlug">
-        <ProtectedRoute component={ClassworkDetail} />
-      </Route>
-      <Route path="/classrooms/:slug/materials/new">
-        <ProtectedRoute component={ClassroomMaterialPage} />
-      </Route>
-      <Route path="/classrooms/:slug/materials/:materialSlug/edit">
-        <ProtectedRoute component={ClassroomMaterialPage} />
-      </Route>
-      <Route path="/classrooms/:slug/materials/:materialSlug">
-        <ProtectedRoute component={ClassroomMaterialPage} />
-      </Route>
-      <Route path="/classrooms/folders/:folderId">
-        <ProtectedRoute component={FolderDetailPage} />
-      </Route>
-      <Route path="/classrooms/:slug">
-        <ProtectedRoute component={ClassroomDetail} />
-      </Route>
-      <Route path="/classrooms">
-        <TeacherRoute component={ClassroomsPage} />
-      </Route>
-      <Route path="/dashboard/:tab">
-        <DashboardRouter />
-      </Route>
-      <Route path="/dashboard">
-        <DashboardRouter />
-      </Route>
-      <Route path="/">
-        {user ? <Redirect to="/dashboard" /> : <Landing />}
-      </Route>
-    </Switch>
+    <>
+      <RouteTracker />
+      <Switch>
+        <Route path="/login">
+          {user ? <Redirect to="/dashboard" /> : <Login />}
+        </Route>
+        <Route path="/signup">
+          {user ? <Redirect to="/dashboard" /> : <Signup />}
+        </Route>
+        <Route path="/student-signup">
+          {user ? <Redirect to="/dashboard" /> : <StudentSignup />}
+        </Route>
+        <Route path="/verify-email">
+          <VerifyEmail />
+        </Route>
+        <Route path="/settings">
+          <ProtectedRoute component={Profile} />
+        </Route>
+        <Route path="/admin">
+          <AdminRoute component={AdminUsers} />
+        </Route>
+        <Route path="/notifications">
+          <ProtectedRoute component={NotificationsPage} />
+        </Route>
+        <Route path="/form-builder">
+          <ProtectedRoute component={FormBuilderPage} />
+        </Route>
+        <Route path="/classrooms/:slug/assignments/new">
+          <ProtectedRoute component={NewAssignmentPage} />
+        </Route>
+        <Route path="/classrooms/:slug/assignments/:assignmentSlug/edit">
+          <ProtectedRoute component={EditAssignmentPage} />
+        </Route>
+        <Route path="/classrooms/:slug/submissions/:submissionId/review">
+          <ProtectedRoute component={SubmissionReviewPage} />
+        </Route>
+        <Route path="/classrooms/:slug/classwork/:classworkSlug">
+          <ProtectedRoute component={ClassworkDetail} />
+        </Route>
+        <Route path="/classrooms/:slug/materials/new">
+          <ProtectedRoute component={ClassroomMaterialPage} />
+        </Route>
+        <Route path="/classrooms/:slug/materials/:materialSlug/edit">
+          <ProtectedRoute component={ClassroomMaterialPage} />
+        </Route>
+        <Route path="/classrooms/:slug/materials/:materialSlug">
+          <ProtectedRoute component={ClassroomMaterialPage} />
+        </Route>
+        <Route path="/classrooms/folders/:folderId">
+          <ProtectedRoute component={FolderDetailPage} />
+        </Route>
+        <Route path="/classrooms/:slug">
+          <ProtectedRoute component={ClassroomDetail} />
+        </Route>
+        <Route path="/classrooms">
+          <TeacherRoute component={ClassroomsPage} />
+        </Route>
+        <Route path="/dashboard/:tab">
+          <DashboardRouter />
+        </Route>
+        <Route path="/dashboard">
+          <DashboardRouter />
+        </Route>
+        <Route path="/">
+          {user ? <Redirect to="/dashboard" /> : <Landing />}
+        </Route>
+      </Switch>
+    </>
   );
 }
 

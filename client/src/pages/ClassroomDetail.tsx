@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,7 +77,15 @@ export default function ClassroomDetail() {
 
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") ?? "feed");
+  const [activeTab, setActiveTabState] = useState<string>(searchParams.get("tab") ?? "feed");
+  const goBack = useGoBack((user?.roles?.includes("teacher") || user?.role === "teacher") ? "/classrooms" : "/dashboard");
+
+  function setActiveTab(tab: string) {
+    setActiveTabState(tab);
+    const qs = new URLSearchParams(window.location.search);
+    qs.set("tab", tab);
+    window.history.replaceState(null, "", `${window.location.pathname}?${qs.toString()}`);
+  }
 
   const { data: classroom, isLoading } = useQuery<Classroom>({
     queryKey: ["/api/classrooms", slugParam],
@@ -250,7 +259,7 @@ export default function ClassroomDetail() {
 
           {/* Back nav */}
           <button
-            onClick={() => navigate((user?.roles?.includes("teacher") || user?.role === "teacher") ? "/classrooms" : "/dashboard/classrooms")}
+            onClick={goBack}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronLeft className="h-3.5 w-3.5" />Back to Classrooms
