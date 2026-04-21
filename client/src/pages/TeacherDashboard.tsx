@@ -242,7 +242,7 @@ function TeacherGradeDialog({
   const handleSave = () => {
     const gradeNum = parseInt(grade);
     if (isNaN(gradeNum) || gradeNum < 0 || gradeNum > 100) {
-      toast({ title: "Please enter a valid grade between 0 and 100", type: "error" });
+      toast({ title: "Grade must be between 0 and 100.", type: "warning" });
       return;
     }
     mutation.mutate();

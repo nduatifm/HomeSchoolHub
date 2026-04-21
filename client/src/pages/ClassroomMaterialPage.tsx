@@ -260,7 +260,7 @@ function TeacherEditor({
     for (let i = 0; i < fileList.length; i++) {
       const f = fileList[i];
       if (f.size > 10 * 1024 * 1024) {
-        toast({ title: "File too large", description: `${f.name} exceeds 10 MB.`, type: "error" });
+        toast({ title: `"${f.name}" is over 10 MB — please choose a smaller file.`, type: "warning" });
         continue;
       }
       toAdd.push(f);
@@ -276,9 +276,8 @@ function TeacherEditor({
       const url = await uploadFileToCloudinary(imgFile, "classwork-images");
       editor.chain().focus().setImage({ src: url }).run();
       setPendingFiles((prev) => prev.filter((f) => f !== imgFile));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Upload failed";
-      toast({ title: "Image upload failed", description: msg, type: "error" });
+    } catch {
+      toast({ title: "Image upload failed — try again.", type: "error" });
     } finally {
       setIsUploadingImage(false);
     }
@@ -290,9 +289,8 @@ function TeacherEditor({
     try {
       const url = await uploadFileToCloudinary(imgFile, "classwork-images");
       editor.chain().focus().setImage({ src: url }).run();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Upload failed";
-      toast({ title: "Image upload failed", description: msg, type: "error" });
+    } catch {
+      toast({ title: "Image upload failed — try again.", type: "error" });
     } finally {
       setIsUploadingImage(false);
       if (imageRef.current) imageRef.current.value = "";
