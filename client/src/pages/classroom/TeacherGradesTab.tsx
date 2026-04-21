@@ -43,7 +43,13 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
             {assignments.map((a) => (
               <th key={a.id} className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">
                 <div className="truncate max-w-[100px]" title={a.title}>{a.title}</div>
-                <div className="text-muted-foreground/60 font-normal">{a.points} pts</div>
+                <div className="flex items-center justify-center gap-1 mt-0.5">
+                  {a.assignmentType === "test"
+                    ? <span className="text-[9px] font-medium px-1 rounded-full bg-orange-100 text-orange-700">Test</span>
+                    : <span className="text-[9px] font-medium px-1 rounded-full bg-blue-100 text-blue-700">Asgmt</span>
+                  }
+                  <span className="text-muted-foreground/60 font-normal">{a.points} pts</span>
+                </div>
               </th>
             ))}
             <th className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px]">Total</th>

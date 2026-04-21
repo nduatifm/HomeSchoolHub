@@ -482,18 +482,19 @@ model ClassroomPost {
 }
 
 model ClassroomAssignment {
-  id          Int      @id @default(autoincrement())
-  classroomId Int
-  title       String
-  description String
-  dueDate     String
-  points      Int      @default(100)
-  fileUrl     String?
-  linkUrl     String?
-  slug        String?
-  formSchema  Json?
-  answerKey   Json?
-  createdAt   DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  classroomId    Int
+  title          String
+  description    String
+  dueDate        String
+  points         Int      @default(100)
+  assignmentType String   @default("assignment")
+  fileUrl        String?
+  linkUrl        String?
+  slug           String?
+  formSchema     Json?
+  answerKey      Json?
+  createdAt      DateTime @default(now())
 
   classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   submissions ClassroomSubmission[]

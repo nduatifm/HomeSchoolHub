@@ -138,6 +138,10 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
                     <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
+                    {a.assignmentType === "test"
+                      ? <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Test</span>
+                      : <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">Assignment</span>
+                    }
                     {a.formSchema && a.formSchema.length > 0 && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full font-medium">
                         <ClipboardList className="h-2.5 w-2.5" />Form

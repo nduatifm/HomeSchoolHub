@@ -496,6 +496,7 @@ export const classroomAssignmentSchema = z.object({
   description: z.string(),
   dueDate: z.string(),
   points: z.number(),
+  assignmentType: z.enum(["assignment", "test"]).default("assignment"),
   fileUrl: z.string().nullable().optional(),
   linkUrl: z.string().nullable().optional(),
   slug: z.string().nullable().optional(),

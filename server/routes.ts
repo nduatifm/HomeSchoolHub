@@ -4729,6 +4729,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional().default(""),
         dueDate: z.string().min(1),
         points: z.number().int().min(1).max(10000),
+        assignmentType: z.enum(["assignment", "test"]).default("assignment"),
         linkUrl: z.string().nullable().optional().transform((v) => {
           if (!v || !v.trim()) return undefined;
           const trimmed = v.trim();
@@ -4768,6 +4769,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional().default(""),
         dueDate: z.string().min(1),
         points: z.preprocess((v) => { const n = parseInt(v as string, 10); return isNaN(n) ? undefined : n; }, z.number().int().min(1).max(10000)),
+        assignmentType: z.enum(["assignment", "test"]).default("assignment"),
         linkUrl: z.string().optional().transform((v) => {
           if (!v || !v.trim()) return undefined;
           const trimmed = v.trim();
@@ -4859,6 +4861,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional(),
         dueDate: z.string().min(1).optional(),
         points: z.number().int().min(1).max(10000).optional().nullable().transform((v) => (v == null ? undefined : v)),
+        assignmentType: z.enum(["assignment", "test"]).optional(),
         fileUrl: z.string().url().nullable().optional(),
         linkUrl: z.string().nullable().optional().transform((v) => {
           if (!v || !v.trim()) return null;

@@ -57,6 +57,7 @@ export default function NewAssignmentPage() {
   const classroomSlug = params?.slug ?? "";
 
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
+  const [assignmentType, setAssignmentType] = useState<"assignment" | "test">("assignment");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -135,6 +136,7 @@ export default function NewAssignmentPage() {
       fd.append("description", form.description);
       fd.append("dueDate", form.dueDate);
       fd.append("points", form.points);
+      fd.append("assignmentType", assignmentType);
       if (linkUrl.trim()) fd.append("linkUrl", linkUrl.trim());
       if (attachedFile) fd.append("file", attachedFile);
       if (formQuestions.length > 0) {
@@ -326,6 +328,21 @@ export default function NewAssignmentPage() {
                 {/* Due date + points — mobile only */}
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-4 lg:hidden">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Type</Label>
+                    <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setAssignmentType("assignment")}
+                        className={`flex-1 py-1.5 font-medium transition-colors ${assignmentType === "assignment" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >Assignment</button>
+                      <button
+                        type="button"
+                        onClick={() => setAssignmentType("test")}
+                        className={`flex-1 py-1.5 font-medium transition-colors border-l border-border ${assignmentType === "test" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >Test</button>
+                    </div>
+                  </div>
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
                 </div>
 
@@ -439,6 +456,22 @@ export default function NewAssignmentPage() {
                 {/* Due date + points */}
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Type</Label>
+                    <div className="flex rounded-lg border border-border overflow-hidden text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setAssignmentType("assignment")}
+                        className={`flex-1 py-1.5 font-medium transition-colors ${assignmentType === "assignment" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >Assignment</button>
+                      <button
+                        type="button"
+                        onClick={() => setAssignmentType("test")}
+                        className={`flex-1 py-1.5 font-medium transition-colors border-l border-border ${assignmentType === "test" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >Test</button>
+                    </div>
+                  </div>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="dueDate" className="text-sm font-medium flex items-center gap-1.5">

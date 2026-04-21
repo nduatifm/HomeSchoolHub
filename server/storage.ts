@@ -295,7 +295,7 @@ export interface IStorage {
   getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]>;
   getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null>;
   getClassroomAssignmentById(classroomId: number, id: number): Promise<ClassroomAssignment | null>;
-  updateClassroomAssignment(id: number, data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>): Promise<ClassroomAssignment>;
+  updateClassroomAssignment(id: number, data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "assignmentType" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>): Promise<ClassroomAssignment>;
   deleteClassroomAssignment(id: number): Promise<void>;
 
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
@@ -1760,6 +1760,7 @@ class PrismaStorage implements IStorage {
       description: a.description,
       dueDate: a.dueDate,
       points: a.points,
+      assignmentType: (a.assignmentType === "test" ? "test" : "assignment") as "assignment" | "test",
       fileUrl: a.fileUrl ?? null,
       linkUrl: a.linkUrl ?? null,
       slug: a.slug ?? null,
@@ -1814,7 +1815,7 @@ class PrismaStorage implements IStorage {
 
   async updateClassroomAssignment(
     id: number,
-    data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>,
+    data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "assignmentType" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>,
   ): Promise<ClassroomAssignment> {
     const { formSchema, answerKey, ...rest } = data;
     const safeFormSchema = formSchema !== undefined && formSchema !== null ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : formSchema ?? undefined;

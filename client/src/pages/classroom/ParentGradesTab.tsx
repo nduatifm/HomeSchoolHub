@@ -38,7 +38,7 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Assignment</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Assignment / Test</th>
               <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground uppercase">Due</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase">Status</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase">Grade</th>
@@ -56,9 +56,15 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
                   className={`transition-colors ${isUnseen ? "bg-primary/5 hover:bg-primary/10 cursor-pointer" : "hover:bg-muted/20"}`}
                 >
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <div className="flex items-center gap-1.5">
-                      {isUnseen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
-                      {a.title}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5">
+                        {isUnseen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                        {a.title}
+                      </div>
+                      {a.assignmentType === "test"
+                        ? <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-orange-100 text-orange-700 self-start">Test</span>
+                        : <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-blue-100 text-blue-700 self-start">Assignment</span>
+                      }
                     </div>
                   </td>
                   <td className="px-3 py-3 text-muted-foreground">{a.dueDate}</td>
