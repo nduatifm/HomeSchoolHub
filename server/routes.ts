@@ -1353,13 +1353,13 @@ export function registerRoutes(app: Express) {
       // Augment each student with the classrooms they are enrolled in (for this teacher)
       const teacherClassrooms = await prisma.classroom.findMany({
         where: { teacherId: req.session.userId!, deletedAt: null },
-        select: { id: true, name: true, enrollments: { select: { studentId: true } } },
+        select: { id: true, name: true, slug: true, enrollments: { select: { studentId: true } } },
       });
-      const studentClassroomsMap = new Map<number, { id: number; name: string }[]>();
+      const studentClassroomsMap = new Map<number, { id: number; name: string; slug: string | null }[]>();
       for (const c of teacherClassrooms) {
         for (const e of c.enrollments) {
           const list = studentClassroomsMap.get(e.studentId) ?? [];
-          list.push({ id: c.id, name: c.name });
+          list.push({ id: c.id, name: c.name, slug: c.slug });
           studentClassroomsMap.set(e.studentId, list);
         }
       }

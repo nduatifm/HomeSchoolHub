@@ -704,8 +704,13 @@ export default function TeacherDashboard() {
                             <TableCell>
                               {s.classrooms && s.classrooms.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
-                                  {s.classrooms.map((c: { id: number; name: string }) => (
-                                    <Badge key={c.id} variant="secondary" className="text-xs font-normal">
+                                  {s.classrooms.map((c: { id: number; name: string; slug?: string | null }) => (
+                                    <Badge
+                                      key={c.id}
+                                      variant="secondary"
+                                      className="text-xs font-normal cursor-pointer hover:bg-secondary/70 transition-colors"
+                                      onClick={() => navigate(`/classrooms/${c.slug ?? c.id}`)}
+                                    >
                                       {c.name}
                                     </Badge>
                                   ))}
