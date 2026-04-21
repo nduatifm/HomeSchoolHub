@@ -705,14 +705,23 @@ export default function TeacherDashboard() {
                               {s.classrooms && s.classrooms.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {s.classrooms.map((c: { id: number; name: string; slug?: string | null }) => (
-                                    <Badge
+                                    <a
                                       key={c.id}
-                                      variant="secondary"
-                                      className="text-xs font-normal cursor-pointer hover:bg-secondary/70 transition-colors"
-                                      onClick={() => navigate(`/classrooms/${c.slug ?? c.id}`)}
+                                      href={`/classrooms/${c.slug ?? c.id}`}
+                                      onClick={(e) => {
+                                        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
+                                          e.preventDefault();
+                                          navigate(`/classrooms/${c.slug ?? c.id}`);
+                                        }
+                                      }}
                                     >
-                                      {c.name}
-                                    </Badge>
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-xs font-normal cursor-pointer hover:bg-secondary/70 transition-colors"
+                                      >
+                                        {c.name}
+                                      </Badge>
+                                    </a>
                                   ))}
                                 </div>
                               ) : (
