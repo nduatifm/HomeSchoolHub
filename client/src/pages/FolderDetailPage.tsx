@@ -52,11 +52,26 @@ export default function FolderDetailPage() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
+  const searchParams = new URLSearchParams(window.location.search);
+  const parentStudentId = parseInt(searchParams.get("studentId") ?? "0") || null;
 
-  const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({
+  const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
+  const isParent = user?.roles?.includes("parent") || user?.role === "parent";
+
+  // Teachers and students use own classrooms; parents fetch the child's classrooms
+  const { data: ownClassrooms = [], isLoading: ownClassroomsLoading } = useQuery<Classroom[]>({
     queryKey: ["/api/classrooms"],
+    enabled: !isParent || !parentStudentId,
   });
+
+  const { data: parentClassrooms = [], isLoading: parentClassroomsLoading } = useQuery<Classroom[]>({
+    queryKey: ["/api/classrooms/parent", parentStudentId],
+    queryFn: () => apiRequest(`/api/classrooms/parent/${parentStudentId}`) as Promise<Classroom[]>,
+    enabled: isParent && !!parentStudentId,
+  });
+
+  const classrooms = isParent && parentStudentId ? parentClassrooms : ownClassrooms;
+  const classroomsLoading = isParent && parentStudentId ? parentClassroomsLoading : ownClassroomsLoading;
 
   const { data: folders = [], isLoading: foldersLoading } = useQuery<GradeFolder[]>({
     queryKey: ["/api/grade-folders"],
@@ -73,10 +88,19 @@ export default function FolderDetailPage() {
     enabled: isTeacher,
   });
 
-  // Resolve folder by slug (preferred) or numeric id (backward-compatible)
-  const folder = folders.find(f =>
-    f.slug === folderIdParam || String(f.id) === folderIdParam
-  ) ?? null;
+  // Teachers: resolve folder from /api/grade-folders (supports slug or numeric id)
+  // Students/parents: derive folder info from classroom data (gradeFolderId/gradeFolderName)
+  const folder = isTeacher
+    ? (folders.find(f => f.slug === folderIdParam || String(f.id) === folderIdParam) ?? null)
+    : (() => {
+        const match = classrooms.find(
+          c => c.gradeFolderId !== null && String(c.gradeFolderId) === folderIdParam
+        );
+        return match && match.gradeFolderId && match.gradeFolderName
+          ? ({ id: match.gradeFolderId, name: match.gradeFolderName } as GradeFolder)
+          : null;
+      })();
+
   const folderId = folder?.id ?? -1;
 
   const folderClassrooms = classrooms.filter(c => c.gradeFolderId === folderId);
@@ -248,12 +272,15 @@ export default function FolderDetailPage() {
 
   const renderCard = (c: Classroom, isArchived = false) => {
     const isMoving = movingClassroomId === c.id;
+    const classroomHref = isParent && parentStudentId
+      ? `/classrooms/${c.slug ?? c.id}?studentId=${parentStudentId}`
+      : `/classrooms/${c.slug ?? c.id}`;
     return (
       <div key={c.id} className="relative group/card">
         <ClassroomCard
           classroom={c}
-          href={`/classrooms/${c.slug ?? c.id}`}
-          ctaLabel={isTeacher ? "Open Classroom" : undefined}
+          href={classroomHref}
+          ctaLabel={isTeacher ? "Open Classroom" : isParent ? "View Grades" : undefined}
           notification={notifForClassroom(c)}
         />
         {isTeacher && (
@@ -352,13 +379,13 @@ export default function FolderDetailPage() {
     );
   };
 
-  const isLoading = classroomsLoading || foldersLoading;
+  const isLoading = classroomsLoading || (isTeacher && foldersLoading);
 
   useEffect(() => {
     if (!isLoading && !folder) {
-      navigate("/classrooms");
+      navigate(isTeacher ? "/classrooms" : "/dashboard");
     }
-  }, [isLoading, folder, navigate]);
+  }, [isLoading, folder, navigate, isTeacher]);
 
   if (!isLoading && !folder) return null;
 
@@ -375,7 +402,7 @@ export default function FolderDetailPage() {
                 variant="ghost"
                 size="icon"
                 className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={() => navigate("/classrooms")}
+                onClick={() => navigate(isTeacher ? "/classrooms" : "/dashboard")}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>

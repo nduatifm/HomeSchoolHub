@@ -53,7 +53,6 @@ import {
   Trash2,
   GraduationCap,
   ChevronRight,
-  ChevronDown,
   Folder,
   School,
   Plus,
@@ -278,14 +277,6 @@ export default function ParentDashboard() {
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["/api/students/parent"],
   });
-
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const toggleGroup = (key: string) =>
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
 
   // Dialog state
   const [inviteStudentOpen, setInviteStudentOpen] = useState(false);
@@ -961,17 +952,20 @@ export default function ParentDashboard() {
                   {students.map((child, i) => {
                     const childClassrooms = (childClassroomQueries[i]?.data ?? []) as Classroom[];
                     const childNotifMap = (childNotificationQueries[i]?.data ?? {}) as ClassroomNotificationsMap;
-                    const grouped: Record<string, Classroom[]> = {};
+                    const folderMap = new Map<number, { id: number; name: string; classrooms: Classroom[] }>();
                     const ungrouped: Classroom[] = [];
                     for (const c of childClassrooms) {
-                      if (c.gradeFolderName) {
-                        if (!grouped[c.gradeFolderName]) grouped[c.gradeFolderName] = [];
-                        grouped[c.gradeFolderName].push(c);
+                      if (c.gradeFolderId && c.gradeFolderName) {
+                        if (!folderMap.has(c.gradeFolderId)) {
+                          folderMap.set(c.gradeFolderId, { id: c.gradeFolderId, name: c.gradeFolderName, classrooms: [] });
+                        }
+                        folderMap.get(c.gradeFolderId)!.classrooms.push(c);
                       } else {
                         ungrouped.push(c);
                       }
                     }
-                    const hasGroups = Object.keys(grouped).length > 0;
+                    const childFolders = Array.from(folderMap.values());
+                    const hasGroups = childFolders.length > 0;
                     return (
                       <div key={child.id} className="space-y-4">
                         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -980,45 +974,36 @@ export default function ParentDashboard() {
                         {childClassrooms.length === 0 ? (
                           <p className="text-xs text-gray-400 pl-5">No classrooms yet for this student.</p>
                         ) : (
-                          <div className="space-y-3 pl-0">
-                            {Object.entries(grouped).map(([folderName, group]) => {
-                              const key = `${child.id}:${folderName}`;
-                              const isExpanded = !collapsedGroups.has(key);
-                              return (
-                                <div key={folderName} className="border border-border rounded-xl overflow-hidden">
-                                  <button
-                                    onClick={() => toggleGroup(key)}
-                                    className="w-full flex items-center gap-2 px-4 py-3 bg-muted/40 text-left hover:bg-muted/60 transition-colors"
-                                  >
-                                    {isExpanded
-                                      ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                                      : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                                    }
-                                    <Folder className="h-4 w-4 text-primary shrink-0" />
-                                    <span className="font-semibold text-sm text-foreground flex-1">{folderName}</span>
-                                    <span className="text-xs text-muted-foreground">{group.length} {group.length === 1 ? "class" : "classes"}</span>
-                                  </button>
-                                  {isExpanded && (
-                                    <div className="p-4">
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {group.map(c => (
-                                          <ClassroomCard
-                                            key={c.id}
-                                            classroom={c}
-                                            href={`/classrooms/${c.slug ?? c.id}?studentId=${child.id}`}
-                                            ctaLabel="View Grades"
-                                            notification={childNotifMap[c.id] ?? null}
-                                          />
-                                        ))}
+                          <div className="space-y-4">
+                            {childFolders.length > 0 && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {childFolders.map(folder => (
+                                  <div key={folder.id} className="relative group/folder">
+                                    <button
+                                      onClick={() => navigate(`/classrooms/folders/${folder.id}?studentId=${child.id}`)}
+                                      className="w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
+                                    >
+                                      <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
+                                        <Folder className="h-10 w-10 text-primary opacity-70" />
                                       </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                      <div className="px-4 py-3 flex flex-col gap-1 flex-1">
+                                        <h3 className="font-bold text-sm text-foreground leading-snug">{folder.name}</h3>
+                                        <span className="text-xs text-muted-foreground">
+                                          {folder.classrooms.length} {folder.classrooms.length === 1 ? "subject" : "subjects"}
+                                        </span>
+                                        <div className="mt-auto pt-3 flex items-center justify-between">
+                                          <span className="text-xs font-semibold text-primary group-hover/folder:underline">Open Folder</span>
+                                          <ChevronRight className="h-3.5 w-3.5 text-primary opacity-60 group-hover/folder:opacity-100 transition-opacity" />
+                                        </div>
+                                      </div>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {ungrouped.length > 0 && (
                               <div>
-                                {hasGroups && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-2">Other</p>}
+                                {hasGroups && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-2">Other Classes</p>}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                   {ungrouped.map(c => (
                                     <ClassroomCard

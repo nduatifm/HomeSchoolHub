@@ -167,7 +167,7 @@ function AppRoutes() {
         <ProtectedRoute component={ClassroomMaterialPage} />
       </Route>
       <Route path="/classrooms/folders/:folderId">
-        <TeacherRoute component={FolderDetailPage} />
+        <ProtectedRoute component={FolderDetailPage} />
       </Route>
       <Route path="/classrooms/:slug">
         <ProtectedRoute component={ClassroomDetail} />
