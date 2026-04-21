@@ -4731,11 +4731,12 @@ export function registerRoutes(app: Express) {
         points: z.number().int().min(1).max(10000),
         formSchema: z.array(z.object({
           id: z.string(),
-          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox"]),
+          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox", "true_false"]),
           label: z.string(),
           required: z.boolean().default(false),
           options: z.array(z.string()).optional(),
         })).nullable().optional(),
+        answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
       }).parse(req.body);
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data });
 

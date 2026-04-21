@@ -2057,11 +2057,10 @@ class PrismaStorage implements IStorage {
 
   async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null): Promise<ClassroomSubmission> {
     const now = new Date().toISOString();
-    const isLate = now > dueDate;
     const baseData = {
       content,
       fileUrl: fileUrl ?? null,
-      status: isLate ? "late" : "submitted",
+      status: "submitted",
       submittedAt: now,
       ...(formAnswers !== undefined ? { formAnswers } : {}),
       ...(autoGrade !== undefined && autoGrade !== null ? { grade: autoGrade } : {}),
