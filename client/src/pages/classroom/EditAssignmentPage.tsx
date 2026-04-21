@@ -43,6 +43,10 @@ function getDraftKey(draftId: string) {
   return `lyra_form_draft_${draftId}`;
 }
 
+function getAnswerKeyDraftKey(draftId: string) {
+  return `lyra_form_answerkey_${draftId}`;
+}
+
 export default function EditAssignmentPage() {
   const [, params] = useRoute("/classrooms/:slug/assignments/:assignmentSlug/edit");
   const [, navigate] = useLocation();
@@ -57,6 +61,7 @@ export default function EditAssignmentPage() {
   const [clearFile, setClearFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
+  const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>({});
   const [initialized, setInitialized] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const draftId = useRef(Math.random().toString(36).slice(2, 14));
@@ -110,7 +115,10 @@ export default function EditAssignmentPage() {
     setLinkUrl(assignment.linkUrl ?? "");
     const existing = (assignment.formSchema as FormQuestion[] | null) ?? [];
     setFormQuestions(existing);
+    const existingKey = (assignment.answerKey as Record<string, string | string[]> | null) ?? {};
+    setAnswerKey(existingKey);
     localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(existing));
+    localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(existingKey));
     setInitialized(true);
     // Auto-grow title after seeding
     setTimeout(autoGrowTitle, 0);
@@ -122,15 +130,25 @@ export default function EditAssignmentPage() {
     localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(formQuestions));
   }, [formQuestions, initialized]);
 
+  // Keep localStorage in sync when answerKey changes
+  useEffect(() => {
+    if (!initialized) return;
+    localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(answerKey));
+  }, [answerKey, initialized]);
+
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key !== getDraftKey(draftId.current)) return;
-      try {
-        const updated = JSON.parse(e.newValue ?? "[]") as FormQuestion[];
-        setFormQuestions(updated);
-      } catch {
-        // ignore
+      if (e.key === getDraftKey(draftId.current)) {
+        try {
+          const updated = JSON.parse(e.newValue ?? "[]") as FormQuestion[];
+          setFormQuestions(updated);
+        } catch { }
+      } else if (e.key === getAnswerKeyDraftKey(draftId.current)) {
+        try {
+          const updated = JSON.parse(e.newValue ?? "{}") as Record<string, string | string[]>;
+          setAnswerKey(updated);
+        } catch { }
       }
     }
     window.addEventListener("storage", handleStorage);
@@ -167,11 +185,13 @@ export default function EditAssignmentPage() {
           ...(fileUrl !== undefined ? { fileUrl } : {}),
           linkUrl: linkUrl.trim() || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
+          answerKey: formQuestions.length > 0 && Object.keys(answerKey).length > 0 ? answerKey : null,
         }),
       });
     },
     onSuccess: () => {
       localStorage.removeItem(getDraftKey(draftId.current));
+      localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment updated", type: "success" });
       navigate(`/classrooms/${classroomSlug}`);
@@ -196,6 +216,7 @@ export default function EditAssignmentPage() {
       if (!window.confirm("You have unsaved changes. Leave without saving?")) return;
     }
     localStorage.removeItem(getDraftKey(draftId.current));
+    localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
     navigate(url);
   }
 

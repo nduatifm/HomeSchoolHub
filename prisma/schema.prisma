@@ -492,6 +492,7 @@ model ClassroomAssignment {
   linkUrl     String?
   slug        String?
   formSchema  Json?
+  answerKey   Json?
   createdAt   DateTime @default(now())
 
   classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)

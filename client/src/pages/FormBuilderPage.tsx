@@ -9,6 +9,10 @@ function getDraftKey(draftId: string) {
   return `lyra_form_draft_${draftId}`;
 }
 
+function getAnswerKeyDraftKey(draftId: string) {
+  return `lyra_form_answerkey_${draftId}`;
+}
+
 function loadDraft(draftId: string): FormQuestion[] {
   try {
     const raw = localStorage.getItem(getDraftKey(draftId));
@@ -19,8 +23,22 @@ function loadDraft(draftId: string): FormQuestion[] {
   }
 }
 
+function loadAnswerKey(draftId: string): Record<string, string | string[]> {
+  try {
+    const raw = localStorage.getItem(getAnswerKeyDraftKey(draftId));
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, string | string[]>;
+  } catch {
+    return {};
+  }
+}
+
 function saveDraft(draftId: string, questions: FormQuestion[]) {
   localStorage.setItem(getDraftKey(draftId), JSON.stringify(questions));
+}
+
+function saveAnswerKey(draftId: string, answerKey: Record<string, string | string[]>) {
+  localStorage.setItem(getAnswerKeyDraftKey(draftId), JSON.stringify(answerKey));
 }
 
 export default function FormBuilderPage() {
@@ -34,10 +52,19 @@ export default function FormBuilderPage() {
     draftId ? loadDraft(draftId) : []
   );
 
+  const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>(() =>
+    draftId ? loadAnswerKey(draftId) : {}
+  );
+
   useEffect(() => {
     if (!draftId) return;
     saveDraft(draftId, questions);
   }, [draftId, questions]);
+
+  useEffect(() => {
+    if (!draftId) return;
+    saveAnswerKey(draftId, answerKey);
+  }, [draftId, answerKey]);
 
   function handleClose() {
     if (window.opener) {
@@ -62,6 +89,8 @@ export default function FormBuilderPage() {
       </div>
     );
   }
+
+  const keyedCount = Object.keys(answerKey).length;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -96,7 +125,7 @@ export default function FormBuilderPage() {
           <span className="text-xs text-muted-foreground hidden sm:inline">
             {questions.length === 0
               ? "No questions yet"
-              : `${questions.length} question${questions.length === 1 ? "" : "s"}`}
+              : `${questions.length} question${questions.length === 1 ? "" : "s"}${keyedCount > 0 ? ` · ${keyedCount} keyed` : ""}`}
           </span>
           <Button
             size="sm"
@@ -111,7 +140,13 @@ export default function FormBuilderPage() {
 
       {/* ── Builder — fills remaining height ── */}
       <div style={{ height: "calc(100vh - 3.5rem)" }}>
-        <FormBuilder questions={questions} onChange={setQuestions} fullPage />
+        <FormBuilder
+          questions={questions}
+          onChange={setQuestions}
+          answerKey={answerKey}
+          onAnswerKeyChange={setAnswerKey}
+          fullPage
+        />
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronLeft, Paperclip, ExternalLink } from "lucide-react";
+import { Loader2, ChevronLeft, Paperclip, ExternalLink, Zap } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
@@ -151,6 +151,7 @@ export default function SubmissionReviewPage() {
                     answers={submission.formAnswers as Record<string, string | string[]>}
                     onChange={() => {}}
                     disabled
+                    answerKey={(assignment.answerKey as Record<string, string | string[]> | null | undefined) ?? undefined}
                   />
                 </div>
               </div>
@@ -197,9 +198,17 @@ export default function SubmissionReviewPage() {
 
           {/* Grading section */}
           <div className="bg-white rounded-2xl border border-border shadow-sm p-6 space-y-4">
-            <p className="text-sm font-semibold text-foreground">
-              {submission.status === "graded" ? "Update Grade" : "Grade Submission"}
-            </p>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm font-semibold text-foreground">
+                {submission.status === "graded" ? "Update Grade" : "Grade Submission"}
+              </p>
+              {submission.grade !== null && submission.grade !== undefined && submission.status !== "graded" && (assignment.answerKey as any) && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-100 px-2.5 py-1 rounded-full">
+                  <Zap className="h-3 w-3" />
+                  Auto-scored: {submission.grade}/{assignment.points} pts — review and save to confirm
+                </span>
+              )}
+            </div>
 
             {submission.feedback && (
               <div className="rounded-lg bg-amber-50 border border-amber-100 px-3.5 py-2.5">

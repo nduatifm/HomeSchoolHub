@@ -500,6 +500,7 @@ export const classroomAssignmentSchema = z.object({
   linkUrl: z.string().nullable().optional(),
   slug: z.string().nullable().optional(),
   formSchema: z.array(formQuestionSchema).nullable().optional(),
+  answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
   createdAt: z.string(),
 });
 export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true });

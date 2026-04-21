@@ -43,6 +43,10 @@ function getDraftKey(draftId: string) {
   return `lyra_form_draft_${draftId}`;
 }
 
+function getAnswerKeyDraftKey(draftId: string) {
+  return `lyra_form_answerkey_${draftId}`;
+}
+
 export default function NewAssignmentPage() {
   const [, params] = useRoute("/classrooms/:slug/assignments/new");
   const [, navigate] = useLocation();
@@ -55,6 +59,7 @@ export default function NewAssignmentPage() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
+  const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>({});
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const draftId = useRef(Math.random().toString(36).slice(2, 14));
 
@@ -97,12 +102,16 @@ export default function NewAssignmentPage() {
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key !== getDraftKey(draftId.current)) return;
-      try {
-        const updated = JSON.parse(e.newValue ?? "[]") as FormQuestion[];
-        setFormQuestions(updated);
-      } catch {
-        // ignore parse errors
+      if (e.key === getDraftKey(draftId.current)) {
+        try {
+          const updated = JSON.parse(e.newValue ?? "[]") as FormQuestion[];
+          setFormQuestions(updated);
+        } catch { }
+      } else if (e.key === getAnswerKeyDraftKey(draftId.current)) {
+        try {
+          const updated = JSON.parse(e.newValue ?? "{}") as Record<string, string | string[]>;
+          setAnswerKey(updated);
+        } catch { }
       }
     }
     window.addEventListener("storage", handleStorage);
@@ -127,6 +136,9 @@ export default function NewAssignmentPage() {
       if (formQuestions.length > 0) {
         fd.append("formSchema", JSON.stringify(formQuestions));
       }
+      if (formQuestions.length > 0 && Object.keys(answerKey).length > 0) {
+        fd.append("answerKey", JSON.stringify(answerKey));
+      }
       const token = localStorage.getItem("sessionId");
       return fetch(`/api/classrooms/${classroomId}/assignments/with-file`, {
         method: "POST",
@@ -140,6 +152,7 @@ export default function NewAssignmentPage() {
     },
     onSuccess: () => {
       localStorage.removeItem(getDraftKey(draftId.current));
+      localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment created", type: "success" });
       navigate(`/classrooms/${classroomSlug}`);
@@ -164,6 +177,7 @@ export default function NewAssignmentPage() {
       if (!window.confirm("You have unsaved changes. Leave without creating the assignment?")) return;
     }
     localStorage.removeItem(getDraftKey(draftId.current));
+    localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
     navigate(url);
   }
 

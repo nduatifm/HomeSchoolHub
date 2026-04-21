@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import {
   Plus,
   Trash2,
@@ -9,6 +10,7 @@ import {
   CheckSquare,
   ToggleLeft,
   X,
+  Key,
 } from "lucide-react";
 import type { FormQuestion } from "@shared/schema";
 
@@ -51,10 +53,12 @@ const ALL_TYPES: QType[] = ["short", "paragraph", "multiple_choice", "checkbox",
 interface Props {
   questions: FormQuestion[];
   onChange: (questions: FormQuestion[]) => void;
+  answerKey?: Record<string, string | string[]>;
+  onAnswerKeyChange?: (answerKey: Record<string, string | string[]>) => void;
   fullPage?: boolean;
 }
 
-export default function FormBuilder({ questions, onChange, fullPage = false }: Props) {
+export default function FormBuilder({ questions, onChange, answerKey = {}, onAnswerKeyChange, fullPage = false }: Props) {
   const [activeId, setActiveId] = useState<string | null>(
     questions[0]?.id ?? null,
   );
@@ -112,6 +116,10 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
     onChange(updated);
     const next = updated[Math.max(0, idx - 1)];
     setActiveId(next?.id ?? null);
+    if (onAnswerKeyChange) {
+      const { [id]: _removed, ...remaining } = answerKey;
+      onAnswerKeyChange(remaining);
+    }
   }
 
   function addOption(qId: string) {
@@ -144,6 +152,155 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
           : ["Option 1", "Option 2"]
         : [],
     });
+    if (onAnswerKeyChange) {
+      const { [qId]: _removed, ...remaining } = answerKey;
+      onAnswerKeyChange(remaining);
+    }
+  }
+
+  function setAnswerKey(qId: string, value: string | string[] | null) {
+    if (!onAnswerKeyChange) return;
+    if (value === null || value === "" || (Array.isArray(value) && value.length === 0)) {
+      const { [qId]: _removed, ...remaining } = answerKey;
+      onAnswerKeyChange(remaining);
+    } else {
+      onAnswerKeyChange({ ...answerKey, [qId]: value });
+    }
+  }
+
+  function toggleCheckboxAnswer(qId: string, option: string) {
+    const current = (answerKey[qId] as string[] | undefined) ?? [];
+    const next = current.includes(option)
+      ? current.filter((v) => v !== option)
+      : [...current, option];
+    setAnswerKey(qId, next);
+  }
+
+  function renderAnswerKeySection(q: FormQuestion) {
+    if (!onAnswerKeyChange) return null;
+
+    if (q.type === "paragraph") {
+      return (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <Key className="h-3 w-3" />Answer Key
+          </p>
+          <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            Paragraph answers are not auto-graded. Teacher must review manually.
+          </p>
+        </div>
+      );
+    }
+
+    if (q.type === "short") {
+      const current = (answerKey[q.id] as string | undefined) ?? "";
+      return (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <Key className="h-3 w-3" />Answer Key
+          </p>
+          <Input
+            value={current}
+            onChange={(e) => setAnswerKey(q.id, e.target.value)}
+            placeholder="Exact answer…"
+            className="h-7 text-xs"
+          />
+          <p className="text-[10px] text-muted-foreground/60">Case-insensitive exact match</p>
+        </div>
+      );
+    }
+
+    if (q.type === "true_false") {
+      const current = answerKey[q.id] as string | undefined;
+      return (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <Key className="h-3 w-3" />Answer Key
+          </p>
+          <div className="flex gap-2">
+            {["True", "False"].map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setAnswerKey(q.id, current === opt ? null : opt)}
+                className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                  current === opt
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (q.type === "multiple_choice") {
+      const current = answerKey[q.id] as string | undefined;
+      const options = q.options ?? [];
+      if (options.length === 0) return null;
+      return (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <Key className="h-3 w-3" />Answer Key
+          </p>
+          <div className="space-y-1">
+            {options.map((opt) => (
+              <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="radio"
+                  name={`ak-${q.id}`}
+                  checked={current === opt}
+                  onChange={() => setAnswerKey(q.id, current === opt ? null : opt)}
+                  className="accent-primary w-3 h-3"
+                />
+                <span className="text-xs text-foreground truncate">{opt || <span className="text-muted-foreground/50 italic">Empty option</span>}</span>
+              </label>
+            ))}
+          </div>
+          {current && (
+            <button type="button" onClick={() => setAnswerKey(q.id, null)} className="text-[10px] text-red-500 hover:underline">
+              Clear
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    if (q.type === "checkbox") {
+      const current = (answerKey[q.id] as string[] | undefined) ?? [];
+      const options = q.options ?? [];
+      if (options.length === 0) return null;
+      return (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+            <Key className="h-3 w-3" />Answer Key
+          </p>
+          <div className="space-y-1">
+            {options.map((opt) => (
+              <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={current.includes(opt)}
+                  onChange={() => toggleCheckboxAnswer(q.id, opt)}
+                  className="accent-primary w-3 h-3"
+                />
+                <span className="text-xs text-foreground truncate">{opt || <span className="text-muted-foreground/50 italic">Empty option</span>}</span>
+              </label>
+            ))}
+          </div>
+          {current.length > 0 && (
+            <button type="button" onClick={() => setAnswerKey(q.id, null)} className="text-[10px] text-red-500 hover:underline">
+              Clear
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return null;
   }
 
   return (
@@ -166,6 +323,7 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
           {questions.map((q, i) => {
             const meta = TYPE_META[q.type];
             const isActive = q.id === activeId;
+            const hasKey = answerKey[q.id] !== undefined;
             return (
               <button
                 key={q.id}
@@ -188,6 +346,9 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
                 }`}>
                   {q.label || "Untitled"}
                 </span>
+                {hasKey && (
+                  <span className="shrink-0 w-3 h-3 rounded-full bg-emerald-500" title="Has answer key" />
+                )}
               </button>
             );
           })}
@@ -241,6 +402,11 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
                 {activeQuestion.required && (
                   <span className="text-[10px] font-semibold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
                     Required
+                  </span>
+                )}
+                {answerKey[activeQuestion.id] !== undefined && (
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                    <Key className="h-2.5 w-2.5" />Keyed
                   </span>
                 )}
               </div>
@@ -350,7 +516,7 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
       </div>
 
       {/* ── Right panel — question settings ── */}
-      <div className="w-48 shrink-0 flex flex-col border-l border-border bg-muted/30">
+      <div className="w-52 shrink-0 flex flex-col border-l border-border bg-muted/30">
         <div className="px-3 py-3 border-b border-border">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
             Settings
@@ -403,6 +569,12 @@ export default function FormBuilder({ questions, onChange, fullPage = false }: P
                 })}
               </div>
             </div>
+
+            {onAnswerKeyChange && (
+              <div className="border-t border-border pt-4">
+                {renderAnswerKeySection(activeQuestion)}
+              </div>
+            )}
 
             <div className="border-t border-border pt-4">
               <button

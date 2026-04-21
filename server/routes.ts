@@ -4769,6 +4769,15 @@ export function registerRoutes(app: Express) {
         } catch { formSchema = undefined; }
       }
 
+      let answerKey: Record<string, string | string[]> | undefined;
+      const rawAnswerKey = req.body.answerKey;
+      if (rawAnswerKey) {
+        try {
+          const parsed = JSON.parse(rawAnswerKey);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) answerKey = parsed;
+        } catch { answerKey = undefined; }
+      }
+
       let fileUrl: string | undefined;
       if (req.file) {
         const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-assignments");
@@ -4777,7 +4786,11 @@ export function registerRoutes(app: Express) {
       }
 
       const linkUrl = data.linkUrl || undefined;
-      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...data, fileUrl, linkUrl, ...(formSchema !== undefined ? { formSchema } : {}) });
+      const assignment = await storage.createClassroomAssignment({
+        classroomId: classroom.id, ...data, fileUrl, linkUrl,
+        ...(formSchema !== undefined ? { formSchema } : {}),
+        ...(answerKey !== undefined ? { answerKey } : {}),
+      });
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -4838,6 +4851,7 @@ export function registerRoutes(app: Express) {
           required: z.boolean().default(false),
           options: z.array(z.string()).optional(),
         })).nullable().optional(),
+        answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
       }).parse(req.body);
 
       const updated = await storage.updateClassroomAssignment(assignmentId, data);
@@ -4949,7 +4963,39 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers);
+      // Auto-score if answer key is present
+      let autoGrade: number | null = null;
+      const answerKeyRaw = (assignment as any).answerKey;
+      if (
+        answerKeyRaw &&
+        typeof answerKeyRaw === "object" &&
+        !Array.isArray(answerKeyRaw) &&
+        Array.isArray(assignment.formSchema) &&
+        assignment.formSchema.length > 0 &&
+        formAnswers
+      ) {
+        const answerKey = answerKeyRaw as Record<string, string | string[]>;
+        const keyedQuestions = (assignment.formSchema as Array<{ id: string; type: string }>).filter((q) => answerKey[q.id] !== undefined);
+        if (keyedQuestions.length > 0) {
+          let correct = 0;
+          for (const q of keyedQuestions) {
+            const correct_answer = answerKey[q.id];
+            const student_answer = formAnswers[q.id];
+            if (q.type === "checkbox") {
+              const expected = (Array.isArray(correct_answer) ? correct_answer : [correct_answer]).map((v) => v.trim().toLowerCase()).sort();
+              const actual = (Array.isArray(student_answer) ? student_answer : [student_answer ?? ""]).map((v) => v.trim().toLowerCase()).sort();
+              if (expected.length === actual.length && expected.every((v, i) => v === actual[i])) correct++;
+            } else {
+              const expected = (typeof correct_answer === "string" ? correct_answer : correct_answer[0] ?? "").trim().toLowerCase();
+              const actual = (typeof student_answer === "string" ? student_answer : (Array.isArray(student_answer) ? student_answer[0] : "") ?? "").trim().toLowerCase();
+              if (expected && actual && expected === actual) correct++;
+            }
+          }
+          autoGrade = Math.round((correct / keyedQuestions.length) * assignment.points);
+        }
+      }
+
+      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers, autoGrade);
 
       res.json(submission);
     } catch (error: any) {
