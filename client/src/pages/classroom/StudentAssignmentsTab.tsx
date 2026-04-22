@@ -78,11 +78,39 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
     apiRequest(`/api/classrooms/${classroomId}/materials/${m.id}/seen`, { method: "POST" }).catch(() => {});
   }
 
+  const [statusFilter, setStatusFilter] = useState<"all" | "not-submitted" | "submitted" | "graded" | "overdue">("all");
+
   if (loadingA || loadingS) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   const taskEmojis = ["📖", "✏️", "🔬", "🎨", "🧮"];
   const accentColors = ["border-l-violet-400", "border-l-sky-400", "border-l-emerald-400", "border-l-amber-400", "border-l-pink-400"];
   const bgHovers = ["hover:bg-violet-50/40", "hover:bg-sky-50/40", "hover:bg-emerald-50/40", "hover:bg-amber-50/40", "hover:bg-pink-50/40"];
+
+  const classroomStatusStr = isArchived ? "archived" : "active";
+
+  const enriched = assignments.map((a, index) => {
+    const sub = subMap[a.id];
+    const urgency = classifyAssignment(a, mySubmissions, classroomStatusStr);
+    const filterStatus: "graded" | "submitted" | "not-submitted" =
+      sub?.status === "graded" ? "graded" :
+      sub?.status === "submitted" || sub?.status === "late" ? "submitted" :
+      "not-submitted";
+    return { a, sub, urgency, index, filterStatus };
+  });
+
+  const filteredEnriched = enriched.filter(({ filterStatus, urgency }) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "overdue") return urgency === "overdue";
+    return filterStatus === statusFilter;
+  });
+
+  const filterChips: { key: typeof statusFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "not-submitted", label: "Not submitted" },
+    { key: "submitted", label: "Submitted" },
+    { key: "graded", label: "Graded" },
+    { key: "overdue", label: "Overdue" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -95,15 +123,32 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
         </div>
       )}
 
+      <div className="flex flex-wrap gap-2">
+        {filterChips.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(key)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+              statusFilter === key
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {assignments.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No assignments yet.</div>
       )}
 
+      {assignments.length > 0 && filteredEnriched.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No assignments match this filter.</div>
+      )}
+
       <div className="space-y-2.5">
-        {assignments.map((a, index) => {
-          const sub = subMap[a.id];
-          const classroomStatus = isArchived ? "archived" : "active";
-          const urgency = classifyAssignment(a, mySubmissions, classroomStatus);
+        {filteredEnriched.map(({ a, sub, urgency, index }) => {
           const emoji = taskEmojis[index % taskEmojis.length];
           const accent = accentColors[index % accentColors.length];
           const bgHover = bgHovers[index % bgHovers.length];
