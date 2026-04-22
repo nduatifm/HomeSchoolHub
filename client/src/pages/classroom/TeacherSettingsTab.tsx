@@ -98,7 +98,7 @@ export default function TeacherSettingsTab({ classroomId }: { classroomId: numbe
                   max={100}
                   value={weights[t.key]}
                   onChange={(e) => setWeights((prev) => ({ ...prev, [t.key]: e.target.value }))}
-                  className="h-8 text-sm pr-8 text-right"
+                  className="h-8 text-sm pr-8 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <span className="absolute right-3 text-xs text-muted-foreground pointer-events-none">%</span>
               </div>
