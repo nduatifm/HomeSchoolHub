@@ -5445,7 +5445,12 @@ export function registerRoutes(app: Express) {
       });
       res.status(201).json(policy);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      // Distinguish validation errors (user-visible) from server faults
+      if (error?.name === "ZodError") {
+        const msg = error.errors?.[0]?.message ?? "Weights must sum to exactly 100";
+        return res.status(400).json({ error: msg });
+      }
+      res.status(500).json({ error: "Failed to save grading policy" });
     }
   });
 
