@@ -117,10 +117,15 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
             return Math.round((due.getTime() - today.getTime()) / 86400000);
           })();
 
+          const isLate = sub?.status === "late";
+          const isGraded = sub?.status === "graded";
+          const cardAccent = isLate ? "border-l-amber-400" : accent;
+          const cardBgHover = isLate ? "hover:bg-amber-50/40" : bgHover;
+
           return (
             <div
               key={a.id}
-              className={`rounded-2xl border border-border border-l-4 ${accent} ${bgHover} bg-card transition-all duration-150`}
+              className={`rounded-2xl border border-border border-l-4 ${cardAccent} ${cardBgHover} bg-card transition-all duration-150`}
             >
               <div className="flex items-center gap-4 px-4 py-3.5">
                 <span className="text-2xl select-none shrink-0 leading-none">{emoji}</span>
@@ -138,19 +143,27 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
                     <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{a.points} pts</span>
-                    {a.assignmentType === "test"
-                      ? <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Test</span>
-                      : <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">Assignment</span>
-                    }
+                    {a.assignmentType === "test" && (
+                      <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">Test</span>
+                    )}
+                    {a.assignmentType === "quiz" && (
+                      <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">Quiz</span>
+                    )}
+                    {a.assignmentType === "project" && (
+                      <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">Project</span>
+                    )}
+                    {(!a.assignmentType || a.assignmentType === "assignment") && (
+                      <span className="inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">Assignment</span>
+                    )}
                     {a.formSchema && a.formSchema.length > 0 && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full font-medium">
                         <ClipboardList className="h-2.5 w-2.5" />Form
                       </span>
                     )}
-                    {sub && <StatusBadge status={sub.status} />}
-                    {sub?.grade !== null && sub?.grade !== undefined && (
-                      <span className="text-xs font-semibold text-green-700">{sub.grade}/{a.points}</span>
-                    )}
+                    {sub
+                      ? <StatusBadge status={sub.status} grade={sub.grade} points={a.points} />
+                      : <StatusBadge status="not-submitted" />
+                    }
                   </div>
                   {materialByAssignment[a.id] && (
                     <button
@@ -166,8 +179,15 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                   )}
                 </div>
 
-                <div className="shrink-0">
-                  {(!sub || sub.status === "pending") && !isArchived ? (
+                <div className="shrink-0 flex flex-col items-end gap-1">
+                  {isGraded && sub.grade !== null && sub.grade !== undefined ? (
+                    <div className="text-right">
+                      <span className="text-xl font-bold text-green-700 leading-none">{sub.grade}</span>
+                      <span className="text-xs text-muted-foreground">/{a.points}</span>
+                    </div>
+                  ) : isGraded ? (
+                    <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded">Graded</span>
+                  ) : (!sub || sub.status === "pending") && !isArchived ? (
                     a.formSchema && a.formSchema.length > 0 ? (
                       <Button
                         size="sm"
@@ -210,7 +230,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                         </DialogContent>
                       </Dialog>
                     )
-                  ) : sub && sub.status !== "pending" ? (
+                  ) : sub && sub.status !== "pending" && !isGraded ? (
                     <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
                   ) : null}
                 </div>
