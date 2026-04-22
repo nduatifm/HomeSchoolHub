@@ -181,7 +181,12 @@ export default function ClassroomDetail() {
   const isArchived = classroom.status === "archived";
   const theme = getSubjectTheme(classroom.subject || "");
 
-  if (activeTab === "students" && !isTeacher) {
+  const validTeacherTabs = ["feed", "assignments", "grades", "classwork", "students"];
+  const validStudentTabs = ["feed", "assignments", "grades", "classwork"];
+  const validParentTabs = ["feed", "grades", "classwork"];
+  const validTabs = isTeacher ? validTeacherTabs : isStudent ? validStudentTabs : validParentTabs;
+
+  if (!validTabs.includes(activeTab) || (activeTab === "students" && !isTeacher)) {
     navigate(`/classrooms/${slugParam}/feed${window.location.search}`);
     return null;
   }
