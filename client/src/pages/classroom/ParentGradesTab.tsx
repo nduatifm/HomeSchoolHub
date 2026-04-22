@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
+import type { ClassroomAssignment, ClassroomSubmission, GradingPolicy } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
 import GradeBreakdownPanel from "./GradeBreakdownPanel";
+import { Scale } from "lucide-react";
 
 const TYPE_BADGE: Record<string, string> = {
   assignment: "bg-blue-100 text-blue-700",
@@ -17,6 +18,41 @@ const TYPE_LABEL: Record<string, string> = {
   project: "Project",
 };
 
+const POLICY_TYPES = [
+  { key: "assignmentWeight" as const, label: "Assignments", dot: "bg-blue-500", badge: "bg-blue-100 text-blue-700" },
+  { key: "testWeight" as const, label: "Tests", dot: "bg-orange-500", badge: "bg-orange-100 text-orange-700" },
+  { key: "quizWeight" as const, label: "Quizzes", dot: "bg-purple-500", badge: "bg-purple-100 text-purple-700" },
+  { key: "projectWeight" as const, label: "Projects", dot: "bg-teal-500", badge: "bg-teal-100 text-teal-700" },
+];
+
+function GradingPolicyCard({ policy }: { policy: GradingPolicy }) {
+  const active = POLICY_TYPES.filter((t) => policy[t.key] > 0);
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-md bg-violet-100 flex items-center justify-center shrink-0">
+          <Scale className="h-3.5 w-3.5 text-violet-600" />
+        </div>
+        <span className="text-sm font-semibold text-foreground">Grading Policy</span>
+      </div>
+      {active.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No grading policy set.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {active.map((t) => (
+            <div key={t.key} className="flex items-center gap-1.5">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${t.dot}`} />
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${t.badge}`}>
+                {t.label} · {policy[t.key]}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ParentGradesTab({ classroomId, studentId, seenAssignmentIds, onAssignmentSeen }: {
   classroomId: number; studentId: number;
   seenAssignmentIds?: Set<number>; onAssignmentSeen?: (assignmentId: number) => void;
@@ -30,11 +66,21 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/my-submissions?studentId=${studentId}`),
     enabled: classroomId > 0 && studentId > 0,
   });
+  const { data: policy } = useQuery<GradingPolicy | null>({
+    queryKey: ["/api/classrooms", classroomId, "grading-policy"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-policy`),
+    enabled: classroomId > 0,
+  });
 
   const subMap = Object.fromEntries(submissions.map((s) => [s.assignmentId, s]));
 
   if (assignments.length === 0) {
-    return <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No assignments yet.</div>;
+    return (
+      <div className="space-y-4">
+        {policy && <GradingPolicyCard policy={policy} />}
+        <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No assignments yet.</div>
+      </div>
+    );
   }
 
   return (
@@ -42,6 +88,8 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
       {studentId > 0 && (
         <GradeBreakdownPanel classroomId={classroomId} studentId={studentId} />
       )}
+
+      {policy && <GradingPolicyCard policy={policy} />}
 
       <div className="overflow-x-auto rounded-2xl border border-border">
         <table className="min-w-full text-sm">
