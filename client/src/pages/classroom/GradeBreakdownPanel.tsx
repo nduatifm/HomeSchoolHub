@@ -33,10 +33,11 @@ export default function GradeBreakdownPanel({
 
   if (!breakdown) return null;
 
-  const visibleItems = breakdown.breakdown.filter((b) => b.status !== "no-items");
+  // Show all 4 types — filter nothing; "no-items" rows render in a muted "not set up" style
+  const allItems = breakdown.breakdown;
 
-  const allPending = visibleItems.length === 0 || visibleItems.every((b) => b.status === "pending");
-  if (allPending) {
+  const hasAnyGraded = allItems.some((b) => b.status === "graded");
+  if (!hasAnyGraded) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-5 py-4 space-y-0.5 text-center">
         <p className="text-sm font-medium text-muted-foreground">No items have been graded yet.</p>
@@ -49,9 +50,7 @@ export default function GradeBreakdownPanel({
     <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
       {/* Overall */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-foreground">
-          Overall Grade
-        </span>
+        <span className="text-sm font-semibold text-foreground">Overall Grade</span>
         {breakdown.overall !== null ? (
           <span className={`text-lg font-bold ${breakdown.overall >= 70 ? "text-green-600" : breakdown.overall >= 50 ? "text-amber-600" : "text-red-600"}`}>
             {breakdown.overall}%
@@ -71,18 +70,27 @@ export default function GradeBreakdownPanel({
         </div>
       )}
 
-      {/* Per-type breakdown */}
+      {/* Per-type breakdown — always shows all 4 types */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-        {visibleItems.map((item) => {
+        {allItems.map((item) => {
           const meta = TYPE_META[item.type] ?? TYPE_META.assignment;
           return (
             <div key={item.type} className="flex items-center gap-2">
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${meta.color}`}>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${item.status === "no-items" ? "bg-muted text-muted-foreground" : meta.color}`}>
                 {item.label}
               </span>
 
+              {item.status === "no-items" && (
+                <span className="text-xs text-muted-foreground/60 italic">No items</span>
+              )}
+
               {item.status === "pending" && (
-                <span className="text-xs font-medium text-amber-600">Pending</span>
+                <span className="text-xs font-medium text-amber-600">
+                  Pending
+                  {item.configuredWeight > 0 && (
+                    <span className="ml-1 font-normal text-muted-foreground">({item.configuredWeight}% of grade)</span>
+                  )}
+                </span>
               )}
 
               {item.status === "zero-weight" && item.average !== null && (
@@ -101,7 +109,9 @@ export default function GradeBreakdownPanel({
                     <div className={`h-full rounded-full ${meta.bar}`} style={{ width: `${item.average}%` }} />
                   </div>
                   <span className={`text-xs font-semibold tabular-nums shrink-0 ${meta.text}`}>{item.average}%</span>
-                  <span className="text-[10px] text-muted-foreground shrink-0">({item.effectiveWeight}% of grade)</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0" title={`Configured: ${item.configuredWeight}%`}>
+                    ({item.effectiveWeight}% of grade)
+                  </span>
                 </div>
               )}
             </div>

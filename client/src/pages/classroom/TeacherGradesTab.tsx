@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { ChevronDown } from "lucide-react";
 import type { ClassroomAssignment, GradingPolicy } from "@shared/schema";
 import type { SubmissionWithName, EnrollmentWithStudent } from "./types";
+import GradeBreakdownPanel from "./GradeBreakdownPanel";
 
 const TYPE_BADGE: Record<string, string> = {
   assignment: "bg-blue-100 text-blue-700",
@@ -41,6 +44,8 @@ function computeWeightedPct(
 }
 
 export default function TeacherGradesTab({ classroomId }: { classroomId: number }) {
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+
   const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
@@ -71,13 +76,19 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
   });
 
   if (assignments.length === 0 || enrollments.length === 0) {
-    return <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">Add assignments and students to see the grade book.</div>;
+    return (
+      <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
+        Add assignments and students to see the grade book.
+      </div>
+    );
   }
 
   const totalPossible = assignments.reduce((s, a) => s + a.points, 0);
+  const selectedEnrollment = enrollments.find((e) => e.studentId === selectedStudentId);
 
   return (
     <div className="space-y-3">
+      {/* Grading policy summary */}
       {policy && (
         <div className="rounded-xl border border-border bg-muted/30 px-4 py-2.5 flex flex-wrap gap-x-4 gap-y-1 items-center text-xs">
           <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Grading Policy</span>
@@ -92,6 +103,7 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
         </div>
       )}
 
+      {/* Grade book table — click a row to view that student's full weighted breakdown */}
       <div className="overflow-x-auto rounded-2xl border border-border">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 border-b border-border">
@@ -108,7 +120,7 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
                   </div>
                 </th>
               ))}
-              <th className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px]">
+              <th className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">
                 {policy ? "Weighted %" : "Total"}
               </th>
             </tr>
@@ -119,9 +131,20 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
               const earned = assignments.reduce((s, a) => s + (subs[a.id]?.grade ?? 0), 0);
               const hasAnyGrade = assignments.some((a) => subs[a.id]?.grade != null);
               const weightedPct = computeWeightedPct(assignments, subs, policy);
+              const isSelected = selectedStudentId === e.studentId;
               return (
-                <tr key={e.studentId} className="hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium text-foreground sticky left-0 bg-card">{e.student.name}</td>
+                <tr
+                  key={e.studentId}
+                  className={`hover:bg-muted/20 cursor-pointer transition-colors ${isSelected ? "bg-muted/30" : ""}`}
+                  onClick={() => setSelectedStudentId(isSelected ? null : e.studentId)}
+                  title="Click to view detailed grade breakdown"
+                >
+                  <td className={`px-4 py-3 font-medium text-foreground sticky left-0 ${isSelected ? "bg-muted/30" : "bg-card"}`}>
+                    <div className="flex items-center gap-1.5">
+                      {e.student.name}
+                      <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isSelected ? "rotate-180" : ""}`} />
+                    </div>
+                  </td>
                   {assignments.map((a) => {
                     const sub = subs[a.id];
                     return (
@@ -150,6 +173,16 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
           </tbody>
         </table>
       </div>
+
+      {/* Selected student's full weighted breakdown panel */}
+      {selectedStudentId !== null && selectedEnrollment && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-0.5">
+            {selectedEnrollment.student.name} — Grade Breakdown
+          </p>
+          <GradeBreakdownPanel classroomId={classroomId} studentId={selectedStudentId} />
+        </div>
+      )}
     </div>
   );
 }
