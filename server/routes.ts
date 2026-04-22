@@ -2827,6 +2827,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/tutor-requests/pending-count — count of pending requests for the logged-in teacher
+  app.get("/api/tutor-requests/pending-count", requireAuth, async (req, res) => {
+    try {
+      const count = await prisma.tutorRequest.count({
+        where: { teacherId: req.session.userId!, status: "pending" },
+      });
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.patch("/api/tutor-requests/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
@@ -5294,10 +5306,16 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/notifications/count — unread count for current user
+  // GET /api/notifications/count — unread count for current user (excludes tutor-request notifications which are surfaced on the Tutor Requests sidebar item instead)
   app.get("/api/notifications/count", requireAuth, async (req, res) => {
     try {
-      const count = await storage.getUnreadNotificationCount(req.session.userId!);
+      const count = await prisma.notification.count({
+        where: {
+          userId: req.session.userId!,
+          isRead: false,
+          NOT: { type: "new_tutor_request" },
+        },
+      });
       res.json({ count });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

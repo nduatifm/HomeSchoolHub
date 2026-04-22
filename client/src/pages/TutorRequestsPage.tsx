@@ -22,6 +22,7 @@ export default function TutorRequestsPage() {
       apiRequest(`/api/tutor-requests/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tutor-requests/teacher"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tutor-requests/pending-count"] });
       toast({ title: "Request updated!", type: "success" });
     },
   });
