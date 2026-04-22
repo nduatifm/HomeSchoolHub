@@ -5508,14 +5508,13 @@ export function registerRoutes(app: Express) {
         ? { assignment: policy.assignmentWeight, test: policy.testWeight, quiz: policy.quizWeight, project: policy.projectWeight }
         : defaultWeights;
 
-      type BreakdownStatus = "graded" | "pending" | "zero-weight" | "no-items";
+      type BreakdownStatus = "graded" | "pending" | "zero-weight";
       const breakdown = ALL_TYPES.map((type) => {
         const typeAssignments = assignments.filter((a) => a.assignmentType === type);
         const gradedSubs = typeAssignments
           .map((a) => subMap[a.id])
           .filter((s) => s && s.grade !== null && s.grade !== undefined);
 
-        const hasItems = typeAssignments.length > 0;
         const isGraded = gradedSubs.length > 0;
         const configuredWeight = weights[type];
 
@@ -5528,9 +5527,9 @@ export function registerRoutes(app: Express) {
           average = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
         }
 
+        // zero-weight always takes precedence; otherwise graded if submissions exist, else pending
         let status: BreakdownStatus;
-        if (!hasItems) status = "no-items";
-        else if (configuredWeight === 0) status = "zero-weight";
+        if (configuredWeight === 0) status = "zero-weight";
         else if (!isGraded) status = "pending";
         else status = "graded";
 

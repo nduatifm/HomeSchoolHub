@@ -591,7 +591,7 @@ export const gradeBreakdownItemSchema = z.object({
   configuredWeight: z.number(),
   effectiveWeight: z.number(),
   average: z.number().nullable(),
-  status: z.enum(["graded", "pending", "zero-weight", "no-items"]),
+  status: z.enum(["graded", "pending", "zero-weight"]),
 });
 export const gradeBreakdownSchema = z.object({
   overall: z.number().nullable(),

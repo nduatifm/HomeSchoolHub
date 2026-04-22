@@ -33,11 +33,12 @@ export default function GradeBreakdownPanel({
 
   if (!breakdown) return null;
 
-  // Show all 4 types — filter nothing; "no-items" rows render in a muted "not set up" style
-  const allItems = breakdown.breakdown;
+  const { breakdown: items } = breakdown;
+  const hasAnyGraded = items.some((b) => b.status === "graded");
+  // zero-weight items that have graded work must still be shown (not an empty state)
+  const hasAnyZeroWeightGraded = items.some((b) => b.status === "zero-weight" && b.average !== null);
 
-  const hasAnyGraded = allItems.some((b) => b.status === "graded");
-  if (!hasAnyGraded) {
+  if (!hasAnyGraded && !hasAnyZeroWeightGraded) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-5 py-4 space-y-0.5 text-center">
         <p className="text-sm font-medium text-muted-foreground">No items have been graded yet.</p>
@@ -70,35 +71,35 @@ export default function GradeBreakdownPanel({
         </div>
       )}
 
-      {/* Per-type breakdown — always shows all 4 types */}
+      {/* Per-type breakdown — all 4 types always shown */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-        {allItems.map((item) => {
+        {items.map((item) => {
           const meta = TYPE_META[item.type] ?? TYPE_META.assignment;
           return (
             <div key={item.type} className="flex items-center gap-2">
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${item.status === "no-items" ? "bg-muted text-muted-foreground" : meta.color}`}>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${meta.color}`}>
                 {item.label}
               </span>
-
-              {item.status === "no-items" && (
-                <span className="text-xs text-muted-foreground/60 italic">No items</span>
-              )}
 
               {item.status === "pending" && (
                 <span className="text-xs font-medium text-amber-600">
                   Pending
                   {item.configuredWeight > 0 && (
-                    <span className="ml-1 font-normal text-muted-foreground">({item.configuredWeight}% of grade)</span>
+                    <span className="ml-1 font-normal text-muted-foreground">({item.configuredWeight}%)</span>
                   )}
                 </span>
               )}
 
-              {item.status === "zero-weight" && item.average !== null && (
+              {item.status === "zero-weight" && (
                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div className={`h-full rounded-full opacity-40 ${meta.bar}`} style={{ width: `${item.average}%` }} />
-                  </div>
-                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">{item.average}%</span>
+                  {item.average !== null ? (
+                    <>
+                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className={`h-full rounded-full opacity-40 ${meta.bar}`} style={{ width: `${item.average}%` }} />
+                      </div>
+                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">{item.average}%</span>
+                    </>
+                  ) : null}
                   <span className="text-[10px] text-muted-foreground/70 shrink-0 italic">Not counted</span>
                 </div>
               )}
@@ -109,7 +110,10 @@ export default function GradeBreakdownPanel({
                     <div className={`h-full rounded-full ${meta.bar}`} style={{ width: `${item.average}%` }} />
                   </div>
                   <span className={`text-xs font-semibold tabular-nums shrink-0 ${meta.text}`}>{item.average}%</span>
-                  <span className="text-[10px] text-muted-foreground shrink-0" title={`Configured: ${item.configuredWeight}%`}>
+                  <span
+                    className="text-[10px] text-muted-foreground shrink-0"
+                    title={`Configured: ${item.configuredWeight}%`}
+                  >
                     ({item.effectiveWeight}% of grade)
                   </span>
                 </div>
