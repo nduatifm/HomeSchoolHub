@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Route, Switch, Redirect, useLocation } from "wouter";
+import { Route, Switch, Redirect, useLocation, useRoute } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -10,9 +10,6 @@ import Signup from "./pages/Signup";
 import StudentSignup from "./pages/StudentSignup";
 import VerifyEmail from "./pages/VerifyEmail";
 import Profile from "./pages/Profile";
-import TeacherDashboard from "./pages/TeacherDashboard";
-import ParentDashboard from "./pages/ParentDashboard";
-import StudentDashboard from "./pages/StudentDashboard";
 import ClassroomDetail from "./pages/ClassroomDetail";
 import ClassworkDetail from "./pages/ClassworkDetail";
 import ClassroomMaterialPage from "./pages/ClassroomMaterialPage";
@@ -28,6 +25,18 @@ import ClassroomsPage from "./pages/ClassroomsPage";
 import FolderDetailPage from "./pages/FolderDetailPage";
 import MessagesPage from "./pages/MessagesPage";
 
+import TeacherStudentsPage from "./pages/TeacherStudentsPage";
+import TutorRequestsPage from "./pages/TutorRequestsPage";
+import TeacherFeedbackPage from "./pages/TeacherFeedbackPage";
+import StudentClassroomsPage from "./pages/StudentClassroomsPage";
+import StudentGradesPage from "./pages/StudentGradesPage";
+import StudentFeedbackPage from "./pages/StudentFeedbackPage";
+import ParentChildrenPage from "./pages/ParentChildrenPage";
+import ParentClassroomsPage from "./pages/ParentClassroomsPage";
+import ParentTutorsPage from "./pages/ParentTutorsPage";
+import ParentInvitesPage from "./pages/ParentInvitesPage";
+import ParentReportsPage from "./pages/ParentReportsPage";
+
 function RouteTracker() {
   const [location] = useLocation();
   const isFirstRender = useRef(true);
@@ -38,95 +47,62 @@ function RouteTracker() {
   return null;
 }
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto" />
+        <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Redirect to="/login" />;
-  }
-
-  return <Component />;
-}
-
-function DashboardRouter() {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Redirect to="/login" />;
-  }
-
-  if (user.role === "teacher") {
-    return <TeacherDashboard />;
-  } else if (user.role === "parent") {
-    return <ParentDashboard />;
-  } else if (user.role === "student") {
-    return <StudentDashboard />;
-  }
-
-  return <Redirect to="/login" />;
-}
-
-function TeacherRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
+  if (isLoading) return <LoadingScreen />;
   if (!user) return <Redirect to="/login" />;
-  if (user.role !== "teacher" && !user.roles?.includes("teacher")) return <Redirect to="/dashboard" />;
-
   return <Component />;
 }
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-3 text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
-    return <Redirect to="/dashboard" />;
-  }
-
+  if (isLoading) return <LoadingScreen />;
+  if (!user || (!user.isAdmin && !user.isSuperAdmin)) return <Redirect to="/dashboard" />;
   return <Component />;
+}
+
+function DashboardRouter() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role === "teacher") return <Redirect to="/classrooms" />;
+  if (user.role === "parent") return <Redirect to="/children" />;
+  if (user.role === "student") return <Redirect to="/classrooms" />;
+  return <Redirect to="/login" />;
+}
+
+function ClassroomsRouter() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role === "teacher") return <ClassroomsPage />;
+  if (user.role === "parent") return <ParentClassroomsPage />;
+  return <StudentClassroomsPage />;
+}
+
+function FeedbackRouter() {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role === "teacher") return <TeacherFeedbackPage />;
+  return <StudentFeedbackPage />;
+}
+
+function ClassroomRedirect() {
+  const [, params] = useRoute("/classrooms/:slug");
+  const qs = window.location.search;
+  return <Redirect to={`/classrooms/${params?.slug ?? ""}/feed${qs}`} />;
 }
 
 function AppRoutes() {
@@ -160,6 +136,43 @@ function AppRoutes() {
         <Route path="/form-builder">
           <ProtectedRoute component={FormBuilderPage} />
         </Route>
+        <Route path="/messages">
+          <ProtectedRoute component={MessagesPage} />
+        </Route>
+
+        {/* Teacher-only pages */}
+        <Route path="/students">
+          <ProtectedRoute component={TeacherStudentsPage} />
+        </Route>
+        <Route path="/requests">
+          <ProtectedRoute component={TutorRequestsPage} />
+        </Route>
+
+        {/* Feedback — teacher or student */}
+        <Route path="/feedback">
+          <FeedbackRouter />
+        </Route>
+
+        {/* Student-only */}
+        <Route path="/grades">
+          <ProtectedRoute component={StudentGradesPage} />
+        </Route>
+
+        {/* Parent-only pages */}
+        <Route path="/children">
+          <ProtectedRoute component={ParentChildrenPage} />
+        </Route>
+        <Route path="/find-tutor">
+          <ProtectedRoute component={ParentTutorsPage} />
+        </Route>
+        <Route path="/invites">
+          <ProtectedRoute component={ParentInvitesPage} />
+        </Route>
+        <Route path="/reports">
+          <ProtectedRoute component={ParentReportsPage} />
+        </Route>
+
+        {/* Classroom sub-pages — most specific first */}
         <Route path="/classrooms/:slug/assignments/new">
           <ProtectedRoute component={NewAssignmentPage} />
         </Route>
@@ -181,24 +194,35 @@ function AppRoutes() {
         <Route path="/classrooms/:slug/materials/:materialSlug">
           <ProtectedRoute component={ClassroomMaterialPage} />
         </Route>
+
+        {/* Folder detail */}
         <Route path="/classrooms/folders/:folderId">
           <ProtectedRoute component={FolderDetailPage} />
         </Route>
-        <Route path="/classrooms/:slug">
+
+        {/* ClassroomDetail with tab in path */}
+        <Route path="/classrooms/:slug/:tab">
           <ProtectedRoute component={ClassroomDetail} />
         </Route>
+
+        {/* Bare /classrooms/:slug → redirect to /classrooms/:slug/feed */}
+        <Route path="/classrooms/:slug">
+          <ClassroomRedirect />
+        </Route>
+
+        {/* Classrooms list — role-aware */}
         <Route path="/classrooms">
-          <TeacherRoute component={ClassroomsPage} />
+          <ClassroomsRouter />
         </Route>
-        <Route path="/messages">
-          <ProtectedRoute component={MessagesPage} />
-        </Route>
+
+        {/* Legacy dashboard routes — redirect to new pages */}
         <Route path="/dashboard/:tab">
           <DashboardRouter />
         </Route>
         <Route path="/dashboard">
           <DashboardRouter />
         </Route>
+
         <Route path="/">
           {user ? <Redirect to="/dashboard" /> : <Landing />}
         </Route>

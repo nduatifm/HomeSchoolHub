@@ -38,8 +38,7 @@ import {
 interface SidebarItem {
   icon: React.ReactNode;
   label: string;
-  hash: string;
-  href?: string;
+  href: string;
   badge?: number;
   badgeCap?: number;
 }
@@ -91,35 +90,28 @@ export default function ModernSidebar() {
     setMobileOpen(false);
   }, [location]);
 
-  const defaultTab = user?.role === "parent" ? "children" : "classrooms";
-
-  const handleNavigation = (tab: string) => {
-    setLocation("/dashboard/" + tab);
-    setMobileOpen(false);
-  };
-
   const teacherItems: SidebarItem[] = [
-    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
-    { icon: <User className="w-4 h-4" />, label: "Students", hash: "students" },
-    { icon: <UserPlus className="w-4 h-4" />, label: "Tutor Requests", hash: "requests" },
-    { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
-    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", href: "/messages", badge: unreadCount },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
+    { icon: <User className="w-4 h-4" />, label: "Students", href: "/students" },
+    { icon: <UserPlus className="w-4 h-4" />, label: "Tutor Requests", href: "/requests" },
+    { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", href: "/feedback" },
+    { icon: <Send className="w-4 h-4" />, label: "Messages", href: "/messages", badge: unreadCount },
   ];
 
   const parentItems: SidebarItem[] = [
-    { icon: <Users className="w-4 h-4" />, label: "My Children", hash: "children" },
-    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
-    { icon: <GraduationCap className="w-4 h-4" />, label: "Find a Tutor", hash: "tutors" },
-    { icon: <UserPlus className="w-4 h-4" />, label: "Invite Student", hash: "invites" },
-    { icon: <FileText className="w-4 h-4" />, label: "Progress Reports", hash: "reports" },
-    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", href: "/messages", badge: unreadCount },
+    { icon: <Users className="w-4 h-4" />, label: "My Children", href: "/children" },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
+    { icon: <GraduationCap className="w-4 h-4" />, label: "Find a Tutor", href: "/find-tutor" },
+    { icon: <UserPlus className="w-4 h-4" />, label: "Invite Student", href: "/invites" },
+    { icon: <FileText className="w-4 h-4" />, label: "Progress Reports", href: "/reports" },
+    { icon: <Send className="w-4 h-4" />, label: "Messages", href: "/messages", badge: unreadCount },
   ];
 
   const studentItems: SidebarItem[] = [
-    { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
-    { icon: <BarChart2 className="w-4 h-4" />, label: "Grades", hash: "grades" },
-    { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
-    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", href: "/messages", badge: unreadCount },
+    { icon: <School className="w-4 h-4" />, label: "Classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
+    { icon: <BarChart2 className="w-4 h-4" />, label: "Grades", href: "/grades" },
+    { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", href: "/feedback" },
+    { icon: <Send className="w-4 h-4" />, label: "Messages", href: "/messages", badge: unreadCount },
   ];
 
   const getItems = () => {
@@ -130,17 +122,15 @@ export default function ModernSidebar() {
 
   const items = getItems();
 
-  const isActive = (item: SidebarItem) => {
-    if (item.href) return location === item.href || location.startsWith(item.href + "/");
-    return location === `/dashboard/${item.hash}` || (location === "/dashboard" && item.hash === defaultTab);
-  };
+  const isActive = (item: SidebarItem) =>
+    location === item.href || location.startsWith(item.href + "/");
 
   // ── Nav item ──────────────────────────────────────────────────────────────
   const NavItem = ({ item }: { item: SidebarItem }) => {
     const active = isActive(item);
     return (
       <button
-        onClick={() => item.href ? setLocation(item.href) : handleNavigation(item.hash)}
+        onClick={() => setLocation(item.href)}
         data-testid={`sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
         className={`
           w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm
@@ -204,7 +194,7 @@ export default function ModernSidebar() {
       {/* Nav */}
       <nav className="flex-1 px-3 py-1 space-y-0.5 overflow-y-auto">
         {items.map((item) => (
-          <NavItem key={item.hash} item={item} />
+          <NavItem key={item.href} item={item} />
         ))}
         <NotificationBell />
       </nav>

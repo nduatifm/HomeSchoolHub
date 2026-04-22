@@ -71,21 +71,20 @@ function TabNav({
 }
 
 export default function ClassroomDetail() {
-  const [, params] = useRoute("/classrooms/:slug");
+  const [, tabParams] = useRoute("/classrooms/:slug/:tab");
+  const [, slugOnlyParams] = useRoute("/classrooms/:slug");
   const [, navigate] = useLocation();
   const { user } = useAuth();
-  const slugParam = params?.slug ?? "";
+
+  const slugParam = tabParams?.slug ?? slugOnlyParams?.slug ?? "";
+  const activeTab = tabParams?.tab ?? "feed";
 
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
-  const [activeTab, setActiveTabState] = useState<string>(searchParams.get("tab") ?? "feed");
-  const goBack = useGoBack((user?.roles?.includes("teacher") || user?.role === "teacher") ? "/classrooms" : "/dashboard");
+  const goBack = useGoBack("/classrooms");
 
   function setActiveTab(tab: string) {
-    setActiveTabState(tab);
-    const qs = new URLSearchParams(window.location.search);
-    qs.set("tab", tab);
-    window.history.replaceState(null, "", `${window.location.pathname}?${qs.toString()}`);
+    navigate(`/classrooms/${slugParam}/${tab}${window.location.search ? window.location.search : ""}`);
   }
 
   const { data: classroom, isLoading } = useQuery<Classroom>({
