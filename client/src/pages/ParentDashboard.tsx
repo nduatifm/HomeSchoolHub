@@ -569,8 +569,8 @@ export default function ParentDashboard() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
 
-      <div className="md:ml-[228px] flex">
-        <main className="flex-1 p-4 sm:p-6 pt-20 md:pt-6">
+      <div className="md:ml-[228px]">
+        <main className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto">
 
           {/* GREETING */}
           {(() => {

@@ -87,9 +87,9 @@ export default function SubmissionReviewPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen">
+      <div className="min-h-screen bg-background">
         <ModernSidebar />
-        <div className="flex-1 md:ml-[228px] flex items-center justify-center">
+        <div className="md:ml-[228px] flex items-center justify-center min-h-screen">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>
       </div>
@@ -98,9 +98,9 @@ export default function SubmissionReviewPage() {
 
   if (!classroom || !submission || !assignment) {
     return (
-      <div className="flex min-h-screen">
+      <div className="min-h-screen bg-background">
         <ModernSidebar />
-        <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
+        <div className="md:ml-[228px] flex flex-col items-center justify-center gap-3 min-h-screen">
           <p className="text-gray-500 text-sm">Submission not found.</p>
           <Button variant="outline" size="sm" onClick={goBack}>
             Back to Classroom
@@ -113,10 +113,10 @@ export default function SubmissionReviewPage() {
   const canGrade = gradeVal !== "" && !gradeMutation.isPending;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <ModernSidebar />
-      <div className="flex-1 md:ml-[228px] overflow-auto">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-20 pb-12 md:pt-8 space-y-6">
+      <div className="md:ml-[228px]">
+        <div className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-5">
           {/* Breadcrumb */}
           <div>
             <button

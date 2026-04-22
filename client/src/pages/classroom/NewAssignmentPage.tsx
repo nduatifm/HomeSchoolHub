@@ -205,9 +205,9 @@ export default function NewAssignmentPage() {
 
   if (classroomLoading) {
     return (
-      <div className="flex min-h-screen">
+      <div className="min-h-screen bg-background">
         <ModernSidebar />
-        <div className="flex-1 md:ml-[228px] flex items-center justify-center">
+        <div className="md:ml-[228px] flex items-center justify-center min-h-screen">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </div>
@@ -216,9 +216,9 @@ export default function NewAssignmentPage() {
 
   if (!classroom) {
     return (
-      <div className="flex min-h-screen">
+      <div className="min-h-screen bg-background">
         <ModernSidebar />
-        <div className="flex-1 md:ml-[228px] flex flex-col items-center justify-center gap-3">
+        <div className="md:ml-[228px] flex flex-col items-center justify-center gap-3 min-h-screen">
           <p className="text-muted-foreground text-sm">Classroom not found.</p>
           <Button variant="outline" size="sm" onClick={goBack}>Back to Dashboard</Button>
         </div>
@@ -230,9 +230,9 @@ export default function NewAssignmentPage() {
 
   return (
     <>
-    <div className="flex min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <ModernSidebar />
-      <div className="flex-1 md:ml-[228px] flex flex-col">
+      <div className="md:ml-[228px] flex flex-col">
 
         {/* ── Sticky top bar ── */}
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -275,7 +275,7 @@ export default function NewAssignmentPage() {
 
         {/* ── Page body ── */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-16">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-16">
 
             {/* Page heading */}
             <div className="mb-7">

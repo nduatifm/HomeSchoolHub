@@ -364,10 +364,10 @@ export default function Profile() {
   const empty = (label: string) => <span className="text-gray-400">{label}</span>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <ModernSidebar />
-      <div className="md:ml-[228px] px-4 sm:px-6 py-12 pt-20 md:pt-12">
-        <div className="max-w-2xl mx-auto space-y-12">
+      <div className="md:ml-[228px]">
+        <main className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-12">
 
           {/* ══ Account ══ */}
           <Section title="Account">
@@ -809,7 +809,7 @@ export default function Profile() {
           </Section>
 
           <div className="h-10" />
-        </div>
+        </main>
       </div>
 
       {/* Confirm "Become a teacher" */}

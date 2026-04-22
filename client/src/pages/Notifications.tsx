@@ -201,11 +201,11 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <ModernSidebar />
 
-      <main className="flex-1 md:ml-[228px] min-h-screen">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-20 pb-8 md:pt-8">
+      <div className="md:ml-[228px]">
+        <main className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -264,8 +264,8 @@ export default function NotificationsPage() {
               {renderGroup(earlierItems, "Earlier")}
             </>
           )}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
