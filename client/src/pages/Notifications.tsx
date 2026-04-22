@@ -129,18 +129,26 @@ export default function NotificationsPage() {
     onError: () => toast({ title: "Couldn't mark all as read — try again.", type: "error" }),
   });
 
+  const normalizeLink = (link: string): string => {
+    if (link === "/dashboard/messages" || link.startsWith("/dashboard/messages/")) {
+      return "/messages" + link.slice("/dashboard/messages".length);
+    }
+    return link;
+  };
+
   const handleNotificationClick = async (n: Notification) => {
     if (!n.isRead) {
       await markReadMutation.mutateAsync(n.id).catch(console.error);
     }
     if (n.link) {
-      const isSpaPath = ["/dashboard", "/notifications", "/settings", "/admin"].some(
-        (p) => n.link === p || n.link!.startsWith(p + "/")
-      ) || n.link.startsWith("/classrooms/");
+      const resolved = normalizeLink(n.link);
+      const isSpaPath = ["/dashboard", "/notifications", "/settings", "/admin", "/messages"].some(
+        (p) => resolved === p || resolved.startsWith(p + "/")
+      ) || resolved.startsWith("/classrooms/");
       if (isSpaPath) {
-        setLocation(n.link);
+        setLocation(resolved);
       } else {
-        window.location.href = n.link;
+        window.location.href = resolved;
       }
     }
   };
