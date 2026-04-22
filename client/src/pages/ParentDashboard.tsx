@@ -976,12 +976,23 @@ export default function ParentDashboard() {
                           <div className="space-y-4">
                             {childFolders.length > 0 && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {childFolders.map(folder => (
+                                {childFolders.map(folder => {
+                                  const pending = folder.classrooms.reduce((sum, c) => sum + (childNotifMap[c.id]?.pendingCount ?? 0), 0);
+                                  const hasDue = folder.classrooms.some(c => (childNotifMap[c.id]?.dueCount ?? 0) > 0 || (childNotifMap[c.id]?.newPostsCount ?? 0) > 0);
+                                  const hasDueSoon = folder.classrooms.some(c => (childNotifMap[c.id]?.dueSoonCount ?? 0) > 0);
+                                  const hasNew = folder.classrooms.some(c => (childNotifMap[c.id]?.newCount ?? 0) > 0 || (childNotifMap[c.id]?.newMaterialsCount ?? 0) > 0);
+                                  const badgeBg = hasDue ? "bg-red-500" : hasDueSoon ? "bg-amber-500" : hasNew ? "bg-green-500" : "bg-primary";
+                                  return (
                                   <div key={folder.id} className="relative group/folder">
                                     <button
                                       onClick={() => navigate(`/classrooms/folders/${folder.id}?studentId=${child.id}`)}
-                                      className="w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
+                                      className="relative w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
                                     >
+                                      {pending > 0 && (
+                                        <span className={`absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm ${badgeBg}`}>
+                                          {pending > 9 ? "9+" : pending}
+                                        </span>
+                                      )}
                                       <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
                                         <Folder className="h-10 w-10 text-primary opacity-70" />
                                       </div>
@@ -997,7 +1008,8 @@ export default function ParentDashboard() {
                                       </div>
                                     </button>
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                             {ungrouped.length > 0 && (

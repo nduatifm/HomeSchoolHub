@@ -607,32 +607,108 @@ export default function ClassroomsPage() {
                 </div>
               )}
 
-              {/* Ungrouped active classrooms */}
-              {(() => {
+              {/* Teacher: other (ungrouped) classrooms */}
+              {isTeacher && (() => {
                 const ungrouped = classroomsByFolder["none"] ?? [];
-                if (!isTeacher && ungrouped.length === 0 && folders.length === 0) return null;
-                if (ungrouped.length === 0 && folders.length > 0 && !isTeacher) return null;
                 return (
                   <div>
                     {folders.length > 0 && (
                       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
                         <Folder className="h-3.5 w-3.5" />
-                        {isTeacher ? "Other Classrooms" : "All Classes"}
+                        Other Classrooms
                       </h2>
                     )}
-                    {ungrouped.length === 0 && isTeacher ? (
+                    {ungrouped.length === 0 ? (
                       folders.length === 0 && (
                         <div className="text-center py-16 text-muted-foreground text-sm border border-dashed border-border rounded-xl">
                           No classrooms yet. Create a grade folder or add a classroom directly.
                         </div>
                       )
-                    ) : ungrouped.length === 0 && !isTeacher ? (
-                      <div className="text-center py-10 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
-                        You have not been enrolled in any classrooms yet.
-                      </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {ungrouped.map(c => renderCard(c))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Student / parent: derive folder cards from classroom data + show ungrouped */}
+              {!isTeacher && (() => {
+                const studentFolderMap = new Map<number, { id: number; name: string; classrooms: Classroom[] }>();
+                const ungrouped: Classroom[] = [];
+                for (const c of activeClassrooms) {
+                  if (c.gradeFolderId && c.gradeFolderName) {
+                    if (!studentFolderMap.has(c.gradeFolderId)) {
+                      studentFolderMap.set(c.gradeFolderId, { id: c.gradeFolderId, name: c.gradeFolderName, classrooms: [] });
+                    }
+                    studentFolderMap.get(c.gradeFolderId)!.classrooms.push(c);
+                  } else {
+                    ungrouped.push(c);
+                  }
+                }
+                const studentFolders = Array.from(studentFolderMap.values());
+                const hasGroups = studentFolders.length > 0;
+
+                if (activeClassrooms.length === 0) {
+                  return (
+                    <div className="text-center py-10 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
+                      You have not been enrolled in any classrooms yet.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {studentFolders.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {studentFolders.map(folder => {
+                          const pending = folder.classrooms.reduce((sum, c) => sum + (studentNotifMap[c.id]?.pendingCount ?? 0), 0);
+                          const hasDue = folder.classrooms.some(c => (studentNotifMap[c.id]?.dueCount ?? 0) > 0 || (studentNotifMap[c.id]?.newPostsCount ?? 0) > 0);
+                          const hasDueSoon = folder.classrooms.some(c => (studentNotifMap[c.id]?.dueSoonCount ?? 0) > 0);
+                          const hasNew = folder.classrooms.some(c => (studentNotifMap[c.id]?.newCount ?? 0) > 0 || (studentNotifMap[c.id]?.newMaterialsCount ?? 0) > 0);
+                          const badgeBg = hasDue ? "bg-red-500" : hasDueSoon ? "bg-amber-500" : hasNew ? "bg-green-500" : "bg-primary";
+                          return (
+                            <div key={folder.id} className="relative group/folder">
+                              <button
+                                onClick={() => navigate(`/classrooms/folders/${folder.id}`)}
+                                className="relative w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
+                              >
+                                {pending > 0 && (
+                                  <span className={`absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm ${badgeBg}`}>
+                                    {pending > 9 ? "9+" : pending}
+                                  </span>
+                                )}
+                                <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
+                                  <Folder className="h-10 w-10 text-primary opacity-70" />
+                                </div>
+                                <div className="px-4 py-3 flex flex-col gap-1 flex-1">
+                                  <h3 className="font-bold text-sm text-foreground leading-snug">{folder.name}</h3>
+                                  <span className="text-xs text-muted-foreground">
+                                    {folder.classrooms.length} {folder.classrooms.length === 1 ? "subject" : "subjects"}
+                                  </span>
+                                  <div className="mt-auto pt-3 flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-primary group-hover/folder:underline">Open Folder</span>
+                                    <ChevronRight className="h-3.5 w-3.5 text-primary opacity-60 group-hover/folder:opacity-100 transition-opacity" />
+                                  </div>
+                                </div>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {ungrouped.length > 0 && (
+                      <div>
+                        {hasGroups && (
+                          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                            <Folder className="h-3.5 w-3.5" />
+                            Other Classes
+                          </h2>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {ungrouped.map(c => renderCard(c))}
+                        </div>
                       </div>
                     )}
                   </div>
