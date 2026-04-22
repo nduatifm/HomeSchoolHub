@@ -65,6 +65,30 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <Component />;
 }
 
+function TeacherRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "teacher" && !user.roles?.includes("teacher")) return <Redirect to="/classrooms" />;
+  return <Component />;
+}
+
+function StudentRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "student") return <Redirect to="/classrooms" />;
+  return <Component />;
+}
+
+function ParentRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Redirect to="/login" />;
+  if (user.role !== "parent") return <Redirect to="/classrooms" />;
+  return <Component />;
+}
+
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
   const { user, isLoading } = useAuth();
   if (isLoading) return <LoadingScreen />;
@@ -96,13 +120,15 @@ function FeedbackRouter() {
   if (isLoading) return <LoadingScreen />;
   if (!user) return <Redirect to="/login" />;
   if (user.role === "teacher") return <TeacherFeedbackPage />;
-  return <StudentFeedbackPage />;
+  if (user.role === "student") return <StudentFeedbackPage />;
+  return <Redirect to="/children" />;
 }
 
 function ClassroomRedirect() {
-  const [, params] = useRoute("/classrooms/:slug");
+  const [location] = useLocation();
+  const slug = location.split("/")[2] ?? "";
   const qs = window.location.search;
-  return <Redirect to={`/classrooms/${params?.slug ?? ""}/feed${qs}`} />;
+  return <Redirect to={`/classrooms/${slug}/feed${qs}`} />;
 }
 
 function AppRoutes() {
@@ -142,60 +168,60 @@ function AppRoutes() {
 
         {/* Teacher-only pages */}
         <Route path="/students">
-          <ProtectedRoute component={TeacherStudentsPage} />
+          <TeacherRoute component={TeacherStudentsPage} />
         </Route>
         <Route path="/requests">
-          <ProtectedRoute component={TutorRequestsPage} />
+          <TeacherRoute component={TutorRequestsPage} />
         </Route>
 
-        {/* Feedback — teacher or student */}
+        {/* Feedback — teacher or student; parent redirected to /children */}
         <Route path="/feedback">
           <FeedbackRouter />
         </Route>
 
         {/* Student-only */}
         <Route path="/grades">
-          <ProtectedRoute component={StudentGradesPage} />
+          <StudentRoute component={StudentGradesPage} />
         </Route>
 
         {/* Parent-only pages */}
         <Route path="/children">
-          <ProtectedRoute component={ParentChildrenPage} />
+          <ParentRoute component={ParentChildrenPage} />
         </Route>
         <Route path="/find-tutor">
-          <ProtectedRoute component={ParentTutorsPage} />
+          <ParentRoute component={ParentTutorsPage} />
         </Route>
         <Route path="/invites">
-          <ProtectedRoute component={ParentInvitesPage} />
+          <ParentRoute component={ParentInvitesPage} />
         </Route>
         <Route path="/reports">
-          <ProtectedRoute component={ParentReportsPage} />
+          <ParentRoute component={ParentReportsPage} />
         </Route>
 
         {/* Classroom sub-pages — most specific first */}
         <Route path="/classrooms/:slug/assignments/new">
-          <ProtectedRoute component={NewAssignmentPage} />
+          <TeacherRoute component={NewAssignmentPage} />
         </Route>
         <Route path="/classrooms/:slug/assignments/:assignmentSlug/edit">
-          <ProtectedRoute component={EditAssignmentPage} />
+          <TeacherRoute component={EditAssignmentPage} />
         </Route>
         <Route path="/classrooms/:slug/submissions/:submissionId/review">
-          <ProtectedRoute component={SubmissionReviewPage} />
+          <TeacherRoute component={SubmissionReviewPage} />
         </Route>
         <Route path="/classrooms/:slug/classwork/:classworkSlug">
           <ProtectedRoute component={ClassworkDetail} />
         </Route>
         <Route path="/classrooms/:slug/materials/new">
-          <ProtectedRoute component={ClassroomMaterialPage} />
+          <TeacherRoute component={ClassroomMaterialPage} />
         </Route>
         <Route path="/classrooms/:slug/materials/:materialSlug/edit">
-          <ProtectedRoute component={ClassroomMaterialPage} />
+          <TeacherRoute component={ClassroomMaterialPage} />
         </Route>
         <Route path="/classrooms/:slug/materials/:materialSlug">
           <ProtectedRoute component={ClassroomMaterialPage} />
         </Route>
 
-        {/* Folder detail */}
+        {/* Folder detail — before :slug/:tab so "folders" isn't matched as slug */}
         <Route path="/classrooms/folders/:folderId">
           <ProtectedRoute component={FolderDetailPage} />
         </Route>
@@ -215,7 +241,7 @@ function AppRoutes() {
           <ClassroomsRouter />
         </Route>
 
-        {/* Legacy dashboard routes — redirect to new pages */}
+        {/* Legacy dashboard routes → redirect to role's home */}
         <Route path="/dashboard/:tab">
           <DashboardRouter />
         </Route>

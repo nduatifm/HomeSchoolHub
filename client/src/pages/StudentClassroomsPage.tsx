@@ -1,12 +1,38 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery, useQueries } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { School, ChevronRight, Folder, Loader2, BarChart2 } from "lucide-react";
+import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { School, ChevronRight, Folder, Loader2, BookOpen, Clock } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ClassroomCard from "@/components/ClassroomCard";
 import type { ClassroomNotificationsMap } from "@/lib/classroomNotifications";
-import type { Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
+import type { Classroom, ClassroomAssignment, ClassroomSubmission, Assignment, StudentAssignment } from "@shared/schema";
+
+type AssignmentWithStatus = Assignment & { studentAssignment: StudentAssignment | null };
+
+type PendingTask = {
+  key: string;
+  title: string;
+  subtitle: string;
+  dueDate: string;
+  type: "classwork" | "legacy";
+  classroomSlug?: string;
+  assignmentSlug?: string;
+  assignmentId?: number;
+  studentAssignmentId?: number;
+  hasStudentAssignment?: boolean;
+};
 
 export default function StudentClassroomsPage() {
   const { user, student } = useAuth();
@@ -16,7 +42,23 @@ export default function StudentClassroomsPage() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = user?.name?.split(" ")[0] || "there";
 
+  const [submitDialogAssignmentId, setSubmitDialogAssignmentId] = useState<number | null>(null);
+  const [submissionForm, setSubmissionForm] = useState({
+    assignmentId: 0,
+    studentAssignmentId: 0,
+    submission: "",
+    notes: "",
+    hasStudentAssignment: false,
+  });
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({ queryKey: ["/api/classrooms"] });
+
+  const { data: legacyAssignments = [], isLoading: assignmentsLoading } = useQuery<AssignmentWithStatus[]>({
+    queryKey: ["/api/assignments/student", student?.id],
+    enabled: !!student,
+  });
 
   const classroomAssignmentQueries = useQueries({
     queries: classrooms.map(c => ({
@@ -40,14 +82,88 @@ export default function StudentClassroomsPage() {
     enabled: !!student,
   });
 
-  const isTasksLoading = classroomsLoading || classroomAssignmentQueries.some(q => q.isLoading);
+  const pendingClassworkItems = classrooms.flatMap((c, i) => {
+    const cwAssignments: ClassroomAssignment[] = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];
+    const cwSubmissions: ClassroomSubmission[] = (classroomSubmissionQueries[i]?.data as ClassroomSubmission[]) ?? [];
+    return cwAssignments
+      .map(a => {
+        const sub = cwSubmissions.find(s => s.assignmentId === a.id);
+        return {
+          id: a.id,
+          title: a.title,
+          slug: a.slug ?? String(a.id),
+          classroomName: c.name,
+          classroomSlug: c.slug ?? String(c.id),
+          dueDate: a.dueDate,
+          status: sub?.status ?? "pending",
+        };
+      })
+      .filter(item => item.status === "pending");
+  }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-  const pendingCount = classrooms.reduce((sum, c, i) => {
-    const assigns = (classroomAssignmentQueries[i]?.data as ClassroomAssignment[]) ?? [];
-    const subs = (classroomSubmissionQueries[i]?.data as ClassroomSubmission[]) ?? [];
-    const subMap = Object.fromEntries(subs.map(s => [s.assignmentId, s]));
-    return sum + assigns.filter(a => { const sub = subMap[a.id]; return !sub || sub.status === "pending"; }).length;
-  }, 0);
+  const pendingLegacy = (legacyAssignments as AssignmentWithStatus[]).filter(
+    a => a.studentAssignment?.status === "pending" || !a.studentAssignment,
+  );
+
+  const allPendingItems: PendingTask[] = [
+    ...pendingClassworkItems.map(a => ({
+      key: `cw-${a.id}`,
+      title: a.title,
+      subtitle: a.classroomName,
+      dueDate: a.dueDate,
+      type: "classwork" as const,
+      classroomSlug: a.classroomSlug,
+      assignmentSlug: a.slug,
+    })),
+    ...pendingLegacy.map(a => ({
+      key: `legacy-${a.id}`,
+      title: a.title,
+      subtitle: (a as any).subject,
+      dueDate: a.dueDate,
+      type: "legacy" as const,
+      assignmentId: a.id,
+      studentAssignmentId: a.studentAssignment?.id ?? 0,
+      hasStudentAssignment: !!a.studentAssignment,
+    })),
+  ].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+  const isTasksLoading = assignmentsLoading || classroomsLoading || classroomAssignmentQueries.some(q => q.isLoading);
+
+  const submitAssignmentMutation = useMutation({
+    mutationFn: async ({
+      assignmentId,
+      studentAssignmentId,
+      submission,
+      notes,
+      hasStudentAssignment,
+      file,
+    }: typeof submissionForm & { file: File | null }) => {
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append("submission", submission);
+      if (notes) formData.append("notes", notes);
+      if (file) formData.append("file", file);
+
+      if (hasStudentAssignment) {
+        return apiUpload(`/api/student-assignments/${studentAssignmentId}/submit`, formData, { method: "PATCH" });
+      } else {
+        formData.append("studentId", String(student?.id));
+        return apiUpload(`/api/assignments/${assignmentId}/submit`, formData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments/student", student?.id] });
+      toast({ title: "Assignment submitted!", type: "success" });
+      setSubmissionForm({ assignmentId: 0, studentAssignmentId: 0, submission: "", notes: "", hasStudentAssignment: false });
+      setSubmissionFile(null);
+      setSubmitDialogAssignmentId(null);
+      setIsSubmitting(false);
+    },
+    onError: () => {
+      setIsSubmitting(false);
+      toast({ title: "Couldn't submit — try again.", type: "error" });
+    },
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,11 +175,52 @@ export default function StudentClassroomsPage() {
             <p className="text-sm text-muted-foreground">
               {isTasksLoading
                 ? "Loading your tasks…"
-                : pendingCount > 0
-                  ? `You have ${pendingCount} thing${pendingCount === 1 ? "" : "s"} to do.`
+                : allPendingItems.length > 0
+                  ? `You have ${allPendingItems.length} thing${allPendingItems.length === 1 ? "" : "s"} to do.`
                   : "Nothing due — you're ahead of the game!"}
             </p>
           </div>
+
+          {/* Pending tasks panel */}
+          {!isTasksLoading && allPendingItems.length > 0 && (
+            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-200">
+                <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                <span className="text-sm font-semibold text-amber-800">Things to do</span>
+              </div>
+              <ul className="divide-y divide-amber-100">
+                {allPendingItems.slice(0, 8).map(item => (
+                  <li
+                    key={item.key}
+                    className="flex items-center justify-between px-4 py-3 hover:bg-amber-100/60 cursor-pointer transition-colors group"
+                    onClick={() => {
+                      if (item.type === "classwork" && item.classroomSlug && item.assignmentSlug) {
+                        navigate(`/classrooms/${item.classroomSlug}/classwork/${item.assignmentSlug}`);
+                      } else if (item.type === "legacy" && item.assignmentId) {
+                        setSubmitDialogAssignmentId(item.assignmentId);
+                        setSubmissionForm({
+                          assignmentId: item.assignmentId,
+                          studentAssignmentId: item.studentAssignmentId ?? 0,
+                          submission: "",
+                          notes: "",
+                          hasStudentAssignment: item.hasStudentAssignment ?? false,
+                        });
+                      }
+                    }}
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <BookOpen className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-amber-900 truncate">{item.title}</p>
+                        <p className="text-xs text-amber-700">{item.subtitle} · Due {item.dueDate}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-3.5 w-3.5 text-amber-400 shrink-0 group-hover:text-amber-600 transition-colors" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <h2 className="text-base font-semibold text-foreground mb-4 flex items-center gap-2">
             <School className="h-4 w-4 text-primary" /> All Classes
@@ -152,6 +309,47 @@ export default function StudentClassroomsPage() {
           })()}
         </main>
       </div>
+
+      {/* Submit legacy assignment dialog */}
+      <Dialog
+        open={submitDialogAssignmentId !== null}
+        onOpenChange={(open) => { if (!open) setSubmitDialogAssignmentId(null); }}
+      >
+        <DialogContent>
+          <DialogHeader><DialogTitle>Submit Assignment</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Your answer or response..."
+              value={submissionForm.submission}
+              onChange={(e) => setSubmissionForm({ ...submissionForm, submission: e.target.value })}
+              rows={5}
+            />
+            <Textarea
+              placeholder="Notes for your teacher (optional)"
+              value={submissionForm.notes}
+              onChange={(e) => setSubmissionForm({ ...submissionForm, notes: e.target.value })}
+              rows={2}
+            />
+            <div>
+              <label className="text-sm font-medium block mb-1">Attach file (optional)</label>
+              <input
+                type="file"
+                onChange={(e) => setSubmissionFile(e.target.files?.[0] ?? null)}
+                className="text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSubmitDialogAssignmentId(null)}>Cancel</Button>
+            <Button
+              disabled={!submissionForm.submission || isSubmitting}
+              onClick={() => submitAssignmentMutation.mutate({ ...submissionForm, file: submissionFile })}
+            >
+              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</> : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
