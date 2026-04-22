@@ -117,7 +117,7 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
             {enrollments.map((e) => {
               const subs = submissionMap[e.studentId] ?? {};
               const earned = assignments.reduce((s, a) => s + (subs[a.id]?.grade ?? 0), 0);
-              const rawPct = totalPossible > 0 ? Math.round((earned / totalPossible) * 100) : 0;
+              const hasAnyGrade = assignments.some((a) => subs[a.id]?.grade != null);
               const weightedPct = computeWeightedPct(assignments, subs, policy);
               return (
                 <tr key={e.studentId} className="hover:bg-muted/20">
@@ -133,10 +133,16 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
                     );
                   })}
                   <td className="px-3 py-3 text-center">
-                    <div className="font-semibold text-foreground">
-                      {weightedPct !== null ? `${weightedPct}%` : `${rawPct}%`}
-                    </div>
-                    <div className="text-xs text-muted-foreground tabular-nums">{earned}/{totalPossible} pts</div>
+                    {hasAnyGrade ? (
+                      <>
+                        <div className="font-semibold text-foreground">
+                          {weightedPct !== null ? `${weightedPct}%` : "—"}
+                        </div>
+                        <div className="text-xs text-muted-foreground tabular-nums">{earned}/{totalPossible} pts</div>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground/40 text-sm">—</span>
+                    )}
                   </td>
                 </tr>
               );

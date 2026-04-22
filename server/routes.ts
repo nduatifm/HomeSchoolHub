@@ -5474,6 +5474,12 @@ export function registerRoutes(app: Express) {
       }
       // teacher: already verified they're the classroom owner via requireClassroomMember
 
+      // Verify targetStudentId is enrolled in this classroom (prevents IDOR for all roles)
+      const enrollment = await prisma.classroomEnrollment.findFirst({
+        where: { classroomId: classroom.id, studentId: targetStudentId },
+      });
+      if (!enrollment) return res.status(404).json({ error: "Student not enrolled in this classroom" });
+
       // Fetch assignments and submissions
       const assignments = await prisma.classroomAssignment.findMany({
         where: { classroomId: classroom.id },

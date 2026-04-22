@@ -140,7 +140,15 @@ export default function TeacherSettingsTab({ classroomId }: { classroomId: numbe
 
         {policy && (
           <p className="text-xs text-muted-foreground">
-            Current policy: {policy.assignmentWeight}% Assignments · {policy.testWeight}% Tests · {policy.quizWeight}% Quizzes · {policy.projectWeight}% Projects
+            Active since{" "}
+            <span className="font-medium">
+              {new Date(policy.effectiveFrom).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+            {" "}— {policy.assignmentWeight}% Assignments · {policy.testWeight}% Tests · {policy.quizWeight}% Quizzes · {policy.projectWeight}% Projects
           </p>
         )}
       </div>

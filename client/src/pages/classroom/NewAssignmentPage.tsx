@@ -352,6 +352,9 @@ export default function NewAssignmentPage() {
                         <SelectItem value="project">Project</SelectItem>
                       </SelectContent>
                     </Select>
+                    {!assignmentType && !!form.title.trim() && (
+                      <p className="text-xs text-destructive">A type is required to save this assignment.</p>
+                    )}
                   </div>
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
                 </div>
@@ -480,6 +483,9 @@ export default function NewAssignmentPage() {
                         <SelectItem value="project">Project</SelectItem>
                       </SelectContent>
                     </Select>
+                    {!assignmentType && !!form.title.trim() && (
+                      <p className="text-xs text-destructive">A type is required to save this assignment.</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
