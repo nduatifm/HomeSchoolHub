@@ -74,7 +74,7 @@ export default function TeacherSettingsTab({ classroomId }: { classroomId: numbe
   }
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-xl mx-auto space-y-6">
       <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
