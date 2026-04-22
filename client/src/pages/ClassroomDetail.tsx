@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useRoute, useLocation } from "wouter";
-import { useGoBack } from "@/hooks/useGoBack";
+import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,11 +13,11 @@ import {
   BarChart2,
   Megaphone,
   Loader2,
-  ChevronLeft,
+  ChevronRight,
   Archive,
   ArchiveRestore,
 } from "lucide-react";
-import ModernSidebar from "@/components/ModernSidebar";
+import ModernSidebar, { ROLE_HOME_CRUMBS } from "@/components/ModernSidebar";
 import { getSubjectTheme } from "@/lib/subjectTheme";
 import type {
   Classroom,
@@ -81,7 +80,6 @@ export default function ClassroomDetail() {
 
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
-  const goBack = useGoBack("/classrooms");
 
   function setActiveTab(tab: string) {
     navigate(`/classrooms/${slugParam}/${tab}${window.location.search ? window.location.search : ""}`);
@@ -268,13 +266,48 @@ export default function ClassroomDetail() {
       <div className="md:ml-[228px]">
         <div className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-5">
 
-          {/* Back nav */}
-          <button
-            onClick={goBack}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />Back to Classrooms
-          </button>
+          {/* Breadcrumbs */}
+          {(() => {
+            const tabLabels: Record<string, string> = {
+              feed: "Feed",
+              assignments: "Assignments & Test",
+              grades: "Grades",
+              classwork: "Classwork",
+              students: "Students",
+            };
+            const tabLabel = tabLabels[activeTab] ?? activeTab;
+            const crumbClass = "text-muted-foreground hover:text-foreground transition-colors shrink-0";
+            const sep = <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" aria-hidden="true" />;
+            const homeCrumb = ROLE_HOME_CRUMBS[user?.role ?? ""] ?? ROLE_HOME_CRUMBS.student;
+            const homeIsClassrooms = homeCrumb.href === "/classrooms";
+            return (
+              <nav aria-label="Breadcrumb" className="flex items-center gap-1 flex-wrap text-sm min-w-0">
+                <Link href={homeCrumb.href} className={crumbClass}>{homeCrumb.label}</Link>
+                {!homeIsClassrooms && (
+                  <>
+                    {sep}
+                    <Link href="/classrooms" className={crumbClass}>Classrooms</Link>
+                  </>
+                )}
+                {sep}
+                <Link
+                  href={`/classrooms/${slugParam}/feed${window.location.search}`}
+                  className={`${crumbClass} truncate max-w-[140px] sm:max-w-[240px]`}
+                  title={classroom.name}
+                >
+                  {classroom.name}
+                </Link>
+                {sep}
+                <Link
+                  href={`/classrooms/${slugParam}/${activeTab}${window.location.search}`}
+                  aria-current="page"
+                  className="text-foreground font-medium truncate hover:text-foreground"
+                >
+                  {tabLabel}
+                </Link>
+              </nav>
+            );
+          })()}
 
           {/* Illustrated header card */}
           <div className={`rounded-2xl border border-border overflow-hidden ${theme.bg}`}>

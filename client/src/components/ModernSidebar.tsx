@@ -43,6 +43,12 @@ interface SidebarItem {
   badgeCap?: number;
 }
 
+export const ROLE_HOME_CRUMBS: Record<string, { label: string; href: string }> = {
+  teacher: { label: "Classrooms", href: "/classrooms" },
+  student: { label: "Classrooms", href: "/classrooms" },
+  parent: { label: "My Children", href: "/children" },
+};
+
 export default function ModernSidebar() {
   const { user, setUser, logout } = useAuth();
   const queryClient = useQueryClient();
