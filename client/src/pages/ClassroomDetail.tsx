@@ -277,7 +277,7 @@ export default function ClassroomDetail() {
             };
             return (
               <Breadcrumb crumbs={buildClassroomCrumbs({
-                role: user?.role,
+                role: user?.role ?? undefined,
                 classroomName: classroom.name,
                 classroomHref: `/classrooms/${slugParam}/feed`,
                 tabLabel: tabLabels[activeTab] ?? activeTab,

@@ -506,7 +506,7 @@ export default function ClassworkDetail() {
         <div className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-5">
           {/* Breadcrumbs */}
           <Breadcrumb crumbs={buildClassroomCrumbs({
-            role: user?.role,
+            role: user?.role ?? undefined,
             classroomName: classroom.name,
             classroomHref: `/classrooms/${classroomSlug}/feed`,
             tabLabel: "Assignments & Tests",
