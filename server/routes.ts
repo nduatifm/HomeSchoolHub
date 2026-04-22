@@ -1407,6 +1407,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/students/me — resolve the current user's student record
+  // MUST be registered before /api/students/:id to avoid "me" being parsed as an ID
+  app.get("/api/students/me", requireAuth, async (req, res) => {
+    try {
+      const student = await storage.getStudentByUserId(req.session.userId!);
+      if (!student) return res.status(404).json({ error: "No student profile for this user" });
+      res.json({ id: student.id, name: student.name, userId: student.userId });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/students/:studentId/classroom-notifications", requireAuth, async (req, res) => {
     try {
       const studentId = parseInt(req.params.studentId);
@@ -1489,6 +1501,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/students/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid student ID" });
       const student = await storage.getStudentById(id);
       if (!student) return res.status(404).json({ error: "Student not found" });
 
@@ -3646,6 +3659,53 @@ export function registerRoutes(app: Express) {
           });
         }
 
+        // ── Grade Folder + Classroom + Enrollments (idempotent) ──
+        // Ensure teacher has a grade folder so students see "My Classes" on a fresh DB
+        let demoFolder = await prisma.gradeFolder.findFirst({
+          where: { teacherId: teacher.id, name: "Grade 5" },
+        });
+        if (!demoFolder) {
+          demoFolder = await prisma.gradeFolder.create({
+            data: { name: "Grade 5", teacherId: teacher.id, slug: "grade-5-demo" },
+          });
+        }
+
+        let demoClassroom = await prisma.classroom.findFirst({
+          where: { teacherId: teacher.id, name: "Grade 5 English", deletedAt: null },
+        });
+        if (!demoClassroom) {
+          demoClassroom = await prisma.classroom.create({
+            data: {
+              name: "Grade 5 English",
+              subject: "English",
+              description: "A comprehensive English classroom covering grammar, literature, and writing.",
+              teacherId: teacher.id,
+              status: "active",
+              slug: "grade-5-english-demo",
+              gradeFolderId: demoFolder.id,
+            },
+          });
+        } else if (demoClassroom.gradeFolderId !== demoFolder.id) {
+          // Repair missing folder link on existing classroom
+          await prisma.classroom.update({
+            where: { id: demoClassroom.id },
+            data: { gradeFolderId: demoFolder.id },
+          });
+          demoClassroom = { ...demoClassroom, gradeFolderId: demoFolder.id };
+        }
+
+        // Enroll all three demo students
+        for (const sr of [studentRecord, studentRecord2, studentRecord3]) {
+          const alreadyEnrolled = await prisma.classroomEnrollment.findUnique({
+            where: { classroomId_studentId: { classroomId: demoClassroom.id, studentId: sr.id } },
+          });
+          if (!alreadyEnrolled) {
+            await prisma.classroomEnrollment.create({
+              data: { classroomId: demoClassroom.id, studentId: sr.id },
+            });
+          }
+        }
+
         // ── Seed rich test data (idempotent) ──
         const seeded = await storage.getSystemSetting("DEV_SEED_V2_DONE");
         if (!seeded) {
@@ -4109,6 +4169,54 @@ export function registerRoutes(app: Express) {
           await storage.createFeedback({ teacherId: teacher3.id, studentId: studentRecord3.id, message: "Always show your ICE table working even when it feels obvious — AP graders award method marks and you don't want to lose them.", date: new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0], type: "constructive" });
           await storage.createAttendance({ studentId: studentRecord3.id, sessionId: pastSession3.id, date: new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0], status: "present", notes: null });
 
+          // ── Classroom seed content ──
+          // Welcome post from teacher
+          await prisma.classroomPost.create({
+            data: {
+              classroomId: demoClassroom.id,
+              authorId: teacher.id,
+              content: "Welcome to Grade 5 English! This classroom is where we'll share announcements, materials, and assignments. Looking forward to a great term with all of you.",
+            },
+          });
+
+          // Two classroom assignments with due dates
+          const ca1 = await prisma.classroomAssignment.create({
+            data: {
+              classroomId: demoClassroom.id,
+              title: "Reading Comprehension — Chapter 1",
+              description: "Read Chapter 1 of 'Charlotte's Web' and answer the 5 comprehension questions on the worksheet. Write in full sentences.",
+              dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+              points: 50,
+              assignmentType: "assignment",
+              slug: "reading-comprehension-ch1",
+            },
+          });
+
+          const ca2 = await prisma.classroomAssignment.create({
+            data: {
+              classroomId: demoClassroom.id,
+              title: "Vocabulary Quiz — Unit 2",
+              description: "Match the 20 vocabulary words to their definitions. Spelling counts.",
+              dueDate: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0],
+              points: 40,
+              assignmentType: "quiz",
+              slug: "vocabulary-quiz-unit-2",
+            },
+          });
+
+          // Graded submission for Emily on the past quiz
+          await prisma.classroomSubmission.create({
+            data: {
+              assignmentId: ca2.id,
+              studentId: studentRecord.id,
+              content: "Completed the vocabulary quiz.",
+              status: "graded",
+              submittedAt: new Date(Date.now() - 1 * 86400000).toISOString().split("T")[0],
+              grade: 36,
+              feedback: "Excellent work! You missed 4 definitions — review 'ambiguous', 'resilient', 'benevolent', and 'elusive' for next time.",
+            },
+          });
+
           // Mark seed done (v2)
           await storage.setSystemSetting("DEV_SEED_V2_DONE", "true", "Demo seed data v2 — 3 teachers, 3 students under one parent");
         }
@@ -4357,17 +4465,6 @@ export function registerRoutes(app: Express) {
       await prisma.user.delete({ where: { id } });
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // GET /api/students/me — resolve the current user's student record
-  app.get("/api/students/me", requireAuth, async (req, res) => {
-    try {
-      const student = await storage.getStudentByUserId(req.session.userId!);
-      if (!student) return res.status(404).json({ error: "No student profile for this user" });
-      res.json({ id: student.id, name: student.name, userId: student.userId });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
