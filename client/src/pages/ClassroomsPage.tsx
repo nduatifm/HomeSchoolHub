@@ -483,26 +483,27 @@ export default function ClassroomsPage() {
     <div className="min-h-screen bg-background">
       <ModernSidebar />
       <div className="md:ml-[228px]">
-        <main className="p-4 sm:p-6 pt-20 md:pt-6 max-w-5xl mx-auto">
+        {/* ── Refined: tighter max-width, balanced top padding ── */}
+        <main className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto">
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          {/* Header — tightened bottom margin */}
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <School className="h-5 w-5 text-primary" />
+              <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <School className="h-4.5 w-4.5 text-primary" />
                 Classrooms
               </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Organize your classrooms by grade level
               </p>
             </div>
             {isTeacher && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="gap-1.5">
-                    <Plus className="h-4 w-4" />
+                  <Button size="sm" className="gap-1.5 h-8 text-sm">
+                    <Plus className="h-3.5 w-3.5" />
                     New
-                    <ChevronDown className="h-3.5 w-3.5 ml-0.5 opacity-70" />
+                    <ChevronDown className="h-3 w-3 ml-0.5 opacity-70" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -521,21 +522,24 @@ export default function ClassroomsPage() {
           </div>
 
           {isLoading && (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="flex justify-center py-14">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           )}
 
           {!isLoading && (
-            <div className="space-y-6">
+            // ── Refined: space-y-5 instead of space-y-6 ──
+            <div className="space-y-5">
+
               {/* Grade folder cards grid */}
               {folders.length > 0 && (
                 <div>
-                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                     <FolderOpen className="h-3.5 w-3.5" />
                     Grade Folders
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* ── Refined: gap-3 instead of gap-4 ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {folders.map(folder => {
                       const folderClassrooms = classroomsByFolder[folder.id] ?? [];
                       const subjectCount = folderClassrooms.length;
@@ -543,22 +547,24 @@ export default function ClassroomsPage() {
                         <div key={folder.id} className="relative group/folder">
                           <button
                             onClick={() => navigate(`/classrooms/folders/${folder.slug ?? folder.id}`)}
-                            className="relative w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
+                            className="relative w-full text-left rounded-xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
                           >
                             {isTeacher && folderPendingCount(folder) > 0 && (
-                              <span className="absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm bg-amber-500 group-hover/folder:opacity-0 transition-opacity">
+                              <span className="absolute top-2.5 right-2.5 z-10 min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold text-white flex items-center justify-center shadow-sm bg-amber-500 group-hover/folder:opacity-0 transition-opacity">
                                 {folderPendingCount(folder) > 9 ? "9+" : folderPendingCount(folder)}
                               </span>
                             )}
-                            <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
-                              <Folder className="h-10 w-10 text-primary opacity-70" />
+                            {/* ── Refined: h-20 banner (was h-24) ── */}
+                            <div className="w-full h-20 shrink-0 bg-primary/10 flex items-center justify-center">
+                              <Folder className="h-8 w-8 text-primary opacity-70" />
                             </div>
-                            <div className="px-4 py-3 flex flex-col gap-1 flex-1">
-                              <h3 className="font-bold text-sm text-foreground leading-snug">{folder.name}</h3>
+                            {/* ── Refined: px-3.5 py-2.5 (was px-4 py-3) ── */}
+                            <div className="px-3.5 py-2.5 flex flex-col gap-0.5 flex-1">
+                              <h3 className="font-semibold text-sm text-foreground leading-snug">{folder.name}</h3>
                               <span className="text-xs text-muted-foreground">
                                 {subjectCount} {subjectCount === 1 ? "subject" : "subjects"}
                               </span>
-                              <div className="mt-auto pt-3 flex items-center justify-between">
+                              <div className="mt-auto pt-2.5 flex items-center justify-between">
                                 <span className="text-xs font-semibold text-primary group-hover/folder:underline">Open Folder</span>
                                 <ChevronRight className="h-3.5 w-3.5 text-primary opacity-60 group-hover/folder:opacity-100 transition-opacity" />
                               </div>
@@ -613,19 +619,19 @@ export default function ClassroomsPage() {
                 return (
                   <div>
                     {folders.length > 0 && (
-                      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                      <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                         <Folder className="h-3.5 w-3.5" />
                         Other Classrooms
                       </h2>
                     )}
                     {ungrouped.length === 0 ? (
                       folders.length === 0 && (
-                        <div className="text-center py-16 text-muted-foreground text-sm border border-dashed border-border rounded-xl">
+                        <div className="text-center py-12 text-muted-foreground text-sm border border-dashed border-border rounded-xl">
                           No classrooms yet. Create a grade folder or add a classroom directly.
                         </div>
                       )
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {ungrouped.map(c => renderCard(c))}
                       </div>
                     )}
@@ -652,16 +658,16 @@ export default function ClassroomsPage() {
 
                 if (activeClassrooms.length === 0) {
                   return (
-                    <div className="text-center py-10 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
+                    <div className="text-center py-10 text-muted-foreground text-sm rounded-xl border border-dashed border-border">
                       You have not been enrolled in any classrooms yet.
                     </div>
                   );
                 }
 
                 return (
-                  <div className="space-y-6">
+                  <div className="space-y-5">
                     {studentFolders.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {studentFolders.map(folder => {
                           const pending = folder.classrooms.reduce((sum, c) => sum + (studentNotifMap[c.id]?.pendingCount ?? 0), 0);
                           const hasDue = folder.classrooms.some(c => (studentNotifMap[c.id]?.dueCount ?? 0) > 0 || (studentNotifMap[c.id]?.newPostsCount ?? 0) > 0);
@@ -672,22 +678,22 @@ export default function ClassroomsPage() {
                             <div key={folder.id} className="relative group/folder">
                               <button
                                 onClick={() => navigate(`/classrooms/folders/${folder.id}`)}
-                                className="relative w-full text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
+                                className="relative w-full text-left rounded-xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] bg-card"
                               >
                                 {pending > 0 && (
-                                  <span className={`absolute top-2.5 right-2.5 z-10 min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center shadow-sm ${badgeBg}`}>
+                                  <span className={`absolute top-2.5 right-2.5 z-10 min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold text-white flex items-center justify-center shadow-sm ${badgeBg}`}>
                                     {pending > 9 ? "9+" : pending}
                                   </span>
                                 )}
-                                <div className="w-full h-24 shrink-0 bg-primary/10 flex items-center justify-center">
-                                  <Folder className="h-10 w-10 text-primary opacity-70" />
+                                <div className="w-full h-20 shrink-0 bg-primary/10 flex items-center justify-center">
+                                  <Folder className="h-8 w-8 text-primary opacity-70" />
                                 </div>
-                                <div className="px-4 py-3 flex flex-col gap-1 flex-1">
-                                  <h3 className="font-bold text-sm text-foreground leading-snug">{folder.name}</h3>
+                                <div className="px-3.5 py-2.5 flex flex-col gap-0.5 flex-1">
+                                  <h3 className="font-semibold text-sm text-foreground leading-snug">{folder.name}</h3>
                                   <span className="text-xs text-muted-foreground">
                                     {folder.classrooms.length} {folder.classrooms.length === 1 ? "subject" : "subjects"}
                                   </span>
-                                  <div className="mt-auto pt-3 flex items-center justify-between">
+                                  <div className="mt-auto pt-2.5 flex items-center justify-between">
                                     <span className="text-xs font-semibold text-primary group-hover/folder:underline">Open Folder</span>
                                     <ChevronRight className="h-3.5 w-3.5 text-primary opacity-60 group-hover/folder:opacity-100 transition-opacity" />
                                   </div>
@@ -701,12 +707,12 @@ export default function ClassroomsPage() {
                     {ungrouped.length > 0 && (
                       <div>
                         {hasGroups && (
-                          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                             <Folder className="h-3.5 w-3.5" />
                             Other Classes
                           </h2>
                         )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                           {ungrouped.map(c => renderCard(c))}
                         </div>
                       </div>
@@ -720,23 +726,23 @@ export default function ClassroomsPage() {
                 <div className="border border-border rounded-xl overflow-hidden">
                   <button
                     onClick={() => setCollapsedArchived(prev => !prev)}
-                    className="flex items-center gap-2 px-4 py-3 bg-muted/30 w-full text-left group"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 w-full text-left group"
                   >
                     {collapsedArchived
-                      ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                     }
-                    <Archive className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                    <Archive className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="font-medium text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                       Archived Classrooms
                     </span>
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4.5 ml-1">
                       {archivedClassrooms.length}
                     </Badge>
                   </button>
                   {!collapsedArchived && (
-                    <div className="p-4 border-t border-border">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="p-3.5 border-t border-border">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {archivedClassrooms.map(c => renderCard(c, true))}
                       </div>
                     </div>
@@ -750,27 +756,28 @@ export default function ClassroomsPage() {
                   <div className="bg-muted/30">
                     <button
                       onClick={() => setCollapsedTrash(prev => !prev)}
-                      className="flex items-center gap-2 px-4 py-3 w-full text-left group"
+                      className="flex items-center gap-2 px-4 py-2.5 w-full text-left group"
                     >
                       {collapsedTrash
-                        ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       }
-                      <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-semibold text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="font-medium text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                         Recently Deleted
                       </span>
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5 ml-1">
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4.5 ml-1">
                         {deletedClassrooms.length}
                       </Badge>
                     </button>
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground px-4 pb-2.5">
-                      <Info className="h-3.5 w-3.5 shrink-0" />
+                    {/* ── Refined: inline info banner, less vertical weight ── */}
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground px-4 pb-2">
+                      <Info className="h-3 w-3 shrink-0" />
                       Classrooms here are permanently deleted after 30 days.
                     </p>
                   </div>
                   {!collapsedTrash && (
-                    <div className="p-4 border-t border-border space-y-2">
+                    <div className="p-3.5 border-t border-border space-y-1.5">
                       {deletedClassrooms.map(c => {
                         const isRestoring = restoringId === c.id;
                         const isPermanentDeleting = permanentDeletingId === c.id;
@@ -778,10 +785,11 @@ export default function ClassroomsPage() {
                         return (
                           <div
                             key={c.id}
-                            className="flex items-center gap-3 py-3 px-3 rounded-lg border border-border bg-muted/20"
+                            // ── Refined: py-2.5 px-3 (was py-3 px-3) ──
+                            className="flex items-center gap-3 py-2.5 px-3 rounded-lg border border-border bg-muted/20"
                           >
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-foreground truncate">{c.name}</p>
+                              <p className="font-medium text-sm text-foreground truncate">{c.name}</p>
                               {c.subject && (
                                 <p className="text-xs text-muted-foreground truncate">{c.subject}</p>
                               )}
@@ -793,11 +801,11 @@ export default function ClassroomsPage() {
                                 {formatTimeRemaining(c.deletedAt)}
                               </p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1.5 shrink-0">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 text-xs gap-1.5"
+                                className="h-7 text-xs gap-1"
                                 disabled={isBusy}
                                 onClick={() => trashRestoreMutation.mutate(c.id)}
                               >
@@ -814,10 +822,7 @@ export default function ClassroomsPage() {
                                 disabled={isBusy}
                                 onClick={() => setPermanentDeleteId(c.id)}
                               >
-                                {isPermanentDeleting
-                                  ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                  : null
-                                }
+                                {isPermanentDeleting && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                                 Delete permanently
                               </Button>
                             </div>
@@ -996,7 +1001,6 @@ export default function ClassroomsPage() {
               />
             </div>
 
-            {/* Folder selector when creating from "Ungrouped" */}
             {newClassroomFolderId === null && folders.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-1">Grade Folder <span className="text-muted-foreground font-normal">(optional)</span></p>
@@ -1011,7 +1015,6 @@ export default function ClassroomsPage() {
               </div>
             )}
 
-            {/* Student enrollment */}
             <div>
               <p className="text-sm font-medium mb-1 flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5 text-muted-foreground" />
