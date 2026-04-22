@@ -53,7 +53,16 @@ export default function MessagesPage() {
   });
 
   useEffect(() => {
-    if (conversations.length > 0 && !selected) {
+    if (conversations.length === 0) return;
+    if (!selected) {
+      const first = conversations.find((c) => c.teacherUserId !== 0) ?? null;
+      setSelected(first);
+      return;
+    }
+    const stillExists = conversations.some(
+      (c) => c.studentId === selected.studentId && c.teacherUserId === selected.teacherUserId,
+    );
+    if (!stillExists) {
       const first = conversations.find((c) => c.teacherUserId !== 0) ?? null;
       setSelected(first);
     }
