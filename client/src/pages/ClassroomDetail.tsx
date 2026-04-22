@@ -181,9 +181,9 @@ export default function ClassroomDetail() {
   const isArchived = classroom.status === "archived";
   const theme = getSubjectTheme(classroom.subject || "");
 
-  const validTeacherTabs = ["feed", "assignments", "grades", "classwork", "students", "settings"];
-  const validStudentTabs = ["feed", "assignments", "grades", "classwork"];
-  const validParentTabs = ["feed", "grades", "classwork"];
+  const validTeacherTabs = ["feed", "classwork", "assignments", "grades", "students", "settings"];
+  const validStudentTabs = ["feed", "classwork", "assignments", "grades"];
+  const validParentTabs = ["feed", "classwork", "grades"];
   const validTabs = isTeacher ? validTeacherTabs : isStudent ? validStudentTabs : validParentTabs;
 
   if (!validTabs.includes(activeTab) || (activeTab === "students" && !isTeacher) || (activeTab === "settings" && !isTeacher)) {
@@ -243,22 +243,22 @@ export default function ClassroomDetail() {
   const teacherToGrade = _teacherStats[classroomId]?.toGradeCount ?? 0;
   const teacherTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" /> },
+    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
     { value: "assignments", label: "Assignments & Test", icon: <BookOpen className="h-3.5 w-3.5" />, badge: teacherToGrade || undefined },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
-    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
     { value: "students", label: "Students", icon: <Users className="h-3.5 w-3.5" /> },
     { value: "settings", label: "Settings", icon: <Settings2 className="h-3.5 w-3.5" /> },
   ];
   const studentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
+    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
     { value: "assignments", label: "Assignments & Test", icon: <BookOpen className="h-3.5 w-3.5" />, badge: assignmentsBadge || undefined },
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
-    { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
   ];
   const parentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
-    { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" />, badge: classworkBadge || undefined },
+    { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
   ];
 
   const tabs = isTeacher ? teacherTabs : isStudent ? studentTabs : parentTabs;
