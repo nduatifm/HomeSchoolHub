@@ -431,13 +431,7 @@ export default function FolderDetailPage() {
             <div className="flex items-center gap-2 min-w-0">
               <Folder className="h-4 w-4 text-primary shrink-0" />
               <Breadcrumb crumbs={[
-                ...(isParent
-                  ? [
-                      { label: "My Children", href: "/children", current: false },
-                      { label: "Classrooms", href: "/classrooms", current: false },
-                    ]
-                  : [{ label: "Classrooms", href: "/classrooms", current: false }]
-                ),
+                { label: "Classrooms", href: "/classrooms", current: false },
                 { label: folder?.name ?? "…" },
               ]} />
             </div>

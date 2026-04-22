@@ -68,26 +68,24 @@ export default function Breadcrumb({ crumbs, className = "" }: BreadcrumbProps) 
 }
 
 /**
- * Builds a role-aware classroom breadcrumb trail.
+ * Builds a classroom breadcrumb trail (all roles use the same shape).
  *
  * Trail shapes:
- *  Teacher / Student (no folder):  Classrooms → Room → [Tab] → [extra]
- *  Teacher / Student (in folder):  Classrooms → Folder → Room → [Tab] → [extra]
- *  Parent (no folder):             My Children → Classrooms → Room → [Tab] → [extra]
- *  Parent (in folder):             My Children → Classrooms → Folder → Room → [Tab] → [extra]
+ *  No folder:  Classrooms → Room → [Tab] → [extra]
+ *  In folder:  Classrooms → Folder → Room → [Tab] → [extra]
  *
  * Notes:
- *  - `search` (e.g. "?studentId=14") is applied to the classroom crumb and the
- *    folder crumb (for parents) so the parent's child-context survives navigation.
- *  - The folder crumb is only emitted when both `folderName` and `folderHref` are
- *    provided — callers are responsible for computing the href (including ?studentId).
- *  - Intermediate crumbs carry explicit `current: false` so they always render as
- *    links regardless of position.
- *  - The tab crumb carries no explicit `current`; position (isLast) decides. Pages
- *    that chain .concat() automatically get a clickable tab crumb rather than a span.
+ *  - `folderName`/`folderHref` are optional; when both are provided a folder
+ *    crumb is inserted between "Classrooms" and the classroom name.
+ *  - `search` (e.g. "?studentId=14") is threaded into the classroom crumb so
+ *    parent child-context survives navigating back to the classroom root.
+ *  - Intermediate crumbs carry explicit `current: false` so they always render
+ *    as links regardless of position.
+ *  - The tab crumb carries no explicit `current`; position (isLast) decides.
+ *    Pages that chain .concat() automatically get a clickable tab crumb.
  */
 export function buildClassroomCrumbs({
-  role,
+  role: _role,
   classroomName,
   classroomHref,
   tabLabel,
@@ -105,15 +103,9 @@ export function buildClassroomCrumbs({
   folderName?: string;
   folderHref?: string;
 }): BreadcrumbCrumb[] {
-  const isParent = role === "parent";
   const crumbs: BreadcrumbCrumb[] = [];
 
-  if (isParent) {
-    crumbs.push({ label: "My Children", href: "/children", current: false });
-    crumbs.push({ label: "Classrooms", href: "/classrooms", current: false });
-  } else {
-    crumbs.push({ label: "Classrooms", href: "/classrooms", current: false });
-  }
+  crumbs.push({ label: "Classrooms", href: "/classrooms", current: false });
 
   // Optional folder crumb — inserted between "Classrooms" and the classroom name.
   // callers supply folderHref already including any ?studentId param for parents.
