@@ -4,12 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
+import { Info } from "lucide-react";
 import type { EnrichedTutorRequest } from "@shared/schema";
 
 export default function TutorRequestsPage() {
   const { data: tutorRequests = [] } = useQuery<EnrichedTutorRequest[]>({
     queryKey: ["/api/tutor-requests/teacher"],
   });
+
+  const { data: tutorRequestModeSetting } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/system-settings/tutor-request-mode"],
+  });
+  const tutorRequestMode = tutorRequestModeSetting?.enabled ?? false;
 
   const approveTutorRequestMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
@@ -26,6 +32,15 @@ export default function TutorRequestsPage() {
       <div className="md:ml-[228px]">
         <main className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto">
           <h1 className="text-xl font-semibold text-foreground mb-5">Tutor Requests</h1>
+
+          {!tutorRequestMode && (
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
+              <span>
+                Tutor request approval is currently <strong>off</strong> — students are assigned automatically when they sign up. The list below shows historical assignments.
+              </span>
+            </div>
+          )}
 
           <div className="space-y-4">
             {tutorRequests.length === 0 ? (
@@ -63,7 +78,7 @@ export default function TutorRequestsPage() {
                           {r.status}
                         </Badge>
                       </div>
-                      {r.status === "pending" && (
+                      {r.status === "pending" && tutorRequestMode && (
                         <div className="flex gap-2 shrink-0">
                           <Button
                             size="sm"

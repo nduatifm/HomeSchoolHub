@@ -181,6 +181,11 @@ export default function ClassroomDetail() {
   const isArchived = classroom.status === "archived";
   const theme = getSubjectTheme(classroom.subject || "");
 
+  if (activeTab === "students" && !isTeacher) {
+    navigate(`/classrooms/${slugParam}/feed${window.location.search}`);
+    return null;
+  }
+
   // Merge server-seen + optimistic local-seen into unified Sets
   const seenPostIds = new Set<number>(_seenData?.postIds ?? []);
   localSeenPosts.forEach((id) => seenPostIds.add(id));

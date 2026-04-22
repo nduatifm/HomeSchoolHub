@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import type { Student, EnrichedTutorRequest, User } from "@shared/schema";
@@ -133,6 +133,10 @@ export default function ParentTutorsPage() {
   const { data: students = [] } = useQuery<Student[]>({ queryKey: ["/api/students/parent"] });
   const { data: teachers = [] } = useQuery<PublicTeacher[]>({ queryKey: ["/api/teachers"] });
   const { data: tutorRequests = [] } = useQuery<EnrichedTutorRequest[]>({ queryKey: ["/api/tutor-requests/parent"] });
+  const { data: tutorRequestModeSetting } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/system-settings/tutor-request-mode"],
+  });
+  const tutorRequestMode = tutorRequestModeSetting?.enabled ?? false;
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,15 +147,29 @@ export default function ParentTutorsPage() {
             <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-primary" /> Find a Tutor
             </h1>
-            <Button onClick={() => setRequestTutorOpen(true)} data-testid="button-request-tutor">
-              Request Tutor
-            </Button>
+            {tutorRequestMode && (
+              <Button onClick={() => setRequestTutorOpen(true)} data-testid="button-request-tutor">
+                Request Tutor
+              </Button>
+            )}
           </div>
+
+          {!tutorRequestMode && (
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
+              <span>
+                Tutor requests are currently <strong>off</strong>. Teachers are automatically assigned when your child registers with an invite code.
+                {tutorRequests.length > 0 ? " Your current assignments are listed below." : ""}
+              </span>
+            </div>
+          )}
 
           <div className="space-y-4">
             {tutorRequests.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10 rounded-2xl border border-dashed border-border">
-                No tutor requests yet. Click "Request Tutor" to get started.
+                {tutorRequestMode
+                  ? "No tutor requests yet. Click \"Request Tutor\" to get started."
+                  : "No teacher assignments yet. Teachers are assigned automatically when your child signs up."}
               </p>
             ) : (
               tutorRequests.map((r: any) => (

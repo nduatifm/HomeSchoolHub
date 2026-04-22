@@ -22,11 +22,12 @@ import { GraduationCap, MessageSquare, School } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
-import type { Student, User, Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
+import type { Student, User, Classroom, ClassroomAssignment, ClassroomSubmission, Assignment, StudentAssignment } from "@shared/schema";
 
 type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
 type AssignedTeacherRef = { id: number; name: string; email: string } | null;
 type ChildStat = Student & { pct: number | null; completed: number; total: number; classroomCount: number };
+type AssignmentWithStatus = Assignment & { studentAssignment: StudentAssignment | null };
 
 export default function ParentChildrenPage() {
   const { user } = useAuth();
@@ -77,6 +78,14 @@ export default function ParentChildrenPage() {
     })),
   });
 
+  const childLegacyAssignmentQueries = useQueries({
+    queries: students.map((child) => ({
+      queryKey: ["/api/assignments/student", child.id],
+      queryFn: () => apiRequest(`/api/assignments/student/${child.id}`),
+      enabled: students.length > 0,
+    })),
+  });
+
   const childStats: ChildStat[] = students.map((child, ci) => {
     let offset = 0;
     for (let j = 0; j < ci; j++) {
@@ -94,8 +103,12 @@ export default function ParentChildrenPage() {
       return sum + assigns.length;
     }, 0);
 
-    const total = classworkTotal;
-    const completed = classworkCompleted;
+    const legacyAssignments = (childLegacyAssignmentQueries[ci]?.data as AssignmentWithStatus[]) ?? [];
+    const legacyTotal = legacyAssignments.length;
+    const legacyCompleted = legacyAssignments.filter(a => a.studentAssignment?.status === "graded").length;
+
+    const total = classworkTotal + legacyTotal;
+    const completed = classworkCompleted + legacyCompleted;
     const pct = total > 0 ? Math.round((completed / total) * 100) : null;
     return { ...child, pct, completed, total, classroomCount };
   });
