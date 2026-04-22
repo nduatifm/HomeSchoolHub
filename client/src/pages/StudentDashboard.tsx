@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
-import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
@@ -44,19 +43,7 @@ type ClassworkItem = {
   status: "pending" | "submitted" | "graded" | "late";
 };
 
-function formatPreviewTime(ts: string): string {
-  const date = new Date(ts);
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-const STUDENT_TABS = ["classrooms", "grades", "feedback", "messages"];
+const STUDENT_TABS = ["classrooms", "grades", "feedback"];
 
 export default function StudentDashboard() {
   const { user, student, logout } = useAuth();
@@ -81,25 +68,6 @@ export default function StudentDashboard() {
     queryKey: ["/api/teachers/student", student?.id],
     enabled: !!student,
   });
-  type ConversationSummary = {
-    studentId: number;
-    teacherUserId: number;
-    studentName: string;
-    teacherName: string;
-    parentName: string | null;
-    lastMessage: string | null;
-    lastMessageTimestamp: string | null;
-    unreadCount: number;
-    customName: string | null;
-  };
-
-  const { data: conversationSummaries = [] } = useQuery<ConversationSummary[]>({
-    queryKey: ["/api/messages/conversations"],
-    enabled: !!student,
-    staleTime: 30000,
-  });
-  const teacherSummary = conversationSummaries[0] ?? null;
-
   const { data: feedback = [] } = useQuery({
     queryKey: ["/api/feedback/student", student?.id],
     enabled: !!student,
@@ -520,75 +488,6 @@ export default function StudentDashboard() {
               </div>
             );
           })()}
-
-          {activeTab === "messages" && (
-            <div className="overflow-hidden bg-background flex flex-col h-[calc(100vh-140px)]">
-              <div className="flex flex-col md:flex-row flex-1 h-full">
-                {/* Left conversation sidebar */}
-                <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border/40 flex flex-col shrink-0 max-h-48 md:max-h-none">
-                  <div className="px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversations</p>
-                  </div>
-                  <div className="flex-1 overflow-y-auto">
-                    {!assignedTeacher ? (
-                      <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center gap-2">
-                        <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
-                        <p className="text-xs text-muted-foreground">No teacher assigned yet</p>
-                      </div>
-                    ) : (
-                      <button
-                        className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
-                        style={{ background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" }}
-                      >
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-primary">
-                            {assignedTeacher.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-0.5">
-                            <p className="text-sm font-medium truncate text-foreground">
-                              {teacherSummary?.customName ?? assignedTeacher.name}
-                            </p>
-                            {teacherSummary?.lastMessageTimestamp && (
-                              <span className="text-[11px] text-muted-foreground shrink-0">
-                                {formatPreviewTime(teacherSummary.lastMessageTimestamp)}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {teacherSummary?.lastMessage
-                              ? teacherSummary.lastMessage.length > 42
-                                ? teacherSummary.lastMessage.slice(0, 42) + "…"
-                                : teacherSummary.lastMessage
-                              : "No messages yet"}
-                          </p>
-                        </div>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right thread panel */}
-                <div className="flex-1 min-w-0 flex flex-col min-h-[360px] md:min-h-0">
-                  {assignedTeacher ? (
-                    <MessageThread
-                      teacherId={assignedTeacher.id}
-                      studentId={student!.id}
-                      myUserId={user!.id}
-                      title={`Thread: ${assignedTeacher.name}`}
-                      customName={teacherSummary?.customName ?? null}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-                      <MessageSquare className="w-10 h-10 opacity-20" />
-                      <p className="text-sm">Your teacher thread will appear here once assigned</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Submit assignment dialog */}
           <Dialog open={submitDialogAssignmentId !== null} onOpenChange={(open) => { if (!open) setSubmitDialogAssignmentId(null); }}>

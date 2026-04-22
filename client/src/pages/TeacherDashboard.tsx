@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -113,25 +112,13 @@ type StudentSubmissionWithRelations = StudentAssignment & {
   assignment?: { id: number; title: string; subject: string; fileUrl?: string | null };
 };
 
-function formatPreviewTime(ts: string): string {
-  const date = new Date(ts);
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
 const feedbackSchema = z.object({
   studentId: z.number().min(1, "Student required"),
   message: z.string().min(1, "Message required"),
   type: z.string().min(1, "Type required"),
 });
 
-const TEACHER_TABS = ["classrooms", "students", "requests", "feedback", "messages"];
+const TEACHER_TABS = ["classrooms", "students", "requests", "feedback"];
 
 function TeacherClassroomsTab() {
   const { toast } = useToast();
@@ -555,23 +542,6 @@ export default function TeacherDashboard() {
     queryKey: ["/api/students/teacher"],
   });
 
-  type ConversationSummary = {
-    studentId: number;
-    teacherUserId: number;
-    studentName: string;
-    teacherName: string;
-    parentName: string | null;
-    lastMessage: string | null;
-    lastMessageTimestamp: string | null;
-    unreadCount: number;
-    customName: string | null;
-  };
-
-  const { data: conversationSummaries = [] } = useQuery<ConversationSummary[]>({
-    queryKey: ["/api/messages/conversations"],
-    staleTime: 30000,
-  });
-
   const { data: tutorRequests = [] } = useQuery<EnrichedTutorRequest[]>({
     queryKey: ["/api/tutor-requests/teacher"],
   });
@@ -614,15 +584,6 @@ export default function TeacherDashboard() {
     },
   });
 
-
-  // Messages tab — selected student for thread view (auto-select first on load)
-  const [selectedStudentForMessages, setSelectedStudentForMessages] = useState<StudentWithParent | null>(null);
-
-  useEffect(() => {
-    if (students.length > 0 && !selectedStudentForMessages) {
-      setSelectedStudentForMessages(students[0]);
-    }
-  }, [students]);
 
   // Send message — state lives in TeacherSendMessageDialog; parent only tracks receiver for pre-fill
   const [sendMessageReceiverId, setSendMessageReceiverId] = useState(0);
@@ -972,85 +933,6 @@ export default function TeacherDashboard() {
               <TeacherClassroomsTab />
             </TabsContent>
 
-            <TabsContent value="messages" className="flex flex-col h-[calc(100vh-140px)]">
-              <div className="overflow-hidden bg-background flex flex-col flex-1">
-                <div className="flex flex-col md:flex-row flex-1 h-full">
-                  {/* Left conversation sidebar */}
-                  <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border/40 flex flex-col shrink-0 max-h-60 md:max-h-none">
-                    <div className="px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversations</p>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                      {students.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center gap-2">
-                          <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
-                          <p className="text-xs text-muted-foreground">No students assigned yet</p>
-                        </div>
-                      ) : (
-                        students.map((s) => {
-                          const isActive = selectedStudentForMessages?.id === s.id;
-                          const summary = conversationSummaries.find((c) => c.studentId === s.id) ?? null;
-                          return (
-                            <button
-                              key={s.id}
-                              onClick={() => setSelectedStudentForMessages(s)}
-                              className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
-                              style={isActive ? { background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" } : { paddingLeft: "13px" }}
-                              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "hsl(var(--muted))"; }}
-                              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = ""; }}
-                            >
-                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-primary">
-                                  {s.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2 mb-0.5">
-                                  <p className="text-sm font-medium truncate text-foreground">{summary?.customName ?? s.name}</p>
-                                  {summary?.lastMessageTimestamp && (
-                                    <span className="text-[11px] text-muted-foreground shrink-0">
-                                      {formatPreviewTime(summary.lastMessageTimestamp)}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {summary?.lastMessage
-                                    ? summary.lastMessage.length > 42 ? summary.lastMessage.slice(0, 42) + "…" : summary.lastMessage
-                                    : "No messages yet"}
-                                </p>
-                                {(summary?.parentName ?? s.parentName) && (
-                                  <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                                    Parent: {summary?.parentName ?? s.parentName}
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right thread panel */}
-                  <div className="flex-1 min-w-0 flex flex-col min-h-[360px] md:min-h-0">
-                    {selectedStudentForMessages ? (
-                      <MessageThread
-                        teacherId={user!.id}
-                        studentId={selectedStudentForMessages.id}
-                        myUserId={user!.id}
-                        title={`Thread: ${selectedStudentForMessages.name}${selectedStudentForMessages.parentName ? ` & ${selectedStudentForMessages.parentName}` : ""}`}
-                        customName={conversationSummaries.find((c) => c.studentId === selectedStudentForMessages.id)?.customName ?? null}
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-                        <MessageSquare className="w-10 h-10 opacity-20" />
-                        <p className="text-sm">Select a student to view the thread</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
           </Tabs>
         </main>
       </div>

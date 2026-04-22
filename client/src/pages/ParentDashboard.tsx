@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import MessageThread from "@/components/MessageThread";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -93,18 +92,6 @@ type ChildStat = Student & {
   total: number;
 };
 
-function formatPreviewTime(ts: string): string {
-  const date = new Date(ts);
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
 const paymentSchema = z.object({
   teacherId: z.number().min(1, "Teacher required"),
   amount: z.number().min(0.01, "Amount must be greater than 0"),
@@ -121,7 +108,7 @@ const ratingSchema = z.object({
   comment: z.string(),
 });
 
-const PARENT_TABS = ["children", "classrooms", "tutors", "invites", "reports", "messages"];
+const PARENT_TABS = ["children", "classrooms", "tutors", "invites", "reports"];
 
 function ParentRequestTutorDialog({
   open,
@@ -282,14 +269,6 @@ export default function ParentDashboard() {
   const [requestTutorOpen, setRequestTutorOpen] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
-  const [selectedChildForMessages, setSelectedChildForMessages] = useState<Student | null>(null);
-
-  useEffect(() => {
-    if (students.length > 0 && !selectedChildForMessages) {
-      setSelectedChildForMessages(students[0]);
-    }
-  }, [students]);
-
   const [rateTutorOpen, setRateTutorOpen] = useState(false);
   const { data: invites = [] } = useQuery<StudentInvite[]>({
     queryKey: ["/api/invites/student/parent"],
@@ -368,23 +347,6 @@ export default function ParentDashboard() {
       queryFn: () => apiRequest(`/api/classrooms/${classroom.id}/assignments`),
       enabled: childClassroomPairs.length > 0,
     })),
-  });
-
-  type ConversationSummary = {
-    studentId: number;
-    teacherUserId: number;
-    studentName: string;
-    teacherName: string;
-    parentName: string | null;
-    lastMessage: string | null;
-    lastMessageTimestamp: string | null;
-    unreadCount: number;
-    customName: string | null;
-  };
-
-  const { data: conversationSummaries = [] } = useQuery<ConversationSummary[]>({
-    queryKey: ["/api/messages/conversations"],
-    staleTime: 30000,
   });
 
   const childStats: (ChildStat & { classroomCount: number })[] = students.map((child, ci) => {
@@ -1037,103 +999,6 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="messages" className="flex flex-col h-[calc(100vh-140px)]">
-              <div className="overflow-hidden bg-background flex flex-col flex-1">
-                <div className="flex flex-col md:flex-row flex-1 h-full">
-                  {/* Left conversation sidebar */}
-                  <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-border/40 flex flex-col shrink-0 max-h-60 md:max-h-none">
-                    <div className="px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversations</p>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                      {students.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full px-4 py-8 text-center gap-2">
-                          <MessageSquare className="w-7 h-7 text-muted-foreground/30" />
-                          <p className="text-xs text-muted-foreground">No children registered yet</p>
-                        </div>
-                      ) : (
-                        students.map((child) => {
-                          const isActive = selectedChildForMessages?.id === child.id;
-                          const summary = conversationSummaries.find((c) => c.studentId === child.id) ?? null;
-                          return (
-                            <button
-                              key={child.id}
-                              onClick={() => setSelectedChildForMessages(child)}
-                              className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors"
-                              style={isActive ? { background: "hsl(var(--primary) / 0.1)", borderLeft: "3px solid hsl(var(--primary))" } : { paddingLeft: "13px" }}
-                              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "hsl(var(--muted))"; }}
-                              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = ""; }}
-                            >
-                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-primary">
-                                  {child.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2 mb-0.5">
-                                  <p className="text-sm font-medium truncate text-foreground">{summary?.customName ?? child.name}</p>
-                                  {summary?.lastMessageTimestamp && (
-                                    <span className="text-[11px] text-muted-foreground shrink-0">
-                                      {formatPreviewTime(summary.lastMessageTimestamp)}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {summary?.lastMessage
-                                    ? summary.lastMessage.length > 42 ? summary.lastMessage.slice(0, 42) + "…" : summary.lastMessage
-                                    : "No messages yet"}
-                                </p>
-                                {summary?.teacherName && (
-                                  <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                                    Teacher: {summary.teacherUserId === user?.id ? "You (as teacher)" : summary.teacherName}
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right thread panel */}
-                  <div className="flex-1 min-w-0 flex flex-col min-h-[360px] md:min-h-0">
-                    {(() => {
-                      if (!selectedChildForMessages) {
-                        return (
-                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-                            <MessageSquare className="w-10 h-10 opacity-20" />
-                            <p className="text-sm">Select a child to view their thread</p>
-                          </div>
-                        );
-                      }
-                      const selectedIndex = students.findIndex((s) => s.id === selectedChildForMessages.id);
-                      const selectedTeacher = selectedIndex >= 0
-                        ? (childTeacherQueries[selectedIndex]?.data ?? null) as AssignedTeacherRef
-                        : null;
-                      if (!selectedTeacher) {
-                        return (
-                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-                            <MessageSquare className="w-10 h-10 opacity-20" />
-                            <p className="text-sm">No teacher assigned to {selectedChildForMessages.name} yet</p>
-                          </div>
-                        );
-                      }
-                      const teacherLabel = selectedTeacher.id === user!.id ? "You (as teacher)" : selectedTeacher.name;
-                      return (
-                        <MessageThread
-                          teacherId={selectedTeacher.id}
-                          studentId={selectedChildForMessages.id}
-                          myUserId={user!.id}
-                          title={`Thread: ${selectedChildForMessages.name} & ${teacherLabel}`}
-                          customName={conversationSummaries.find((c) => c.studentId === selectedChildForMessages.id)?.customName ?? null}
-                        />
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
           </Tabs>
         </main>
       </div>

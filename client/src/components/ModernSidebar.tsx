@@ -103,7 +103,7 @@ export default function ModernSidebar() {
     { icon: <User className="w-4 h-4" />, label: "Students", hash: "students" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Tutor Requests", hash: "requests" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
-    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
+    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", href: "/messages", badge: unreadCount },
   ];
 
   const parentItems: SidebarItem[] = [
@@ -112,14 +112,14 @@ export default function ModernSidebar() {
     { icon: <GraduationCap className="w-4 h-4" />, label: "Find a Tutor", hash: "tutors" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Invite Student", hash: "invites" },
     { icon: <FileText className="w-4 h-4" />, label: "Progress Reports", hash: "reports" },
-    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
+    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", href: "/messages", badge: unreadCount },
   ];
 
   const studentItems: SidebarItem[] = [
     { icon: <School className="w-4 h-4" />, label: "Classrooms", hash: "classrooms", badge: classroomBadge, badgeCap: 9 },
     { icon: <BarChart2 className="w-4 h-4" />, label: "Grades", hash: "grades" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", hash: "feedback" },
-    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", badge: unreadCount },
+    { icon: <Send className="w-4 h-4" />, label: "Messages", hash: "messages", href: "/messages", badge: unreadCount },
   ];
 
   const getItems = () => {

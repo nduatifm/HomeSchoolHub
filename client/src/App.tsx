@@ -26,6 +26,7 @@ import NotificationsPage from "./pages/Notifications";
 import FormBuilderPage from "./pages/FormBuilderPage";
 import ClassroomsPage from "./pages/ClassroomsPage";
 import FolderDetailPage from "./pages/FolderDetailPage";
+import MessagesPage from "./pages/MessagesPage";
 
 function RouteTracker() {
   const [location] = useLocation();
@@ -188,6 +189,9 @@ function AppRoutes() {
         </Route>
         <Route path="/classrooms">
           <TeacherRoute component={ClassroomsPage} />
+        </Route>
+        <Route path="/messages">
+          <ProtectedRoute component={MessagesPage} />
         </Route>
         <Route path="/dashboard/:tab">
           <DashboardRouter />
