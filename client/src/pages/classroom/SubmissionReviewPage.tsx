@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronLeft, Paperclip, ExternalLink, Zap } from "lucide-react";
+import { Loader2, Paperclip, ExternalLink, Zap } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
+import Breadcrumb from "@/components/Breadcrumb";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 import FormResponse from "@/components/FormResponse";
@@ -75,13 +76,13 @@ export default function SubmissionReviewPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classroom-notifications/total"] });
       toast({ title: "Grade saved", type: "success" });
-      navigate(`/classrooms/${classroomSlug}?tab=assignments`);
+      navigate(`/classrooms/${classroomSlug}/assignments`);
     },
     onError: () => toast({ title: "Couldn't save the grade — try again.", type: "error" }),
   });
 
   const assignment = submission?.assignment;
-  const backUrl = `/classrooms/${classroomSlug}?tab=assignments`;
+  const backUrl = `/classrooms/${classroomSlug}/assignments`;
   const goBack = useGoBack(backUrl);
   const isLoading = classroomLoading || submissionLoading;
 
@@ -117,15 +118,13 @@ export default function SubmissionReviewPage() {
       <ModernSidebar />
       <div className="md:ml-[228px]">
         <div className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-5">
-          {/* Breadcrumb */}
-          <div>
-            <button
-              onClick={goBack}
-              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />Back to {classroom.name}
-            </button>
-          </div>
+          {/* Breadcrumbs */}
+          <Breadcrumb crumbs={[
+            { label: "Classrooms", href: "/classrooms" },
+            { label: classroom.name, href: `/classrooms/${classroomSlug}/feed` },
+            { label: "Assignments & Tests", href: `/classrooms/${classroomSlug}/assignments` },
+            { label: `${submission.studentName}'s Submission`, current: true },
+          ]} />
 
           {/* Header */}
           <div className="space-y-1">

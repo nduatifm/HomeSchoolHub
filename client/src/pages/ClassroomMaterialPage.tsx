@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
 import {
   Loader2,
   ChevronLeft,
@@ -113,7 +114,7 @@ function TeacherEditor({
   isEdit: boolean;
 }) {
   const [, navigate] = useLocation();
-  const goBack = useGoBack(`/classrooms/${classroomSlug}?tab=classwork`);
+  const goBack = useGoBack(`/classrooms/${classroomSlug}/classwork`);
   const [title, setTitle] = useState(initial?.title ?? "");
   const [assignmentId, setAssignmentId] = useState(
     initial?.assignmentId ? String(initial.assignmentId) : "",
@@ -338,7 +339,7 @@ function TeacherEditor({
         });
       }
       toast({ title: isEdit ? "Classwork updated" : "Classwork created", type: "success" });
-      navigate(`/classrooms/${classroomSlug}?tab=classwork`);
+      navigate(`/classrooms/${classroomSlug}/classwork`);
     },
     onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
   });
@@ -551,7 +552,15 @@ function TeacherEditor({
 
         {/* Writing canvas */}
         <main className="flex-1 flex justify-center">
-          <div className="w-full max-w-[680px] px-5 sm:px-8 pt-16 pb-40">
+          <div className="w-full max-w-[680px] px-5 sm:px-8 pt-10 pb-40">
+
+            {/* Breadcrumbs */}
+            <Breadcrumb crumbs={[
+              { label: "Classrooms", href: "/classrooms" },
+              { label: classroom.name, href: `/classrooms/${classroomSlug}/feed` },
+              { label: "Classwork", href: `/classrooms/${classroomSlug}/classwork` },
+              { label: isEdit ? (initial?.title ?? "Edit Material") : "New Material", current: true },
+            ]} className="mb-8" />
 
             {/* Title */}
             <input
@@ -822,8 +831,8 @@ function ReadView({
   const sp = new URLSearchParams(window.location.search);
   const parentStudentId = sp.get("studentId") ?? "";
 
-  const backHref = `/classrooms/${classroomSlug}?tab=classwork${
-    isParent && parentStudentId ? `&studentId=${parentStudentId}` : ""
+  const backHref = `/classrooms/${classroomSlug}/classwork${
+    isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""
   }`;
   const goBack = useGoBack(backHref);
 
@@ -853,14 +862,14 @@ function ReadView({
       <div className="flex-1 md:ml-[228px] overflow-auto">
         <div className="max-w-3xl mx-auto px-4 sm:px-8 pt-20 pb-20 md:pt-10">
 
-          <button
-            type="button"
-            onClick={goBack}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Back to {classroom.name}
-          </button>
+          <Breadcrumb crumbs={buildClassroomCrumbs({
+            role: isParent ? "parent" : isTeacher ? "teacher" : "student",
+            classroomName: classroom.name,
+            classroomHref: `/classrooms/${classroomSlug}/feed`,
+            tabLabel: "Classwork",
+            tabHref: backHref,
+            search: isParent && parentStudentId ? `?studentId=${parentStudentId}` : "",
+          }).concat({ label: material.title, current: true })} className="mb-8" />
 
           <div className="mb-8 pb-6 border-b border-border">
             <h1 className="text-3xl font-bold text-foreground leading-tight mb-3">
@@ -976,7 +985,7 @@ export default function ClassroomMaterialPage() {
 
   const classroomSlug =
     (matchNew ? paramsNew?.slug : matchEdit ? paramsEdit?.slug : paramsMaterial?.slug) ?? "";
-  const goBack = useGoBack(`/classrooms/${classroomSlug}?tab=classwork`);
+  const goBack = useGoBack(`/classrooms/${classroomSlug}/classwork`);
   const materialSlug = matchEdit
     ? (paramsEdit?.materialSlug ?? "")
     : matchMaterial

@@ -13,11 +13,11 @@ import {
   BarChart2,
   Megaphone,
   Loader2,
-  ChevronRight,
   Archive,
   ArchiveRestore,
 } from "lucide-react";
-import ModernSidebar, { ROLE_HOME_CRUMBS } from "@/components/ModernSidebar";
+import ModernSidebar from "@/components/ModernSidebar";
+import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
 import { getSubjectTheme } from "@/lib/subjectTheme";
 import type {
   Classroom,
@@ -270,42 +270,20 @@ export default function ClassroomDetail() {
           {(() => {
             const tabLabels: Record<string, string> = {
               feed: "Feed",
-              assignments: "Assignments & Test",
+              assignments: "Assignments & Tests",
               grades: "Grades",
               classwork: "Classwork",
               students: "Students",
             };
-            const tabLabel = tabLabels[activeTab] ?? activeTab;
-            const crumbClass = "text-muted-foreground hover:text-foreground transition-colors shrink-0";
-            const sep = <ChevronRight className="h-3 w-3 text-muted-foreground/50 shrink-0" aria-hidden="true" />;
-            const homeCrumb = ROLE_HOME_CRUMBS[user?.role ?? ""] ?? ROLE_HOME_CRUMBS.student;
-            const homeIsClassrooms = homeCrumb.href === "/classrooms";
             return (
-              <nav aria-label="Breadcrumb" className="flex items-center gap-1 flex-wrap text-sm min-w-0">
-                <Link href={homeCrumb.href} className={crumbClass}>{homeCrumb.label}</Link>
-                {!homeIsClassrooms && (
-                  <>
-                    {sep}
-                    <Link href="/classrooms" className={crumbClass}>Classrooms</Link>
-                  </>
-                )}
-                {sep}
-                <Link
-                  href={`/classrooms/${slugParam}/feed${window.location.search}`}
-                  className={`${crumbClass} truncate max-w-[140px] sm:max-w-[240px]`}
-                  title={classroom.name}
-                >
-                  {classroom.name}
-                </Link>
-                {sep}
-                <Link
-                  href={`/classrooms/${slugParam}/${activeTab}${window.location.search}`}
-                  aria-current="page"
-                  className="text-foreground font-medium truncate hover:text-foreground"
-                >
-                  {tabLabel}
-                </Link>
-              </nav>
+              <Breadcrumb crumbs={buildClassroomCrumbs({
+                role: user?.role,
+                classroomName: classroom.name,
+                classroomHref: `/classrooms/${slugParam}/feed`,
+                tabLabel: tabLabels[activeTab] ?? activeTab,
+                tabHref: `/classrooms/${slugParam}/${activeTab}${window.location.search}`,
+                search: window.location.search,
+              })} />
             );
           })()}
 

@@ -16,9 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, ChevronLeft, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2, Info } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2, Info } from "lucide-react";
 import DOMPurify from "dompurify";
 import ModernSidebar from "@/components/ModernSidebar";
+import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
 import { toast } from "@/hooks/use-toast";
 import { getAttachmentKind } from "@/lib/classroomUtils";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
@@ -434,7 +435,7 @@ export default function ClassworkDetail() {
 
   const classroomSlug = params?.slug ?? "";
   const classworkSlug = params?.classworkSlug ?? "";
-  const goBack = useGoBack(`/classrooms/${classroomSlug}?tab=assignments`);
+  const goBack = useGoBack(`/classrooms/${classroomSlug}/assignments`);
 
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0");
@@ -503,15 +504,15 @@ export default function ClassworkDetail() {
       <ModernSidebar />
       <div className="md:ml-[228px]">
         <div className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-5">
-          {/* Breadcrumb */}
-          <div className="space-y-1">
-            <button
-              onClick={goBack}
-              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />Back to {classroom.name}
-            </button>
-          </div>
+          {/* Breadcrumbs */}
+          <Breadcrumb crumbs={buildClassroomCrumbs({
+            role: user?.role,
+            classroomName: classroom.name,
+            classroomHref: `/classrooms/${classroomSlug}/feed`,
+            tabLabel: "Assignments & Tests",
+            tabHref: `/classrooms/${classroomSlug}/assignments${window.location.search}`,
+            search: window.location.search,
+          }).concat({ label: assignment.title, current: true })} />
 
           {/* Assignment header */}
           <div className="space-y-1">

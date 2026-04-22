@@ -21,6 +21,7 @@ import {
   Link2,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
+import Breadcrumb from "@/components/Breadcrumb";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, ClassroomAssignment, FormQuestion } from "@shared/schema";
@@ -201,7 +202,7 @@ export default function EditAssignmentPage() {
       localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
       toast({ title: "Assignment updated", type: "success" });
-      navigate(`/classrooms/${classroomSlug}?tab=assignments`);
+      navigate(`/classrooms/${classroomSlug}/assignments`);
     },
     onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
   });
@@ -210,7 +211,7 @@ export default function EditAssignmentPage() {
   const pointsNum = Number(form.points);
   const pointsValid = !!form.points && Number.isInteger(pointsNum) && pointsNum >= 1 && pointsNum <= 10000;
   const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !!assignment && !saveMutation.isPending;
-  const backUrl = `/classrooms/${classroomSlug}?tab=assignments`;
+  const backUrl = `/classrooms/${classroomSlug}/assignments`;
   const goBack = useGoBack(backUrl);
 
   useEffect(() => {
@@ -321,6 +322,12 @@ export default function EditAssignmentPage() {
         {/* ── Page body ── */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-16">
+            <Breadcrumb crumbs={[
+              { label: "Classrooms", href: "/classrooms" },
+              { label: classroom.name, href: `/classrooms/${classroomSlug}/feed` },
+              { label: "Assignments & Tests", href: `/classrooms/${classroomSlug}/assignments` },
+              { label: "Edit Assignment", current: true },
+            ]} className="mb-6" />
 
             {/* Page heading */}
             <div className="mb-7">

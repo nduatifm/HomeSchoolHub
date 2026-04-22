@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import ModernSidebar from "@/components/ModernSidebar";
+import Breadcrumb from "@/components/Breadcrumb";
 import ClassroomCard from "@/components/ClassroomCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,11 +36,9 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
-  ChevronRight,
   Users,
   Check,
   Archive,
-  ArrowLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -60,7 +59,7 @@ export default function FolderDetailPage() {
   const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
   const isParent = user?.roles?.includes("parent") || user?.role === "parent";
   const isStudent = !isTeacher && !isParent;
-  const goBack = useGoBack(isTeacher ? "/classrooms" : "/dashboard");
+  const goBack = useGoBack("/classrooms");
 
   // Teachers and students use own classrooms; parents fetch the child's classrooms
   const { data: ownClassrooms = [], isLoading: ownClassroomsLoading } = useQuery<Classroom[]>({
@@ -428,21 +427,15 @@ export default function FolderDetailPage() {
         {/* Sticky header */}
         <div className="sticky top-14 md:top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
           <div className="flex items-center justify-between px-4 sm:px-6 py-3 max-w-4xl mx-auto">
-            <div className="flex items-center gap-3 min-w-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="shrink-0 h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={goBack}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-2 min-w-0">
-                <Folder className="h-5 w-5 text-primary shrink-0" />
-                <h1 className="text-xl font-semibold text-foreground truncate">
-                  {folder?.name ?? "Loading…"}
-                </h1>
-              </div>
+            <div className="flex items-center gap-2 min-w-0">
+              <Folder className="h-4 w-4 text-primary shrink-0" />
+              <Breadcrumb crumbs={[
+                isParent
+                  ? { label: "My Children", href: "/children" }
+                  : { label: "Classrooms", href: "/classrooms" },
+                ...(isParent ? [{ label: "Classrooms", href: `/classrooms${window.location.search}` }] : []),
+                { label: folder?.name ?? "…", current: true },
+              ]} />
             </div>
             {isTeacher && (
               <div className="flex items-center gap-2 shrink-0">
