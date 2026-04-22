@@ -1,0 +1,29 @@
+identify any gaps, ambiguities, edge cases, or implementation risks before a single line of code is written. Do not suggest new features — only surface problems with what is already planned.
+Stress test across these five dimensions:
+1. Data integrity
+
+What happens to existing gradeable items that were created before the type field exists? Do they get a default type or are they left null? If null, are they excluded from grade calculations silently?
+The plan says saving a policy "appends a new record with today's date." What if a teacher saves two policies on the same day? Which one wins?
+If a classroom has no grading policy, equal weights are applied across types with at least one graded item. What if a new test is added later — does the equal weight recalculate across more types now, and does that change previously displayed grades?
+
+2. Calculation logic
+
+The plan excludes pending types from the overall percentage. But if Tests are worth 50% and are pending, the remaining 50% is split across the other types — does the calculation renormalize to 100% across non-pending types, or does it just sum to 50% and display that as the overall? This needs to be explicit.
+What defines a type as "graded" vs "pending"? Is it enough that one item of that type exists, or does at least one item need a score submitted by the teacher?
+If a student has submitted an assignment but the teacher hasn't graded it yet, does that type show as Pending or is it excluded entirely?
+
+3. Policy versioning
+
+The plan says policy changes only apply to items created on or after the effective date. But what if a teacher creates a test, then changes the policy, then grades that test — which policy applies, the one active at creation or at grading?
+The plan does not define what happens if a teacher deletes a classroom and recreates it — do historical policy records survive?
+
+4. Role visibility
+
+The plan says teachers, students, and parents all see the Grades tab with the same breakdown. Are there any fields in that breakdown a student or parent should not see (e.g. class-wide averages, other students' scores)?
+Parents with multiple children enrolled in the same subject — does each child get a separate grade view or is it combined?
+
+5. UX and edge cases
+
+What does the grade breakdown look like if all types are pending — does the student see a blank Grades tab, a 0%, or a specific empty state?
+The Type dropdown is required on creation. What about items imported or created programmatically — is there a fallback type or does the import fail?
+If a teacher sets weights of 0% for a type (e.g. Quiz = 0%), should items of that type still appear in the breakdown or be hidden entirely?
