@@ -235,7 +235,6 @@ export default function MessageThread({
   const META_TEXT  = "#94a3b8";
   const BORDER     = "#e2e8f0";
   const PAGE_BG    = "#ffffff";
-  const CHAT_BG    = "#f4f6f9";   // light grey for the chat bubble area
 
   return (
     <div
@@ -321,7 +320,7 @@ export default function MessageThread({
       {/* ── Message list ────────────────────────────────────────────────────── */}
       <div
         className="flex-1 overflow-y-auto min-h-0 px-4 py-3"
-        style={{ background: CHAT_BG }}
+        style={{ background: PAGE_BG }}
       >
         {/* Loading skeletons */}
         {isLoading && (
