@@ -219,7 +219,8 @@ export default function TeacherAssignmentsTab({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-xs gap-1.5 h-8"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    title={isExpanded ? "Collapse submissions" : "View submissions"}
                     onClick={() => setExpanded(isExpanded ? null : a.id)}
                   >
                     {isExpanded ? (
@@ -227,7 +228,6 @@ export default function TeacherAssignmentsTab({
                     ) : (
                       <ChevronDown className="h-3.5 w-3.5" />
                     )}
-                    {isExpanded ? "Collapse" : "Submissions"}
                   </Button>
                   <Button
                     variant="ghost"
