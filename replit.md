@@ -100,6 +100,22 @@ Icons are provided by Lucide React. The profile management features a modern tab
 - **Indicators**: "N form questions" pill badge (violet) on assignment cards in teacher and student tabs, and in the assignment header on `ClassworkDetail`.
 - **Backward compatible**: Assignments without `formSchema` behave exactly as before. No `type` field on assignments.
 
+### Weighted Grading System (Task #115)
+- **Four item types**: `ClassroomAssignment.assignmentType` expanded from `["assignment","test"]` to `["assignment","test","quiz","project"]`. Pill colours: Assignment=blue, Test=orange, Quiz=purple, Project=teal.
+- **`GradingPolicy` model**: New Prisma model (migration `20260422124945_add_grading_policy`) — `id`, `classroomId` (FK→Classroom Cascade), `assignmentWeight`, `testWeight`, `quizWeight`, `projectWeight` (all `Int @default(25)`), `effectiveFrom DateTime @default(now())`. The record with the highest `id` is the active policy for a classroom.
+- **Backend routes**:
+  - `GET /api/classrooms/:id/grading-policy` — returns active policy or `null` (member auth)
+  - `POST /api/classrooms/:id/grading-policy` — creates new policy snapshot; validates weights sum = 100 (owner only)
+  - `GET /api/classrooms/:id/grade-breakdown/:studentId` — weighted grade breakdown: computes per-type average, renormalises weights excluding pending/zero types, returns `{ overall, isPartial, pendingTypes, policy, breakdown[] }` (teacher=any enrolled student; student=self; parent=their child only)
+- **Frontend — Grade tabs**:
+  - `TeacherGradesTab`: displays policy summary bar above table; column header pills show all 4 types in distinct colours; Total column shows weighted % (falls back to raw % when no policy).
+  - `StudentGradesTab`: now receives `studentId` prop; replaces green banner with `GradeBreakdownPanel`.
+  - `ParentGradesTab`: replaces green banner with `GradeBreakdownPanel`.
+  - `GradeBreakdownPanel` (new): fetches `/grade-breakdown/:studentId`; shows overall weighted %, per-type bars with effective weight label; pending/zero-weight notes; all-pending neutral empty state.
+- **Frontend — Assignment forms**: `NewAssignmentPage` and `EditAssignmentPage` both replace the 2-option toggle with a 4-option `<Select>` dropdown (placeholder "Select a type"; required before submit). `NewAssignmentPage` starts with no default type selected.
+- **Frontend — Classroom Settings tab** (teacher only): new tab added to `ClassroomDetail`; renders `TeacherSettingsTab` with 4 weight inputs, live sum indicator (green at 100, red otherwise), visual stacked bar, and "Save Policy" button.
+- **Shared types**: `itemTypes`, `ItemType`, `itemTypeLabels`, `GradingPolicy`, `InsertGradingPolicy`, `GradeBreakdown`, `GradeBreakdownItem` exported from `shared/schema.ts`.
+
 ### Slug System
 - **`shared/slugify.ts`**: `slugify(text, id)` generates URL-safe slugs in format `<sanitized-title>-<id>` (e.g. `biology-101-3`). The ID suffix guarantees global uniqueness without any retry loop.
 - **DB fields**: `slug` column added to `User`, `Assignment`, `Material`, `Classroom` (`@unique`), and scoped `@@unique([classroomId, slug])` on `ClassroomAssignment` and `ClassroomMaterial`.

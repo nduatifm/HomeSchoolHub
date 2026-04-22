@@ -441,12 +441,13 @@ model Classroom {
   gradeFolderId Int?
   deletedAt     DateTime?
 
-  teacher     User                  @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
-  gradeFolder GradeFolder?          @relation(fields: [gradeFolderId], references: [id], onDelete: SetNull)
-  enrollments ClassroomEnrollment[]
-  posts       ClassroomPost[]
-  assignments ClassroomAssignment[]
-  materials   ClassroomMaterial[]
+  teacher         User                  @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
+  gradeFolder     GradeFolder?          @relation(fields: [gradeFolderId], references: [id], onDelete: SetNull)
+  enrollments     ClassroomEnrollment[]
+  posts           ClassroomPost[]
+  assignments     ClassroomAssignment[]
+  materials       ClassroomMaterial[]
+  gradingPolicies GradingPolicy[]
 
   @@index([teacherId])
   @@index([slug])
@@ -574,4 +575,20 @@ model Notification {
 
   @@index([userId])
   @@index([isRead])
+}
+
+// ─── Grading Policy ──────────────────────────────────────────────────────────
+
+model GradingPolicy {
+  id               Int      @id @default(autoincrement())
+  classroomId      Int
+  assignmentWeight Int      @default(25)
+  testWeight       Int      @default(25)
+  quizWeight       Int      @default(25)
+  projectWeight    Int      @default(25)
+  effectiveFrom    DateTime @default(now())
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@index([classroomId])
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Loader2,
   ChevronLeft,
@@ -24,7 +25,7 @@ import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb from "@/components/Breadcrumb";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
-import type { Classroom, FormQuestion } from "@shared/schema";
+import type { Classroom, FormQuestion, ItemType } from "@shared/schema";
 
 const typeLabel: Record<string, string> = {
   short: "Short answer",
@@ -58,7 +59,7 @@ export default function NewAssignmentPage() {
   const classroomSlug = params?.slug ?? "";
 
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
-  const [assignmentType, setAssignmentType] = useState<"assignment" | "test">("assignment");
+  const [assignmentType, setAssignmentType] = useState<ItemType | "">("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -170,7 +171,7 @@ export default function NewAssignmentPage() {
   const didSubmit = createMutation.isSuccess;
   const pointsNum = Number(form.points);
   const pointsValid = !!form.points && Number.isInteger(pointsNum) && pointsNum >= 1 && pointsNum <= 10000;
-  const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !createMutation.isPending;
+  const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !!assignmentType && !createMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}/assignments`;
   const goBack = useGoBack(backUrl);
 
@@ -339,19 +340,18 @@ export default function NewAssignmentPage() {
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-4 lg:hidden">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Type</Label>
-                    <div className="flex rounded-lg border border-border overflow-hidden text-sm">
-                      <button
-                        type="button"
-                        onClick={() => setAssignmentType("assignment")}
-                        className={`flex-1 py-1.5 font-medium transition-colors ${assignmentType === "assignment" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                      >Assignment</button>
-                      <button
-                        type="button"
-                        onClick={() => setAssignmentType("test")}
-                        className={`flex-1 py-1.5 font-medium transition-colors border-l border-border ${assignmentType === "test" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                      >Test</button>
-                    </div>
+                    <Label className="text-sm font-medium">Type <span className="text-destructive text-xs">*</span></Label>
+                    <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as ItemType)}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Select a type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="assignment">Assignment</SelectItem>
+                        <SelectItem value="test">Test</SelectItem>
+                        <SelectItem value="quiz">Quiz</SelectItem>
+                        <SelectItem value="project">Project</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
                 </div>
@@ -468,19 +468,18 @@ export default function NewAssignmentPage() {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
 
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Type</Label>
-                    <div className="flex rounded-lg border border-border overflow-hidden text-sm">
-                      <button
-                        type="button"
-                        onClick={() => setAssignmentType("assignment")}
-                        className={`flex-1 py-1.5 font-medium transition-colors ${assignmentType === "assignment" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                      >Assignment</button>
-                      <button
-                        type="button"
-                        onClick={() => setAssignmentType("test")}
-                        className={`flex-1 py-1.5 font-medium transition-colors border-l border-border ${assignmentType === "test" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                      >Test</button>
-                    </div>
+                    <Label className="text-sm font-medium">Type <span className="text-destructive text-xs">*</span></Label>
+                    <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as ItemType)}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Select a type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="assignment">Assignment</SelectItem>
+                        <SelectItem value="test">Test</SelectItem>
+                        <SelectItem value="quiz">Quiz</SelectItem>
+                        <SelectItem value="project">Project</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-1.5">

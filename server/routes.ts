@@ -4729,7 +4729,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional().default(""),
         dueDate: z.string().min(1),
         points: z.number().int().min(1).max(10000),
-        assignmentType: z.enum(["assignment", "test"]).default("assignment"),
+        assignmentType: z.enum(["assignment", "test", "quiz", "project"]).default("assignment"),
         linkUrl: z.string().nullable().optional().transform((v) => {
           if (!v || !v.trim()) return undefined;
           const trimmed = v.trim();
@@ -4769,7 +4769,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional().default(""),
         dueDate: z.string().min(1),
         points: z.preprocess((v) => { const n = parseInt(v as string, 10); return isNaN(n) ? undefined : n; }, z.number().int().min(1).max(10000)),
-        assignmentType: z.enum(["assignment", "test"]).default("assignment"),
+        assignmentType: z.enum(["assignment", "test", "quiz", "project"]).default("assignment"),
         linkUrl: z.string().optional().transform((v) => {
           if (!v || !v.trim()) return undefined;
           const trimmed = v.trim();
@@ -4861,7 +4861,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional(),
         dueDate: z.string().min(1).optional(),
         points: z.number().int().min(1).max(10000).optional().nullable().transform((v) => (v == null ? undefined : v)),
-        assignmentType: z.enum(["assignment", "test"]).optional(),
+        assignmentType: z.enum(["assignment", "test", "quiz", "project"]).optional(),
         fileUrl: z.string().url().nullable().optional(),
         linkUrl: z.string().nullable().optional().transform((v) => {
           if (!v || !v.trim()) return null;
@@ -5404,6 +5404,153 @@ export function registerRoutes(app: Express) {
       if (!assignment) return res.status(404).json({ error: "Assignment not found in this classroom" });
       await storage.markContentSeen(req.session.userId!, "assignment", assignmentId);
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── Grading Policy ─────────────────────────────────────────────────────────
+
+  // GET /api/classrooms/:classroomId/grading-policy — latest policy for classroom
+  app.get("/api/classrooms/:classroomId/grading-policy", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+      const policy = await prisma.gradingPolicy.findFirst({
+        where: { classroomId: classroom.id },
+        orderBy: { id: "desc" },
+      });
+      res.json(policy ?? null);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/classrooms/:classroomId/grading-policy — teacher saves new policy snapshot
+  app.post("/api/classrooms/:classroomId/grading-policy", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const data = z.object({
+        assignmentWeight: z.number().int().min(0).max(100),
+        testWeight: z.number().int().min(0).max(100),
+        quizWeight: z.number().int().min(0).max(100),
+        projectWeight: z.number().int().min(0).max(100),
+      }).refine(
+        (d) => d.assignmentWeight + d.testWeight + d.quizWeight + d.projectWeight === 100,
+        { message: "Weights must sum to 100" }
+      ).parse(req.body);
+      const policy = await prisma.gradingPolicy.create({
+        data: { classroomId: classroom.id, ...data },
+      });
+      res.status(201).json(policy);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // ─── Grade Breakdown ─────────────────────────────────────────────────────────
+
+  // GET /api/classrooms/:classroomId/grade-breakdown/:studentId
+  app.get("/api/classrooms/:classroomId/grade-breakdown/:studentId", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomMember(req, res);
+      if (!classroom) return;
+
+      const targetStudentId = parseInt(req.params.studentId);
+      if (isNaN(targetStudentId)) return res.status(400).json({ error: "Invalid student ID" });
+
+      // Auth check: teacher can view any enrolled student; students/parents can only view their own / their child's
+      const userId = req.session.userId as number;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        const student = await storage.getStudentByUserId(userId);
+        if (!student || student.id !== targetStudentId) return res.status(403).json({ error: "Forbidden" });
+      } else if (user.role === "parent") {
+        const children = await storage.getStudentsByParent(userId);
+        if (!children.some((c: any) => c.id === targetStudentId)) return res.status(403).json({ error: "Forbidden" });
+      }
+      // teacher: already verified they're the classroom owner via requireClassroomMember
+
+      // Fetch assignments and submissions
+      const assignments = await prisma.classroomAssignment.findMany({
+        where: { classroomId: classroom.id },
+        orderBy: { createdAt: "asc" },
+      });
+      const submissions = await prisma.classroomSubmission.findMany({
+        where: { assignmentId: { in: assignments.map((a) => a.id) }, studentId: targetStudentId },
+      });
+
+      const policy = await prisma.gradingPolicy.findFirst({
+        where: { classroomId: classroom.id },
+        orderBy: { id: "desc" },
+      });
+
+      const ALL_TYPES = ["assignment", "test", "quiz", "project"] as const;
+      const TYPE_LABELS: Record<string, string> = {
+        assignment: "Assignments",
+        test: "Tests",
+        quiz: "Quizzes",
+        project: "Projects",
+      };
+
+      const subMap = Object.fromEntries(submissions.map((s) => [s.assignmentId, s]));
+      const defaultWeights = { assignment: 25, test: 25, quiz: 25, project: 25 };
+      const weights = policy
+        ? { assignment: policy.assignmentWeight, test: policy.testWeight, quiz: policy.quizWeight, project: policy.projectWeight }
+        : defaultWeights;
+
+      type BreakdownStatus = "graded" | "pending" | "zero-weight" | "no-items";
+      const breakdown = ALL_TYPES.map((type) => {
+        const typeAssignments = assignments.filter((a) => a.assignmentType === type);
+        const gradedSubs = typeAssignments
+          .map((a) => subMap[a.id])
+          .filter((s) => s && s.grade !== null && s.grade !== undefined);
+
+        const hasItems = typeAssignments.length > 0;
+        const isGraded = gradedSubs.length > 0;
+        const configuredWeight = weights[type];
+
+        let average: number | null = null;
+        if (isGraded) {
+          const totalPossible = typeAssignments
+            .filter((a) => subMap[a.id]?.grade != null)
+            .reduce((s, a) => s + a.points, 0);
+          const totalEarned = gradedSubs.reduce((s, sub) => s + (sub.grade ?? 0), 0);
+          average = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+        }
+
+        let status: BreakdownStatus;
+        if (!hasItems) status = "no-items";
+        else if (configuredWeight === 0) status = "zero-weight";
+        else if (!isGraded) status = "pending";
+        else status = "graded";
+
+        return { type, label: TYPE_LABELS[type], configuredWeight, effectiveWeight: 0, average, status };
+      });
+
+      // Renormalize weights among graded (non-zero-weight, non-pending) types
+      const gradedItems = breakdown.filter((b) => b.status === "graded");
+      const totalConfiguredWeight = gradedItems.reduce((s, b) => s + b.configuredWeight, 0);
+      if (totalConfiguredWeight > 0) {
+        gradedItems.forEach((b) => {
+          b.effectiveWeight = Math.round((b.configuredWeight / totalConfiguredWeight) * 100);
+        });
+      }
+
+      let overall: number | null = null;
+      if (gradedItems.length > 0 && totalConfiguredWeight > 0) {
+        overall = Math.round(
+          gradedItems.reduce((s, b) => s + (b.average ?? 0) * (b.configuredWeight / totalConfiguredWeight), 0)
+        );
+      }
+
+      const pendingTypes = breakdown.filter((b) => b.status === "pending").map((b) => b.label);
+      const isPartial = pendingTypes.length > 0 && gradedItems.length > 0;
+
+      res.json({ overall, isPartial, pendingTypes, policy, breakdown });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -1,16 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { BarChart2 } from "lucide-react";
 import type { ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
+import GradeBreakdownPanel from "./GradeBreakdownPanel";
+
+const TYPE_BADGE: Record<string, string> = {
+  assignment: "bg-blue-100 text-blue-700",
+  test: "bg-orange-100 text-orange-700",
+  quiz: "bg-purple-100 text-purple-700",
+  project: "bg-teal-100 text-teal-700",
+};
+const TYPE_LABEL: Record<string, string> = {
+  assignment: "Assignment",
+  test: "Test",
+  quiz: "Quiz",
+  project: "Project",
+};
 
 export default function StudentGradesTab({
   classroomId,
   classroomSlug,
+  studentId,
 }: {
   classroomId: number;
   classroomSlug: string | number;
+  studentId: number;
 }) {
   const [, navigate] = useLocation();
 
@@ -24,9 +39,6 @@ export default function StudentGradesTab({
   });
 
   const subMap = Object.fromEntries(submissions.map((s) => [s.assignmentId, s]));
-  const totalPoints = assignments.reduce((s, a) => s + a.points, 0);
-  const earnedPoints = submissions.reduce((s, sub) => s + (sub.grade ?? 0), 0);
-  const pct = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
   if (assignments.length === 0) {
     return (
@@ -38,24 +50,15 @@ export default function StudentGradesTab({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3 flex items-center gap-3">
-        <BarChart2 className="h-4 w-4 text-green-600 shrink-0" />
-        <span className="text-sm font-medium text-green-800">
-          Your total: {earnedPoints} / {totalPoints} pts ({pct}%)
-        </span>
-        <div className="flex-1 ml-2 h-2 rounded-full bg-green-200 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-green-500 transition-all"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
+      {studentId > 0 && (
+        <GradeBreakdownPanel classroomId={classroomId} studentId={studentId} />
+      )}
 
       <div className="overflow-x-auto rounded-2xl border border-border">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assignment / Test</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assignment</th>
               <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Due</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grade</th>
@@ -75,10 +78,9 @@ export default function StudentGradesTab({
                   <td className="px-4 py-3 font-medium text-foreground">
                     <div className="flex flex-col gap-0.5">
                       <span>{a.title}</span>
-                      {a.assignmentType === "test"
-                        ? <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-orange-100 text-orange-700 self-start">Test</span>
-                        : <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-blue-100 text-blue-700 self-start">Assignment</span>
-                      }
+                      <span className={`text-[10px] font-medium px-1.5 py-0 rounded-full self-start ${TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment}`}>
+                        {TYPE_LABEL[a.assignmentType] ?? a.assignmentType}
+                      </span>
                     </div>
                   </td>
                   <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{a.dueDate}</td>

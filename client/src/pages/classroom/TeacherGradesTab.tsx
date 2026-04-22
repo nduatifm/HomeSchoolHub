@@ -1,7 +1,44 @@
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { ClassroomAssignment } from "@shared/schema";
+import type { ClassroomAssignment, GradingPolicy } from "@shared/schema";
 import type { SubmissionWithName, EnrollmentWithStudent } from "./types";
+
+const TYPE_BADGE: Record<string, string> = {
+  assignment: "bg-blue-100 text-blue-700",
+  test: "bg-orange-100 text-orange-700",
+  quiz: "bg-purple-100 text-purple-700",
+  project: "bg-teal-100 text-teal-700",
+};
+const TYPE_LABEL: Record<string, string> = {
+  assignment: "Assignment",
+  test: "Test",
+  quiz: "Quiz",
+  project: "Project",
+};
+
+function computeWeightedPct(
+  assignments: ClassroomAssignment[],
+  subs: Record<number, SubmissionWithName>,
+  policy: GradingPolicy | null | undefined
+): number | null {
+  const types = ["assignment", "test", "quiz", "project"] as const;
+  const weights = policy
+    ? { assignment: policy.assignmentWeight, test: policy.testWeight, quiz: policy.quizWeight, project: policy.projectWeight }
+    : { assignment: 25, test: 25, quiz: 25, project: 25 };
+  const groups = types.map((type) => {
+    const typeAssigns = assignments.filter((a) => a.assignmentType === type);
+    const graded = typeAssigns.filter((a) => subs[a.id]?.grade != null);
+    if (graded.length === 0) return { w: weights[type], avg: null as number | null };
+    const earned = graded.reduce((s, a) => s + (subs[a.id].grade ?? 0), 0);
+    const possible = graded.reduce((s, a) => s + a.points, 0);
+    return { w: weights[type], avg: possible > 0 ? (earned / possible) * 100 : 0 };
+  });
+  const gradedGroups = groups.filter((g) => g.avg !== null);
+  if (gradedGroups.length === 0) return null;
+  const tw = gradedGroups.reduce((s, g) => s + g.w, 0);
+  if (tw === 0) return null;
+  return Math.round(gradedGroups.reduce((s, g) => s + (g.avg! * g.w) / tw, 0));
+}
 
 export default function TeacherGradesTab({ classroomId }: { classroomId: number }) {
   const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
@@ -11,6 +48,11 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
   const { data: enrollments = [] } = useQuery<EnrollmentWithStudent[]>({
     queryKey: ["/api/classrooms", classroomId, "enrollments"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/enrollments`),
+  });
+  const { data: policy } = useQuery<GradingPolicy | null>({
+    queryKey: ["/api/classrooms", classroomId, "grading-policy"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-policy`),
+    enabled: classroomId > 0,
   });
   const allSubsResults = useQueries({
     queries: assignments.map((a) => ({
@@ -35,53 +77,73 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
   const totalPossible = assignments.reduce((s, a) => s + a.points, 0);
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border">
-      <table className="min-w-full text-sm">
-        <thead className="bg-muted/40 border-b border-border">
-          <tr>
-            <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider sticky left-0 bg-muted/40 min-w-[140px]">Student</th>
-            {assignments.map((a) => (
-              <th key={a.id} className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">
-                <div className="truncate max-w-[100px]" title={a.title}>{a.title}</div>
-                <div className="flex items-center justify-center gap-1 mt-0.5">
-                  {a.assignmentType === "test"
-                    ? <span className="text-[9px] font-medium px-1 rounded-full bg-orange-100 text-orange-700">Test</span>
-                    : <span className="text-[9px] font-medium px-1 rounded-full bg-blue-100 text-blue-700">Assignment</span>
-                  }
-                  <span className="text-muted-foreground/60 font-normal">{a.points} pts</span>
-                </div>
+    <div className="space-y-3">
+      {policy && (
+        <div className="rounded-xl border border-border bg-muted/30 px-4 py-2.5 flex flex-wrap gap-x-4 gap-y-1 items-center text-xs">
+          <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Grading Policy</span>
+          {[
+            { label: "Assignments", w: policy.assignmentWeight, cls: "text-blue-700" },
+            { label: "Tests", w: policy.testWeight, cls: "text-orange-700" },
+            { label: "Quizzes", w: policy.quizWeight, cls: "text-purple-700" },
+            { label: "Projects", w: policy.projectWeight, cls: "text-teal-700" },
+          ].map((t) => (
+            <span key={t.label} className={`font-medium ${t.cls}`}>{t.label}: {t.w}%</span>
+          ))}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-2xl border border-border">
+        <table className="min-w-full text-sm">
+          <thead className="bg-muted/40 border-b border-border">
+            <tr>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider sticky left-0 bg-muted/40 min-w-[140px]">Student</th>
+              {assignments.map((a) => (
+                <th key={a.id} className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">
+                  <div className="truncate max-w-[100px]" title={a.title}>{a.title}</div>
+                  <div className="flex items-center justify-center gap-1 mt-0.5">
+                    <span className={`text-[9px] font-medium px-1 rounded-full ${TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment}`}>
+                      {TYPE_LABEL[a.assignmentType] ?? a.assignmentType}
+                    </span>
+                    <span className="text-muted-foreground/60 font-normal">{a.points} pts</span>
+                  </div>
+                </th>
+              ))}
+              <th className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px]">
+                {policy ? "Weighted %" : "Total"}
               </th>
-            ))}
-            <th className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px]">Total</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {enrollments.map((e) => {
-            const subs = submissionMap[e.studentId] ?? {};
-            const earned = assignments.reduce((s, a) => s + (subs[a.id]?.grade ?? 0), 0);
-            const pct = totalPossible > 0 ? Math.round((earned / totalPossible) * 100) : 0;
-            return (
-              <tr key={e.studentId} className="hover:bg-muted/20">
-                <td className="px-4 py-3 font-medium text-foreground sticky left-0 bg-card">{e.student.name}</td>
-                {assignments.map((a) => {
-                  const sub = subs[a.id];
-                  return (
-                    <td key={a.id} className="px-3 py-3 text-center">
-                      {sub?.grade !== null && sub?.grade !== undefined
-                        ? <span className="font-medium text-green-700">{sub.grade}</span>
-                        : <span className="text-muted-foreground/40">—</span>}
-                    </td>
-                  );
-                })}
-                <td className="px-3 py-3 text-center">
-                  <div className="font-semibold text-foreground">{earned}/{totalPossible}</div>
-                  <div className="text-xs text-muted-foreground">{pct}%</div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {enrollments.map((e) => {
+              const subs = submissionMap[e.studentId] ?? {};
+              const earned = assignments.reduce((s, a) => s + (subs[a.id]?.grade ?? 0), 0);
+              const rawPct = totalPossible > 0 ? Math.round((earned / totalPossible) * 100) : 0;
+              const weightedPct = computeWeightedPct(assignments, subs, policy);
+              return (
+                <tr key={e.studentId} className="hover:bg-muted/20">
+                  <td className="px-4 py-3 font-medium text-foreground sticky left-0 bg-card">{e.student.name}</td>
+                  {assignments.map((a) => {
+                    const sub = subs[a.id];
+                    return (
+                      <td key={a.id} className="px-3 py-3 text-center">
+                        {sub?.grade !== null && sub?.grade !== undefined
+                          ? <span className="font-medium text-green-700">{sub.grade}</span>
+                          : <span className="text-muted-foreground/40">—</span>}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-3 text-center">
+                    <div className="font-semibold text-foreground">
+                      {weightedPct !== null ? `${weightedPct}%` : `${rawPct}%`}
+                    </div>
+                    <div className="text-xs text-muted-foreground tabular-nums">{earned}/{totalPossible} pts</div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

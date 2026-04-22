@@ -489,6 +489,16 @@ export const formQuestionSchema = z.object({
 });
 export type FormQuestion = z.infer<typeof formQuestionSchema>;
 
+export const itemTypes = ["assignment", "test", "quiz", "project"] as const;
+export type ItemType = (typeof itemTypes)[number];
+
+export const itemTypeLabels: Record<ItemType, string> = {
+  assignment: "Assignment",
+  test: "Test",
+  quiz: "Quiz",
+  project: "Project",
+};
+
 export const classroomAssignmentSchema = z.object({
   id: z.number(),
   classroomId: z.number(),
@@ -496,7 +506,7 @@ export const classroomAssignmentSchema = z.object({
   description: z.string(),
   dueDate: z.string(),
   points: z.number(),
-  assignmentType: z.enum(["assignment", "test"]).default("assignment"),
+  assignmentType: z.enum(itemTypes).default("assignment"),
   fileUrl: z.string().nullable().optional(),
   linkUrl: z.string().nullable().optional(),
   slug: z.string().nullable().optional(),
@@ -557,3 +567,38 @@ export type TeacherStudentAssignment = z.infer<
 export type InsertTeacherStudentAssignment = z.infer<
   typeof insertTeacherStudentAssignmentSchema
 >;
+
+// ─── Grading Policy ──────────────────────────────────────────────────────────
+
+export const gradingPolicySchema = z.object({
+  id: z.number(),
+  classroomId: z.number(),
+  assignmentWeight: z.number(),
+  testWeight: z.number(),
+  quizWeight: z.number(),
+  projectWeight: z.number(),
+  effectiveFrom: z.string(),
+});
+export const insertGradingPolicySchema = gradingPolicySchema.omit({ id: true, effectiveFrom: true });
+export type GradingPolicy = z.infer<typeof gradingPolicySchema>;
+export type InsertGradingPolicy = z.infer<typeof insertGradingPolicySchema>;
+
+// ─── Grade Breakdown ─────────────────────────────────────────────────────────
+
+export const gradeBreakdownItemSchema = z.object({
+  type: z.enum(itemTypes),
+  label: z.string(),
+  configuredWeight: z.number(),
+  effectiveWeight: z.number(),
+  average: z.number().nullable(),
+  status: z.enum(["graded", "pending", "zero-weight", "no-items"]),
+});
+export const gradeBreakdownSchema = z.object({
+  overall: z.number().nullable(),
+  isPartial: z.boolean(),
+  pendingTypes: z.array(z.string()),
+  policy: gradingPolicySchema.nullable(),
+  breakdown: z.array(gradeBreakdownItemSchema),
+});
+export type GradeBreakdown = z.infer<typeof gradeBreakdownSchema>;
+export type GradeBreakdownItem = z.infer<typeof gradeBreakdownItemSchema>;

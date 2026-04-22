@@ -15,6 +15,7 @@ import {
   Loader2,
   Archive,
   ArchiveRestore,
+  Settings2,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
@@ -34,6 +35,7 @@ import ParentGradesTab from "./classroom/ParentGradesTab";
 import StudentGradesTab from "./classroom/StudentGradesTab";
 import ClassworkTab from "./classroom/ClassworkTab";
 import StudentsTab from "./classroom/StudentsTab";
+import TeacherSettingsTab from "./classroom/TeacherSettingsTab";
 
 function TabNav({
   tabs,
@@ -179,12 +181,12 @@ export default function ClassroomDetail() {
   const isArchived = classroom.status === "archived";
   const theme = getSubjectTheme(classroom.subject || "");
 
-  const validTeacherTabs = ["feed", "assignments", "grades", "classwork", "students"];
+  const validTeacherTabs = ["feed", "assignments", "grades", "classwork", "students", "settings"];
   const validStudentTabs = ["feed", "assignments", "grades", "classwork"];
   const validParentTabs = ["feed", "grades", "classwork"];
   const validTabs = isTeacher ? validTeacherTabs : isStudent ? validStudentTabs : validParentTabs;
 
-  if (!validTabs.includes(activeTab) || (activeTab === "students" && !isTeacher)) {
+  if (!validTabs.includes(activeTab) || (activeTab === "students" && !isTeacher) || (activeTab === "settings" && !isTeacher)) {
     navigate(`/classrooms/${slugParam}/feed${window.location.search}`);
     return null;
   }
@@ -245,6 +247,7 @@ export default function ClassroomDetail() {
     { value: "grades", label: "Grades", icon: <BarChart2 className="h-3.5 w-3.5" /> },
     { value: "classwork", label: "Classwork", icon: <LibraryBig className="h-3.5 w-3.5" /> },
     { value: "students", label: "Students", icon: <Users className="h-3.5 w-3.5" /> },
+    { value: "settings", label: "Settings", icon: <Settings2 className="h-3.5 w-3.5" /> },
   ];
   const studentTabs = [
     { value: "feed", label: "Feed", icon: <Megaphone className="h-3.5 w-3.5" />, badge: feedBadge || undefined },
@@ -273,6 +276,7 @@ export default function ClassroomDetail() {
               grades: "Grades",
               classwork: "Classwork",
               students: "Students",
+              settings: "Settings",
             };
             const tabLabel = tabLabels[activeTab];
             const folderHref = classroom.gradeFolderId
@@ -343,7 +347,7 @@ export default function ClassroomDetail() {
           {activeTab === "assignments" && isStudent && <StudentAssignmentsTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} studentId={studentData?.id ?? 0} isArchived={isArchived} />}
           {activeTab === "grades" && isTeacher && <TeacherGradesTab classroomId={classroomId} />}
           {activeTab === "grades" && isStudent && (
-            <StudentGradesTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} />
+            <StudentGradesTab classroomId={classroomId} classroomSlug={classroom.slug ?? classroom.id} studentId={studentData?.id ?? 0} />
           )}
           {activeTab === "grades" && isParent && (
             <ParentGradesTab
@@ -365,6 +369,7 @@ export default function ClassroomDetail() {
             />
           )}
           {activeTab === "students" && isTeacher && <StudentsTab classroomId={classroomId} isArchived={isArchived} />}
+          {activeTab === "settings" && isTeacher && <TeacherSettingsTab classroomId={classroomId} />}
 
         </div>
       </div>

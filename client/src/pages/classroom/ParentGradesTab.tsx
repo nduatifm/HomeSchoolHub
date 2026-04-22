@@ -1,8 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { BarChart2 } from "lucide-react";
 import type { ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
+import GradeBreakdownPanel from "./GradeBreakdownPanel";
+
+const TYPE_BADGE: Record<string, string> = {
+  assignment: "bg-blue-100 text-blue-700",
+  test: "bg-orange-100 text-orange-700",
+  quiz: "bg-purple-100 text-purple-700",
+  project: "bg-teal-100 text-teal-700",
+};
+const TYPE_LABEL: Record<string, string> = {
+  assignment: "Assignment",
+  test: "Test",
+  quiz: "Quiz",
+  project: "Project",
+};
 
 export default function ParentGradesTab({ classroomId, studentId, seenAssignmentIds, onAssignmentSeen }: {
   classroomId: number; studentId: number;
@@ -19,8 +32,6 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
   });
 
   const subMap = Object.fromEntries(submissions.map((s) => [s.assignmentId, s]));
-  const totalPoints = assignments.reduce((s, a) => s + a.points, 0);
-  const earned = submissions.reduce((s, sub) => s + (sub.grade ?? 0), 0);
 
   if (assignments.length === 0) {
     return <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No assignments yet.</div>;
@@ -28,17 +39,15 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-green-50 border border-green-200 px-4 py-3 flex items-center gap-3">
-        <BarChart2 className="h-4 w-4 text-green-600 shrink-0" />
-        <span className="text-sm font-medium text-green-800">
-          Total: {earned} / {totalPoints} pts ({totalPoints > 0 ? Math.round((earned / totalPoints) * 100) : 0}%)
-        </span>
-      </div>
+      {studentId > 0 && (
+        <GradeBreakdownPanel classroomId={classroomId} studentId={studentId} />
+      )}
+
       <div className="overflow-x-auto rounded-2xl border border-border">
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40 border-b border-border">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Assignment / Test</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Assignment</th>
               <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground uppercase">Due</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase">Status</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase">Grade</th>
@@ -61,10 +70,9 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
                         {isUnseen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
                         {a.title}
                       </div>
-                      {a.assignmentType === "test"
-                        ? <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-orange-100 text-orange-700 self-start">Test</span>
-                        : <span className="text-[10px] font-medium px-1.5 py-0 rounded-full bg-blue-100 text-blue-700 self-start">Assignment</span>
-                      }
+                      <span className={`text-[10px] font-medium px-1.5 py-0 rounded-full self-start ${TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment}`}>
+                        {TYPE_LABEL[a.assignmentType] ?? a.assignmentType}
+                      </span>
                     </div>
                   </td>
                   <td className="px-3 py-3 text-muted-foreground">{a.dueDate}</td>
