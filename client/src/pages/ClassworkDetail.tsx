@@ -512,6 +512,10 @@ export default function ClassworkDetail() {
             tabLabel: "Assignments & Tests",
             tabHref: `/classrooms/${classroomSlug}/assignments${window.location.search}`,
             search: window.location.search,
+            folderName: classroom.gradeFolderName ?? undefined,
+            folderHref: classroom.gradeFolderId
+              ? `/classrooms/folders/${classroom.gradeFolderId}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`
+              : undefined,
           }).concat({ label: assignment.title, current: true })} />
 
           {/* Assignment header */}

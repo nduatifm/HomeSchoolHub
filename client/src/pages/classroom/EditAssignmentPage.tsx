@@ -324,8 +324,11 @@ export default function EditAssignmentPage() {
           <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-16">
             <Breadcrumb crumbs={[
               { label: "Classrooms", href: "/classrooms" },
-              { label: classroom.name, href: `/classrooms/${classroomSlug}/feed` },
-              { label: "Assignments & Tests", href: `/classrooms/${classroomSlug}/assignments` },
+              ...(classroom.gradeFolderId && classroom.gradeFolderName
+                ? [{ label: classroom.gradeFolderName, href: `/classrooms/folders/${classroom.gradeFolderId}`, current: false as const }]
+                : []),
+              { label: classroom.name, href: `/classrooms/${classroomSlug}/feed`, current: false },
+              { label: "Assignments & Tests", href: `/classrooms/${classroomSlug}/assignments`, current: false },
               { label: "Edit Assignment", current: true },
             ]} className="mb-6" />
 

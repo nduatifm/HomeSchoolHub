@@ -121,8 +121,11 @@ export default function SubmissionReviewPage() {
           {/* Breadcrumbs */}
           <Breadcrumb crumbs={[
             { label: "Classrooms", href: "/classrooms" },
-            { label: classroom.name, href: `/classrooms/${classroomSlug}/feed` },
-            { label: "Assignments & Tests", href: `/classrooms/${classroomSlug}/assignments` },
+            ...(classroom.gradeFolderId && classroom.gradeFolderName
+              ? [{ label: classroom.gradeFolderName, href: `/classrooms/folders/${classroom.gradeFolderId}`, current: false as const }]
+              : []),
+            { label: classroom.name, href: `/classrooms/${classroomSlug}/feed`, current: false },
+            { label: "Assignments & Tests", href: `/classrooms/${classroomSlug}/assignments`, current: false },
             { label: `${submission.studentName}'s Submission`, current: true },
           ]} />
 

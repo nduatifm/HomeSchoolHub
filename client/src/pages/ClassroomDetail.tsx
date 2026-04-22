@@ -269,20 +269,25 @@ export default function ClassroomDetail() {
           {/* Breadcrumbs */}
           {(() => {
             const tabLabels: Record<string, string> = {
-              feed: "Feed",
               assignments: "Assignments & Tests",
               grades: "Grades",
               classwork: "Classwork",
               students: "Students",
             };
+            const tabLabel = tabLabels[activeTab];
+            const folderHref = classroom.gradeFolderId
+              ? `/classrooms/folders/${classroom.gradeFolderId}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`
+              : undefined;
             return (
               <Breadcrumb crumbs={buildClassroomCrumbs({
                 role: user?.role ?? undefined,
                 classroomName: classroom.name,
                 classroomHref: `/classrooms/${slugParam}/feed`,
-                tabLabel: tabLabels[activeTab] ?? activeTab,
-                tabHref: `/classrooms/${slugParam}/${activeTab}${window.location.search}`,
+                tabLabel,
+                tabHref: tabLabel ? `/classrooms/${slugParam}/${activeTab}${window.location.search}` : undefined,
                 search: window.location.search,
+                folderName: classroom.gradeFolderName ?? undefined,
+                folderHref,
               })} />
             );
           })()}

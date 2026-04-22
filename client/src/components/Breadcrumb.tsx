@@ -28,7 +28,6 @@ export default function Breadcrumb({ crumbs, className = "" }: BreadcrumbProps) 
     >
       {crumbs.map((crumb, i) => {
         const isLast = i === crumbs.length - 1;
-        // Explicit current overrides position; undefined falls back to isLast
         const isCurrent = crumb.current ?? isLast;
 
         return (
@@ -71,20 +70,21 @@ export default function Breadcrumb({ crumbs, className = "" }: BreadcrumbProps) 
 /**
  * Builds a role-aware classroom breadcrumb trail.
  *
- * Rules:
- *  - Teacher / Student:  Classrooms → Room → [Tab] → [extra]
- *  - Parent:             My Children → Classrooms → Room → [Tab] → [extra]
+ * Trail shapes:
+ *  Teacher / Student (no folder):  Classrooms → Room → [Tab] → [extra]
+ *  Teacher / Student (in folder):  Classrooms → Folder → Room → [Tab] → [extra]
+ *  Parent (no folder):             My Children → Classrooms → Room → [Tab] → [extra]
+ *  Parent (in folder):             My Children → Classrooms → Folder → Room → [Tab] → [extra]
  *
- * The `search` string (e.g. "?studentId=14") is threaded through the classroom-
- * level crumb only — it is NOT added to the "Classrooms" list crumb because the
- * classrooms list page doesn't filter by studentId.
- *
- * Intermediate crumbs are always explicit `current: false` so they render as
- * clickable links even if they accidentally become the last item.
- *
- * The tab crumb does NOT have an explicit current; position (isLast) determines
- * that. This means pages that call `.concat(deeperCrumb)` automatically get a
- * clickable "Assignments & Tests" / "Classwork" crumb rather than a dead span.
+ * Notes:
+ *  - `search` (e.g. "?studentId=14") is applied to the classroom crumb and the
+ *    folder crumb (for parents) so the parent's child-context survives navigation.
+ *  - The folder crumb is only emitted when both `folderName` and `folderHref` are
+ *    provided — callers are responsible for computing the href (including ?studentId).
+ *  - Intermediate crumbs carry explicit `current: false` so they always render as
+ *    links regardless of position.
+ *  - The tab crumb carries no explicit `current`; position (isLast) decides. Pages
+ *    that chain .concat() automatically get a clickable tab crumb rather than a span.
  */
 export function buildClassroomCrumbs({
   role,
@@ -93,6 +93,8 @@ export function buildClassroomCrumbs({
   tabLabel,
   tabHref,
   search = "",
+  folderName,
+  folderHref,
 }: {
   role?: string;
   classroomName: string;
@@ -100,34 +102,35 @@ export function buildClassroomCrumbs({
   tabLabel?: string;
   tabHref?: string;
   search?: string;
+  folderName?: string;
+  folderHref?: string;
 }): BreadcrumbCrumb[] {
   const isParent = role === "parent";
   const crumbs: BreadcrumbCrumb[] = [];
 
   if (isParent) {
-    // "My Children" — parent's top-level home
     crumbs.push({ label: "My Children", href: "/children", current: false });
-    // "Classrooms" — the parent classrooms list; no studentId since the page
-    // doesn't filter by it and the param would be misleading noise
     crumbs.push({ label: "Classrooms", href: "/classrooms", current: false });
   } else {
-    // Teachers and students share the same /classrooms home
     crumbs.push({ label: "Classrooms", href: "/classrooms", current: false });
   }
 
-  // Classroom name crumb — preserve search (e.g. ?studentId) so parent context
-  // survives the click back into the classroom root
+  // Optional folder crumb — inserted between "Classrooms" and the classroom name.
+  // callers supply folderHref already including any ?studentId param for parents.
+  if (folderName && folderHref) {
+    crumbs.push({ label: folderName, href: folderHref, current: false });
+  }
+
+  // Classroom name crumb — thread search (e.g. ?studentId) so parent context
+  // survives clicking back into the classroom root.
   crumbs.push({
     label: classroomName,
     href: `${classroomHref}${search}`,
-    // current only when there is no tab level below it
     current: !tabLabel,
   });
 
   if (tabLabel) {
     // No explicit current — position (isLast) decides.
-    // When a page chains .concat() to add a deeper crumb, this tab crumb
-    // becomes a clickable link automatically (isLast is false).
     crumbs.push({ label: tabLabel, href: tabHref });
   }
 

@@ -557,8 +557,11 @@ function TeacherEditor({
             {/* Breadcrumbs */}
             <Breadcrumb crumbs={[
               { label: "Classrooms", href: "/classrooms" },
-              { label: classroom.name, href: `/classrooms/${classroomSlug}/feed` },
-              { label: "Classwork", href: `/classrooms/${classroomSlug}/classwork` },
+              ...(classroom.gradeFolderId && classroom.gradeFolderName
+                ? [{ label: classroom.gradeFolderName, href: `/classrooms/folders/${classroom.gradeFolderId}`, current: false as const }]
+                : []),
+              { label: classroom.name, href: `/classrooms/${classroomSlug}/feed`, current: false },
+              { label: "Classwork", href: `/classrooms/${classroomSlug}/classwork`, current: false },
               { label: isEdit ? (initial?.title ?? "Edit Material") : "New Material", current: true },
             ]} className="mb-8" />
 
@@ -869,6 +872,10 @@ function ReadView({
             tabLabel: "Classwork",
             tabHref: backHref,
             search: isParent && parentStudentId ? `?studentId=${parentStudentId}` : "",
+            folderName: classroom.gradeFolderName ?? undefined,
+            folderHref: classroom.gradeFolderId
+              ? `/classrooms/folders/${classroom.gradeFolderId}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`
+              : undefined,
           }).concat({ label: material.title, current: true })} className="mb-8" />
 
           <div className="mb-8 pb-6 border-b border-border">
