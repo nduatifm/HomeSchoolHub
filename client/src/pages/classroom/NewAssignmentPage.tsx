@@ -125,6 +125,17 @@ export default function NewAssignmentPage() {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
+  // Warn on browser close / tab close only when there are genuine unsaved changes
+  useEffect(() => {
+    if (!isDirty || didSubmit) return;
+    const handle = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handle);
+    return () => window.removeEventListener("beforeunload", handle);
+  }, [isDirty, didSubmit]);
+
   function openFormBuilder() {
     const label = classroom ? `${classroom.name} · ${form.title || "New Assignment"}` : "New Assignment";
     const url = `/form-builder?draft=${draftId.current}&label=${encodeURIComponent(label)}`;

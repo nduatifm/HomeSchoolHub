@@ -175,6 +175,17 @@ export default function EditAssignmentPage() {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
+  // Warn on browser close / tab close only when there are genuine unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handle = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handle);
+    return () => window.removeEventListener("beforeunload", handle);
+  }, [isDirty]);
+
   function openFormBuilder() {
     const label = classroom
       ? `${classroom.name} · ${form.title || assignment?.title || "Edit Assignment"}`
