@@ -166,11 +166,17 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                       <Button
                         size="sm"
                         className="h-8"
-                        disabled={gradeMutation.isPending || !inputs.grade}
+                        disabled={
+                          gradeMutation.isPending ||
+                          !inputs.grade ||
+                          isNaN(parseInt(inputs.grade, 10)) ||
+                          parseInt(inputs.grade, 10) < 0 ||
+                          parseInt(inputs.grade, 10) > assignment.points
+                        }
                         onClick={() =>
                           gradeMutation.mutate({
                             submissionId: sub.id,
-                            grade: parseInt(inputs.grade),
+                            grade: parseInt(inputs.grade, 10),
                             feedback: inputs.feedback,
                           })
                         }

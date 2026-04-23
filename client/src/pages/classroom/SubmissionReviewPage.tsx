@@ -98,7 +98,13 @@ export default function SubmissionReviewPage() {
     );
   }
 
-  const canGrade = gradeVal !== "" && !gradeMutation.isPending;
+  const gradeNum = parseInt(gradeVal, 10);
+  const canGrade =
+    gradeVal !== "" &&
+    !isNaN(gradeNum) &&
+    gradeNum >= 0 &&
+    gradeNum <= (assignment?.points ?? 0) &&
+    !gradeMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background">
