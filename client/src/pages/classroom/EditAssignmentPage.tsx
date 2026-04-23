@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -68,14 +68,35 @@ export default function EditAssignmentPage() {
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
   const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>({});
   const [initialized, setInitialized] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  // Snapshot of form values as they were when the assignment data was first loaded.
+  // isDirty compares current state against the snapshot so reversions clear the flag.
+  const [snapshot, setSnapshot] = useState<{
+    form: { title: string; description: string; dueDate: string; points: string };
+    assignmentType: ItemType;
+    linkUrl: string;
+    formQuestions: FormQuestion[];
+    answerKey: Record<string, string | string[]>;
+    clearFile: boolean;
+  } | null>(null);
+
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const draftId = useRef(Math.random().toString(36).slice(2, 14));
   const pendingLeave = useRef<(() => void) | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
-  const isFirstRenderAfterSeedRef = useRef(true);
 
-  const isDirty = hasChanges;
+  // True only when current state differs from the original seeded snapshot.
+  const isDirty = useMemo(() => {
+    if (attachedFile) return true;
+    if (!snapshot) return false;
+    return (
+      JSON.stringify(form) !== JSON.stringify(snapshot.form) ||
+      assignmentType !== snapshot.assignmentType ||
+      linkUrl !== snapshot.linkUrl ||
+      JSON.stringify(formQuestions) !== JSON.stringify(snapshot.formQuestions) ||
+      JSON.stringify(answerKey) !== JSON.stringify(snapshot.answerKey) ||
+      clearFile !== snapshot.clearFile
+    );
+  }, [snapshot, form, assignmentType, linkUrl, formQuestions, answerKey, attachedFile, clearFile]);
 
   function autoGrowTitle() {
     const el = titleRef.current;
@@ -112,25 +133,29 @@ export default function EditAssignmentPage() {
     enabled: !!classroomId && !!assignmentSlug,
   });
 
-  // Seed form state once assignment is loaded
+  // Seed form state + snapshot once assignment is loaded
   useEffect(() => {
     if (!assignment || initialized) return;
-    setForm({
+    const seedForm = {
       title: assignment.title,
       description: assignment.description ?? "",
       dueDate: assignment.dueDate,
       points: String(assignment.points),
-    });
-    setAssignmentType((assignment.assignmentType as ItemType) ?? "assignment");
-    setLinkUrl(assignment.linkUrl ?? "");
+    };
+    const seedType = (assignment.assignmentType as ItemType) ?? "assignment";
+    const seedLink = assignment.linkUrl ?? "";
     const existing = (assignment.formSchema as FormQuestion[] | null) ?? [];
-    setFormQuestions(existing);
     const existingKey = (assignment.answerKey as Record<string, string | string[]> | null) ?? {};
+    setForm(seedForm);
+    setAssignmentType(seedType);
+    setLinkUrl(seedLink);
+    setFormQuestions(existing);
     setAnswerKey(existingKey);
     localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(existing));
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(existingKey));
+    // Snapshot captured here — isDirty compares against this baseline
+    setSnapshot({ form: seedForm, assignmentType: seedType, linkUrl: seedLink, formQuestions: existing, answerKey: existingKey, clearFile: false });
     setInitialized(true);
-    // Auto-grow title after seeding
     setTimeout(autoGrowTitle, 0);
   }, [assignment, initialized]);
 
@@ -145,16 +170,6 @@ export default function EditAssignmentPage() {
     if (!initialized) return;
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(answerKey));
   }, [answerKey, initialized]);
-
-  // Detect user-initiated changes after the form has been seeded
-  useEffect(() => {
-    if (!initialized) return;
-    if (isFirstRenderAfterSeedRef.current) {
-      isFirstRenderAfterSeedRef.current = false;
-      return;
-    }
-    setHasChanges(true);
-  }, [form, assignmentType, linkUrl, attachedFile, clearFile, formQuestions, answerKey, initialized]);
 
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
@@ -174,17 +189,6 @@ export default function EditAssignmentPage() {
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
-
-  // Warn on browser close / tab close only when there are genuine unsaved changes
-  useEffect(() => {
-    if (!isDirty) return;
-    const handle = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handle);
-    return () => window.removeEventListener("beforeunload", handle);
-  }, [isDirty]);
 
   function openFormBuilder() {
     const label = classroom
