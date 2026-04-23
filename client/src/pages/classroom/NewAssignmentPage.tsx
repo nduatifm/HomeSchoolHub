@@ -175,14 +175,6 @@ export default function NewAssignmentPage() {
   const backUrl = `/classrooms/${classroomSlug}/assignments`;
   const goBack = useGoBack(backUrl);
 
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty && !didSubmit) { e.preventDefault(); e.returnValue = ""; }
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty, didSubmit]);
-
   function safeNavigate() {
     if (isDirty && !didSubmit) {
       pendingLeave.current = () => {

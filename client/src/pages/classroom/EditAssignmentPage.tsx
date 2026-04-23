@@ -68,12 +68,14 @@ export default function EditAssignmentPage() {
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
   const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>({});
   const [initialized, setInitialized] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const draftId = useRef(Math.random().toString(36).slice(2, 14));
   const pendingLeave = useRef<(() => void) | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const isFirstRenderAfterSeedRef = useRef(true);
 
-  const isDirty = initialized;
+  const isDirty = hasChanges;
 
   function autoGrowTitle() {
     const el = titleRef.current;
@@ -143,6 +145,16 @@ export default function EditAssignmentPage() {
     if (!initialized) return;
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(answerKey));
   }, [answerKey, initialized]);
+
+  // Detect user-initiated changes after the form has been seeded
+  useEffect(() => {
+    if (!initialized) return;
+    if (isFirstRenderAfterSeedRef.current) {
+      isFirstRenderAfterSeedRef.current = false;
+      return;
+    }
+    setHasChanges(true);
+  }, [form, assignmentType, linkUrl, attachedFile, clearFile, formQuestions, answerKey, initialized]);
 
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
@@ -214,14 +226,6 @@ export default function EditAssignmentPage() {
   const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !!assignment && !saveMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}/assignments`;
   const goBack = useGoBack(backUrl);
-
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty && !didSave) { e.preventDefault(); e.returnValue = ""; }
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty, didSave]);
 
   function safeNavigate() {
     if (isDirty && !didSave) {
