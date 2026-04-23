@@ -55,7 +55,7 @@ export default function SubmissionReviewPage() {
     mutationFn: () =>
       apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/grade`, {
         method: "PATCH",
-        body: JSON.stringify({ grade: parseInt(gradeVal), feedback: feedbackVal || null }),
+        body: JSON.stringify({ grade: parseInt(gradeVal, 10), feedback: feedbackVal || null }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", submission?.assignmentId, "submissions"] });
