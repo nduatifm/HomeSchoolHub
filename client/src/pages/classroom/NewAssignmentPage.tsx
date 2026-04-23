@@ -125,17 +125,6 @@ export default function NewAssignmentPage() {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // Warn on browser close / tab close only when there are genuine unsaved changes
-  useEffect(() => {
-    if (!isDirty || didSubmit) return;
-    const handle = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handle);
-    return () => window.removeEventListener("beforeunload", handle);
-  }, [isDirty, didSubmit]);
-
   function openFormBuilder() {
     const label = classroom ? `${classroom.name} · ${form.title || "New Assignment"}` : "New Assignment";
     const url = `/form-builder?draft=${draftId.current}&label=${encodeURIComponent(label)}`;
@@ -180,6 +169,19 @@ export default function NewAssignmentPage() {
   });
 
   const didSubmit = createMutation.isSuccess;
+
+  // Warn on browser close / tab close only when there are genuine unsaved changes
+  // (placed after didSubmit declaration to avoid temporal dead zone)
+  useEffect(() => {
+    if (!isDirty || didSubmit) return;
+    const handle = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handle);
+    return () => window.removeEventListener("beforeunload", handle);
+  }, [isDirty, didSubmit]);
+
   const pointsNum = Number(form.points);
   const pointsValid = !!form.points && Number.isInteger(pointsNum) && pointsNum >= 1 && pointsNum <= 10000;
   const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !!assignmentType && !createMutation.isPending;
