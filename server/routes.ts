@@ -4866,6 +4866,10 @@ export function registerRoutes(app: Express) {
       } else if (typeof rawMaterialIds === "string") {
         try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
       }
+      if (materialIds && materialIds.length > 0) {
+        const validCount = await prisma.classroomMaterial.count({ where: { id: { in: materialIds }, classroomId: classroom.id } });
+        if (validCount !== materialIds.length) return res.status(400).json({ error: "One or more classwork items do not belong to this classroom" });
+      }
 
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...finalData }, materialIds);
 
@@ -4928,6 +4932,10 @@ export function registerRoutes(app: Express) {
       const rawMaterialIds = req.body.materialIds;
       if (rawMaterialIds) {
         try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
+      }
+      if (materialIds && materialIds.length > 0) {
+        const validCount = await prisma.classroomMaterial.count({ where: { id: { in: materialIds }, classroomId: classroom.id } });
+        if (validCount !== materialIds.length) return res.status(400).json({ error: "One or more classwork items do not belong to this classroom" });
       }
 
       const assignment = await storage.createClassroomAssignment({
@@ -5015,6 +5023,10 @@ export function registerRoutes(app: Express) {
         materialIds = rawMaterialIds.map(Number).filter((n) => !isNaN(n));
       } else if (typeof rawMaterialIds === "string") {
         try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
+      }
+      if (materialIds && materialIds.length > 0) {
+        const validCount = await prisma.classroomMaterial.count({ where: { id: { in: materialIds }, classroomId: classroom.id } });
+        if (validCount !== materialIds.length) return res.status(400).json({ error: "One or more classwork items do not belong to this classroom" });
       }
 
       const updated = await storage.updateClassroomAssignment(assignmentId, data, materialIds);
@@ -5216,12 +5228,7 @@ export function registerRoutes(app: Express) {
         description: z.string().default(""),
         url: z.string().url().optional().nullable(),
         attachments: z.array(z.string().url()).optional(),
-        assignmentId: z.number().int().positive().optional().nullable(),
       }).parse(req.body);
-      if (data.assignmentId) {
-        const assignment = await prisma.classroomAssignment.findUnique({ where: { id: data.assignmentId }, select: { classroomId: true } });
-        if (!assignment || assignment.classroomId !== classroom.id) return res.status(400).json({ error: "Assignment does not belong to this classroom" });
-      }
       const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data });
 
       res.status(201).json(material);
@@ -5243,12 +5250,7 @@ export function registerRoutes(app: Express) {
         const data = z.object({
           title: z.string().min(1),
           description: z.string().default(""),
-          assignmentId: z.preprocess((v) => (v ? Number(v) : undefined), z.number().int().positive().optional().nullable()),
         }).parse(req.body);
-        if (data.assignmentId) {
-          const assignment = await prisma.classroomAssignment.findUnique({ where: { id: data.assignmentId }, select: { classroomId: true } });
-          if (!assignment || assignment.classroomId !== classroom.id) return res.status(400).json({ error: "Assignment does not belong to this classroom" });
-        }
         let url: string | null = null;
         if (req.file) {
           const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classwork");
@@ -5341,12 +5343,7 @@ export function registerRoutes(app: Express) {
         description: z.string().optional(),
         url: z.string().url().optional().nullable(),
         attachments: z.array(z.string().url()).optional(),
-        assignmentId: z.number().int().positive().optional().nullable(),
       }).parse(req.body);
-      if (data.assignmentId) {
-        const assignment = await prisma.classroomAssignment.findUnique({ where: { id: data.assignmentId }, select: { classroomId: true } });
-        if (!assignment || assignment.classroomId !== classroom.id) return res.status(400).json({ error: "Assignment does not belong to this classroom" });
-      }
       const updated = await storage.updateClassroomMaterial(materialId, data);
       res.json(updated);
     } catch (error: any) {
@@ -5370,13 +5367,8 @@ export function registerRoutes(app: Express) {
         const data = z.object({
           title: z.string().min(1).optional(),
           description: z.string().optional(),
-          assignmentId: z.preprocess((v) => (v !== undefined && v !== "" ? Number(v) : undefined), z.number().int().positive().optional().nullable()),
           clearUrl: z.string().optional(),
         }).parse(req.body);
-        if (data.assignmentId) {
-          const assignment = await prisma.classroomAssignment.findUnique({ where: { id: data.assignmentId }, select: { classroomId: true } });
-          if (!assignment || assignment.classroomId !== classroom.id) return res.status(400).json({ error: "Assignment does not belong to this classroom" });
-        }
         const { clearUrl, ...rest } = data;
         let url: string | null | undefined = undefined;
         if (req.file) {
