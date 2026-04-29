@@ -559,24 +559,6 @@ export const insertClassroomAssignmentMaterialSchema = classroomAssignmentMateri
 export type ClassroomAssignmentMaterial = z.infer<typeof classroomAssignmentMaterialSchema>;
 export type InsertClassroomAssignmentMaterial = z.infer<typeof insertClassroomAssignmentMaterialSchema>;
 
-// Teacher Assignment schema (for direct teacher-student assignments without request flow)
-export const teacherStudentAssignmentSchema = z.object({
-  id: z.number(),
-  teacherId: z.number(),
-  studentId: z.number(),
-  assignedDate: z.string(),
-  status: z.enum(["active", "inactive"]),
-});
-
-export const insertTeacherStudentAssignmentSchema =
-  teacherStudentAssignmentSchema.omit({ id: true });
-export type TeacherStudentAssignment = z.infer<
-  typeof teacherStudentAssignmentSchema
->;
-export type InsertTeacherStudentAssignment = z.infer<
-  typeof insertTeacherStudentAssignmentSchema
->;
-
 // ─── Grading Policy ──────────────────────────────────────────────────────────
 
 export const gradingPolicySchema = z.object({

@@ -23,7 +23,6 @@ import {
   insertClarificationSchema,
   insertParentalControlSchema,
   insertTutorRatingSchema,
-  insertEarningsSchema,
   insertStudentInviteSchema,
   signupSchema,
   loginSchema,

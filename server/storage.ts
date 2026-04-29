@@ -41,8 +41,6 @@ import type {
   InsertStudentInvite,
   SystemSettings,
   InsertSystemSettings,
-  TeacherStudentAssignment,
-  InsertTeacherStudentAssignment,
   GradeFolder,
   Classroom,
   InsertClassroom,
@@ -93,7 +91,6 @@ export interface IStorage {
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
   getAssignmentById(id: number): Promise<Assignment | null>;
   getAssignmentsByTeacher(teacherId: number): Promise<Assignment[]>;
-  getAssignmentsByGradeLevel(gradeLevel: string): Promise<Assignment[]>;
   getAllAssignments(): Promise<Assignment[]>;
   updateAssignment(id: number, assignment: any): Promise<Assignment>;
   deleteAssignment(id: number): Promise<void>;
@@ -116,7 +113,6 @@ export interface IStorage {
   createMaterial(material: InsertMaterial): Promise<Material>;
   getMaterialById(id: number): Promise<Material | null>;
   getMaterialsByTeacher(teacherId: number): Promise<Material[]>;
-  getMaterialsBySubject(subject: string): Promise<Material[]>;
   getMaterialsByGradeLevel(gradeLevel: string): Promise<Material[]>;
   getAllMaterials(): Promise<Material[]>;
   getAllTeachers(): Promise<User[]>;
@@ -149,7 +145,6 @@ export interface IStorage {
 
   createAttendance(attendance: InsertAttendance): Promise<Attendance>;
   getAttendanceByStudent(studentId: number): Promise<Attendance[]>;
-  getAttendanceBySession(sessionId: number): Promise<Attendance[]>;
   updateAttendance(
     id: number,
     attendance: Prisma.AttendanceUpdateInput,
@@ -207,22 +202,18 @@ export interface IStorage {
 
   createTutorRating(rating: InsertTutorRating): Promise<TutorRating>;
   getRatingsByTeacher(teacherId: number): Promise<TutorRating[]>;
-  getRatingsByParent(parentId: number): Promise<TutorRating[]>;
-
   createEarnings(earnings: InsertEarnings): Promise<Earnings>;
   getEarningsByTeacher(teacherId: number): Promise<Earnings[]>;
 
   createStudentInvite(
     invite: Prisma.StudentInviteCreateInput,
   ): Promise<StudentInvite>;
-  getStudentInviteByToken(token: string): Promise<StudentInvite | null>;
   getStudentInviteByCode(code: string): Promise<StudentInvite | null>;
   getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]>;
   updateStudentInvite(
     id: number,
     invite: Prisma.StudentInviteUpdateInput,
   ): Promise<StudentInvite>;
-  deleteStudentInvite(token: string): Promise<void>;
   deleteStudentInviteById(id: number): Promise<void>;
 
   getAllUsers(): Promise<(User & { createdAt: Date | null })[]>;
@@ -237,30 +228,9 @@ export interface IStorage {
   getAllSystemSettings(): Promise<SystemSettings[]>;
 
   // Teacher-Student Assignments (direct assignment without request flow)
-  createTeacherStudentAssignment(
-    assignment: InsertTeacherStudentAssignment,
-  ): Promise<TeacherStudentAssignment>;
-  getTeacherStudentAssignment(
-    teacherId: number,
-    studentId: number,
-  ): Promise<TeacherStudentAssignment | null>;
-  getStudentsByTeacherDirect(
-    teacherId: number,
-  ): Promise<(Student & { email?: string })[]>;
   getAllStudentsForTeachers(): Promise<(Student & { email?: string })[]>;
-  assignStudentToFirstAvailableTeacher(
-    studentId: number,
-  ): Promise<TeacherStudentAssignment | null>;
   findFirstAvailableTeacherId(studentId: number): Promise<number | null>;
-  removeTeacherStudentAssignment(
-    teacherId: number,
-    studentId: number,
-  ): Promise<void>;
-  getAssignedTeachersForStudent(
-    studentId: number,
-  ): Promise<TeacherStudentAssignment[]>;
 
-  getThreadLabel(teacherUserId: number, studentId: number): Promise<string | null>;
   setThreadLabel(teacherUserId: number, studentId: number, name: string | null): Promise<void>;
 
   // ─── Grade Folders ───────────────────────────────────────────────────────
@@ -317,7 +287,6 @@ export interface IStorage {
   // ─── Notifications ────────────────────────────────────────────────────────
   createNotification(data: { userId: number; type: string; title: string; body: string; link?: string }): Promise<any>;
   getNotificationsForUser(userId: number, limit?: number): Promise<any[]>;
-  getUnreadNotificationCount(userId: number): Promise<number>;
   markNotificationRead(id: number, userId: number): Promise<any>;
   markAllNotificationsRead(userId: number): Promise<void>;
 
@@ -464,12 +433,6 @@ class PrismaStorage implements IStorage {
     })) as Assignment[];
   }
 
-  async getAssignmentsByGradeLevel(gradeLevel: string): Promise<Assignment[]> {
-    return (await prisma.assignment.findMany({
-      where: { gradeLevel },
-    })) as Assignment[];
-  }
-
   async getAllAssignments(): Promise<Assignment[]> {
     return (await prisma.assignment.findMany()) as Assignment[];
   }
@@ -545,12 +508,6 @@ class PrismaStorage implements IStorage {
   async getMaterialsByTeacher(teacherId: number): Promise<Material[]> {
     return (await prisma.material.findMany({
       where: { teacherId },
-    })) as Material[];
-  }
-
-  async getMaterialsBySubject(subject: string): Promise<Material[]> {
-    return (await prisma.material.findMany({
-      where: { subject },
     })) as Material[];
   }
 
@@ -692,12 +649,6 @@ class PrismaStorage implements IStorage {
   async getAttendanceByStudent(studentId: number): Promise<Attendance[]> {
     return (await prisma.attendance.findMany({
       where: { studentId },
-    })) as Attendance[];
-  }
-
-  async getAttendanceBySession(sessionId: number): Promise<Attendance[]> {
-    return (await prisma.attendance.findMany({
-      where: { sessionId },
     })) as Attendance[];
   }
 
@@ -1268,12 +1219,6 @@ class PrismaStorage implements IStorage {
     })) as TutorRating[];
   }
 
-  async getRatingsByParent(parentId: number): Promise<TutorRating[]> {
-    return (await prisma.tutorRating.findMany({
-      where: { parentId },
-    })) as TutorRating[];
-  }
-
   async createEarnings(earnings: InsertEarnings): Promise<Earnings> {
     return (await prisma.earnings.create({ data: earnings })) as Earnings;
   }
@@ -1290,12 +1235,6 @@ class PrismaStorage implements IStorage {
     return (await prisma.studentInvite.create({
       data: invite,
     })) as StudentInvite;
-  }
-
-  async getStudentInviteByToken(token: string): Promise<StudentInvite | null> {
-    return (await prisma.studentInvite.findUnique({
-      where: { token },
-    })) as StudentInvite | null;
   }
 
   async getStudentInviteByCode(code: string): Promise<StudentInvite | null> {
@@ -1318,10 +1257,6 @@ class PrismaStorage implements IStorage {
       where: { id },
       data: invite,
     })) as StudentInvite;
-  }
-
-  async deleteStudentInvite(token: string): Promise<void> {
-    await prisma.studentInvite.delete({ where: { token } });
   }
 
   async deleteStudentInviteById(id: number): Promise<void> {
@@ -1369,38 +1304,6 @@ class PrismaStorage implements IStorage {
     return (await prisma.systemSettings.findMany()) as SystemSettings[];
   }
 
-  // Teacher-Student Assignment methods
-  async createTeacherStudentAssignment(
-    assignment: InsertTeacherStudentAssignment,
-  ): Promise<TeacherStudentAssignment> {
-    return (await prisma.teacherStudentAssignment.create({
-      data: assignment,
-    })) as TeacherStudentAssignment;
-  }
-
-  async getTeacherStudentAssignment(
-    teacherId: number,
-    studentId: number,
-  ): Promise<TeacherStudentAssignment | null> {
-    return (await prisma.teacherStudentAssignment.findUnique({
-      where: { teacherId_studentId: { teacherId, studentId } },
-    })) as TeacherStudentAssignment | null;
-  }
-
-  async getStudentsByTeacherDirect(
-    teacherId: number,
-  ): Promise<(Student & { email?: string })[]> {
-    const assignments = await prisma.teacherStudentAssignment.findMany({
-      where: { teacherId, status: "active" },
-      include: { student: { include: { user: true } } },
-    });
-    return assignments.map((a: any) => ({
-      ...a.student,
-      email: a.student.user?.email,
-      user: undefined,
-    })) as (Student & { email?: string })[];
-  }
-
   async getAllStudentsForTeachers(): Promise<(Student & { email?: string; parentName?: string; parentId?: number })[]> {
     const students = await prisma.student.findMany({
       include: { user: true, parent: true },
@@ -1412,50 +1315,6 @@ class PrismaStorage implements IStorage {
       user: undefined,
       parent: undefined,
     })) as (Student & { email?: string; parentName?: string; parentId?: number })[];
-  }
-
-  async assignStudentToFirstAvailableTeacher(
-    studentId: number,
-  ): Promise<TeacherStudentAssignment | null> {
-    // Find the first available teacher (teacher with least students)
-    const teachers = await prisma.user.findMany({
-      where: { role: "teacher" },
-      include: {
-        teacherStudentAssignments: {
-          where: { status: "active" },
-        },
-      },
-    });
-
-    if (teachers.length === 0) return null;
-
-    // Sort by number of students (ascending) to balance load
-    teachers.sort(
-      (a, b) =>
-        a.teacherStudentAssignments.length - b.teacherStudentAssignments.length,
-    );
-    const selectedTeacher = teachers[0];
-
-    // Check if assignment already exists
-    const existing = await prisma.teacherStudentAssignment.findUnique({
-      where: {
-        teacherId_studentId: { teacherId: selectedTeacher.id, studentId },
-      },
-    });
-
-    if (existing) {
-      return existing as TeacherStudentAssignment;
-    }
-
-    // Create new assignment
-    return (await prisma.teacherStudentAssignment.create({
-      data: {
-        teacherId: selectedTeacher.id,
-        studentId,
-        assignedDate: new Date().toISOString(),
-        status: "active",
-      },
-    })) as TeacherStudentAssignment;
   }
 
   // Selects the teacher with fewest approved TutorRequests (load-balancing) and
@@ -1476,31 +1335,6 @@ class PrismaStorage implements IStorage {
     if (existing) return existing.teacherId;
     teachers.sort((a, b) => a._count.tutorRequests - b._count.tutorRequests);
     return teachers[0].id;
-  }
-
-  async removeTeacherStudentAssignment(
-    teacherId: number,
-    studentId: number,
-  ): Promise<void> {
-    await prisma.teacherStudentAssignment.delete({
-      where: { teacherId_studentId: { teacherId, studentId } },
-    });
-  }
-
-  async getAssignedTeachersForStudent(
-    studentId: number,
-  ): Promise<TeacherStudentAssignment[]> {
-    return (await prisma.teacherStudentAssignment.findMany({
-      where: { studentId, status: "active" },
-    })) as TeacherStudentAssignment[];
-  }
-
-  async getThreadLabel(teacherUserId: number, studentId: number): Promise<string | null> {
-    const label = await prisma.threadLabel.findUnique({
-      where: { teacherUserId_studentId: { teacherUserId, studentId } },
-      select: { name: true },
-    });
-    return label?.name ?? null;
   }
 
   async setThreadLabel(teacherUserId: number, studentId: number, name: string | null): Promise<void> {
@@ -2232,10 +2066,6 @@ class PrismaStorage implements IStorage {
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-  }
-
-  async getUnreadNotificationCount(userId: number): Promise<number> {
-    return prisma.notification.count({ where: { userId, isRead: false } });
   }
 
   async markNotificationRead(id: number, userId: number): Promise<any> {
