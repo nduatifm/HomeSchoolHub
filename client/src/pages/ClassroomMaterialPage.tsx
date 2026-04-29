@@ -156,9 +156,10 @@ function TeacherEditor({
   // Grid picker hover state for the table insert tool.
   const [tableHoverRow, setTableHoverRow] = useState(0);
   const [tableHoverCol, setTableHoverCol] = useState(0);
-  // Tracks whether the most recent right-click was inside a table cell.
-  // Set from the actual DOM target on the contextmenu event (not selection state).
-  const rightClickInTableRef = useRef(false);
+  // Virtual trigger ref — a zero-size fixed span used as the Radix
+  // ContextMenu anchor. We dispatch a synthetic contextmenu event on it
+  // (with the original clientX/Y) so Radix positions the menu correctly.
+  const virtualTriggerRef = useRef<HTMLSpanElement>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);   // PDF / any attachment
   const imageRef = useRef<HTMLInputElement>(null);  // toolbar image-only picker
@@ -702,39 +703,60 @@ function TeacherEditor({
 
             <div className="border-t border-border mb-8" />
 
-            {/* Body — wrapped in ContextMenu so right-clicking inside a table
-                opens the table action menu. The onContextMenu handler on the
-                inner div records whether the click target is inside a <td>/<th>.
-                ContextMenuContent only renders when that flag is true, so right-
-                clicking outside a table produces no custom menu. */}
-            <ContextMenu>
-              <ContextMenuTrigger asChild>
-                <div
-                  onContextMenu={(e) => {
-                    // Determine right-click target from the actual DOM element,
-                    // not from stale editor selection state.
-                    rightClickInTableRef.current = !!(
-                      (e.target as Element).closest("td, th")
-                    );
-                  }}
-                  className="prose prose-sm max-w-none text-foreground
-                  prose-headings:font-semibold prose-headings:text-foreground
-                  prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
-                  prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
-                  prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-1.5
-                  prose-p:leading-relaxed prose-p:my-2 prose-p:text-foreground/90
-                  prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
-                  prose-strong:font-semibold prose-strong:text-foreground
-                  prose-em:text-foreground/80
-                  prose-a:text-primary prose-a:underline
-                  prose-hr:border-border prose-hr:my-6
-                  prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
-                >
-                  <EditorContent editor={editor} />
-                </div>
-              </ContextMenuTrigger>
+            {/* Body — onContextMenu checks whether the right-click target
+                is inside a table cell (<td>/<th>). If yes, preventDefault stops
+                the browser's native menu and we forward the event (with correct
+                clientX/Y) to the virtual Radix ContextMenuTrigger so Radix can
+                position and open the table action menu. If no, we return without
+                calling preventDefault so the browser shows its native menu as
+                usual — the Radix trigger is a separate element and never sees
+                these non-table events. */}
+            <div
+              className="prose prose-sm max-w-none text-foreground
+              prose-headings:font-semibold prose-headings:text-foreground
+              prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
+              prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
+              prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-1.5
+              prose-p:leading-relaxed prose-p:my-2 prose-p:text-foreground/90
+              prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
+              prose-strong:font-semibold prose-strong:text-foreground
+              prose-em:text-foreground/80
+              prose-a:text-primary prose-a:underline
+              prose-hr:border-border prose-hr:my-6
+              prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
+              onContextMenu={(e) => {
+                if (!(e.target as Element).closest("td, th")) return;
+                e.preventDefault();
+                virtualTriggerRef.current?.dispatchEvent(
+                  new MouseEvent("contextmenu", {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                  })
+                );
+              }}
+            >
+              <EditorContent editor={editor} />
+            </div>
 
-              {editor && rightClickInTableRef.current && (
+            {/* Zero-size fixed anchor — receives the forwarded contextmenu event
+                so Radix knows where to position the table action menu. */}
+            {editor && (
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <span
+                    ref={virtualTriggerRef}
+                    style={{
+                      position: "fixed",
+                      left: 0,
+                      top: 0,
+                      width: 0,
+                      height: 0,
+                      pointerEvents: "none",
+                    }}
+                  />
+                </ContextMenuTrigger>
                 <ContextMenuContent>
                   <ContextMenuItem
                     onMouseDown={(e) => e.preventDefault()}
@@ -791,8 +813,8 @@ function TeacherEditor({
                     Delete table
                   </ContextMenuItem>
                 </ContextMenuContent>
-              )}
-            </ContextMenu>
+              </ContextMenu>
+            )}
           </div>
         </main>
 
