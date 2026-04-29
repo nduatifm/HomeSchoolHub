@@ -1,7 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import prisma from "./db";
-import { slugify } from "../shared/slugify";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
@@ -189,54 +188,6 @@ export function registerRoutes(app: Express) {
   prisma.authSession.deleteMany({ where: { expiresAt: { lt: new Date() } } })
     .then((r) => { if (r.count > 0) console.log(`[sessions] Deleted ${r.count} expired sessions`); })
     .catch((err) => console.error("[sessions] Failed to clean expired sessions:", err));
-
-  // Regenerate all slugs with new slug format
-  (async () => {
-    try {
-      const [classrooms, classroomAssignments, classroomMaterials, users, assignments, materials, gradeFolders] = await Promise.all([
-        prisma.classroom.findMany({ select: { id: true, name: true } }),
-        prisma.classroomAssignment.findMany({ select: { id: true, title: true } }),
-        prisma.classroomMaterial.findMany({ select: { id: true, title: true } }),
-        prisma.user.findMany({ select: { id: true, name: true } }),
-        prisma.assignment.findMany({ select: { id: true, title: true } }),
-        prisma.material.findMany({ select: { id: true, title: true } }),
-        prisma.gradeFolder.findMany({ select: { id: true, name: true } }),
-      ]);
-      const work: Promise<unknown>[] = [];
-      if (classrooms.length > 0) {
-        work.push(...classrooms.map((r) => prisma.classroom.update({ where: { id: r.id }, data: { slug: slugify(r.name, r.id) } })));
-        console.log(`[slugs] Regenerated ${classrooms.length} classroom slug(s)`);
-      }
-      if (gradeFolders.length > 0) {
-        work.push(...gradeFolders.map((r) => prisma.gradeFolder.update({ where: { id: r.id }, data: { slug: slugify(r.name, r.id) } })));
-        console.log(`[slugs] Regenerated ${gradeFolders.length} grade folder slug(s)`);
-      }
-      if (classroomAssignments.length > 0) {
-        work.push(...classroomAssignments.map((r) => prisma.classroomAssignment.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
-        console.log(`[slugs] Regenerated ${classroomAssignments.length} classroomAssignment slug(s)`);
-      }
-      if (classroomMaterials.length > 0) {
-        work.push(...classroomMaterials.map((r) => prisma.classroomMaterial.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
-        console.log(`[slugs] Regenerated ${classroomMaterials.length} classroomMaterial slug(s)`);
-      }
-      if (users.length > 0) {
-        work.push(...users.map((r) => prisma.user.update({ where: { id: r.id }, data: { slug: slugify(r.name, r.id) } })));
-        console.log(`[slugs] Regenerated ${users.length} user slug(s)`);
-      }
-      if (assignments.length > 0) {
-        work.push(...assignments.map((r) => prisma.assignment.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
-        console.log(`[slugs] Regenerated ${assignments.length} assignment slug(s)`);
-      }
-      if (materials.length > 0) {
-        work.push(...materials.map((r) => prisma.material.update({ where: { id: r.id }, data: { slug: slugify(r.title, r.id) } })));
-        console.log(`[slugs] Regenerated ${materials.length} material slug(s)`);
-      }
-      if (work.length > 0) await Promise.all(work);
-    } catch (err) {
-      console.error("[slugs] Regeneration failed:", err);
-    }
-  })();
-
 
   // Ensure TUTOR_REQUEST_MODE is ON by default (requests require teacher approval)
   storage.getSystemSetting("TUTOR_REQUEST_MODE").then(async (s) => {
