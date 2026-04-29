@@ -156,8 +156,9 @@ function TeacherEditor({
   // Grid picker hover state for the table insert tool.
   const [tableHoverRow, setTableHoverRow] = useState(0);
   const [tableHoverCol, setTableHoverCol] = useState(0);
-  // Ref to the editor prose wrapper — used by the context-menu capture listener.
-  const editorWrapperRef = useRef<HTMLDivElement>(null);
+  // Tracks whether the most recent right-click was inside a table cell.
+  // Set from the actual DOM target on the contextmenu event (not selection state).
+  const rightClickInTableRef = useRef(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);   // PDF / any attachment
   const imageRef = useRef<HTMLInputElement>(null);  // toolbar image-only picker
@@ -208,20 +209,6 @@ function TeacherEditor({
     };
   }, [editor, forceUpdate]);
 
-  // Capture-phase contextmenu listener: when the cursor is NOT inside a table,
-  // stop the event before it reaches the Radix ContextMenuTrigger (which would
-  // otherwise always suppress the browser's native context menu). Stopping
-  // propagation without calling preventDefault lets the browser show its own menu.
-  useEffect(() => {
-    if (!editor) return;
-    const handleCapture = (e: MouseEvent) => {
-      const wrapper = editorWrapperRef.current;
-      if (!wrapper || !wrapper.contains(e.target as Node)) return;
-      if (!editor.isActive("table")) e.stopPropagation();
-    };
-    document.addEventListener("contextmenu", handleCapture, true);
-    return () => document.removeEventListener("contextmenu", handleCapture, true);
-  }, [editor]);
 
   // ── Style / alignment helpers ──────────────────────────────────────────────
 
@@ -716,13 +703,20 @@ function TeacherEditor({
             <div className="border-t border-border mb-8" />
 
             {/* Body — wrapped in ContextMenu so right-clicking inside a table
-                opens the table action menu. The capture-phase listener above
-                stops the event before it reaches the Radix trigger whenever the
-                cursor is NOT in a table, so the browser's native menu shows instead. */}
+                opens the table action menu. The onContextMenu handler on the
+                inner div records whether the click target is inside a <td>/<th>.
+                ContextMenuContent only renders when that flag is true, so right-
+                clicking outside a table produces no custom menu. */}
             <ContextMenu>
               <ContextMenuTrigger asChild>
                 <div
-                  ref={editorWrapperRef}
+                  onContextMenu={(e) => {
+                    // Determine right-click target from the actual DOM element,
+                    // not from stale editor selection state.
+                    rightClickInTableRef.current = !!(
+                      (e.target as Element).closest("td, th")
+                    );
+                  }}
                   className="prose prose-sm max-w-none text-foreground
                   prose-headings:font-semibold prose-headings:text-foreground
                   prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
@@ -740,7 +734,7 @@ function TeacherEditor({
                 </div>
               </ContextMenuTrigger>
 
-              {editor && (
+              {editor && rightClickInTableRef.current && (
                 <ContextMenuContent>
                   <ContextMenuItem
                     onMouseDown={(e) => e.preventDefault()}
