@@ -25,6 +25,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -276,6 +277,11 @@ function TeacherEditor({
         toast({ title: `"${f.name}" is over 10 MB — please choose a smaller file.`, type: "warning" });
         continue;
       }
+      const kind = getAttachmentKind(f.name);
+      if (kind === "link") {
+        toast({ title: `"${f.name}" is not supported. Please attach images or PDFs only.`, type: "warning" });
+        continue;
+      }
       toAdd.push(f);
     }
     if (toAdd.length > 0) setPendingFiles((prev) => [...prev, ...toAdd]);
@@ -518,7 +524,7 @@ function TeacherEditor({
                           <Trash2 className="h-3.5 w-3.5 shrink-0" />
                           Delete row
                         </DropdownMenuItem>
-                        <div className="my-1 h-px bg-border mx-2" />
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onMouseDown={(e) => e.preventDefault()}
                           onSelect={() => editor.chain().focus().addColumnBefore().run()}
@@ -543,7 +549,7 @@ function TeacherEditor({
                           <Trash2 className="h-3.5 w-3.5 shrink-0" />
                           Delete column
                         </DropdownMenuItem>
-                        <div className="my-1 h-px bg-border mx-2" />
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onMouseDown={(e) => e.preventDefault()}
                           onSelect={() => editor.chain().focus().deleteTable().run()}
@@ -727,6 +733,13 @@ function TeacherEditor({
               onContextMenu={(e) => {
                 if (!(e.target as Element).closest("td, th")) return;
                 e.preventDefault();
+                // Move the editor cursor to the right-clicked cell so that
+                // subsequent commands (Add row, Delete column, etc.) act on
+                // the cell the user actually clicked, not the previous selection.
+                if (editor) {
+                  const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+                  if (pos) editor.commands.setTextSelection(pos.pos);
+                }
                 virtualTriggerRef.current?.dispatchEvent(
                   new MouseEvent("contextmenu", {
                     bubbles: true,
@@ -832,7 +845,7 @@ function TeacherEditor({
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-0.5 hover:bg-muted/50 transition-colors">
                   <Plus className="h-3 w-3" /><Upload className="h-3 w-3" />
                 </button>
-                <input ref={fileRef} type="file" multiple className="hidden"
+                <input ref={fileRef} type="file" multiple accept=".pdf,image/*" className="hidden"
                   onChange={(e) => addFiles(e.target.files)} />
               </div>
 
@@ -854,10 +867,10 @@ function TeacherEditor({
               ))}
 
               {/* Pending (staged) files */}
-              {pendingFiles.map((f, i) => {
+              {pendingFiles.map((f) => {
                 const kind = getAttachmentKind(f.name);
                 return (
-                  <div key={i} className="space-y-2">
+                  <div key={`${f.name}-${f.size}`} className="space-y-2">
                     <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
                       {kind === "pdf"
                         ? <FileText className="h-4 w-4 text-primary shrink-0" />
@@ -960,10 +973,10 @@ function TeacherEditor({
                   </button>
                 </div>
               ))}
-              {pendingFiles.map((f, i) => {
+              {pendingFiles.map((f) => {
                 const kind = getAttachmentKind(f.name);
                 return (
-                  <div key={i} className="space-y-2">
+                  <div key={`${f.name}-${f.size}`} className="space-y-2">
                     <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border">
                       {kind === "pdf"
                         ? <FileText className="h-4 w-4 text-primary shrink-0" />
