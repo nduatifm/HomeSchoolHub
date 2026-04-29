@@ -58,7 +58,6 @@ import {
   AlignRight,
   AlignJustify,
   Table2,
-  ToggleLeft,
   RowsIcon,
   Columns3,
   Trash2,
@@ -483,15 +482,6 @@ function TeacherEditor({
                     {editor.isActive("table") ? (
                       /* ── Context controls when cursor is inside a table ── */
                       <div className="py-1 min-w-[190px]">
-                        <DropdownMenuItem
-                          onMouseDown={(e) => e.preventDefault()}
-                          onSelect={() => editor.chain().focus().toggleHeaderRow().run()}
-                          className="gap-2.5 text-xs"
-                        >
-                          <ToggleLeft className="h-3.5 w-3.5 shrink-0" />
-                          Toggle header row
-                        </DropdownMenuItem>
-                        <div className="my-1 h-px bg-border mx-2" />
                         <DropdownMenuItem
                           onMouseDown={(e) => e.preventDefault()}
                           onSelect={() => editor.chain().focus().addRowBefore().run()}
