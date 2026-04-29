@@ -499,7 +499,6 @@ model ClassroomAssignment {
 
   classroom     Classroom                    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   submissions   ClassroomSubmission[]
-  materials     ClassroomMaterial[]
   materialLinks ClassroomAssignmentMaterial[]
 
   @@unique([classroomId, slug])
@@ -533,17 +532,14 @@ model ClassroomMaterial {
   description  String
   url          String?
   attachments  String[]
-  assignmentId Int?
   slug         String?
   uploadedAt   DateTime @default(now())
 
   classroom       Classroom                    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  assignment      ClassroomAssignment?         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
   assignmentLinks ClassroomAssignmentMaterial[]
 
   @@unique([classroomId, slug])
   @@index([classroomId])
-  @@index([assignmentId])
 }
 
 model ClassroomAssignmentMaterial {

@@ -67,6 +67,7 @@ export default function EditAssignmentPage() {
   const [clearFile, setClearFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
+  const [materialSearch, setMaterialSearch] = useState("");
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
   const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>({});
   const [initialized, setInitialized] = useState(false);
@@ -453,21 +454,32 @@ export default function EditAssignmentPage() {
                         })}
                       </div>
                     )}
+                    {materials.length > 3 && (
+                      <input
+                        type="search"
+                        placeholder="Search classwork…"
+                        value={materialSearch}
+                        onChange={(e) => setMaterialSearch(e.target.value)}
+                        className="w-full h-8 rounded-lg border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                    )}
                     <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
-                      {materials.map((m) => {
-                        const selected = selectedMaterialIds.includes(m.id);
-                        return (
-                          <button key={m.id} type="button"
-                            onClick={() => setSelectedMaterialIds((prev) => selected ? prev.filter((id) => id !== m.id) : [...prev, m.id])}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all text-sm ${selected ? "border-primary bg-primary/5 text-foreground" : "border-border bg-transparent text-muted-foreground hover:text-foreground hover:border-primary/40"}`}
-                          >
-                            <span className={`shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors ${selected ? "bg-primary border-primary" : "border-border"}`}>
-                              {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                            </span>
-                            <span className="truncate">{m.title}</span>
-                          </button>
-                        );
-                      })}
+                      {materials
+                        .filter((m) => m.title.toLowerCase().includes(materialSearch.toLowerCase()))
+                        .map((m) => {
+                          const selected = selectedMaterialIds.includes(m.id);
+                          return (
+                            <button key={m.id} type="button"
+                              onClick={() => setSelectedMaterialIds((prev) => selected ? prev.filter((id) => id !== m.id) : [...prev, m.id])}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all text-sm ${selected ? "border-primary bg-primary/5 text-foreground" : "border-border bg-transparent text-muted-foreground hover:text-foreground hover:border-primary/40"}`}
+                            >
+                              <span className={`shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors ${selected ? "bg-primary border-primary" : "border-border"}`}>
+                                {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                              </span>
+                              <span className="truncate">{m.title}</span>
+                            </button>
+                          );
+                        })}
                     </div>
                   </div>
                 )}
@@ -752,31 +764,42 @@ export default function EditAssignmentPage() {
                         })}
                       </div>
                     )}
+                    {materials.length > 3 && (
+                      <input
+                        type="search"
+                        placeholder="Search classwork…"
+                        value={materialSearch}
+                        onChange={(e) => setMaterialSearch(e.target.value)}
+                        className="w-full h-8 rounded-lg border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                    )}
                     <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
-                      {materials.map((m) => {
-                        const selected = selectedMaterialIds.includes(m.id);
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() =>
-                              setSelectedMaterialIds((prev) =>
-                                selected ? prev.filter((id) => id !== m.id) : [...prev, m.id]
-                              )
-                            }
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all text-sm ${
-                              selected
-                                ? "border-primary bg-primary/5 text-foreground"
-                                : "border-border bg-transparent text-muted-foreground hover:text-foreground hover:border-primary/40"
-                            }`}
-                          >
-                            <span className={`shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors ${selected ? "bg-primary border-primary" : "border-border"}`}>
-                              {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                            </span>
-                            <span className="truncate">{m.title}</span>
-                          </button>
-                        );
-                      })}
+                      {materials
+                        .filter((m) => m.title.toLowerCase().includes(materialSearch.toLowerCase()))
+                        .map((m) => {
+                          const selected = selectedMaterialIds.includes(m.id);
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() =>
+                                setSelectedMaterialIds((prev) =>
+                                  selected ? prev.filter((id) => id !== m.id) : [...prev, m.id]
+                                )
+                              }
+                              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all text-sm ${
+                                selected
+                                  ? "border-primary bg-primary/5 text-foreground"
+                                  : "border-border bg-transparent text-muted-foreground hover:text-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              <span className={`shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors ${selected ? "bg-primary border-primary" : "border-border"}`}>
+                                {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                              </span>
+                              <span className="truncate">{m.title}</span>
+                            </button>
+                          );
+                        })}
                     </div>
                   </div>
                 )}

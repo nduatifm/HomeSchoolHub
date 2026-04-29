@@ -237,27 +237,6 @@ export function registerRoutes(app: Express) {
     }
   })();
 
-  // Migrate legacy ClassroomMaterial.assignmentId → ClassroomAssignmentMaterial join table (one-time, idempotent)
-  (async () => {
-    try {
-      const unmigratedMaterials = await prisma.classroomMaterial.findMany({
-        where: { assignmentId: { not: null } },
-        select: { id: true, assignmentId: true },
-      });
-      if (unmigratedMaterials.length > 0) {
-        for (const m of unmigratedMaterials) {
-          await prisma.classroomAssignmentMaterial.upsert({
-            where: { assignmentId_materialId: { assignmentId: m.assignmentId!, materialId: m.id } },
-            create: { assignmentId: m.assignmentId!, materialId: m.id },
-            update: {},
-          });
-        }
-        console.log(`[migration] Migrated ${unmigratedMaterials.length} legacy material-assignment link(s) to join table`);
-      }
-    } catch (err) {
-      console.error("[migration] Failed to migrate legacy material-assignment links:", err);
-    }
-  })();
 
   // Ensure TUTOR_REQUEST_MODE is ON by default (requests require teacher approval)
   storage.getSystemSetting("TUTOR_REQUEST_MODE").then(async (s) => {

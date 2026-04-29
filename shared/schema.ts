@@ -550,6 +550,15 @@ export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: 
 export type ClassroomMaterial = z.infer<typeof classroomMaterialSchema>;
 export type InsertClassroomMaterial = z.infer<typeof insertClassroomMaterialSchema>;
 
+// ClassroomAssignmentMaterial join table schema
+export const classroomAssignmentMaterialSchema = z.object({
+  assignmentId: z.number(),
+  materialId: z.number(),
+});
+export const insertClassroomAssignmentMaterialSchema = classroomAssignmentMaterialSchema;
+export type ClassroomAssignmentMaterial = z.infer<typeof classroomAssignmentMaterialSchema>;
+export type InsertClassroomAssignmentMaterial = z.infer<typeof insertClassroomAssignmentMaterialSchema>;
+
 // Teacher Assignment schema (for direct teacher-student assignments without request flow)
 export const teacherStudentAssignmentSchema = z.object({
   id: z.number(),
