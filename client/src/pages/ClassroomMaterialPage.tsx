@@ -20,6 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
 import {
@@ -132,11 +138,6 @@ function TeacherEditor({
   // Files the teacher has staged locally (not yet uploaded).
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
-  // Toolbar dropdown state
-  const [showStyleMenu, setShowStyleMenu] = useState(false);
-  const [showAlignMenu, setShowAlignMenu] = useState(false);
-  const toolbarRef = useRef<HTMLDivElement>(null);
-
   // Force a re-render whenever the editor selection or content changes so
   // toolbar active-state highlights stay current.
   const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
@@ -185,19 +186,6 @@ function TeacherEditor({
       editor.off("update", forceUpdate);
     };
   }, [editor, forceUpdate]);
-
-  // Close toolbar dropdowns when clicking outside the toolbar
-  useEffect(() => {
-    if (!showStyleMenu && !showAlignMenu) return;
-    const close = (e: MouseEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
-        setShowStyleMenu(false);
-        setShowAlignMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [showStyleMenu, showAlignMenu]);
 
   // ── Style / alignment helpers ──────────────────────────────────────────────
 
@@ -377,10 +365,7 @@ function TeacherEditor({
 
           {/* Center: toolbar */}
           <div className="flex-1 flex justify-center overflow-x-auto">
-            <div
-              ref={toolbarRef}
-              className="flex items-center gap-0.5 bg-muted/50 rounded-xl px-2 py-1.5 shrink-0"
-            >
+            <div className="flex items-center gap-0.5 bg-muted/50 rounded-xl px-2 py-1.5 shrink-0">
               {editor && <>
                 {/* Undo / Redo */}
                 <button type="button" title="Undo"
@@ -396,37 +381,37 @@ function TeacherEditor({
 
                 {sep}
 
-                {/* Style dropdown */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    title="Text style"
-                    onMouseDown={(e) => { e.preventDefault(); setShowAlignMenu(false); setShowStyleMenu((v) => !v); }}
-                    className="h-7 flex items-center gap-1 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    {getCurrentStyle()}
-                    <ChevronDown className="h-3 w-3 opacity-60" />
-                  </button>
-                  {showStyleMenu && (
-                    <div className="absolute top-full left-0 mt-1 bg-white dark:bg-background border border-border rounded-xl shadow-lg z-50 py-1 min-w-[130px]">
-                      {([
-                        { label: "Normal", fn: () => editor.chain().focus().setParagraph().run(), active: getCurrentStyle() === "Normal" },
-                        { label: "Heading 1", fn: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), active: getCurrentStyle() === "H1" },
-                        { label: "Heading 2", fn: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), active: getCurrentStyle() === "H2" },
-                        { label: "Heading 3", fn: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), active: getCurrentStyle() === "H3" },
-                      ] as { label: string; fn: () => void; active: boolean }[]).map((item) => (
-                        <button
-                          key={item.label}
-                          type="button"
-                          onMouseDown={(e) => { e.preventDefault(); item.fn(); setShowStyleMenu(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-muted/60 ${item.active ? "text-primary font-medium" : "text-foreground"}`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Style dropdown — Radix portal so overflow-x-auto never clips it */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title="Text style"
+                      onMouseDown={(e) => e.preventDefault()}
+                      className="h-7 flex items-center gap-1 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      {getCurrentStyle()}
+                      <ChevronDown className="h-3 w-3 opacity-60" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[130px]">
+                    {([
+                      { label: "Normal", fn: () => editor.chain().focus().setParagraph().run(), active: getCurrentStyle() === "Normal" },
+                      { label: "Heading 1", fn: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), active: getCurrentStyle() === "H1" },
+                      { label: "Heading 2", fn: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), active: getCurrentStyle() === "H2" },
+                      { label: "Heading 3", fn: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), active: getCurrentStyle() === "H3" },
+                    ] as { label: string; fn: () => void; active: boolean }[]).map((item) => (
+                      <DropdownMenuItem
+                        key={item.label}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onSelect={() => item.fn()}
+                        className={item.active ? "text-primary font-medium" : ""}
+                      >
+                        {item.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {sep}
 
@@ -485,42 +470,38 @@ function TeacherEditor({
 
                 {sep}
 
-                {/* Alignment dropdown */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    title="Text alignment"
-                    onMouseDown={(e) => { e.preventDefault(); setShowStyleMenu(false); setShowAlignMenu((v) => !v); }}
-                    className="h-7 flex items-center gap-0.5 rounded-lg px-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    {alignIcons[getCurrentAlign()]}
-                    <ChevronDown className="h-3 w-3 opacity-60" />
-                  </button>
-                  {showAlignMenu && (
-                    <div className="absolute top-full right-0 mt-1 bg-white dark:bg-background border border-border rounded-xl shadow-lg z-50 py-1">
-                      {([
-                        { align: "left", label: "Left", icon: <AlignLeft className="h-3.5 w-3.5" /> },
-                        { align: "center", label: "Center", icon: <AlignCenter className="h-3.5 w-3.5" /> },
-                        { align: "right", label: "Right", icon: <AlignRight className="h-3.5 w-3.5" /> },
-                        { align: "justify", label: "Justify", icon: <AlignJustify className="h-3.5 w-3.5" /> },
-                      ] as { align: string; label: string; icon: JSX.Element }[]).map((item) => (
-                        <button
-                          key={item.align}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            editor.chain().focus().setTextAlign(item.align).run();
-                            setShowAlignMenu(false);
-                          }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors hover:bg-muted/60 ${getCurrentAlign() === item.align ? "text-primary font-medium" : "text-foreground"}`}
-                        >
-                          {item.icon}
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* Alignment dropdown — Radix portal so overflow-x-auto never clips it */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title="Text alignment"
+                      onMouseDown={(e) => e.preventDefault()}
+                      className="h-7 flex items-center gap-0.5 rounded-lg px-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      {alignIcons[getCurrentAlign()]}
+                      <ChevronDown className="h-3 w-3 opacity-60" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {([
+                      { align: "left", label: "Left", icon: <AlignLeft className="h-3.5 w-3.5" /> },
+                      { align: "center", label: "Center", icon: <AlignCenter className="h-3.5 w-3.5" /> },
+                      { align: "right", label: "Right", icon: <AlignRight className="h-3.5 w-3.5" /> },
+                      { align: "justify", label: "Justify", icon: <AlignJustify className="h-3.5 w-3.5" /> },
+                    ] as { align: string; label: string; icon: JSX.Element }[]).map((item) => (
+                      <DropdownMenuItem
+                        key={item.align}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onSelect={() => editor.chain().focus().setTextAlign(item.align).run()}
+                        className={`gap-2.5 ${getCurrentAlign() === item.align ? "text-primary font-medium" : ""}`}
+                      >
+                        {item.icon}
+                        {item.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>}
             </div>
           </div>
