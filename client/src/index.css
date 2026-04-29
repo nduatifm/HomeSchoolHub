@@ -237,7 +237,9 @@
   margin: 1rem 0;
 }
 
-/* Fallback: if the table is not wrapped, still scroll at the prose level */
-.prose {
+/* Fallback: bare <table> not inside a .tableWrapper still gets horizontal scroll */
+.prose > table,
+.ProseMirror > table {
   overflow-x: auto;
+  display: block;
 }
