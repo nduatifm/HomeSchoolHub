@@ -1,53 +1,90 @@
-import { createPortal } from "react-dom";
+import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
 import { cn } from "@/lib/utils";
 
-function ContextMenuPanel({
-  x,
-  y,
-  children,
-}: {
-  x: number;
-  y: number;
-  children: React.ReactNode;
-}) {
-  return createPortal(
-    <div
-      style={{ position: "fixed", top: y, left: x }}
-      className="z-50 min-w-[190px] overflow-hidden rounded-md border border-border bg-white p-1 text-foreground shadow-md"
-    >
-      {children}
-    </div>,
-    document.body,
+const ContextMenu = ContextMenuPrimitive.Root;
+const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
+const ContextMenuGroup = ContextMenuPrimitive.Group;
+const ContextMenuPortal = ContextMenuPrimitive.Portal;
+
+function ContextMenuContent({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>) {
+  return (
+    <ContextMenuPrimitive.Portal>
+      <ContextMenuPrimitive.Content
+        className={cn(
+          "z-50 min-w-[190px] overflow-hidden rounded-md border border-border bg-white p-1 text-foreground shadow-md",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          className,
+        )}
+        {...props}
+      />
+    </ContextMenuPrimitive.Portal>
   );
 }
 
 function ContextMenuItem({
-  onAction,
-  children,
   className,
-}: {
-  onAction: () => void;
-  children: React.ReactNode;
-  className?: string;
+  inset,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
+  inset?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={onAction}
+    <ContextMenuPrimitive.Item
       className={cn(
-        "relative w-full flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none",
-        "transition-colors hover:bg-muted hover:text-foreground text-foreground",
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none",
+        "transition-colors focus:bg-muted focus:text-foreground",
+        "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        inset && "pl-8",
         className,
       )}
-    >
-      {children}
-    </button>
+      {...props}
+    />
   );
 }
 
-function ContextMenuSeparator({ className }: { className?: string }) {
-  return <div className={cn("-mx-1 my-1 h-px bg-border", className)} />;
+function ContextMenuSeparator({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Separator>) {
+  return (
+    <ContextMenuPrimitive.Separator
+      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      {...props}
+    />
+  );
 }
 
-export { ContextMenuPanel, ContextMenuItem, ContextMenuSeparator };
+function ContextMenuLabel({
+  className,
+  inset,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Label> & {
+  inset?: boolean;
+}) {
+  return (
+    <ContextMenuPrimitive.Label
+      className={cn(
+        "px-2 py-1.5 text-xs font-semibold text-muted-foreground",
+        inset && "pl-8",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+  ContextMenuGroup,
+  ContextMenuPortal,
+};

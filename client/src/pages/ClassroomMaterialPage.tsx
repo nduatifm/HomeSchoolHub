@@ -28,8 +28,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ContextMenuPanel,
-  ContextMenuItem as ContextMenuAction,
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 import { toast } from "@/hooks/use-toast";
@@ -154,8 +156,8 @@ function TeacherEditor({
   // Grid picker hover state for the table insert tool.
   const [tableHoverRow, setTableHoverRow] = useState(0);
   const [tableHoverCol, setTableHoverCol] = useState(0);
-  // Right-click context menu position (null = closed).
-  const [tableCtxMenu, setTableCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  // Ref to the editor prose wrapper — used by the context-menu capture listener.
+  const editorWrapperRef = useRef<HTMLDivElement>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);   // PDF / any attachment
   const imageRef = useRef<HTMLInputElement>(null);  // toolbar image-only picker
@@ -206,18 +208,20 @@ function TeacherEditor({
     };
   }, [editor, forceUpdate]);
 
-  // Close the right-click context menu on any click or Escape key.
+  // Capture-phase contextmenu listener: when the cursor is NOT inside a table,
+  // stop the event before it reaches the Radix ContextMenuTrigger (which would
+  // otherwise always suppress the browser's native context menu). Stopping
+  // propagation without calling preventDefault lets the browser show its own menu.
   useEffect(() => {
-    if (!tableCtxMenu) return;
-    const close = () => setTableCtxMenu(null);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    document.addEventListener("click", close);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("click", close);
-      document.removeEventListener("keydown", onKey);
+    if (!editor) return;
+    const handleCapture = (e: MouseEvent) => {
+      const wrapper = editorWrapperRef.current;
+      if (!wrapper || !wrapper.contains(e.target as Node)) return;
+      if (!editor.isActive("table")) e.stopPropagation();
     };
-  }, [tableCtxMenu]);
+    document.addEventListener("contextmenu", handleCapture, true);
+    return () => document.removeEventListener("contextmenu", handleCapture, true);
+  }, [editor]);
 
   // ── Style / alignment helpers ──────────────────────────────────────────────
 
@@ -711,73 +715,90 @@ function TeacherEditor({
 
             <div className="border-t border-border mb-8" />
 
-            {/* Body */}
-            <div
-              className="prose prose-sm max-w-none text-foreground
-              prose-headings:font-semibold prose-headings:text-foreground
-              prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
-              prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
-              prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-1.5
-              prose-p:leading-relaxed prose-p:my-2 prose-p:text-foreground/90
-              prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
-              prose-strong:font-semibold prose-strong:text-foreground
-              prose-em:text-foreground/80
-              prose-a:text-primary prose-a:underline
-              prose-hr:border-border prose-hr:my-6
-              prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
-              onContextMenu={(e) => {
-                if (!editor?.isActive("table")) return;
-                e.preventDefault();
-                setTableCtxMenu({ x: e.clientX, y: e.clientY });
-              }}
-            >
-              <EditorContent editor={editor} />
-            </div>
+            {/* Body — wrapped in ContextMenu so right-clicking inside a table
+                opens the table action menu. The capture-phase listener above
+                stops the event before it reaches the Radix trigger whenever the
+                cursor is NOT in a table, so the browser's native menu shows instead. */}
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div
+                  ref={editorWrapperRef}
+                  className="prose prose-sm max-w-none text-foreground
+                  prose-headings:font-semibold prose-headings:text-foreground
+                  prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
+                  prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
+                  prose-h3:text-lg prose-h3:mt-5 prose-h3:mb-1.5
+                  prose-p:leading-relaxed prose-p:my-2 prose-p:text-foreground/90
+                  prose-ul:pl-5 prose-ol:pl-5 prose-li:my-0.5
+                  prose-strong:font-semibold prose-strong:text-foreground
+                  prose-em:text-foreground/80
+                  prose-a:text-primary prose-a:underline
+                  prose-hr:border-border prose-hr:my-6
+                  prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
+                >
+                  <EditorContent editor={editor} />
+                </div>
+              </ContextMenuTrigger>
 
-            {/* Table right-click context menu — only shown when cursor is inside a table */}
-            {tableCtxMenu && editor && (
-              <ContextMenuPanel x={tableCtxMenu.x} y={tableCtxMenu.y}>
-                <ContextMenuAction onAction={() => { editor.chain().focus().addRowBefore().run(); setTableCtxMenu(null); }}>
-                  <RowsIcon className="h-3.5 w-3.5 shrink-0" />
-                  Add row above
-                </ContextMenuAction>
-                <ContextMenuAction onAction={() => { editor.chain().focus().addRowAfter().run(); setTableCtxMenu(null); }}>
-                  <RowsIcon className="h-3.5 w-3.5 shrink-0" />
-                  Add row below
-                </ContextMenuAction>
-                <ContextMenuAction
-                  onAction={() => { editor.chain().focus().deleteRow().run(); setTableCtxMenu(null); }}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                  Delete row
-                </ContextMenuAction>
-                <ContextMenuSeparator />
-                <ContextMenuAction onAction={() => { editor.chain().focus().addColumnBefore().run(); setTableCtxMenu(null); }}>
-                  <Columns3 className="h-3.5 w-3.5 shrink-0" />
-                  Add column before
-                </ContextMenuAction>
-                <ContextMenuAction onAction={() => { editor.chain().focus().addColumnAfter().run(); setTableCtxMenu(null); }}>
-                  <Columns3 className="h-3.5 w-3.5 shrink-0" />
-                  Add column after
-                </ContextMenuAction>
-                <ContextMenuAction
-                  onAction={() => { editor.chain().focus().deleteColumn().run(); setTableCtxMenu(null); }}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                  Delete column
-                </ContextMenuAction>
-                <ContextMenuSeparator />
-                <ContextMenuAction
-                  onAction={() => { editor.chain().focus().deleteTable().run(); setTableCtxMenu(null); }}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                  Delete table
-                </ContextMenuAction>
-              </ContextMenuPanel>
-            )}
+              {editor && (
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    onMouseDown={(e) => e.preventDefault()}
+                    onSelect={() => editor.chain().focus().addRowBefore().run()}
+                  >
+                    <RowsIcon className="h-3.5 w-3.5 shrink-0" />
+                    Add row above
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onMouseDown={(e) => e.preventDefault()}
+                    onSelect={() => editor.chain().focus().addRowAfter().run()}
+                  >
+                    <RowsIcon className="h-3.5 w-3.5 shrink-0" />
+                    Add row below
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onMouseDown={(e) => e.preventDefault()}
+                    onSelect={() => editor.chain().focus().deleteRow().run()}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                    Delete row
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onMouseDown={(e) => e.preventDefault()}
+                    onSelect={() => editor.chain().focus().addColumnBefore().run()}
+                  >
+                    <Columns3 className="h-3.5 w-3.5 shrink-0" />
+                    Add column before
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onMouseDown={(e) => e.preventDefault()}
+                    onSelect={() => editor.chain().focus().addColumnAfter().run()}
+                  >
+                    <Columns3 className="h-3.5 w-3.5 shrink-0" />
+                    Add column after
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onMouseDown={(e) => e.preventDefault()}
+                    onSelect={() => editor.chain().focus().deleteColumn().run()}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                    Delete column
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    onMouseDown={(e) => e.preventDefault()}
+                    onSelect={() => editor.chain().focus().deleteTable().run()}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                    Delete table
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              )}
+            </ContextMenu>
           </div>
         </main>
 
