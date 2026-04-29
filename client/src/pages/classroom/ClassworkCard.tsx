@@ -52,8 +52,9 @@ export default function ClassworkCard({
     onError: () => toast({ title: "Couldn't delete — try again.", type: "error" }),
   });
 
-  const linkedFullAssignment = item.linkedAssignment
-    ? assignments.find((a) => a.id === item.linkedAssignment!.id) ?? null
+  const primaryLinkedId = (item.linkedAssignmentIds ?? [])[0] ?? null;
+  const linkedFullAssignment = primaryLinkedId
+    ? assignments.find((a) => a.id === primaryLinkedId) ?? null
     : null;
   const classroomStatus = isArchived ? "archived" : "active";
   const urgency =
@@ -89,7 +90,7 @@ export default function ClassworkCard({
             <span className="font-semibold text-sm text-foreground">{item.title}</span>
             {urlKind === "pdf" && <FileText className="h-3 w-3 text-muted-foreground shrink-0" />}
             {urlKind === "link" && <Paperclip className="h-3 w-3 text-muted-foreground shrink-0" />}
-            {item.linkedAssignment && <Link2 className="h-3 w-3 text-primary shrink-0" />}
+            {(item.linkedAssignmentIds ?? []).length > 0 && <Link2 className="h-3 w-3 text-primary shrink-0" />}
             {urgency === "overdue" && (
               <Badge className="text-[11px] px-1.5 py-0 h-5 bg-red-100 text-red-700 hover:bg-red-100 border-0">
                 Overdue

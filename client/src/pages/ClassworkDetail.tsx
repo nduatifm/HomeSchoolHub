@@ -490,7 +490,7 @@ export default function ClassworkDetail() {
   const isStudent = user?.role === "student";
   const isParent = user?.role === "parent";
 
-  const linkedMaterials = classworkMaterials.filter((m) => m.assignmentId === assignment?.id);
+  const linkedMaterials = classworkMaterials.filter((m) => (m.linkedAssignmentIds ?? []).includes(assignment?.id ?? -1));
 
   return (
     <div className="min-h-screen bg-background">

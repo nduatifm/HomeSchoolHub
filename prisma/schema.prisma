@@ -497,9 +497,10 @@ model ClassroomAssignment {
   answerKey      Json?
   createdAt      DateTime @default(now())
 
-  classroom   Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  submissions ClassroomSubmission[]
-  materials   ClassroomMaterial[]
+  classroom     Classroom                    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  submissions   ClassroomSubmission[]
+  materials     ClassroomMaterial[]
+  materialLinks ClassroomAssignmentMaterial[]
 
   @@unique([classroomId, slug])
   @@index([classroomId])
@@ -536,12 +537,24 @@ model ClassroomMaterial {
   slug         String?
   uploadedAt   DateTime @default(now())
 
-  classroom  Classroom            @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  assignment ClassroomAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  classroom       Classroom                    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  assignment      ClassroomAssignment?         @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  assignmentLinks ClassroomAssignmentMaterial[]
 
   @@unique([classroomId, slug])
   @@index([classroomId])
   @@index([assignmentId])
+}
+
+model ClassroomAssignmentMaterial {
+  assignmentId Int
+  materialId   Int
+
+  assignment ClassroomAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  material   ClassroomMaterial   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@id([assignmentId, materialId])
+  @@index([materialId])
 }
 
 // ─── Content seen tracking ──────────────────────────────────────────────────

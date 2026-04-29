@@ -25,7 +25,8 @@ import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb from "@/components/Breadcrumb";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
-import type { Classroom, ClassroomAssignment, FormQuestion, ItemType } from "@shared/schema";
+import { BookOpen, Check } from "lucide-react";
+import type { Classroom, ClassroomAssignment, ClassroomMaterial, FormQuestion, ItemType } from "@shared/schema";
 
 const typeLabel: Record<string, string> = {
   short: "Short answer",
@@ -65,6 +66,7 @@ export default function EditAssignmentPage() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [clearFile, setClearFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
   const [formQuestions, setFormQuestions] = useState<FormQuestion[]>([]);
   const [answerKey, setAnswerKey] = useState<Record<string, string | string[]>>({});
   const [initialized, setInitialized] = useState(false);
@@ -127,6 +129,12 @@ export default function EditAssignmentPage() {
 
   const classroomId = classroom?.id ?? 0;
 
+  const { data: materials = [] } = useQuery<ClassroomMaterial[]>({
+    queryKey: ["/api/classrooms", classroomId, "materials"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
+    enabled: !!classroomId,
+  });
+
   const { data: assignment, isLoading: assignmentLoading } = useQuery<ClassroomAssignment>({
     queryKey: ["/api/classrooms", classroomId, "assignments", "slug", assignmentSlug],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments/slug/${assignmentSlug}`),
@@ -151,6 +159,7 @@ export default function EditAssignmentPage() {
     setLinkUrl(seedLink);
     setFormQuestions(existing);
     setAnswerKey(existingKey);
+    setSelectedMaterialIds(assignment.linkedMaterialIds ?? []);
     localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(existing));
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(existingKey));
     // Snapshot captured here — isDirty compares against this baseline
@@ -222,6 +231,7 @@ export default function EditAssignmentPage() {
           linkUrl: linkUrl.trim() || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
           answerKey: formQuestions.length > 0 && Object.keys(answerKey).length > 0 ? answerKey : null,
+          materialIds: selectedMaterialIds,
         }),
       });
     },
@@ -676,6 +686,42 @@ export default function EditAssignmentPage() {
                     </label>
                   )}
                 </div>
+
+                {/* Classwork */}
+                {materials.length > 0 && (
+                  <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <BookOpen className="h-3.5 w-3.5" /> Classwork
+                      <span className="normal-case font-normal tracking-normal ml-1 text-muted-foreground/60 text-xs">optional</span>
+                    </p>
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
+                      {materials.map((m) => {
+                        const selected = selectedMaterialIds.includes(m.id);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() =>
+                              setSelectedMaterialIds((prev) =>
+                                selected ? prev.filter((id) => id !== m.id) : [...prev, m.id]
+                              )
+                            }
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all text-sm ${
+                              selected
+                                ? "border-primary bg-primary/5 text-foreground"
+                                : "border-border bg-transparent text-muted-foreground hover:text-foreground hover:border-primary/40"
+                            }`}
+                          >
+                            <span className={`shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors ${selected ? "bg-primary border-primary" : "border-border"}`}>
+                              {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                            </span>
+                            <span className="truncate">{m.title}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Validation nudges */}
                 {!form.dueDate && (

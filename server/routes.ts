@@ -237,6 +237,28 @@ export function registerRoutes(app: Express) {
     }
   })();
 
+  // Migrate legacy ClassroomMaterial.assignmentId → ClassroomAssignmentMaterial join table (one-time, idempotent)
+  (async () => {
+    try {
+      const unmigratedMaterials = await prisma.classroomMaterial.findMany({
+        where: { assignmentId: { not: null } },
+        select: { id: true, assignmentId: true },
+      });
+      if (unmigratedMaterials.length > 0) {
+        for (const m of unmigratedMaterials) {
+          await prisma.classroomAssignmentMaterial.upsert({
+            where: { assignmentId_materialId: { assignmentId: m.assignmentId!, materialId: m.id } },
+            create: { assignmentId: m.assignmentId!, materialId: m.id },
+            update: {},
+          });
+        }
+        console.log(`[migration] Migrated ${unmigratedMaterials.length} legacy material-assignment link(s) to join table`);
+      }
+    } catch (err) {
+      console.error("[migration] Failed to migrate legacy material-assignment links:", err);
+    }
+  })();
+
   // Ensure TUTOR_REQUEST_MODE is ON by default (requests require teacher approval)
   storage.getSystemSetting("TUTOR_REQUEST_MODE").then(async (s) => {
     if (!s) {
@@ -4858,7 +4880,15 @@ export function registerRoutes(app: Express) {
       const finalData = { ...data };
       if (data.formSchema == null) finalData.answerKey = undefined;
 
-      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...finalData });
+      const rawMaterialIds = req.body.materialIds;
+      let materialIds: number[] | undefined;
+      if (Array.isArray(rawMaterialIds)) {
+        materialIds = rawMaterialIds.map(Number).filter((n) => !isNaN(n));
+      } else if (typeof rawMaterialIds === "string") {
+        try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
+      }
+
+      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...finalData }, materialIds);
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -4914,11 +4944,18 @@ export function registerRoutes(app: Express) {
       }
 
       const linkUrl = data.linkUrl || undefined;
+
+      let materialIds: number[] | undefined;
+      const rawMaterialIds = req.body.materialIds;
+      if (rawMaterialIds) {
+        try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
+      }
+
       const assignment = await storage.createClassroomAssignment({
         classroomId: classroom.id, ...data, fileUrl, linkUrl,
         ...(formSchema !== undefined ? { formSchema } : {}),
         ...(answerKey !== undefined ? { answerKey } : {}),
-      });
+      }, materialIds);
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -4993,7 +5030,15 @@ export function registerRoutes(app: Express) {
         data.answerKey = null;
       }
 
-      const updated = await storage.updateClassroomAssignment(assignmentId, data);
+      const rawMaterialIds = req.body.materialIds;
+      let materialIds: number[] | undefined;
+      if (Array.isArray(rawMaterialIds)) {
+        materialIds = rawMaterialIds.map(Number).filter((n) => !isNaN(n));
+      } else if (typeof rawMaterialIds === "string") {
+        try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
+      }
+
+      const updated = await storage.updateClassroomAssignment(assignmentId, data, materialIds);
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

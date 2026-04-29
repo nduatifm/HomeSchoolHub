@@ -68,10 +68,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   const totalPoints = assignments.reduce((s, a) => s + a.points, 0);
   const earned = mySubmissions.reduce((s, sub) => s + (sub.grade ?? 0), 0);
 
-  const materialByAssignment: Record<number, ClassroomMaterial> = {};
-  for (const m of materials) {
-    if (m.assignmentId != null) materialByAssignment[m.assignmentId] = m;
-  }
+  const materialById: Record<number, ClassroomMaterial> = Object.fromEntries(materials.map((m) => [m.id, m]));
 
   function openMaterial(m: ClassroomMaterial) {
     setMaterialOpen(m);
@@ -210,14 +207,23 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                       : <StatusBadge status="not-submitted" />
                     }
                   </div>
-                  {materialByAssignment[a.id] && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); openMaterial(materialByAssignment[a.id]); }}
-                      className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 bg-primary/8 hover:bg-primary/12 px-2 py-0.5 rounded-full transition-colors"
-                    >
-                      <BookOpen className="h-3 w-3" />View material
-                    </button>
+                  {(a.linkedMaterialIds ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(a.linkedMaterialIds ?? []).map((mid) => {
+                        const mat = materialById[mid];
+                        if (!mat) return null;
+                        return (
+                          <button
+                            key={mid}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openMaterial(mat); }}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 bg-primary/8 hover:bg-primary/12 px-2 py-0.5 rounded-full transition-colors"
+                          >
+                            <BookOpen className="h-3 w-3" />{mat.title}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                   {sub?.feedback && (
                     <p className="text-xs text-muted-foreground italic mt-1">"{sub.feedback}"</p>

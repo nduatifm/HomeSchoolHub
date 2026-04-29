@@ -225,14 +225,17 @@ export default function ClassroomDetail() {
   // Classwork badge: student = linked-pending + unseen standalone; parent = all unseen
   const classworkBadge = isStudent
     ? _badgeMaterials.filter((m) => {
-        if (m.linkedAssignment?.id) {
-          const sub = _badgeSubmissions.find((s) => s.assignmentId === m.linkedAssignment!.id);
-          return !sub || sub.status === "pending";
+        const linked = m.linkedAssignmentIds ?? [];
+        if (linked.length > 0) {
+          return linked.some((aid) => {
+            const sub = _badgeSubmissions.find((s) => s.assignmentId === aid);
+            return !sub || sub.status === "pending";
+          });
         }
         return !seenMaterialIds.has(m.id);
       }).length
     : isParent
-      ? _badgeMaterials.filter((m) => !m.linkedAssignment?.id && !seenMaterialIds.has(m.id)).length
+      ? _badgeMaterials.filter((m) => (!m.linkedAssignmentIds || m.linkedAssignmentIds.length === 0) && !seenMaterialIds.has(m.id)).length
       : 0;
 
   // Feed badge: unseen posts for students/parents; teachers have no feed badge

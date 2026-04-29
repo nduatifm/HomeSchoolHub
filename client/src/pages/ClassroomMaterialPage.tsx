@@ -135,9 +135,6 @@ function TeacherEditor({
   const [, navigate] = useLocation();
   const goBack = useGoBack(`/classrooms/${classroomSlug}/classwork`);
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [assignmentId, setAssignmentId] = useState(
-    initial?.assignmentId ? String(initial.assignmentId) : "",
-  );
 
   // All saved PDF attachment URLs — seeded from the new attachments[] array,
   // plus the legacy single `url` field if it was a PDF (backward compat).
@@ -344,7 +341,6 @@ function TeacherEditor({
           title,
           description,
           attachments,
-          assignmentId: assignmentId ? Number(assignmentId) : null,
         }),
       }) as Promise<ClassroomMaterial>;
     },
@@ -919,32 +915,21 @@ function TeacherEditor({
 
             <div className="border-t border-border" />
 
-            {/* Link to assignment */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Link to assignment</p>
-              {assignments.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No assignments in this classroom yet.
-                </p>
-              ) : (
-                <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
-                  <SelectTrigger className="h-9 gap-2 text-sm">
-                    <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="flex-1 truncate text-left">
-                      {assignmentId
-                        ? (assignments.find((a) => String(a.id) === assignmentId)?.title ?? "Loading…")
-                        : "None"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    <SelectItem value="none">No linked assignment</SelectItem>
-                    {assignments.map((a) => (
-                      <SelectItem key={a.id} value={String(a.id)}>{a.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            {/* Linked assignments (read-only — set from the assignment's edit page) */}
+            {initial && (initial.linkedAssignmentIds ?? []).length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">Linked assignments</p>
+                {(initial.linkedAssignmentIds ?? []).map((aid) => {
+                  const a = assignments.find((x) => x.id === aid);
+                  return a ? (
+                    <div key={aid} className="flex items-center gap-2 text-xs text-primary bg-primary/8 rounded-lg px-3 py-1.5">
+                      <BookOpen className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{a.title}</span>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            )}
           </div>
         </aside>
 
@@ -998,25 +983,18 @@ function TeacherEditor({
                   </div>
                 );
               })}
-              {assignments.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No assignments in this classroom yet.</p>
-              ) : (
-                <Select value={assignmentId || "none"} onValueChange={(v) => setAssignmentId(v === "none" ? "" : v)}>
-                  <SelectTrigger className="h-9 gap-2">
-                    <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="flex-1 truncate text-left text-sm">
-                      {assignmentId
-                        ? (assignments.find((a) => String(a.id) === assignmentId)?.title ?? "Loading…")
-                        : "No linked assignment"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    <SelectItem value="none">No linked assignment</SelectItem>
-                    {assignments.map((a) => (
-                      <SelectItem key={a.id} value={String(a.id)}>{a.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {initial && (initial.linkedAssignmentIds ?? []).length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Linked assignments</p>
+                  {(initial.linkedAssignmentIds ?? []).map((aid) => {
+                    const a = assignments.find((x) => x.id === aid);
+                    return a ? (
+                      <div key={aid} className="flex items-center gap-2 text-xs text-primary bg-primary/8 rounded-lg px-3 py-1.5">
+                        <BookOpen className="h-3 w-3 shrink-0" /><span className="truncate">{a.title}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
               )}
               <Button disabled={!canSave} onClick={() => saveMutation.mutate()} className="w-full rounded-xl">
                 {saveMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
@@ -1070,6 +1048,12 @@ function ReadView({
   const sp = new URLSearchParams(window.location.search);
   const parentStudentId = sp.get("studentId") ?? "";
 
+  const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
+    queryKey: ["/api/classrooms", classroomId, "assignments"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
+    enabled: !!classroomId && (material.linkedAssignmentIds ?? []).length > 0,
+  });
+
   const backHref = `/classrooms/${classroomSlug}/classwork${
     isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""
   }`;
@@ -1081,9 +1065,9 @@ function ReadView({
   }, [classroomId, material.id, isTeacher]);
 
   const urlKind = material.url ? getAttachmentKind(material.url) : null;
-  const assignmentHref = material.linkedAssignment
-    ? `/classrooms/${classroomSlug}/classwork/${material.linkedAssignment.slug ?? material.linkedAssignment.id}`
-    : null;
+  const linkedAssignments = (material.linkedAssignmentIds ?? [])
+    .map((aid) => assignments.find((a) => a.id === aid))
+    .filter(Boolean) as ClassroomAssignment[];
 
   const hasBody = material.description &&
     material.description !== "<p></p>" &&
@@ -1189,23 +1173,26 @@ function ReadView({
             </div>
           )}
 
-          {assignmentHref && (
-            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
-                  Linked Assignment
-                </p>
-                <p className="text-base font-semibold text-foreground leading-snug truncate">
-                  {material.linkedAssignment!.title}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                className="gap-1.5 shrink-0 h-9 px-4"
-                onClick={() => navigate(assignmentHref)}
-              >
-                Start <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
+          {linkedAssignments.length > 0 && (
+            <div className="space-y-3">
+              {linkedAssignments.map((a) => {
+                const href = `/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`;
+                return (
+                  <div key={a.id} className="rounded-2xl border border-primary/25 bg-primary/5 p-5 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
+                        Linked Assignment
+                      </p>
+                      <p className="text-base font-semibold text-foreground leading-snug truncate">
+                        {a.title}
+                      </p>
+                    </div>
+                    <Button size="sm" className="gap-1.5 shrink-0 h-9 px-4" onClick={() => navigate(href)}>
+                      Start <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -513,8 +513,9 @@ export const classroomAssignmentSchema = z.object({
   formSchema: z.array(formQuestionSchema).nullable().optional(),
   answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
   createdAt: z.string(),
+  linkedMaterialIds: z.array(z.number()).default([]),
 });
-export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true });
+export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true, linkedMaterialIds: true });
 export type ClassroomAssignment = z.infer<typeof classroomAssignmentSchema>;
 export type InsertClassroomAssignment = z.infer<typeof insertClassroomAssignmentSchema>;
 
@@ -541,12 +542,11 @@ export const classroomMaterialSchema = z.object({
   description: z.string(),
   url: z.string().nullable().optional(),
   attachments: z.array(z.string()).optional(),
-  assignmentId: z.number().nullable().optional(),
   slug: z.string().nullable().optional(),
   uploadedAt: z.string(),
-  linkedAssignment: z.object({ id: z.number(), title: z.string(), slug: z.string().nullable().optional() }).nullable().optional(),
+  linkedAssignmentIds: z.array(z.number()).default([]),
 });
-export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: true, uploadedAt: true, linkedAssignment: true });
+export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: true, uploadedAt: true, linkedAssignmentIds: true });
 export type ClassroomMaterial = z.infer<typeof classroomMaterialSchema>;
 export type InsertClassroomMaterial = z.infer<typeof insertClassroomMaterialSchema>;
 
