@@ -1,0 +1,40 @@
+Missing Tiptap extensions — the plan doesn't list them
+Tiptap's table support requires three extensions installed together: @tiptap/extension-table, @tiptap/extension-table-row, and @tiptap/extension-table-cell. If the prompt doesn't name them explicitly, Replit may only install one and wonder why cells don't render. Add this to the prompt.
+
+2. The 2×3 default is arbitrary — let the teacher choose
+"Creates a default 2×3 table" is fine for a quick insert but limiting for a schedule (7 columns) or vocabulary list (2 columns, many rows). A simple grid picker on hover — like Notion or Google Docs — lets the teacher drag to select rows and columns before inserting. Even a small 3×3 to 6×6 picker is significantly more useful than a fixed default. Worth deciding: grid picker, or a simple "rows / columns" input in a mini dialog?
+
+3. Header row is not addressed
+Tiptap's table extension supports TableHeader cells (<th>) distinct from body cells (<td>). The plan doesn't mention whether the first row should be a header row (bold, shaded background) or a plain row. For comparison charts and vocabulary lists, a header row is almost always wanted. The plan should explicitly include @tiptap/extension-table-header and add a "Toggle header row" option to the context dropdown.
+
+4. Table styling is underspecified
+"Visible borders and readable cell padding" leaves too much to Replit's judgment. You'll likely get inconsistent results between the editor view and the student read view unless you specify:
+
+Border: 1px solid using the existing border color token
+Cell padding: 8px 12px
+Min column width so cells don't collapse to nothing when empty
+Whether the table stretches full width or wraps to content width (full width is almost always better for classroom materials)
+
+Also — the plan says tables should render correctly when a student views the saved material, but Tiptap's table CSS is editor-specific. The read view needs the same stylesheet applied or the borders and padding will disappear entirely for students and parents.
+
+5. The context dropdown trigger is fragile
+"When the cursor IS inside a table" as the toggle condition works, but the plan doesn't say what happens if the teacher clicks the Table button while text is selected that spans across a table boundary. Define the fallback: if selection is ambiguous, default to the insert state.
+
+6. Mobile / narrow screen behavior is unaddressed
+A table with 5+ columns inside a narrow material view will overflow its container and break the layout. The plan should specify that tables get overflow-x: auto on a wrapper so they scroll horizontally on small screens rather than breaking out of the card.
+
+7. Merge cells is out of scope — say so explicitly
+Tiptap supports cell merging but it adds significant complexity. If it's out of scope (which it should be for v1), the prompt should explicitly exclude it so Replit doesn't attempt it.
+
+Improved "Done looks like" section:
+
+
+@tiptap/extension-table, @tiptap/extension-table-row, @tiptap/extension-table-cell, and @tiptap/extension-table-header are all installed and registered in the editor
+A Table button appears in the toolbar after the horizontal rule button
+Clicking it when the cursor is outside a table opens a grid picker (up to 6×6) — hovering a cell previews the dimensions, clicking inserts the table at that size with the first row as a header row
+Clicking it when the cursor is inside a table opens a context dropdown with: Toggle header row, Add row above, Add row below, Add column before, Add column after, Delete row, Delete column, Delete table. Cell merging is explicitly out of scope
+Tables render with 1px solid borders using the existing border color token, 8px 12px cell padding, a minimum column width of 80px, and full container width
+The same table styles are applied in both the editor and the student/parent read view — not just the editor
+Tables scroll horizontally on narrow screens via an overflow-x: auto wrapper — they do not overflow the card
+Tab key navigates between cells (native Tiptap behavior — no custom code needed)
+If the cursor selection is ambiguous or spans a table boundary, the button defaults to insert mode
