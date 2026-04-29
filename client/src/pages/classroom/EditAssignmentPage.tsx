@@ -430,6 +430,48 @@ export default function EditAssignmentPage() {
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
                 </div>
 
+                {/* Classwork — mobile only */}
+                {materials.length > 0 && (
+                  <div className="rounded-2xl border border-border bg-card p-5 space-y-3 lg:hidden">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <BookOpen className="h-3.5 w-3.5" /> Classwork
+                      <span className="normal-case font-normal tracking-normal ml-1 text-muted-foreground/60 text-xs">optional</span>
+                    </p>
+                    {selectedMaterialIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedMaterialIds.map((mid) => {
+                          const m = materials.find((x) => x.id === mid);
+                          if (!m) return null;
+                          return (
+                            <span key={mid} className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-medium px-2.5 py-0.5">
+                              {m.title}
+                              <button type="button" onClick={() => setSelectedMaterialIds((prev) => prev.filter((id) => id !== mid))} className="ml-0.5 hover:text-primary/70">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
+                      {materials.map((m) => {
+                        const selected = selectedMaterialIds.includes(m.id);
+                        return (
+                          <button key={m.id} type="button"
+                            onClick={() => setSelectedMaterialIds((prev) => selected ? prev.filter((id) => id !== m.id) : [...prev, m.id])}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all text-sm ${selected ? "border-primary bg-primary/5 text-foreground" : "border-border bg-transparent text-muted-foreground hover:text-foreground hover:border-primary/40"}`}
+                          >
+                            <span className={`shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors ${selected ? "bg-primary border-primary" : "border-border"}`}>
+                              {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                            </span>
+                            <span className="truncate">{m.title}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Link card ── */}
                 <div className="rounded-2xl border border-border bg-card p-6 space-y-3">
                   <div className="flex items-center gap-2.5">
@@ -694,6 +736,22 @@ export default function EditAssignmentPage() {
                       <BookOpen className="h-3.5 w-3.5" /> Classwork
                       <span className="normal-case font-normal tracking-normal ml-1 text-muted-foreground/60 text-xs">optional</span>
                     </p>
+                    {selectedMaterialIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedMaterialIds.map((mid) => {
+                          const m = materials.find((x) => x.id === mid);
+                          if (!m) return null;
+                          return (
+                            <span key={mid} className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-medium px-2.5 py-0.5">
+                              {m.title}
+                              <button type="button" onClick={() => setSelectedMaterialIds((prev) => prev.filter((id) => id !== mid))} className="ml-0.5 hover:text-primary/70">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                     <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5">
                       {materials.map((m) => {
                         const selected = selectedMaterialIds.includes(m.id);

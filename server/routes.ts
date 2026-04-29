@@ -5307,18 +5307,16 @@ export function registerRoutes(app: Express) {
       if (!classroom) return;
       const material = await prisma.classroomMaterial.findFirst({
         where: { classroomId: classroom.id, slug: req.params.slug },
-        include: { assignment: { select: { id: true, title: true, slug: true } } },
+        include: { assignmentLinks: { select: { assignmentId: true } } },
       });
       if (!material) return res.status(404).json({ error: "Classwork not found" });
       res.json({
         id: material.id, classroomId: material.classroomId, title: material.title,
         description: material.description, url: material.url ?? null,
         attachments: material.attachments ?? [],
-        assignmentId: material.assignmentId ?? null, slug: material.slug ?? null,
+        slug: material.slug ?? null,
         uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
-        linkedAssignment: material.assignment
-          ? { id: material.assignment.id, title: material.assignment.title, slug: material.assignment.slug ?? null }
-          : null,
+        linkedAssignmentIds: material.assignmentLinks.map((l) => l.assignmentId),
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -5334,18 +5332,16 @@ export function registerRoutes(app: Express) {
       if (isNaN(materialId)) return res.status(400).json({ error: "Invalid material ID" });
       const material = await prisma.classroomMaterial.findFirst({
         where: { id: materialId, classroomId: classroom.id },
-        include: { assignment: { select: { id: true, title: true, slug: true } } },
+        include: { assignmentLinks: { select: { assignmentId: true } } },
       });
       if (!material) return res.status(404).json({ error: "Classwork not found" });
       res.json({
         id: material.id, classroomId: material.classroomId, title: material.title,
         description: material.description, url: material.url ?? null,
         attachments: material.attachments ?? [],
-        assignmentId: material.assignmentId ?? null, slug: material.slug ?? null,
+        slug: material.slug ?? null,
         uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
-        linkedAssignment: material.assignment
-          ? { id: material.assignment.id, title: material.assignment.title, slug: material.assignment.slug ?? null }
-          : null,
+        linkedAssignmentIds: material.assignmentLinks.map((l) => l.assignmentId),
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
