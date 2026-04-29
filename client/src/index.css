@@ -217,6 +217,16 @@
   vertical-align: top;
 }
 
+/* Always show the text-beam cursor inside editor cells so the pointer
+   doesn't flicker between text/arrow when the mouse crosses cell borders. */
+.ProseMirror td,
+.ProseMirror th {
+  cursor: text;
+  /* Anchor the caret color to the foreground so it stays visible regardless
+     of which background (white td, muted th, or selectedCell tint) is active. */
+  caret-color: hsl(var(--foreground));
+}
+
 .ProseMirror th,
 .prose th {
   background-color: hsl(var(--muted));
@@ -224,9 +234,14 @@
   color: hsl(var(--foreground));
 }
 
-/* Selected cell highlight in the editor */
+/* Selected cell highlight in the editor.
+   The old value (hsl(var(--accent)) = ~93% lightness) was virtually
+   indistinguishable from the cell and header backgrounds (also ~93%).
+   The new value is a clearly visible primary-green tint at 84% lightness.
+   The transition smooths out any flicker caused by rapid re-renders. */
 .ProseMirror .selectedCell {
-  background-color: hsl(var(--accent));
+  background-color: hsl(158 55% 84%);
+  transition: background-color 80ms ease;
 }
 
 /* Overflow-x scroll wrapper — Tiptap wraps <table> in a .tableWrapper div */
