@@ -63,12 +63,12 @@ export default function FolderDetailPage() {
   const goBack = useGoBack("/classrooms");
 
   // Teachers and students use own classrooms; parents fetch the child's classrooms
-  const { data: ownClassrooms = [], isLoading: ownClassroomsLoading } = useQuery<Classroom[]>({
+  const { data: ownClassrooms = [], isLoading: ownClassroomsLoading, isFetching: ownClassroomsFetching } = useQuery<Classroom[]>({
     queryKey: ["/api/classrooms"],
     enabled: !isParent || !parentStudentId,
   });
 
-  const { data: parentClassrooms = [], isLoading: parentClassroomsLoading } = useQuery<Classroom[]>({
+  const { data: parentClassrooms = [], isLoading: parentClassroomsLoading, isFetching: parentClassroomsFetching } = useQuery<Classroom[]>({
     queryKey: ["/api/classrooms/parent", parentStudentId],
     queryFn: () => apiRequest(`/api/classrooms/parent/${parentStudentId}`) as Promise<Classroom[]>,
     enabled: isParent && !!parentStudentId,
@@ -76,6 +76,7 @@ export default function FolderDetailPage() {
 
   const classrooms = isParent && parentStudentId ? parentClassrooms : ownClassrooms;
   const classroomsLoading = isParent && parentStudentId ? parentClassroomsLoading : ownClassroomsLoading;
+  const classroomsFetching = isParent && parentStudentId ? parentClassroomsFetching : ownClassroomsFetching;
 
   const { data: folders = [], isLoading: foldersLoading } = useQuery<GradeFolder[]>({
     queryKey: ["/api/grade-folders"],
@@ -410,7 +411,9 @@ export default function FolderDetailPage() {
     );
   };
 
-  const isLoading = classroomsLoading || (isTeacher && foldersLoading);
+  // isFetching covers background refetches on stale cache; without it, stale data
+  // can resolve folder=null before fresh data arrives, causing a false redirect.
+  const isLoading = classroomsLoading || classroomsFetching || (isTeacher && foldersLoading);
 
   useEffect(() => {
     if (!isLoading && !folder) {
