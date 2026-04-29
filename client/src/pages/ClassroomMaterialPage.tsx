@@ -27,6 +27,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenuPanel,
+  ContextMenuItem as ContextMenuAction,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 import { toast } from "@/hooks/use-toast";
 import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
 import {
@@ -149,6 +154,8 @@ function TeacherEditor({
   // Grid picker hover state for the table insert tool.
   const [tableHoverRow, setTableHoverRow] = useState(0);
   const [tableHoverCol, setTableHoverCol] = useState(0);
+  // Right-click context menu position (null = closed).
+  const [tableCtxMenu, setTableCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);   // PDF / any attachment
   const imageRef = useRef<HTMLInputElement>(null);  // toolbar image-only picker
@@ -198,6 +205,19 @@ function TeacherEditor({
       editor.off("update", forceUpdate);
     };
   }, [editor, forceUpdate]);
+
+  // Close the right-click context menu on any click or Escape key.
+  useEffect(() => {
+    if (!tableCtxMenu) return;
+    const close = () => setTableCtxMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [tableCtxMenu]);
 
   // ── Style / alignment helpers ──────────────────────────────────────────────
 
@@ -692,7 +712,8 @@ function TeacherEditor({
             <div className="border-t border-border mb-8" />
 
             {/* Body */}
-            <div className="prose prose-sm max-w-none text-foreground
+            <div
+              className="prose prose-sm max-w-none text-foreground
               prose-headings:font-semibold prose-headings:text-foreground
               prose-h1:text-2xl prose-h1:mt-6 prose-h1:mb-2
               prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-2
@@ -703,9 +724,60 @@ function TeacherEditor({
               prose-em:text-foreground/80
               prose-a:text-primary prose-a:underline
               prose-hr:border-border prose-hr:my-6
-              prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full">
+              prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
+              onContextMenu={(e) => {
+                if (!editor?.isActive("table")) return;
+                e.preventDefault();
+                setTableCtxMenu({ x: e.clientX, y: e.clientY });
+              }}
+            >
               <EditorContent editor={editor} />
             </div>
+
+            {/* Table right-click context menu — only shown when cursor is inside a table */}
+            {tableCtxMenu && editor && (
+              <ContextMenuPanel x={tableCtxMenu.x} y={tableCtxMenu.y}>
+                <ContextMenuAction onAction={() => { editor.chain().focus().addRowBefore().run(); setTableCtxMenu(null); }}>
+                  <RowsIcon className="h-3.5 w-3.5 shrink-0" />
+                  Add row above
+                </ContextMenuAction>
+                <ContextMenuAction onAction={() => { editor.chain().focus().addRowAfter().run(); setTableCtxMenu(null); }}>
+                  <RowsIcon className="h-3.5 w-3.5 shrink-0" />
+                  Add row below
+                </ContextMenuAction>
+                <ContextMenuAction
+                  onAction={() => { editor.chain().focus().deleteRow().run(); setTableCtxMenu(null); }}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                  Delete row
+                </ContextMenuAction>
+                <ContextMenuSeparator />
+                <ContextMenuAction onAction={() => { editor.chain().focus().addColumnBefore().run(); setTableCtxMenu(null); }}>
+                  <Columns3 className="h-3.5 w-3.5 shrink-0" />
+                  Add column before
+                </ContextMenuAction>
+                <ContextMenuAction onAction={() => { editor.chain().focus().addColumnAfter().run(); setTableCtxMenu(null); }}>
+                  <Columns3 className="h-3.5 w-3.5 shrink-0" />
+                  Add column after
+                </ContextMenuAction>
+                <ContextMenuAction
+                  onAction={() => { editor.chain().focus().deleteColumn().run(); setTableCtxMenu(null); }}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                  Delete column
+                </ContextMenuAction>
+                <ContextMenuSeparator />
+                <ContextMenuAction
+                  onAction={() => { editor.chain().focus().deleteTable().run(); setTableCtxMenu(null); }}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                  Delete table
+                </ContextMenuAction>
+              </ContextMenuPanel>
+            )}
           </div>
         </main>
 
