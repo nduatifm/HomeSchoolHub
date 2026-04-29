@@ -8,6 +8,7 @@ import LinkExtension from "@tiptap/extension-link";
 import ImageExtension from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
+import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import DOMPurify from "dompurify";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -56,6 +57,11 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
+  Table2,
+  ToggleLeft,
+  RowsIcon,
+  Columns3,
+  Trash2,
 } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import type { Classroom, ClassroomAssignment, ClassroomMaterial } from "@shared/schema";
@@ -141,6 +147,9 @@ function TeacherEditor({
   // Force a re-render whenever the editor selection or content changes so
   // toolbar active-state highlights stay current.
   const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
+  // Grid picker hover state for the table insert tool.
+  const [tableHoverRow, setTableHoverRow] = useState(0);
+  const [tableHoverCol, setTableHoverCol] = useState(0);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);   // PDF / any attachment
   const imageRef = useRef<HTMLInputElement>(null);  // toolbar image-only picker
@@ -156,7 +165,7 @@ function TeacherEditor({
   const editor = useEditor({
     extensions: [
       StarterKit,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextAlign.configure({ types: ["heading", "paragraph", "tableCell", "tableHeader"] }),
       LinkExtension.configure({
         openOnClick: false,
         HTMLAttributes: { class: "text-primary underline" },
@@ -167,6 +176,10 @@ function TeacherEditor({
       Placeholder.configure({
         placeholder: "Write instructions, notes, or lesson content…",
       }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: initial?.description ?? "",
     editorProps: {
@@ -453,6 +466,136 @@ function TeacherEditor({
                   className={tbBtn(false)}>
                   <Minus className="h-3.5 w-3.5" />
                 </button>
+
+                {/* Table — grid picker when outside a table, context controls when inside */}
+                <DropdownMenu onOpenChange={(open) => { if (!open) { setTableHoverRow(0); setTableHoverCol(0); } }}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title={editor.isActive("table") ? "Table options" : "Insert table"}
+                      onMouseDown={(e) => e.preventDefault()}
+                      className={tbBtn(editor.isActive("table"))}
+                    >
+                      <Table2 className="h-3.5 w-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="p-0">
+                    {editor.isActive("table") ? (
+                      /* ── Context controls when cursor is inside a table ── */
+                      <div className="py-1 min-w-[190px]">
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().toggleHeaderRow().run()}
+                          className="gap-2.5 text-xs"
+                        >
+                          <ToggleLeft className="h-3.5 w-3.5 shrink-0" />
+                          Toggle header row
+                        </DropdownMenuItem>
+                        <div className="my-1 h-px bg-border mx-2" />
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().addRowBefore().run()}
+                          className="gap-2.5 text-xs"
+                        >
+                          <RowsIcon className="h-3.5 w-3.5 shrink-0" />
+                          Add row above
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().addRowAfter().run()}
+                          className="gap-2.5 text-xs"
+                        >
+                          <RowsIcon className="h-3.5 w-3.5 shrink-0" />
+                          Add row below
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().deleteRow().run()}
+                          className="gap-2.5 text-xs text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                          Delete row
+                        </DropdownMenuItem>
+                        <div className="my-1 h-px bg-border mx-2" />
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().addColumnBefore().run()}
+                          className="gap-2.5 text-xs"
+                        >
+                          <Columns3 className="h-3.5 w-3.5 shrink-0" />
+                          Add column before
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().addColumnAfter().run()}
+                          className="gap-2.5 text-xs"
+                        >
+                          <Columns3 className="h-3.5 w-3.5 shrink-0" />
+                          Add column after
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().deleteColumn().run()}
+                          className="gap-2.5 text-xs text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                          Delete column
+                        </DropdownMenuItem>
+                        <div className="my-1 h-px bg-border mx-2" />
+                        <DropdownMenuItem
+                          onMouseDown={(e) => e.preventDefault()}
+                          onSelect={() => editor.chain().focus().deleteTable().run()}
+                          className="gap-2.5 text-xs text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                          Delete table
+                        </DropdownMenuItem>
+                      </div>
+                    ) : (
+                      /* ── Grid picker when cursor is outside a table ── */
+                      <div className="p-2">
+                        <p className="text-[11px] text-muted-foreground mb-1.5 px-0.5">
+                          {tableHoverRow > 0 && tableHoverCol > 0
+                            ? `${tableHoverRow} × ${tableHoverCol} table`
+                            : "Insert table"}
+                        </p>
+                        <div
+                          className="grid gap-0.5"
+                          style={{ gridTemplateColumns: "repeat(6, 1fr)" }}
+                          onMouseLeave={() => { setTableHoverRow(0); setTableHoverCol(0); }}
+                        >
+                          {Array.from({ length: 6 }, (_, r) =>
+                            Array.from({ length: 6 }, (_, c) => {
+                              const isActive = r < tableHoverRow && c < tableHoverCol;
+                              return (
+                                <button
+                                  key={`${r}-${c}`}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onMouseEnter={() => { setTableHoverRow(r + 1); setTableHoverCol(c + 1); }}
+                                  onClick={() => {
+                                    editor.chain().focus().insertTable({
+                                      rows: r + 1,
+                                      cols: c + 1,
+                                      withHeaderRow: true,
+                                    }).run();
+                                    setTableHoverRow(0);
+                                    setTableHoverCol(0);
+                                  }}
+                                  className={`w-5 h-5 rounded-sm border transition-colors ${
+                                    isActive
+                                      ? "bg-primary/20 border-primary/50"
+                                      : "bg-muted border-border hover:bg-primary/10"
+                                  }`}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {sep}
 

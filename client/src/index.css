@@ -193,3 +193,51 @@
 .ProseMirror h4[style*="text-align"] {
   text-align: revert;
 }
+
+/* ── Table styles (editor + read view) ───────────────────────────────── */
+
+/* Shared table rules — applied inside both the editor and the read view.
+   .tiptap-content targets both .ProseMirror and .prose wrappers. */
+.ProseMirror table,
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 320px;
+  table-layout: auto;
+}
+
+.ProseMirror td,
+.ProseMirror th,
+.prose td,
+.prose th {
+  border: 1px solid hsl(var(--border));
+  padding: 8px 12px;
+  min-width: 80px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ProseMirror th,
+.prose th {
+  background-color: hsl(var(--muted));
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+/* Selected cell highlight in the editor */
+.ProseMirror .selectedCell {
+  background-color: hsl(var(--accent));
+}
+
+/* Overflow-x scroll wrapper — Tiptap wraps <table> in a .tableWrapper div */
+.ProseMirror .tableWrapper,
+.prose .tableWrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+}
+
+/* Fallback: if the table is not wrapped, still scroll at the prose level */
+.prose {
+  overflow-x: auto;
+}
