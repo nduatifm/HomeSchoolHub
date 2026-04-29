@@ -411,17 +411,20 @@ export default function FolderDetailPage() {
     );
   };
 
-  // isFetching covers background refetches on stale cache; without it, stale data
-  // can resolve folder=null before fresh data arrives, causing a false redirect.
-  const isLoading = classroomsLoading || classroomsFetching || (isTeacher && foldersLoading);
+  // isLoading gates the spinner (initial fetch only — no spinner on background refetches).
+  // isSettled gates the redirect decision: only redirect once both the initial load AND any
+  // in-flight background refetch have completed, so stale-cache data never triggers a false
+  // goBack() before fresh classroom data arrives with the matching gradeFolderId.
+  const isLoading = classroomsLoading || (isTeacher && foldersLoading);
+  const isSettled = !classroomsLoading && !classroomsFetching && !(isTeacher && foldersLoading);
 
   useEffect(() => {
-    if (!isLoading && !folder) {
+    if (isSettled && !folder) {
       goBack();
     }
-  }, [isLoading, folder, goBack, isTeacher]);
+  }, [isSettled, folder, goBack, isTeacher]);
 
-  if (!isLoading && !folder) return null;
+  if (!isSettled && !folder) return null;
 
   return (
     <div className="min-h-screen bg-background">
