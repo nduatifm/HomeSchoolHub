@@ -1916,7 +1916,7 @@ class PrismaStorage implements IStorage {
         assignments: {
           include: {
             submissions: {
-              where: { status: { in: ["submitted", "late"] } },
+              where: { status: { in: ["submitted", "late", "returned"] } },
               select: { id: true },
             },
           },
@@ -1934,7 +1934,8 @@ class PrismaStorage implements IStorage {
 
   async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null): Promise<ClassroomSubmission> {
     const now = new Date();
-    const dueDateTime = new Date(dueDate + "T23:59:59");
+    const dueDatePart = dueDate.includes("T") ? dueDate.split("T")[0] : dueDate;
+    const dueDateTime = new Date(dueDatePart + "T23:59:59");
     const status = now > dueDateTime ? "late" : "submitted";
     const baseData = {
       content,
