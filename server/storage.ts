@@ -1933,12 +1933,14 @@ class PrismaStorage implements IStorage {
   }
 
   async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null): Promise<ClassroomSubmission> {
-    const now = new Date().toISOString();
+    const now = new Date();
+    const dueDateTime = new Date(dueDate + "T23:59:59");
+    const status = now > dueDateTime ? "late" : "submitted";
     const baseData = {
       content,
       fileUrl: fileUrl ?? null,
-      status: "submitted",
-      submittedAt: now,
+      status,
+      submittedAt: now.toISOString(),
       ...(formAnswers !== undefined ? { formAnswers: JSON.parse(JSON.stringify(formAnswers)) as Prisma.InputJsonValue } : {}),
       ...(autoGrade !== undefined && autoGrade !== null ? { grade: autoGrade } : {}),
     } as const;
