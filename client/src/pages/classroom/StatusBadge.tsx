@@ -12,6 +12,7 @@ export default function StatusBadge({
     submitted: "bg-blue-100 text-blue-700",
     late: "bg-amber-100 text-amber-800",
     graded: "bg-green-100 text-green-700",
+    returned: "bg-orange-100 text-orange-700",
     "not-submitted": "bg-gray-100 text-gray-500",
   };
 

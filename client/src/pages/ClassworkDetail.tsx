@@ -248,10 +248,19 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
     onError: () => toast({ title: "Couldn't submit — try again.", type: "error" }),
   });
 
+  const isReturned = mySubmission?.status === "returned";
   const isSubmitted = mySubmission && (mySubmission.status === "submitted" || mySubmission.status === "graded" || mySubmission.status === "late");
 
   return (
     <div className="space-y-4">
+      {isReturned && (mySubmission as any).returnNote && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3.5 space-y-1">
+          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Returned for revision</p>
+          <p className="text-sm text-amber-800">{(mySubmission as any).returnNote}</p>
+          <p className="text-xs text-amber-600 mt-1">Please revise your work and resubmit below.</p>
+        </div>
+      )}
+
       {mySubmission && (
         <Card>
           <CardHeader className="pb-2 px-4 pt-4">
@@ -304,7 +313,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
       {!isSubmitted && (
         <Card>
           <CardHeader className="pb-2 px-4 pt-4">
-            <CardTitle className="text-sm font-semibold">Submit Your Work</CardTitle>
+            <CardTitle className="text-sm font-semibold">{isReturned ? "Resubmit Your Work" : "Submit Your Work"}</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-3">
             {hasFormSchema ? (
@@ -356,7 +365,7 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
               onClick={() => submitMutation.mutate()}
             >
               {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Submit Assignment
+              {isReturned ? "Resubmit Assignment" : "Submit Assignment"}
             </Button>
           </CardContent>
         </Card>

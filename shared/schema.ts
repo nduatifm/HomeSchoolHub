@@ -526,10 +526,11 @@ export const classroomSubmissionSchema = z.object({
   content: z.string().nullable(),
   fileUrl: z.string().nullable(),
   formAnswers: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
-  status: z.enum(["pending", "submitted", "graded", "late"]),
+  status: z.enum(["pending", "submitted", "graded", "late", "returned"]),
   submittedAt: z.string().nullable(),
   grade: z.number().nullable(),
   feedback: z.string().nullable(),
+  returnNote: z.string().nullable().optional(),
 });
 export const insertClassroomSubmissionSchema = classroomSubmissionSchema.omit({ id: true });
 export type ClassroomSubmission = z.infer<typeof classroomSubmissionSchema>;

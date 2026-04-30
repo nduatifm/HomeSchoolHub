@@ -274,6 +274,7 @@ export interface IStorage {
   getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
   submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null): Promise<ClassroomSubmission>;
   gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
+  returnClassroomSubmission(submissionId: number, returnNote: string): Promise<ClassroomSubmission>;
 
   createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
   getClassroomMaterials(classroomId: number): Promise<ClassroomMaterial[]>;
@@ -1720,6 +1721,7 @@ class PrismaStorage implements IStorage {
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
+      returnNote: r.returnNote ?? null,
       studentName: r.student?.name ?? "Unknown",
     }));
   }
@@ -1744,6 +1746,7 @@ class PrismaStorage implements IStorage {
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
+      returnNote: r.returnNote ?? null,
       studentName: r.student?.name ?? "Unknown",
       assignment: this.mapClassroomAssignment(r.assignment),
     };
@@ -1766,6 +1769,7 @@ class PrismaStorage implements IStorage {
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
+      returnNote: r.returnNote ?? null,
     }));
   }
 
@@ -1954,6 +1958,7 @@ class PrismaStorage implements IStorage {
       submittedAt: updated.submittedAt ?? null,
       grade: updated.grade ?? null,
       feedback: updated.feedback ?? null,
+      returnNote: updated.returnNote ?? null,
     };
   }
 
@@ -1974,6 +1979,27 @@ class PrismaStorage implements IStorage {
       submittedAt: updated.submittedAt ?? null,
       grade: updated.grade ?? null,
       feedback: updated.feedback ?? null,
+      returnNote: updated.returnNote ?? null,
+    };
+  }
+
+  async returnClassroomSubmission(submissionId: number, returnNote: string): Promise<ClassroomSubmission> {
+    const updated = await prisma.classroomSubmission.update({
+      where: { id: submissionId },
+      data: { status: "returned", returnNote, grade: null, feedback: null },
+    });
+    return {
+      id: updated.id,
+      assignmentId: updated.assignmentId,
+      studentId: updated.studentId,
+      content: updated.content ?? null,
+      fileUrl: updated.fileUrl ?? null,
+      formAnswers: (updated.formAnswers as Record<string, string | string[]> | null) ?? null,
+      status: updated.status as ClassroomSubmission["status"],
+      submittedAt: updated.submittedAt ?? null,
+      grade: null,
+      feedback: null,
+      returnNote: updated.returnNote ?? null,
     };
   }
 

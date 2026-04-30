@@ -75,7 +75,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
     apiRequest(`/api/classrooms/${classroomId}/materials/${m.id}/seen`, { method: "POST" }).catch(() => {});
   }
 
-  const [statusFilter, setStatusFilter] = useState<"all" | "not-submitted" | "submitted" | "graded" | "overdue">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "not-submitted" | "submitted" | "graded" | "returned" | "overdue">("all");
 
   if (loadingA || loadingS) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
@@ -88,9 +88,10 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   const enriched = assignments.map((a, index) => {
     const sub = subMap[a.id];
     const urgency = classifyAssignment(a, mySubmissions, classroomStatusStr);
-    const filterStatus: "graded" | "submitted" | "not-submitted" =
+    const filterStatus: "graded" | "submitted" | "not-submitted" | "returned" =
       sub?.status === "graded" ? "graded" :
       sub?.status === "submitted" || sub?.status === "late" ? "submitted" :
+      sub?.status === "returned" ? "returned" :
       "not-submitted";
     return { a, sub, urgency, index, filterStatus };
   });
@@ -106,6 +107,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
     { key: "not-submitted", label: "Not submitted" },
     { key: "submitted", label: "Submitted" },
     { key: "graded", label: "Graded" },
+    { key: "returned", label: "Returned" },
     { key: "overdue", label: "Overdue" },
   ];
 
@@ -225,7 +227,10 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                       })}
                     </div>
                   )}
-                  {sub?.feedback && (
+                  {sub?.status === "returned" && (sub as any).returnNote && (
+                    <p className="text-xs text-amber-700 italic mt-1 font-medium">Returned: "{(sub as any).returnNote}"</p>
+                  )}
+                  {sub?.feedback && sub.status !== "returned" && (
                     <p className="text-xs text-muted-foreground italic mt-1">"{sub.feedback}"</p>
                   )}
                 </div>
@@ -238,6 +243,14 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                     </div>
                   ) : isGraded ? (
                     <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded">Graded</span>
+                  ) : sub?.status === "returned" && !isArchived ? (
+                    <Button
+                      size="sm"
+                      className="text-xs h-9 px-4 font-semibold bg-amber-600 hover:bg-amber-700"
+                      onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
+                    >
+                      Revise
+                    </Button>
                   ) : (!sub || sub.status === "pending") && !isArchived ? (
                     a.formSchema && a.formSchema.length > 0 ? (
                       <Button

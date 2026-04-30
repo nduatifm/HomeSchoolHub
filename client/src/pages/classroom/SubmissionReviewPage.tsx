@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Paperclip, ExternalLink, Zap } from "lucide-react";
+import { Loader2, Paperclip, ExternalLink, Zap, RotateCcw } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { toast } from "@/hooks/use-toast";
@@ -29,6 +29,8 @@ export default function SubmissionReviewPage() {
 
   const [gradeVal, setGradeVal] = useState("");
   const [feedbackVal, setFeedbackVal] = useState("");
+  const [returnMode, setReturnMode] = useState(false);
+  const [returnNote, setReturnNote] = useState("");
 
   const { data: classroom, isLoading: classroomLoading } = useQuery<Classroom>({
     queryKey: ["/api/classrooms", classroomSlug],
@@ -66,6 +68,23 @@ export default function SubmissionReviewPage() {
       navigate(`/classrooms/${classroomSlug}/assignments`);
     },
     onError: () => toast({ title: "Couldn't save the grade — try again.", type: "error" }),
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/return`, {
+        method: "PATCH",
+        body: JSON.stringify({ returnNote }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", submission?.assignmentId, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "submissions", submissionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classroom-notifications/total"] });
+      toast({ title: "Submission returned for revision", type: "success" });
+      navigate(`/classrooms/${classroomSlug}/assignments`);
+    },
+    onError: () => toast({ title: "Couldn't return the submission — try again.", type: "error" }),
   });
 
   const assignment = submission?.assignment;
@@ -193,6 +212,14 @@ export default function SubmissionReviewPage() {
             )}
           </div>
 
+          {/* Previously returned banner */}
+          {submission.status === "returned" && (submission as any).returnNote && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 space-y-1">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Previously returned with note</p>
+              <p className="text-sm text-amber-800">"{(submission as any).returnNote}"</p>
+            </div>
+          )}
+
           {/* Grading section */}
           <div className="bg-white rounded-2xl border border-border shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -245,15 +272,56 @@ export default function SubmissionReviewPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-1">
-              <Button variant="outline" onClick={goBack}>
-                Cancel
+            <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-amber-700 hover:text-amber-800 hover:bg-amber-50 text-xs"
+                onClick={() => { setReturnMode((v) => !v); setReturnNote(""); }}
+                disabled={returnMutation.isPending || gradeMutation.isPending}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                {returnMode ? "Cancel return" : "Return for revision"}
               </Button>
-              <Button disabled={!canGrade} onClick={() => gradeMutation.mutate()}>
-                {gradeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Save Grade
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" onClick={goBack}>
+                  Cancel
+                </Button>
+                <Button disabled={!canGrade || returnMutation.isPending} onClick={() => gradeMutation.mutate()}>
+                  {gradeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save Grade
+                </Button>
+              </div>
             </div>
+
+            {returnMode && (
+              <div className="border-t border-border pt-4 space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="returnNote" className="text-sm font-medium text-amber-700">
+                    Note for student <span className="text-gray-400 font-normal">(required)</span>
+                  </Label>
+                  <Textarea
+                    id="returnNote"
+                    placeholder="Explain what needs to be revised or improved…"
+                    value={returnNote}
+                    onChange={(e) => setReturnNote(e.target.value)}
+                    rows={3}
+                    className="text-sm resize-none border-amber-200 focus-visible:ring-amber-400"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800 gap-1.5"
+                    disabled={!returnNote.trim() || returnMutation.isPending || gradeMutation.isPending}
+                    onClick={() => returnMutation.mutate()}
+                  >
+                    {returnMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                    Return to student
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

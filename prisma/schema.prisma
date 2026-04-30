@@ -516,6 +516,7 @@ model ClassroomSubmission {
   submittedAt  String?
   grade        Int?
   feedback     String?
+  returnNote   String?
 
   assignment ClassroomAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   student    Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)

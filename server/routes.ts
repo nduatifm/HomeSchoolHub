@@ -5121,7 +5121,28 @@ export function registerRoutes(app: Express) {
         }
       }
 
+      // Check if this is a resubmission of a returned submission (to notify teacher)
+      const priorSub = await prisma.classroomSubmission.findUnique({
+        where: { assignmentId_studentId: { assignmentId, studentId: student.id } },
+        select: { status: true },
+      });
+      const isResubmission = priorSub?.status === "returned";
+
       const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers, autoGrade);
+
+      // Notify the teacher when a returned submission is resubmitted
+      if (isResubmission) {
+        const teacherUser = await storage.getUserById(classroom.teacherId);
+        if (teacherUser) {
+          storage.createNotification({
+            userId: teacherUser.id,
+            type: "submission_resubmitted",
+            title: "Submission Resubmitted",
+            body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}/assignments`,
+          }).catch(console.error);
+        }
+      }
 
       res.json(submission);
     } catch (error: any) {
@@ -5161,6 +5182,35 @@ export function registerRoutes(app: Express) {
       if (!sub) return res.status(404).json({ error: "Submission not found" });
       const updated = await storage.gradeClassroomSubmission(submissionId, grade, feedback ?? null, sub.assignment.points);
 
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/classrooms/:classroomId/submissions/:submissionId/return — teacher returns for revision
+  app.patch("/api/classrooms/:classroomId/submissions/:submissionId/return", requireAuth, async (req, res) => {
+    try {
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const submissionId = parseInt(req.params.submissionId);
+      const { returnNote } = z.object({
+        returnNote: z.string().min(1, "A note is required when returning a submission"),
+      }).parse(req.body);
+      const sub = await storage.getClassroomSubmissionById(submissionId);
+      if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
+      const updated = await storage.returnClassroomSubmission(submissionId, returnNote);
+      // Notify the student
+      const student = await prisma.student.findUnique({ where: { id: sub.studentId }, select: { userId: true, name: true } });
+      if (student?.userId) {
+        storage.createNotification({
+          userId: student.userId,
+          type: "submission_returned",
+          title: "Submission Returned for Revision",
+          body: `Your submission for "${sub.assignment.title}" has been returned. Note: ${returnNote}`,
+          link: `/classrooms/${classroom.slug ?? classroom.id}/classwork/${sub.assignment.slug ?? sub.assignment.id}`,
+        }).catch(console.error);
+      }
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

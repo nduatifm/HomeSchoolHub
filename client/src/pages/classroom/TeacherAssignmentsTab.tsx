@@ -58,14 +58,14 @@ export default function TeacherAssignmentsTab({
     })),
   });
 
-  // Build per-assignment stats: toGrade (submitted/late) + graded counts
+  // Build per-assignment stats: toGrade (submitted/late/returned) + graded counts
   const statsMap: Record<number, { toGrade: number; graded: number }> = {};
   allSubResults.forEach((q, i) => {
     const id = assignments[i]?.id;
     if (!id) return;
     const subs = q.data ?? [];
     statsMap[id] = {
-      toGrade: subs.filter((s) => s.status === "submitted" || s.status === "late").length,
+      toGrade: subs.filter((s) => s.status === "submitted" || s.status === "late" || s.status === "returned").length,
       graded: subs.filter((s) => s.status === "graded").length,
     };
   });
@@ -94,7 +94,7 @@ export default function TeacherAssignmentsTab({
 
   // Sort expanded subs: to-grade first, then graded, then pending
   const toGradeSubs = expandedSubs.filter(
-    (s) => s.status === "submitted" || s.status === "late"
+    (s) => s.status === "submitted" || s.status === "late" || s.status === "returned"
   );
   const gradedSubs = expandedSubs.filter((s) => s.status === "graded");
   const pendingSubs = expandedSubs.filter((s) => s.status === "pending");
@@ -413,11 +413,17 @@ function SubmissionRow({
             </a>
           )}
         </div>
-        {(sub.status === "submitted" || sub.status === "late" || sub.status === "graded") && (
+        {(sub.status === "submitted" || sub.status === "late" || sub.status === "graded" || sub.status === "returned") && (
           <div className="shrink-0">
             <Button size="sm" variant="outline" className="text-xs h-8" onClick={onReview}>
               {sub.status === "graded" ? "Edit Grade" : "Review"}
             </Button>
+          </div>
+        )}
+        {sub.status === "returned" && (sub as any).returnNote && (
+          <div className="mt-2 w-full rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+            <p className="text-xs font-semibold text-amber-700">Returned for revision</p>
+            <p className="text-xs text-amber-800 mt-0.5">{(sub as any).returnNote}</p>
           </div>
         )}
       </div>
