@@ -30,7 +30,7 @@ export function classifyAssignment(
 
   // Overdue / Due Today / Due Soon apply when there's a pending submission or no submission
   if (assignment.dueDate) {
-    const due = new Date(assignment.dueDate);
+    const due = new Date(assignment.dueDate + "T00:00:00");
     if (!isNaN(due.getTime())) {
       due.setHours(0, 0, 0, 0);
       const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000);
