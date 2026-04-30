@@ -88,7 +88,6 @@ export type StudentGoogleSignupInput = z.infer<typeof studentGoogleSignupSchema>
 export const studentSchema = z.object({
   id: z.number(),
   userId: z.number(),
-  parentId: z.number(),
   name: z.string(),
   gradeLevel: z.string(),
   badges: z.array(z.string()),
@@ -98,6 +97,26 @@ export const studentSchema = z.object({
 export const insertStudentSchema = studentSchema.omit({ id: true });
 export type Student = z.infer<typeof studentSchema>;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
+
+// ChildTeamMember schema — join table between Student and parent/guardian User
+export const childTeamMemberSchema = z.object({
+  id: z.number(),
+  childId: z.number(),
+  parentId: z.number(),
+  role: z.enum(["owner", "member"]),
+  status: z.enum(["active", "pending"]),
+  invitedBy: z.number().nullable(),
+  inviteToken: z.string().nullable(),
+  inviteEmail: z.string().nullable(),
+  inviteExpiresAt: z.string().nullable(),
+  invitedAt: z.string(),
+  acceptedAt: z.string().nullable(),
+  createdAt: z.string(),
+  parentName: z.string().nullable().optional(),
+  parentEmail: z.string().nullable().optional(),
+  inviterName: z.string().nullable().optional(),
+});
+export type ChildTeamMember = z.infer<typeof childTeamMemberSchema>;
 
 // Assignment schema
 export const assignmentSchema = z.object({

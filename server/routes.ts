@@ -36,6 +36,7 @@ import bcrypt from "bcryptjs";
 import {
   sendVerificationEmail,
   sendStudentInviteEmail,
+  sendTeamInviteEmail,
 } from "./utils/emailService";
 import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
@@ -368,11 +369,19 @@ export function registerRoutes(app: Express) {
       // Create student profile
       const student = await storage.createStudent({
         userId: user.id,
-        parentId: invite.parentId,
         name: invite.studentName,
         gradeLevel: invite.gradeLevel,
         badges: [],
         points: 0,
+      });
+
+      // Add inviting parent as owner of child's team
+      await storage.createChildTeamMember({
+        childId: student.id,
+        parentId: invite.parentId,
+        role: "owner",
+        status: "active",
+        acceptedAt: new Date(),
       });
 
       // Check if tutor request mode is OFF - if so, auto-assign to a teacher
@@ -492,11 +501,19 @@ export function registerRoutes(app: Express) {
       // Create student profile
       const student = await storage.createStudent({
         userId: user.id,
-        parentId: invite.parentId,
         name: invite.studentName,
         gradeLevel: invite.gradeLevel,
         badges: [],
         points: 0,
+      });
+
+      // Add inviting parent as owner of child's team
+      await storage.createChildTeamMember({
+        childId: student.id,
+        parentId: invite.parentId,
+        role: "owner",
+        status: "active",
+        acceptedAt: new Date(),
       });
 
       // Auto-assign to teacher if not in tutor request mode
@@ -1380,7 +1397,7 @@ export function registerRoutes(app: Express) {
 
       const callerId = req.session.userId!;
       const isOwner = student.userId === callerId;
-      const isParent = student.parentId === callerId;
+      const isParent = await storage.isTeamMember(callerId, student.id);
       const relation = await prisma.teacherStudentAssignment.findFirst({
         where: { teacherId: callerId, studentId: student.id },
       });
@@ -1457,7 +1474,7 @@ export function registerRoutes(app: Express) {
       if (!student) return res.status(404).json({ error: "Student not found" });
 
       const callerId = req.session.userId!;
-      const isParent = student.parentId === callerId;
+      const isParent = await storage.isTeamMember(callerId, student.id);
       const isOwner = student.userId === callerId;
       const relation = await prisma.teacherStudentAssignment.findFirst({
         where: { teacherId: callerId, studentId: student.id },
@@ -1483,7 +1500,7 @@ export function registerRoutes(app: Express) {
       if (!existing) return res.status(404).json({ error: "Student not found" });
 
       const callerId = req.session.userId!;
-      const isParent = existing.parentId === callerId;
+      const isParent = await storage.isTeamMember(callerId, existing.id);
       const isOwner = existing.userId === callerId;
       const relation = await prisma.teacherStudentAssignment.findFirst({
         where: { teacherId: callerId, studentId: existing.id },
@@ -1498,6 +1515,218 @@ export function registerRoutes(app: Express) {
 
       const student = await storage.updateStudent(id, req.body);
       res.json(student);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== FAMILY TEAM MANAGEMENT ROUTES ==========
+
+  // GET /api/children/:studentId/team — list all team members (owner or member)
+  app.get("/api/children/:studentId/team", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const callerId = req.session.userId!;
+      const caller = await storage.getUserById(callerId);
+      const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
+      const isTeamMember = await storage.isTeamMember(callerId, studentId);
+      if (!isTeamMember && !isAdmin) return res.status(403).json({ error: "Forbidden" });
+
+      const team = await storage.getChildTeam(studentId);
+      res.json(team);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/children/:studentId/team/invite — invite a co-parent (owner only)
+  app.post("/api/children/:studentId/team/invite", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const callerId = req.session.userId!;
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+      if (!isOwner) return res.status(403).json({ error: "Only owners can invite co-parents" });
+
+      const schema = z.object({
+        email: z.string().email("Valid email required"),
+        role: z.enum(["owner", "member"]).default("member"),
+      });
+      const parse = schema.safeParse(req.body);
+      if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
+      const { email, role } = parse.data;
+
+      // Check if the email is already a team member
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        const already = await storage.isTeamMember(existingUser.id, studentId);
+        if (already) return res.status(409).json({ error: "This person is already on the team" });
+      }
+
+      // Check no duplicate pending invite for this email + child
+      const dupeInvite = await prisma.childTeamMember.findFirst({
+        where: { childId: studentId, inviteEmail: email, status: "pending" },
+      });
+      if (dupeInvite) return res.status(409).json({ error: "An invite has already been sent to this email" });
+
+      const token = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      const inviter = await storage.getUserById(callerId);
+      const member = await storage.createChildTeamMember({
+        childId: studentId,
+        parentId: existingUser?.id ?? callerId, // placeholder; updated on accept if email not yet registered
+        role,
+        status: "pending",
+        invitedBy: callerId,
+        inviteToken: token,
+        inviteEmail: email,
+        inviteExpiresAt: expiresAt,
+      });
+
+      // Send invite email
+      try {
+        await sendTeamInviteEmail({
+          toEmail: email,
+          inviterName: inviter?.name ?? "Someone",
+          studentName: student.name,
+          role,
+          token,
+          expiresAt,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send team invite email:", emailErr);
+      }
+
+      res.json({ ok: true, member });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/team-invite/:token — get invite info (unauthenticated, for invite acceptance page)
+  app.get("/api/team-invite/:token", async (req, res) => {
+    try {
+      const invite = await storage.getTeamInviteByToken(req.params.token);
+      if (!invite) return res.status(404).json({ error: "Invite not found or already accepted" });
+      if (invite.inviteExpiresAt && new Date(invite.inviteExpiresAt) < new Date()) {
+        return res.status(410).json({ error: "Invite has expired" });
+      }
+      // Return public info only (no tokens)
+      res.json({
+        childId: invite.childId,
+        childName: (invite as any).childName ?? null,
+        childGradeLevel: (invite as any).childGradeLevel ?? null,
+        inviterName: invite.inviterName,
+        role: invite.role,
+        inviteEmail: invite.inviteEmail,
+        expiresAt: invite.inviteExpiresAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/team-invite/:token/accept — accept a team invite (authenticated)
+  app.post("/api/team-invite/:token/accept", requireAuth, async (req, res) => {
+    try {
+      const { token } = req.params;
+      const userId = req.session.userId!;
+
+      const invite = await storage.getTeamInviteByToken(token);
+      if (!invite) return res.status(404).json({ error: "Invite not found or already accepted" });
+      if (invite.inviteExpiresAt && new Date(invite.inviteExpiresAt) < new Date()) {
+        return res.status(410).json({ error: "Invite has expired" });
+      }
+
+      // Verify the user's email matches the invite email
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      if (invite.inviteEmail && user.email.toLowerCase() !== invite.inviteEmail.toLowerCase()) {
+        return res.status(403).json({ error: "This invite was sent to a different email address" });
+      }
+
+      // Check for duplicate (user already on team)
+      const existing = await prisma.childTeamMember.findFirst({
+        where: { childId: invite.childId, parentId: userId, status: "active" },
+      });
+      if (existing) return res.status(409).json({ error: "You are already on this child's team" });
+
+      const member = await storage.acceptTeamInvite(token, userId);
+
+      // If the user doesn't have the parent role, add it
+      if (user.role !== "parent" && !user.roles.includes("parent")) {
+        await storage.updateUser(userId, { role: "parent", roles: { push: "parent" } });
+      }
+
+      res.json({ ok: true, member });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/children/:studentId/team/:memberId/role — change role (owner only)
+  app.patch("/api/children/:studentId/team/:memberId/role", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const memberId = parseInt(req.params.memberId);
+      const callerId = req.session.userId!;
+
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+      if (!isOwner) return res.status(403).json({ error: "Only owners can change roles" });
+
+      const schema = z.object({ role: z.enum(["owner", "member"]) });
+      const parse = schema.safeParse(req.body);
+      if (!parse.success) return res.status(400).json({ error: "role must be 'owner' or 'member'" });
+
+      // Prevent demoting the last owner
+      if (parse.data.role === "member") {
+        const ownerCount = await storage.countTeamOwners(studentId);
+        if (ownerCount <= 1) return res.status(400).json({ error: "Cannot demote the last owner" });
+      }
+
+      const member = await storage.updateTeamMemberRole(memberId, parse.data.role);
+      res.json(member);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/children/:studentId/team/:memberId — remove member (owner only, or member removes self)
+  app.delete("/api/children/:studentId/team/:memberId", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const memberId = parseInt(req.params.memberId);
+      const callerId = req.session.userId!;
+
+      // Find the membership record
+      const membership = await prisma.childTeamMember.findFirst({
+        where: { id: memberId, childId: studentId },
+      });
+      if (!membership) return res.status(404).json({ error: "Team member not found" });
+
+      const isSelf = membership.parentId === callerId;
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+
+      if (!isSelf && !isOwner) return res.status(403).json({ error: "Forbidden" });
+
+      // Prevent removing the last owner
+      if (membership.role === "owner" || membership.status === "active") {
+        const ownerCount = await storage.countTeamOwners(studentId);
+        if (ownerCount <= 1 && membership.role === "owner") {
+          return res.status(400).json({ error: "Cannot remove the last owner" });
+        }
+      }
+
+      await storage.removeTeamMember(memberId);
+      res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1969,15 +2198,21 @@ export function registerRoutes(app: Express) {
           }).catch(console.error);
         }
 
-        // Also notify the parent when a child's assignment is graded
-        // Skip if the teacher and parent are the same person (homeschool dual-role)
-        if (student?.parentId && student.parentId !== req.session.userId!) {
-          storage.createNotification({
-            userId: student.parentId,
-            type: "assignment_graded",
-            title: "Assignment Graded",
-            body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
-            link: "/dashboard/children",
+        // Also notify all team parents when a child's assignment is graded
+        if (student) {
+          storage.getTeamMemberUserIds(student.id).then((parentIds) => {
+            const teacherId = req.session.userId!;
+            parentIds
+              .filter((pid) => pid !== teacherId)
+              .forEach((pid) => {
+                storage.createNotification({
+                  userId: pid,
+                  type: "assignment_graded",
+                  title: "Assignment Graded",
+                  body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
+                  link: "/dashboard/children",
+                }).catch(console.error);
+              });
           }).catch(console.error);
         }
 
@@ -2193,7 +2428,7 @@ export function registerRoutes(app: Express) {
       if (!requestingUser) return res.status(401).json({ error: "Unauthorized" });
 
       const isOwnStudent = requestingUser.role === "student" && student.userId === requestingUser.id;
-      const isParent = requestingUser.role === "parent" && student.parentId === requestingUser.id;
+      const isParent = requestingUser.role === "parent" && await storage.isTeamMember(requestingUser.id, student.id);
 
       const isTutorMode = await isTutorRequestModeEnabled();
 
@@ -2712,7 +2947,7 @@ export function registerRoutes(app: Express) {
       // Validate that studentId (if provided) belongs to this parent
       if (data.studentId) {
         const student = await storage.getStudentById(data.studentId);
-        if (!student || student.parentId !== user.id) {
+        if (!student || !await storage.isTeamOwner(user.id, student.id)) {
           return res.status(403).json({ error: "Student does not belong to you" });
         }
       }
@@ -2879,7 +3114,7 @@ export function registerRoutes(app: Express) {
       const requesterId = req.session.userId!;
       const isTeacher = requesterId === teacherUserId;
       const isStudent = requesterId === student.userId;
-      const isParent = student.parentId != null && requesterId === student.parentId;
+      const isParent = await storage.isTeamMember(requesterId, student.id);
 
       if (!isTeacher && !isStudent && !isParent) {
         return res.status(403).json({ error: "Forbidden" });
@@ -2897,10 +3132,9 @@ export function registerRoutes(app: Express) {
         }
       }
 
+      const teamUserIds = await storage.getTeamMemberUserIds(student.id);
       const allParticipants = Array.from(new Set(
-        [teacherUserId, student.userId, student.parentId].filter(
-          (id): id is number => id != null,
-        ),
+        [teacherUserId, student.userId, ...teamUserIds],
       ));
       const recipients = allParticipants.filter((id) => id !== requesterId);
 
@@ -2963,7 +3197,7 @@ export function registerRoutes(app: Express) {
 
       const isTeacher  = callerId === teacherUserId;
       const isStudent  = callerId === student.userId;
-      const isParent   = student.parentId !== null && callerId === student.parentId;
+      const isParent   = await storage.isTeamMember(callerId, student.id);
       if (!isTeacher && !isStudent && !isParent) {
         return res.status(403).json({ error: "Not a participant of this thread" });
       }
@@ -2991,7 +3225,7 @@ export function registerRoutes(app: Express) {
       const requesterId = req.session.userId!;
       const isTeacher = requesterId === teacherId;
       const isStudent = requesterId === student.userId;
-      const isParent = requesterId === student.parentId;
+      const isParent = await storage.isTeamMember(requesterId, student.id);
 
       if (!isTeacher && !isStudent && !isParent) {
         return res.status(403).json({ error: "Forbidden" });
@@ -3070,7 +3304,8 @@ export function registerRoutes(app: Express) {
       const student = await prisma.student.findUnique({ where: { id: studentId } });
       if (!student) return res.status(404).json({ error: "Student not found" });
 
-      const participantIds = [teacherId, student.userId, student.parentId].filter(Boolean) as number[];
+      const teamUserIds = await storage.getTeamMemberUserIds(studentId);
+      const participantIds = Array.from(new Set([teacherId, student.userId, ...teamUserIds]));
       const viewerId = req.session.userId!;
 
       // Mark every raw DB row in this thread where the current user is the receiver as read
@@ -3133,7 +3368,7 @@ export function registerRoutes(app: Express) {
 
       const report = await storage.createProgressReport(data);
 
-      // Notify student and parent about the new progress report
+      // Notify student and all team parents about the new progress report
       const reportStudent = await storage.getStudentById(data.studentId as number);
       if (reportStudent) {
         storage.createNotification({
@@ -3143,12 +3378,16 @@ export function registerRoutes(app: Express) {
           body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
           link: "/dashboard#classrooms",
         }).catch(console.error);
-        storage.createNotification({
-          userId: reportStudent.parentId,
-          type: "progress_report",
-          title: "New Progress Report",
-          body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
-          link: "/dashboard/reports",
+        storage.getTeamMemberUserIds(reportStudent.id).then((parentIds) => {
+          parentIds.forEach((pid) => {
+            storage.createNotification({
+              userId: pid,
+              type: "progress_report",
+              title: "New Progress Report",
+              body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+              link: "/dashboard/reports",
+            }).catch(console.error);
+          });
         }).catch(console.error);
       }
 
@@ -3548,12 +3787,12 @@ export function registerRoutes(app: Express) {
         if (!studentRecord) {
           studentRecord = await storage.createStudent({
             userId: studentUser.id,
-            parentId: parent.id,
             name: "Emily Wilson",
             gradeLevel: "Grade 10",
             badges: ["First Assignment", "Perfect Score", "5-Day Streak"],
             points: 840,
           });
+          await storage.createChildTeamMember({ childId: studentRecord.id, parentId: parent.id, role: "owner", status: "active", acceptedAt: new Date() });
         }
 
         // Student 2: Liam Wilson, Grade 7 — Marcus Johnson's student
@@ -3575,12 +3814,12 @@ export function registerRoutes(app: Express) {
         if (!studentRecord2) {
           studentRecord2 = await storage.createStudent({
             userId: studentUser2.id,
-            parentId: parent.id,
             name: "Liam Wilson",
             gradeLevel: "Grade 7",
             badges: ["First Assignment", "Bookworm"],
             points: 430,
           });
+          await storage.createChildTeamMember({ childId: studentRecord2.id, parentId: parent.id, role: "owner", status: "active", acceptedAt: new Date() });
         }
 
         // Student 3: Sophie Wilson, Grade 12 — Aisha Patel's student
@@ -3602,12 +3841,12 @@ export function registerRoutes(app: Express) {
         if (!studentRecord3) {
           studentRecord3 = await storage.createStudent({
             userId: studentUser3.id,
-            parentId: parent.id,
             name: "Sophie Wilson",
             gradeLevel: "Grade 12",
             badges: ["First Assignment", "Perfect Score", "Top Performer", "Science Star"],
             points: 1250,
           });
+          await storage.createChildTeamMember({ childId: studentRecord3.id, parentId: parent.id, role: "owner", status: "active", acceptedAt: new Date() });
         }
 
         // ── Grade Folder + Classroom + Enrollments (idempotent) ──
@@ -4312,14 +4551,26 @@ export function registerRoutes(app: Express) {
         // Auto-create a Student record if one doesn't already exist for this user
         const existingStudent = await prisma.student.findUnique({ where: { userId: id } });
         if (!existingStudent) {
-          await storage.createStudent({
+          const newStudent = await storage.createStudent({
             userId: id,
-            parentId: pid,
             name: target.name,
             gradeLevel: "",
             badges: [],
             points: 0,
           });
+          await storage.createChildTeamMember({
+            childId: newStudent.id,
+            parentId: pid,
+            role: "owner",
+            status: "active",
+            acceptedAt: new Date(),
+          });
+        } else {
+          // Ensure the parent is an owner of the existing student (idempotent)
+          const existing = await prisma.childTeamMember.findFirst({ where: { childId: existingStudent.id, parentId: pid } });
+          if (!existing) {
+            await storage.createChildTeamMember({ childId: existingStudent.id, parentId: pid, role: "owner", status: "active", acceptedAt: new Date() });
+          }
         }
       }
 
@@ -4584,7 +4835,7 @@ export function registerRoutes(app: Express) {
       const studentId = parseInt(req.params.studentId);
       const student = await storage.getStudentById(studentId);
       if (!student) return res.status(404).json({ error: "Student not found" });
-      if (student.parentId !== req.session.userId!) return res.status(403).json({ error: "Not your child" });
+      if (!await storage.isTeamMember(req.session.userId!, student.id)) return res.status(403).json({ error: "Not your child" });
       const classrooms = await storage.getClassroomsForParent(studentId);
       res.json(classrooms);
     } catch (error: any) {
@@ -5025,7 +5276,7 @@ export function registerRoutes(app: Express) {
         const sid = parseInt(req.query.studentId as string);
         if (!sid) return res.status(400).json({ error: "studentId query param required" });
         const student = await storage.getStudentById(sid);
-        if (!student || student.parentId !== user.id) return res.status(403).json({ error: "Not your child" });
+        if (!student || !await storage.isTeamMember(user.id, student.id)) return res.status(403).json({ error: "Not your child" });
         studentId = student.id;
       } else {
         return res.status(403).json({ error: "Forbidden" });

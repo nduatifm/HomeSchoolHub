@@ -95,6 +95,57 @@ export async function sendStudentInviteEmail(
   }
 }
 
+export async function sendTeamInviteEmail({
+  toEmail,
+  inviterName,
+  studentName,
+  role,
+  token,
+  expiresAt,
+}: {
+  toEmail: string;
+  inviterName: string;
+  studentName: string;
+  role: 'owner' | 'member';
+  token: string;
+  expiresAt: Date;
+}) {
+  const baseUrl = getBaseUrl();
+  const acceptUrl = `${baseUrl}/team-invite/${token}`;
+  const roleLabel = role === 'owner' ? 'Owner' : 'Member';
+  const expiryStr = expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">You&rsquo;ve been invited to a family team!</h2>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4a5e50;">
+      <strong>${inviterName}</strong> has invited you to co-manage <strong>${studentName}</strong>&rsquo;s
+      Lyra Preparatory account as a <strong>${roleLabel}</strong>.
+    </p>
+    ${primaryButton('Accept Invitation', acceptUrl)}
+    <p style="margin:24px 0 0;font-size:13px;color:#9bb09f;line-height:1.6;">
+      This invitation expires on <strong>${expiryStr}</strong>.
+      If you don&rsquo;t have an account yet, you&rsquo;ll be able to create one after clicking the button above.
+    </p>
+    <p style="margin:12px 0 0;font-size:12px;color:#b8c8bb;word-break:break-all;">
+      Or copy and paste: ${acceptUrl}
+    </p>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: FROM,
+      to: toEmail,
+      subject: `${inviterName} invited you to co-manage ${studentName} on Lyra Preparatory`,
+      html: buildEmailHtml(bodyHtml, { preheader: `${inviterName} invited you to help manage ${studentName}'s Lyra account.` }),
+      text: `${inviterName} has invited you to co-manage ${studentName}'s Lyra Preparatory account as a ${roleLabel}.\n\nAccept the invitation: ${acceptUrl}\n\nThis invitation expires on ${expiryStr}.\n\n© Lyra Preparatory`,
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Team invite email error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function sendPasswordResetEmail(email: string, name: string, token: string) {
   const baseUrl = getBaseUrl();
   const resetUrl = `${baseUrl}/reset-password?token=${token}`;

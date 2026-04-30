@@ -52,7 +52,6 @@ model User {
   teacherFeedback            Feedback[]
   teacherSchedules           Schedule[]                  @relation("TeacherSchedules")
   tutorRequests              TutorRequest[]              @relation("TeacherRequests")
-  parentStudents             Student[]                   @relation("ParentStudents")
   parentInvites              StudentInvite[]
   parentPayments             Payment[]                   @relation("ParentPayments")
   teacherPayments            Payment[]                   @relation("TeacherPayments")
@@ -71,6 +70,8 @@ model User {
   classroomPosts             ClassroomPost[]             @relation("ClassroomPostAuthor")
   notifications              Notification[]
   seenContent                ClassroomContentSeen[]
+  childTeamMemberships       ChildTeamMember[]           @relation("TeamMemberUser")
+  childTeamInvitesSent       ChildTeamMember[]           @relation("TeamInvitedBy")
 
   @@index([email])
   @@index([googleId])
@@ -80,14 +81,12 @@ model User {
 model Student {
   id         Int      @id @default(autoincrement())
   userId     Int      @unique
-  parentId   Int
   name       String
   gradeLevel String
   badges     String[]
   points     Int      @default(0)
 
   user                       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent                     User                       @relation("ParentStudents", fields: [parentId], references: [id], onDelete: Cascade)
   assignments                StudentAssignment[]
   schedules                  Schedule[]
   feedback                   Feedback[]
@@ -98,9 +97,34 @@ model Student {
   teacherStudentAssignments  TeacherStudentAssignment[]
   classroomEnrollments       ClassroomEnrollment[]
   classroomSubmissions       ClassroomSubmission[]
+  childTeamMembers           ChildTeamMember[]          @relation("ChildTeamChild")
 
   @@index([userId])
+}
+
+model ChildTeamMember {
+  id              Int       @id @default(autoincrement())
+  childId         Int
+  parentId        Int
+  role            String    @default("owner")
+  status          String    @default("active")
+  invitedBy       Int?
+  inviteToken     String?   @unique
+  inviteEmail     String?
+  inviteExpiresAt DateTime?
+  invitedAt       DateTime  @default(now())
+  acceptedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  child           Student   @relation("ChildTeamChild", fields: [childId], references: [id], onDelete: Cascade)
+  parent          User      @relation("TeamMemberUser", fields: [parentId], references: [id], onDelete: Cascade)
+  inviter         User?     @relation("TeamInvitedBy", fields: [invitedBy], references: [id], onDelete: SetNull)
+
+  @@unique([childId, parentId])
+  @@index([childId])
   @@index([parentId])
+  @@index([inviteToken])
+  @@map("child_team_members")
 }
 
 model Assignment {

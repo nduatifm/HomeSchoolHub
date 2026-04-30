@@ -36,6 +36,7 @@ import ParentClassroomsPage from "./pages/ParentClassroomsPage";
 import ParentTutorsPage from "./pages/ParentTutorsPage";
 import ParentInvitesPage from "./pages/ParentInvitesPage";
 import ParentReportsPage from "./pages/ParentReportsPage";
+import TeamInvitePage from "./pages/TeamInvitePage";
 
 function RouteTracker() {
   const [location] = useLocation();
@@ -149,6 +150,9 @@ function AppRoutes() {
         </Route>
         <Route path="/verify-email">
           <VerifyEmail />
+        </Route>
+        <Route path="/team-invite/:token">
+          <TeamInvitePage />
         </Route>
         <Route path="/settings">
           <ProtectedRoute component={Profile} />
