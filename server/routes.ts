@@ -5139,7 +5139,7 @@ export function registerRoutes(app: Express) {
             type: "submission_resubmitted",
             title: "Submission Resubmitted",
             body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}/assignments`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}/submissions/${submission.id}/review`,
           }).catch(console.error);
         }
       }

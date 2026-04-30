@@ -1986,7 +1986,7 @@ class PrismaStorage implements IStorage {
   async returnClassroomSubmission(submissionId: number, returnNote: string): Promise<ClassroomSubmission> {
     const updated = await prisma.classroomSubmission.update({
       where: { id: submissionId },
-      data: { status: "returned", returnNote, grade: null, feedback: null },
+      data: { status: "returned", returnNote, grade: null },
     });
     return {
       id: updated.id,
@@ -1998,7 +1998,7 @@ class PrismaStorage implements IStorage {
       status: updated.status as ClassroomSubmission["status"],
       submittedAt: updated.submittedAt ?? null,
       grade: null,
-      feedback: null,
+      feedback: updated.feedback ?? null,
       returnNote: updated.returnNote ?? null,
     };
   }

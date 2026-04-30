@@ -213,10 +213,10 @@ export default function SubmissionReviewPage() {
           </div>
 
           {/* Previously returned banner */}
-          {submission.status === "returned" && (submission as any).returnNote && (
+          {submission.status === "returned" && submission.returnNote && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 space-y-1">
               <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Previously returned with note</p>
-              <p className="text-sm text-amber-800">"{(submission as any).returnNote}"</p>
+              <p className="text-sm text-amber-800">"{submission.returnNote}"</p>
             </div>
           )}
 

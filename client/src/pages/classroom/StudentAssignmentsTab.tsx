@@ -227,8 +227,8 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                       })}
                     </div>
                   )}
-                  {sub?.status === "returned" && (sub as any).returnNote && (
-                    <p className="text-xs text-amber-700 italic mt-1 font-medium">Returned: "{(sub as any).returnNote}"</p>
+                  {sub?.status === "returned" && sub.returnNote && (
+                    <p className="text-xs text-amber-700 italic mt-1 font-medium">Returned: "{sub.returnNote}"</p>
                   )}
                   {sub?.feedback && sub.status !== "returned" && (
                     <p className="text-xs text-muted-foreground italic mt-1">"{sub.feedback}"</p>
