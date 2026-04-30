@@ -80,7 +80,7 @@ export interface IStorage {
   getStudentByUserId(userId: number): Promise<Student | null>;
   getStudentsByParent(
     parentId: number,
-  ): Promise<(Student & { email?: string })[]>;
+  ): Promise<(Student & { email?: string; callerRole?: string; ownerName?: string | null })[]>;
   getStudentsByTeacher(
     teacherId: number,
   ): Promise<(Student & { email?: string })[]>;
@@ -385,16 +385,34 @@ class PrismaStorage implements IStorage {
 
   async getStudentsByParent(
     parentId: number,
-  ): Promise<(Student & { email?: string })[]> {
+  ): Promise<(Student & { email?: string; callerRole?: string; ownerName?: string | null })[]> {
     const memberships = await prisma.childTeamMember.findMany({
       where: { parentId, status: "active" },
-      include: { child: { include: { user: true } } },
+      include: {
+        child: { include: { user: true } },
+        // Include the owner name if the caller is a member (to show "Shared by X")
+      },
     });
-    return memberships.map((m: any) => ({
-      ...m.child,
-      email: m.child.user?.email,
-      user: undefined,
-    })) as (Student & { email?: string })[];
+
+    const results = await Promise.all(memberships.map(async (m: any) => {
+      let ownerName: string | null = null;
+      if (m.role === "member") {
+        const ownerMembership = await prisma.childTeamMember.findFirst({
+          where: { childId: m.childId, role: "owner", status: "active", parentId: { not: null } },
+          include: { parent: { select: { name: true } } },
+        });
+        ownerName = ownerMembership?.parent?.name ?? null;
+      }
+      return {
+        ...m.child,
+        email: m.child.user?.email,
+        callerRole: m.role as string,
+        ownerName,
+        user: undefined,
+      };
+    }));
+
+    return results as (Student & { email?: string; callerRole?: string; ownerName?: string | null })[];
   }
 
   async getStudentsByTeacher(

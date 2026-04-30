@@ -48,6 +48,22 @@ export default function TeamInvitePage() {
     },
   });
 
+  // Auto-accept when:
+  // 1. User is logged in (just returned from login/signup via ?next= redirect)
+  // 2. Invite is loaded and valid
+  // 3. No email mismatch
+  // 4. Haven't already accepted and mutation isn't running
+  useEffect(() => {
+    if (!user || !invite || accepted || acceptMutation.isPending || acceptMutation.isError) return;
+    const emailMismatch =
+      !!invite.inviteEmail &&
+      user.email.toLowerCase() !== invite.inviteEmail.toLowerCase();
+    if (!emailMismatch) {
+      acceptMutation.mutate();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, invite]);
+
   useEffect(() => {
     if (accepted) {
       const t = setTimeout(() => navigate("/children"), 2000);

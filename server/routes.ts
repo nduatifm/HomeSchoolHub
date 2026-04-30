@@ -1721,23 +1721,22 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // DELETE /api/children/:studentId/team/:memberId — remove member (owner only, or member removes self)
+  // DELETE /api/children/:studentId/team/:memberId — remove member (owner only)
   app.delete("/api/children/:studentId/team/:memberId", requireAuth, async (req, res) => {
     try {
       const studentId = parseInt(req.params.studentId);
       const memberId = parseInt(req.params.memberId);
       const callerId = req.session.userId!;
 
+      // Only team owners can remove members (including themselves)
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+      if (!isOwner) return res.status(403).json({ error: "Only team owners can remove members" });
+
       // Find the membership record
       const membership = await prisma.childTeamMember.findFirst({
         where: { id: memberId, childId: studentId },
       });
       if (!membership) return res.status(404).json({ error: "Team member not found" });
-
-      const isSelf = membership.parentId === callerId;
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-
-      if (!isSelf && !isOwner) return res.status(403).json({ error: "Forbidden" });
 
       // Prevent removing the last owner
       if (membership.role === "owner" || membership.status === "active") {
@@ -3170,9 +3169,29 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/messages", requireAuth, async (req, res) => {
     try {
+      const callerId = req.session.userId!;
+      // If a studentId is provided (parent messaging a teacher about a specific child),
+      // enforce that only team owners can send — members are read-only.
+      if (req.body.studentId) {
+        const studentId = parseInt(req.body.studentId);
+        if (!isNaN(studentId)) {
+          const isOwner = await storage.isTeamOwner(callerId, studentId);
+          if (!isOwner) {
+            // Also allow teachers and the student themselves
+            const student = await storage.getStudentById(studentId);
+            const isStudent = student?.userId === callerId;
+            const user = await storage.getUserById(callerId);
+            const isTeacher = user?.role === "teacher";
+            if (!isStudent && !isTeacher) {
+              return res.status(403).json({ error: "Members cannot send messages — only owners can" });
+            }
+          }
+        }
+      }
+
       const data = insertMessageSchema.parse({
         ...req.body,
-        senderId: req.session.userId!,
+        senderId: callerId,
         timestamp: new Date().toISOString(),
         isRead: false,
       });

@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle } from "lucide-react";
+import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
@@ -36,7 +36,8 @@ import type { Student, User, Classroom, ClassroomAssignment, ClassroomSubmission
 
 type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
 type AssignedTeacherRef = { id: number; name: string; email: string } | null;
-type ChildStat = Student & { pct: number | null; completed: number; total: number; classroomCount: number };
+type ExtendedStudent = Student & { email?: string; callerRole?: string; ownerName?: string | null };
+type ChildStat = ExtendedStudent & { pct: number | null; completed: number; total: number; classroomCount: number };
 type AssignmentWithStatus = Assignment & { studentAssignment: StudentAssignment | null };
 type TeamMember = {
   id: number;
@@ -57,15 +58,17 @@ export default function ParentChildrenPage() {
   const firstName = user?.name?.split(" ")[0] || "there";
 
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
-  const [messageForm, setMessageForm] = useState({ receiverId: 0, content: "" });
+  const [messageForm, setMessageForm] = useState({ receiverId: 0, content: "", studentId: 0 });
 
   // Team management state
   const [teamPanelChildId, setTeamPanelChildId] = useState<number | null>(null);
   const [inviteDialogChildId, setInviteDialogChildId] = useState<number | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"owner" | "member">("member");
+  // Inline last-owner error per child
+  const [lastOwnerErrorChildId, setLastOwnerErrorChildId] = useState<number | null>(null);
 
-  const { data: students = [] } = useQuery<Student[]>({ queryKey: ["/api/students/parent"] });
+  const { data: students = [] } = useQuery<ExtendedStudent[]>({ queryKey: ["/api/students/parent"] });
   const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
 
   const childTeacherQueries = useQueries({
@@ -154,8 +157,11 @@ export default function ParentChildrenPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       toast({ title: "Message sent!", type: "success" });
-      setMessageForm({ receiverId: 0, content: "" });
+      setMessageForm({ receiverId: 0, content: "", studentId: 0 });
       setSendMessageOpen(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not send message", description: err?.message ?? "Something went wrong.", variant: "destructive" });
     },
   });
 
@@ -182,10 +188,20 @@ export default function ParentChildrenPage() {
       apiRequest(`/api/children/${childId}/team/${memberId}`, { method: "DELETE" }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
+      setLastOwnerErrorChildId(null);
       toast({ title: "Member removed" });
     },
     onError: (err: any) => {
-      toast({ title: "Could not remove member", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+      const msg = err?.message ?? "";
+      if (msg.toLowerCase().includes("last owner")) {
+        setLastOwnerErrorChildId(
+          students.find(s => s.id === (err as any)?.childId)?.id ?? null
+        );
+        toast({ title: "Cannot remove last owner", description: "Assign another owner before leaving.", variant: "destructive" });
+      } else {
+        toast({ title: "Could not remove member", description: msg || "Something went wrong.", variant: "destructive" });
+      }
     },
   });
 
@@ -197,6 +213,7 @@ export default function ParentChildrenPage() {
       }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      setLastOwnerErrorChildId(null);
       toast({ title: "Role updated" });
     },
     onError: (err: any) => {
@@ -250,10 +267,15 @@ export default function ParentChildrenPage() {
                   const teamData = (childTeamQueries[teamIndex]?.data as TeamMember[]) ?? [];
                   const isTeamPanelOpen = teamPanelChildId === child.id;
 
-                  // Determine if the current user is an owner for this child
-                  const myMembership = teamData.find(m => m.parentId === user?.id && m.status === "active");
-                  const iAmOwner = myMembership?.role === "owner";
-                  const iAmMember = myMembership?.role === "member";
+                  // callerRole comes directly from the API so it's available immediately
+                  // without opening the team panel. teamData is only used for team member list.
+                  const callerRole = child.callerRole ?? "owner";
+                  const iAmOwner = callerRole === "owner";
+                  const iAmMember = callerRole === "member";
+
+                  // Active owners in this team (for last-owner check display)
+                  const activeOwners = teamData.filter(m => m.role === "owner" && m.status === "active");
+                  const isLastOwner = iAmOwner && activeOwners.length === 1 && activeOwners[0]?.parentId === user?.id;
 
                   return (
                     <div
@@ -280,6 +302,12 @@ export default function ParentChildrenPage() {
                           )}
                         </div>
 
+                        {iAmMember && child.ownerName && (
+                          <p className="text-[11px] text-muted-foreground mb-2">
+                            Shared by <span className="font-medium">{child.ownerName}</span>
+                          </p>
+                        )}
+
                         <div className="flex items-center justify-between mb-3 py-2 border-y border-border/50">
                           <div className="flex items-center gap-1.5">
                             <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
@@ -290,10 +318,11 @@ export default function ParentChildrenPage() {
                               }
                             </span>
                           </div>
-                          {assignedTeacher && (
+                          {/* Only owners can send messages — members are read-only */}
+                          {assignedTeacher && iAmOwner && (
                             <button
                               onClick={() => {
-                                setMessageForm({ receiverId: assignedTeacher.id, content: "" });
+                                setMessageForm({ receiverId: assignedTeacher.id, content: "", studentId: child.id });
                                 setSendMessageOpen(true);
                               }}
                               className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -324,7 +353,7 @@ export default function ParentChildrenPage() {
                           <p className="text-xs text-muted-foreground">No assignments yet</p>
                         )}
 
-                        {/* Family team toggle */}
+                        {/* Family team toggle — visible to all roles */}
                         <button
                           className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
                           onClick={() => setTeamPanelChildId(isTeamPanelOpen ? null : child.id)}
@@ -338,6 +367,16 @@ export default function ParentChildrenPage() {
                       {/* Team panel */}
                       {isTeamPanelOpen && (
                         <div className="border-t border-border bg-muted/20 px-4 pt-3 pb-4 space-y-2">
+                          {/* Last-owner inline warning */}
+                          {lastOwnerErrorChildId === child.id && (
+                            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
+                              <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+                              <p className="text-xs text-destructive leading-snug">
+                                You are the only owner. Promote another member to owner before leaving the team.
+                              </p>
+                            </div>
+                          )}
+
                           {childTeamQueries[teamIndex]?.isLoading ? (
                             <p className="text-xs text-muted-foreground">Loading team…</p>
                           ) : teamData.length === 0 ? (
@@ -372,7 +411,8 @@ export default function ParentChildrenPage() {
                                       </>
                                     )}
                                   </Badge>
-                                  {member.status === "pending" && iAmOwner ? (
+                                  {/* Team management controls — owners only */}
+                                  {iAmOwner && member.status === "pending" ? (
                                     <div className="flex items-center gap-1">
                                       <button
                                         title="Resend invite"
@@ -389,7 +429,7 @@ export default function ParentChildrenPage() {
                                         <XCircle className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
-                                  ) : (iAmOwner || isSelf) && member.status === "active" ? (
+                                  ) : iAmOwner && member.status === "active" ? (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
                                         <button className="p-0.5 rounded hover:bg-muted transition-colors">
@@ -397,7 +437,7 @@ export default function ParentChildrenPage() {
                                         </button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end" className="text-sm">
-                                        {iAmOwner && !isSelf && (
+                                        {!isSelf && (
                                           <>
                                             {member.role !== "owner" && (
                                               <DropdownMenuItem
@@ -415,13 +455,30 @@ export default function ParentChildrenPage() {
                                             )}
                                           </>
                                         )}
-                                        <DropdownMenuItem
-                                          className="text-destructive focus:text-destructive"
-                                          onClick={() => removeMemberMutation.mutate({ childId: child.id, memberId: member.id })}
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5 mr-2" />
-                                          {isSelf ? "Leave team" : "Remove"}
-                                        </DropdownMenuItem>
+                                        {isSelf ? (
+                                          <DropdownMenuItem
+                                            className="text-destructive focus:text-destructive"
+                                            disabled={isLastOwner}
+                                            onClick={() => {
+                                              if (isLastOwner) {
+                                                setLastOwnerErrorChildId(child.id);
+                                              } else {
+                                                removeMemberMutation.mutate({ childId: child.id, memberId: member.id });
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                            Leave team
+                                            {isLastOwner && <span className="ml-1 text-[10px] opacity-70">(last owner)</span>}
+                                          </DropdownMenuItem>
+                                        ) : (
+                                          <DropdownMenuItem
+                                            className="text-destructive focus:text-destructive"
+                                            onClick={() => removeMemberMutation.mutate({ childId: child.id, memberId: member.id })}
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 mr-2" /> Remove
+                                          </DropdownMenuItem>
+                                        )}
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   ) : null}
@@ -430,6 +487,7 @@ export default function ParentChildrenPage() {
                             })
                           )}
 
+                          {/* Invite button — owners only */}
                           {iAmOwner && (
                             <button
                               onClick={() => {
@@ -442,6 +500,13 @@ export default function ParentChildrenPage() {
                               <UserPlus className="w-3.5 h-3.5" />
                               Invite co-parent
                             </button>
+                          )}
+
+                          {/* Members see read-only note */}
+                          {iAmMember && (
+                            <p className="text-[11px] text-muted-foreground italic mt-1">
+                              Contact the account owner to manage team members.
+                            </p>
                           )}
                         </div>
                       )}
@@ -478,10 +543,10 @@ export default function ParentChildrenPage() {
         </main>
       </div>
 
-      {/* Send message dialog */}
+      {/* Send message dialog — only reachable by owners (button hidden from members) */}
       <Dialog open={sendMessageOpen} onOpenChange={(open) => {
         setSendMessageOpen(open);
-        if (!open) setMessageForm({ receiverId: 0, content: "" });
+        if (!open) setMessageForm({ receiverId: 0, content: "", studentId: 0 });
       }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Send Message</DialogTitle></DialogHeader>
@@ -507,7 +572,11 @@ export default function ParentChildrenPage() {
               />
             </div>
             <Button
-              onClick={() => sendMessageMutation.mutate(messageForm)}
+              onClick={() => sendMessageMutation.mutate({
+                receiverId: messageForm.receiverId,
+                message: messageForm.content,
+                studentId: messageForm.studentId || undefined,
+              })}
               disabled={sendMessageMutation.isPending || !messageForm.receiverId || !messageForm.content}
               className="w-full"
               data-testid="button-send-message"
@@ -518,7 +587,7 @@ export default function ParentChildrenPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Invite co-parent dialog */}
+      {/* Invite co-parent dialog — only triggered by owners */}
       <Dialog open={inviteDialogChildId !== null} onOpenChange={(open) => { if (!open) setInviteDialogChildId(null); }}>
         <DialogContent>
           <DialogHeader>
