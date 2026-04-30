@@ -5195,7 +5195,7 @@ export function registerRoutes(app: Express) {
       if (!classroom) return;
       const submissionId = parseInt(req.params.submissionId);
       const { returnNote } = z.object({
-        returnNote: z.string().min(1, "A note is required when returning a submission"),
+        returnNote: z.string().trim().min(1, "A note is required when returning a submission"),
       }).parse(req.body);
       const sub = await storage.getClassroomSubmissionById(submissionId);
       if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });

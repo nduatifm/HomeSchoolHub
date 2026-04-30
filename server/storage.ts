@@ -1941,6 +1941,7 @@ class PrismaStorage implements IStorage {
       fileUrl: fileUrl ?? null,
       status,
       submittedAt: now.toISOString(),
+      returnNote: null,
       ...(formAnswers !== undefined ? { formAnswers: JSON.parse(JSON.stringify(formAnswers)) as Prisma.InputJsonValue } : {}),
       ...(autoGrade !== undefined && autoGrade !== null ? { grade: autoGrade } : {}),
     } as const;
