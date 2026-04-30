@@ -262,10 +262,12 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
 
   return (
     <div className="space-y-4">
-      {isReturned && mySubmission.returnNote && (
+      {isReturned && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3.5 space-y-1">
           <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Returned for revision</p>
-          <p className="text-sm text-amber-800">{mySubmission.returnNote}</p>
+          {mySubmission.returnNote && (
+            <p className="text-sm text-amber-800">{mySubmission.returnNote}</p>
+          )}
           <p className="text-xs text-amber-600 mt-1">Please revise your work and resubmit below.</p>
         </div>
       )}
