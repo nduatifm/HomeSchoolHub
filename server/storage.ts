@@ -1860,8 +1860,9 @@ class PrismaStorage implements IStorage {
 
       for (const assignment of classroom.assignments) {
         const sub = assignment.submissions[0] ?? null;
-        // Skip if already submitted (not pending)
-        if (sub && sub.status !== "pending") continue;
+        // Skip if submitted, graded, or late — work is done
+        // "pending" and "returned" still need student action
+        if (sub && sub.status !== "pending" && sub.status !== "returned") continue;
 
         // For parent viewers: skip assignments they've already seen
         if (isParentView && seenAssignmentSet.has(assignment.id)) continue;

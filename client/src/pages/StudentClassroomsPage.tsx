@@ -98,7 +98,7 @@ export default function StudentClassroomsPage() {
           status: sub?.status ?? "pending",
         };
       })
-      .filter(item => item.status === "pending");
+      .filter(item => item.status === "pending" || item.status === "returned");
   }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
   const pendingLegacy = (legacyAssignments as AssignmentWithStatus[]).filter(

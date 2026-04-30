@@ -22,8 +22,9 @@ export function classifyAssignment(
   if (classroomStatus === "archived") return null;
 
   const sub = submissions.find((s) => s.assignmentId === assignment.id);
-  // If submitted/graded/late — no action needed
-  if (sub && sub.status !== "pending") return null;
+  // If submitted, graded, or late — work is done, no urgency needed
+  // "pending" and "returned" still need student action
+  if (sub && sub.status !== "pending" && sub.status !== "returned") return null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
