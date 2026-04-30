@@ -5200,17 +5200,6 @@ export function registerRoutes(app: Express) {
       const sub = await storage.getClassroomSubmissionById(submissionId);
       if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
       const updated = await storage.returnClassroomSubmission(submissionId, returnNote);
-      // Notify the student
-      const student = await prisma.student.findUnique({ where: { id: sub.studentId }, select: { userId: true, name: true } });
-      if (student?.userId) {
-        storage.createNotification({
-          userId: student.userId,
-          type: "submission_returned",
-          title: "Submission Returned for Revision",
-          body: `Your submission for "${sub.assignment.title}" has been returned. Note: ${returnNote}`,
-          link: `/classrooms/${classroom.slug ?? classroom.id}/classwork/${sub.assignment.slug ?? sub.assignment.id}`,
-        }).catch(console.error);
-      }
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
