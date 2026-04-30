@@ -1940,7 +1940,9 @@ class PrismaStorage implements IStorage {
     const status = now > dueDateTime ? "late" : "submitted";
     const baseData = {
       content,
-      fileUrl: fileUrl ?? null,
+      // Only include fileUrl in the update payload when a new file was actually uploaded.
+      // Omitting it preserves the existing fileUrl on resubmissions that don't attach a new file.
+      ...(fileUrl !== undefined ? { fileUrl } : {}),
       status,
       submittedAt: now.toISOString(),
       returnNote: null,
@@ -1950,7 +1952,8 @@ class PrismaStorage implements IStorage {
     const updated = await prisma.classroomSubmission.upsert({
       where: { assignmentId_studentId: { assignmentId, studentId } },
       update: baseData,
-      create: { assignmentId, studentId, grade: null, feedback: null, ...baseData },
+      // On first-time create: explicitly null out fileUrl when no file was uploaded
+      create: { assignmentId, studentId, grade: null, feedback: null, fileUrl: null, ...baseData },
     });
     return {
       id: updated.id,

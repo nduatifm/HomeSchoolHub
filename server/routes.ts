@@ -5177,9 +5177,9 @@ export function registerRoutes(app: Express) {
       const submissionId = parseInt(req.params.submissionId);
       const sub = await prisma.classroomSubmission.findUnique({
         where: { id: submissionId },
-        include: { assignment: { select: { points: true } } },
+        include: { assignment: { select: { points: true, classroomId: true } } },
       });
-      if (!sub) return res.status(404).json({ error: "Submission not found" });
+      if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
       const updated = await storage.gradeClassroomSubmission(submissionId, grade, feedback ?? null, sub.assignment.points);
 
       res.json(updated);
