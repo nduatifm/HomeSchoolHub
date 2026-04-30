@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -216,6 +216,15 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
   });
 
   const mySubmission = submissions.find((s) => s.assignmentId === assignment.id);
+
+  useEffect(() => {
+    if (mySubmission?.status === "returned") {
+      if (mySubmission.content) setText(mySubmission.content);
+      if (mySubmission.formAnswers) {
+        setFormAnswers(mySubmission.formAnswers as Record<string, string | string[]>);
+      }
+    }
+  }, [mySubmission?.id, mySubmission?.status]);
 
   const hasFormSchema = !!(assignment.formSchema && assignment.formSchema.length > 0);
 
