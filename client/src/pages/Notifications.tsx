@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import {
   Bell,
@@ -63,8 +64,6 @@ function notifIcon(type: string) {
       return <BookOpen className="w-4 h-4 text-teal-500" />;
     case "new_post":
       return <MessageSquare className="w-4 h-4 text-indigo-500" />;
-    case "new_clarification":
-      return <MessageSquare className="w-4 h-4 text-orange-400" />;
     case "new_classwork":
       return <LibraryBig className="w-4 h-4 text-teal-600" />;
     default:
@@ -80,7 +79,6 @@ const typeLabel: Record<string, string> = {
   tutor_request_update: "Tutor Requests",
   progress_report: "Progress Reports",
   new_post: "Classroom Posts",
-  new_clarification: "Questions",
   new_classwork: "Classwork",
 };
 
