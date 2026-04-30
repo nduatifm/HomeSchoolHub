@@ -28,9 +28,15 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login, googleSignIn } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+  // Read ?next= query param for post-login redirect (e.g. after team invite)
+  const nextPath = (() => {
+    try { return new URLSearchParams(window.location.search).get("next") || "/dashboard"; }
+    catch { return "/dashboard"; }
+  })();
 
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
@@ -42,7 +48,7 @@ export default function Login() {
     try {
       await login(email, password);
       toast({ title: "Welcome back!", type: "success" });
-      setLocation("/dashboard");
+      setLocation(nextPath);
     } catch (error: any) {
       setIsLoading(false);
       toast({ title: "Login failed — check your credentials and try again.", type: "error", duration: 5000 });
@@ -56,7 +62,7 @@ export default function Login() {
     try {
       await googleSignIn(credential);
       toast({ title: "Welcome back!", type: "success" });
-      setLocation("/dashboard");
+      setLocation(nextPath);
     } catch (error: unknown) {
       const apiError = error as ApiError;
       if (apiError.requiresRole) {
@@ -75,7 +81,7 @@ export default function Login() {
     try {
       await googleSignIn(googleCredential, googleRole);
       toast({ title: "Welcome back!", type: "success" });
-      setLocation("/dashboard");
+      setLocation(nextPath);
     } catch (error: any) {
       toast({ title: "Google Sign In failed — try again.", type: "error" });
     } finally {

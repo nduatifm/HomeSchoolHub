@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2 } from "lucide-react";
+import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
@@ -204,6 +204,30 @@ export default function ParentChildrenPage() {
     },
   });
 
+  const resendInviteMutation = useMutation({
+    mutationFn: ({ childId, memberId }: { childId: number; memberId: number }) =>
+      apiRequest(`/api/children/${childId}/team/${memberId}/resend`, { method: "POST" }),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      toast({ title: "Invite resent!" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not resend invite", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+    },
+  });
+
+  const cancelInviteMutation = useMutation({
+    mutationFn: ({ childId, memberId }: { childId: number; memberId: number }) =>
+      apiRequest(`/api/children/${childId}/team/${memberId}/cancel`, { method: "DELETE" }),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      toast({ title: "Invite cancelled" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not cancel invite", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+    },
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
@@ -229,6 +253,7 @@ export default function ParentChildrenPage() {
                   // Determine if the current user is an owner for this child
                   const myMembership = teamData.find(m => m.parentId === user?.id && m.status === "active");
                   const iAmOwner = myMembership?.role === "owner";
+                  const iAmMember = myMembership?.role === "member";
 
                   return (
                     <div
@@ -248,6 +273,11 @@ export default function ParentChildrenPage() {
                               {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
                             </p>
                           </div>
+                          {iAmMember && (
+                            <Badge variant="secondary" className="flex items-center gap-0.5 text-[10px] px-1.5 h-5 shrink-0">
+                              <Eye className="w-2.5 h-2.5" /> View only
+                            </Badge>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-between mb-3 py-2 border-y border-border/50">
@@ -342,7 +372,24 @@ export default function ParentChildrenPage() {
                                       </>
                                     )}
                                   </Badge>
-                                  {(iAmOwner || isSelf) && (
+                                  {member.status === "pending" && iAmOwner ? (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        title="Resend invite"
+                                        className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+                                        onClick={() => resendInviteMutation.mutate({ childId: child.id, memberId: member.id })}
+                                      >
+                                        <RefreshCw className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        title="Cancel invite"
+                                        className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive"
+                                        onClick={() => cancelInviteMutation.mutate({ childId: child.id, memberId: member.id })}
+                                      >
+                                        <XCircle className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (iAmOwner || isSelf) && member.status === "active" ? (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
                                         <button className="p-0.5 rounded hover:bg-muted transition-colors">
@@ -377,7 +424,7 @@ export default function ParentChildrenPage() {
                                         </DropdownMenuItem>
                                       </DropdownMenuContent>
                                     </DropdownMenu>
-                                  )}
+                                  ) : null}
                                 </div>
                               );
                             })

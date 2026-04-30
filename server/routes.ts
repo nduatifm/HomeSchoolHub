@@ -1577,12 +1577,13 @@ export function registerRoutes(app: Express) {
       if (dupeInvite) return res.status(409).json({ error: "An invite has already been sent to this email" });
 
       const token = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
       const inviter = await storage.getUserById(callerId);
       const member = await storage.createChildTeamMember({
         childId: studentId,
-        parentId: existingUser?.id ?? callerId, // placeholder; updated on accept if email not yet registered
+        // parentId stays null until the invitee accepts; if they already have an account we set it now
+        parentId: existingUser?.id ?? null,
         role,
         status: "pending",
         invitedBy: callerId,
@@ -1666,6 +1667,23 @@ export function registerRoutes(app: Express) {
         await storage.updateUser(userId, { role: "parent", roles: { push: "parent" } });
       }
 
+      // Notify all existing owners that someone accepted the invite
+      const childStudent = await storage.getStudentById(invite.childId);
+      if (childStudent) {
+        const ownerIds = await storage.getTeamOwnerUserIds(invite.childId);
+        ownerIds
+          .filter((oid) => oid !== userId)
+          .forEach((oid) => {
+            storage.createNotification({
+              userId: oid,
+              type: "team_invite_accepted",
+              title: "Family team invitation accepted",
+              body: `${user.name} has joined ${childStudent.name}'s family team as ${member.role}.`,
+              link: "/children",
+            }).catch(console.error);
+          });
+      }
+
       res.json({ ok: true, member });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1682,6 +1700,10 @@ export function registerRoutes(app: Express) {
       const isOwner = await storage.isTeamOwner(callerId, studentId);
       if (!isOwner) return res.status(403).json({ error: "Only owners can change roles" });
 
+      // Validate the membership record belongs to this child (prevent cross-child tampering)
+      const membership = await prisma.childTeamMember.findFirst({ where: { id: memberId, childId: studentId } });
+      if (!membership) return res.status(404).json({ error: "Team member not found" });
+
       const schema = z.object({ role: z.enum(["owner", "member"]) });
       const parse = schema.safeParse(req.body);
       if (!parse.success) return res.status(400).json({ error: "role must be 'owner' or 'member'" });
@@ -1689,7 +1711,7 @@ export function registerRoutes(app: Express) {
       // Prevent demoting the last owner
       if (parse.data.role === "member") {
         const ownerCount = await storage.countTeamOwners(studentId);
-        if (ownerCount <= 1) return res.status(400).json({ error: "Cannot demote the last owner" });
+        if (ownerCount <= 1) return res.status(400).json({ error: "Cannot demote the last owner — promote another owner first" });
       }
 
       const member = await storage.updateTeamMemberRole(memberId, parse.data.role);
@@ -1724,6 +1746,70 @@ export function registerRoutes(app: Express) {
           return res.status(400).json({ error: "Cannot remove the last owner" });
         }
       }
+
+      await storage.removeTeamMember(memberId);
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/children/:studentId/team/:memberId/resend — resend invite (owner only, pending invite only)
+  app.post("/api/children/:studentId/team/:memberId/resend", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const memberId = parseInt(req.params.memberId);
+      const callerId = req.session.userId!;
+
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+      if (!isOwner) return res.status(403).json({ error: "Only owners can resend invites" });
+
+      const membership = await prisma.childTeamMember.findFirst({ where: { id: memberId, childId: studentId, status: "pending" } });
+      if (!membership) return res.status(404).json({ error: "Pending invite not found" });
+
+      // Generate a new token and reset expiry to 24 hours
+      const newToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await prisma.childTeamMember.update({
+        where: { id: memberId },
+        data: { inviteToken: newToken, inviteExpiresAt: expiresAt },
+      });
+
+      const student = await storage.getStudentById(studentId);
+      const inviter = await storage.getUserById(callerId);
+      if (membership.inviteEmail && student) {
+        try {
+          await sendTeamInviteEmail({
+            toEmail: membership.inviteEmail,
+            inviterName: inviter?.name ?? "Someone",
+            studentName: student.name,
+            role: membership.role as "owner" | "member",
+            token: newToken,
+            expiresAt,
+          });
+        } catch (emailErr) {
+          console.error("Failed to resend team invite email:", emailErr);
+        }
+      }
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/children/:studentId/team/:memberId/cancel — cancel pending invite (owner only)
+  app.delete("/api/children/:studentId/team/:memberId/cancel", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const memberId = parseInt(req.params.memberId);
+      const callerId = req.session.userId!;
+
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+      if (!isOwner) return res.status(403).json({ error: "Only owners can cancel invites" });
+
+      const membership = await prisma.childTeamMember.findFirst({ where: { id: memberId, childId: studentId, status: "pending" } });
+      if (!membership) return res.status(404).json({ error: "Pending invite not found" });
 
       await storage.removeTeamMember(memberId);
       res.json({ ok: true });
@@ -3114,9 +3200,10 @@ export function registerRoutes(app: Express) {
       const requesterId = req.session.userId!;
       const isTeacher = requesterId === teacherUserId;
       const isStudent = requesterId === student.userId;
-      const isParent = await storage.isTeamMember(requesterId, student.id);
+      // Only owners can send messages; members get read-only thread access
+      const isOwner = await storage.isTeamOwner(requesterId, student.id);
 
-      if (!isTeacher && !isStudent && !isParent) {
+      if (!isTeacher && !isStudent && !isOwner) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -3132,9 +3219,10 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const teamUserIds = await storage.getTeamMemberUserIds(student.id);
+      // Only owners participate in the thread (not read-only members)
+      const ownerUserIds = await storage.getTeamOwnerUserIds(student.id);
       const allParticipants = Array.from(new Set(
-        [teacherUserId, student.userId, ...teamUserIds],
+        [teacherUserId, student.userId, ...ownerUserIds],
       ));
       const recipients = allParticipants.filter((id) => id !== requesterId);
 

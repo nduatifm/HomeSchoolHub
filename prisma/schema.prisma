@@ -105,7 +105,7 @@ model Student {
 model ChildTeamMember {
   id              Int       @id @default(autoincrement())
   childId         Int
-  parentId        Int
+  parentId        Int?
   role            String    @default("owner")
   status          String    @default("active")
   invitedBy       Int?
@@ -117,7 +117,7 @@ model ChildTeamMember {
   createdAt       DateTime  @default(now())
 
   child           Student   @relation("ChildTeamChild", fields: [childId], references: [id], onDelete: Cascade)
-  parent          User      @relation("TeamMemberUser", fields: [parentId], references: [id], onDelete: Cascade)
+  parent          User?     @relation("TeamMemberUser", fields: [parentId], references: [id], onDelete: Cascade)
   inviter         User?     @relation("TeamInvitedBy", fields: [invitedBy], references: [id], onDelete: SetNull)
 
   @@unique([childId, parentId])

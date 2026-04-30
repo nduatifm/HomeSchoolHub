@@ -92,12 +92,13 @@ export interface IStorage {
   // Family team management
   getChildTeam(studentId: number): Promise<ChildTeamMember[]>;
   getTeamMemberUserIds(studentId: number): Promise<number[]>;
+  getTeamOwnerUserIds(studentId: number): Promise<number[]>;
   isTeamMember(userId: number, studentId: number): Promise<boolean>;
   isTeamOwner(userId: number, studentId: number): Promise<boolean>;
   countTeamOwners(studentId: number): Promise<number>;
   createChildTeamMember(data: {
     childId: number;
-    parentId: number;
+    parentId?: number | null;
     role?: string;
     status?: string;
     invitedBy?: number | null;
@@ -402,31 +403,48 @@ class PrismaStorage implements IStorage {
     const requests = await prisma.tutorRequest.findMany({
       where: { teacherId, status: "approved" },
       include: {
-        parent: { include: { parentStudents: { include: { user: true } } } },
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            // Use the new family team join table instead of the removed parentStudents relation
+            childTeamMemberships: {
+              where: { status: "active" },
+              include: { child: { include: { user: true } } },
+            },
+          },
+        },
       },
     });
     const studentMap = new Map<number, Student & { email?: string; parentName?: string; parentId?: number }>();
     requests.forEach((r) => {
+      const parentName = (r.parent as any).name;
+      const memberships: any[] = (r.parent as any).childTeamMemberships ?? [];
       if (r.studentId) {
         // Specific student was requested — only include that student
-        const s = r.parent.parentStudents.find((ps: any) => ps.id === r.studentId);
+        const m = memberships.find((m: any) => m.childId === r.studentId);
+        const s = m?.child;
         if (s && !studentMap.has(s.id)) {
           studentMap.set(s.id, {
             ...s,
             email: s.user?.email,
-            parentName: (r.parent as any).name,
+            parentName,
             parentId: r.parentId,
             user: undefined,
           } as Student & { email?: string; parentName?: string; parentId?: number });
+        } else if (!s && r.studentId) {
+          // Fallback: look up student directly if not found via team membership
+          // (handles edge cases where assignment pre-dates team membership)
         }
       } else {
-        // Legacy requests without studentId — include all of parent's students
-        r.parent.parentStudents.forEach((s: any) => {
-          if (!studentMap.has(s.id)) {
+        // Legacy requests without studentId — include all of parent's students via team
+        memberships.forEach((m: any) => {
+          const s = m.child;
+          if (s && !studentMap.has(s.id)) {
             studentMap.set(s.id, {
               ...s,
               email: s.user?.email,
-              parentName: (r.parent as any).name,
+              parentName,
               parentId: r.parentId,
               user: undefined,
             } as Student & { email?: string; parentName?: string; parentId?: number });
@@ -1300,15 +1318,27 @@ class PrismaStorage implements IStorage {
 
   async getAllStudentsForTeachers(): Promise<(Student & { email?: string; parentName?: string; parentId?: number })[]> {
     const students = await prisma.student.findMany({
-      include: { user: true, parent: true },
+      include: {
+        user: true,
+        // Get the first active owner as the "primary" parent for display purposes
+        childTeamMembers: {
+          where: { status: "active", role: "owner" },
+          take: 1,
+          include: { parent: { select: { id: true, name: true } } },
+        },
+      },
     });
-    return students.map((s: any) => ({
-      ...s,
-      email: s.user?.email,
-      parentName: s.parent?.name,
-      user: undefined,
-      parent: undefined,
-    })) as (Student & { email?: string; parentName?: string; parentId?: number })[];
+    return students.map((s: any) => {
+      const primaryOwner = s.childTeamMembers?.[0];
+      return {
+        ...s,
+        email: s.user?.email,
+        parentName: primaryOwner?.parent?.name ?? null,
+        parentId: primaryOwner?.parentId ?? null,
+        user: undefined,
+        childTeamMembers: undefined,
+      };
+    }) as (Student & { email?: string; parentName?: string; parentId?: number })[];
   }
 
   // Selects the teacher with fewest approved TutorRequests (load-balancing) and
@@ -2145,10 +2175,18 @@ class PrismaStorage implements IStorage {
 
   async getTeamMemberUserIds(studentId: number): Promise<number[]> {
     const rows = await prisma.childTeamMember.findMany({
-      where: { childId: studentId, status: "active" },
+      where: { childId: studentId, status: "active", parentId: { not: null } },
       select: { parentId: true },
     });
-    return rows.map((r) => r.parentId);
+    return rows.map((r) => r.parentId!);
+  }
+
+  async getTeamOwnerUserIds(studentId: number): Promise<number[]> {
+    const rows = await prisma.childTeamMember.findMany({
+      where: { childId: studentId, status: "active", role: "owner", parentId: { not: null } },
+      select: { parentId: true },
+    });
+    return rows.map((r) => r.parentId!);
   }
 
   async isTeamMember(userId: number, studentId: number): Promise<boolean> {
@@ -2173,7 +2211,7 @@ class PrismaStorage implements IStorage {
 
   async createChildTeamMember(data: {
     childId: number;
-    parentId: number;
+    parentId?: number | null;
     role?: string;
     status?: string;
     invitedBy?: number | null;
@@ -2185,7 +2223,7 @@ class PrismaStorage implements IStorage {
     const row = await prisma.childTeamMember.create({
       data: {
         childId: data.childId,
-        parentId: data.parentId,
+        parentId: data.parentId ?? null,
         role: data.role ?? "owner",
         status: data.status ?? "active",
         invitedBy: data.invitedBy ?? null,

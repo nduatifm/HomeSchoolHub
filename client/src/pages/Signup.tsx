@@ -35,6 +35,15 @@ export default function Signup() {
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
+  // Read ?next= query param for post-signup redirect (e.g. after team invite)
+  const nextPath = (() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get("next") || "/dashboard";
+      // Only allow same-origin paths (no external URLs)
+      return p.startsWith("/") ? p : "/dashboard";
+    } catch { return "/dashboard"; }
+  })();
+
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
   const [googleRole, setGoogleRole] = useState<"teacher" | "parent" | "">("");
@@ -98,7 +107,7 @@ export default function Signup() {
     try {
       await googleSignIn(credential);
       toast({ title: "Welcome back!", type: "success" });
-      setLocation("/dashboard");
+      setLocation(nextPath);
     } catch (error: unknown) {
       const apiError = error as ApiError;
       if (apiError.requiresRole) {
@@ -117,7 +126,7 @@ export default function Signup() {
     try {
       await googleSignIn(googleCredential, googleRole as "teacher" | "parent");
       toast({ title: "Account created!", type: "success" });
-      setLocation("/dashboard");
+      setLocation(nextPath);
     } catch (error: any) {
       toast({ title: "Google Sign Up failed — try again.", type: "error" });
     } finally {

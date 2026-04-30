@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Users, Shield, Eye, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 type InviteInfo = {
   childId: number;
@@ -47,7 +48,6 @@ export default function TeamInvitePage() {
     },
   });
 
-  // After accepting, redirect to /children after 2 seconds
   useEffect(() => {
     if (accepted) {
       const t = setTimeout(() => navigate("/children"), 2000);
@@ -57,6 +57,7 @@ export default function TeamInvitePage() {
 
   const isLoading = authLoading || inviteLoading;
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -65,13 +66,7 @@ export default function TeamInvitePage() {
     );
   }
 
-  // If the user is not logged in, redirect to login with return URL
-  if (!user && !authLoading) {
-    const returnTo = encodeURIComponent(`/team-invite/${token}`);
-    navigate(`/login?next=${returnTo}`);
-    return null;
-  }
-
+  // Error states — show even to unauthenticated users
   if (inviteError) {
     const msg = (inviteError as any)?.message ?? "";
     const isExpired = msg.toLowerCase().includes("expired");
@@ -88,15 +83,18 @@ export default function TeamInvitePage() {
                 ? "This invitation link has expired. Ask the owner to send a new one."
                 : "This invitation link is invalid or has already been used."}
             </p>
-            <Button variant="outline" onClick={() => navigate("/children")}>
-              Go to my children
-            </Button>
+            {user ? (
+              <Button variant="outline" onClick={() => navigate("/children")}>Go to my children</Button>
+            ) : (
+              <Button variant="outline" asChild><Link href="/login">Sign in</Link></Button>
+            )}
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  // Accepted state
   if (accepted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -104,9 +102,7 @@ export default function TeamInvitePage() {
           <CardContent className="pt-8 pb-8">
             <CheckCircle className="w-12 h-12 text-primary mx-auto mb-4" />
             <h2 className="text-lg font-semibold text-foreground mb-2">You're in!</h2>
-            <p className="text-sm text-muted-foreground">
-              Redirecting you to your children…
-            </p>
+            <p className="text-sm text-muted-foreground">Redirecting you to your children…</p>
           </CardContent>
         </Card>
       </div>
@@ -117,6 +113,12 @@ export default function TeamInvitePage() {
 
   const roleLabel = invite.role === "owner" ? "Owner" : "Member";
   const RoleIcon = invite.role === "owner" ? Shield : Eye;
+  const returnTo = encodeURIComponent(`/team-invite/${token}`);
+
+  const emailMismatch =
+    !!user &&
+    !!invite.inviteEmail &&
+    user.email.toLowerCase() !== invite.inviteEmail.toLowerCase();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -155,14 +157,18 @@ export default function TeamInvitePage() {
                 {roleLabel}
               </Badge>
             </div>
+            {invite.inviteEmail && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Sent to</span>
+                <span className="font-medium text-foreground">{invite.inviteEmail}</span>
+              </div>
+            )}
             {invite.expiresAt && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Expires</span>
                 <span className="text-foreground">
                   {new Date(invite.expiresAt).toLocaleDateString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
+                    month: "long", day: "numeric", year: "numeric",
                   })}
                 </span>
               </div>
@@ -175,36 +181,47 @@ export default function TeamInvitePage() {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground bg-muted/50 border border-border rounded-md p-3">
-              <strong>Member access</strong> lets you view {invite.childName ?? "the student"}'s progress, classrooms, and reports.
+              <strong>Member access</strong> lets you view {invite.childName ?? "the student"}'s progress, classrooms, and reports in read-only mode.
             </p>
           )}
 
-          {invite.inviteEmail && user?.email?.toLowerCase() !== invite.inviteEmail.toLowerCase() && (
+          {emailMismatch && (
             <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
-              This invitation was sent to <strong>{invite.inviteEmail}</strong> but you are logged in as{" "}
-              <strong>{user?.email}</strong>. Please log in with the correct account to accept.
+              This invitation was sent to <strong>{invite.inviteEmail}</strong>, but you are signed in as{" "}
+              <strong>{user?.email}</strong>. Please sign in with the correct account to accept.
             </p>
           )}
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => navigate("/children")}
-            >
-              Decline
-            </Button>
-            <Button
-              className="flex-1"
-              disabled={
-                acceptMutation.isPending ||
-                !!(invite.inviteEmail && user?.email?.toLowerCase() !== invite.inviteEmail.toLowerCase())
-              }
-              onClick={() => acceptMutation.mutate()}
-            >
-              {acceptMutation.isPending ? "Accepting…" : "Accept invitation"}
-            </Button>
-          </div>
+          {/* Not logged in: show login/signup buttons */}
+          {!user ? (
+            <div className="space-y-2">
+              <p className="text-sm text-center text-muted-foreground">
+                Sign in or create an account to accept this invitation.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" asChild>
+                  <Link href={`/login?next=${returnTo}`}>Sign in</Link>
+                </Button>
+                <Button className="flex-1" asChild>
+                  <Link href={`/signup?next=${returnTo}`}>Create account</Link>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Logged in: show accept/decline buttons */
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => navigate("/children")}>
+                Decline
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={acceptMutation.isPending || emailMismatch}
+                onClick={() => acceptMutation.mutate()}
+              >
+                {acceptMutation.isPending ? "Accepting…" : "Accept invitation"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
