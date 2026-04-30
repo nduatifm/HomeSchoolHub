@@ -32,10 +32,13 @@ export default function Login() {
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-  // Read ?next= query param for post-login redirect (e.g. after team invite)
+  // Read ?next= query param for post-login redirect (e.g. after team invite).
+  // Strict same-origin validation: only allow paths that start with "/" to prevent open redirects.
   const nextPath = (() => {
-    try { return new URLSearchParams(window.location.search).get("next") || "/dashboard"; }
-    catch { return "/dashboard"; }
+    try {
+      const p = new URLSearchParams(window.location.search).get("next") || "/dashboard";
+      return p.startsWith("/") ? p : "/dashboard";
+    } catch { return "/dashboard"; }
   })();
 
   const [showRoleDialog, setShowRoleDialog] = useState(false);
