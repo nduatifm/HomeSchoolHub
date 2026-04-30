@@ -163,8 +163,9 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
 
           const isLate = sub?.status === "late";
           const isGraded = sub?.status === "graded";
-          const cardAccent = isLate ? "border-l-amber-400" : accent;
-          const cardBgHover = isLate ? "hover:bg-amber-50/40" : bgHover;
+          const isReturned = sub?.status === "returned";
+          const cardAccent = isLate || isReturned ? "border-l-amber-400" : accent;
+          const cardBgHover = isLate || isReturned ? "hover:bg-amber-50/40" : bgHover;
 
           return (
             <div
@@ -179,6 +180,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                       onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
                       className="font-semibold text-sm text-foreground hover:text-primary text-left transition-colors leading-snug"
                     >{a.title}</button>
+                    {isReturned && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 font-semibold">Needs revision</Badge>}
                     {urgency === "overdue"   && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-red-100 text-red-700 hover:bg-red-100 border-0">Overdue</Badge>}
                     {urgency === "due-today" && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0">Due Today</Badge>}
                     {urgency === "due-soon"  && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-0">Due Soon (in {dueSoonDays} day{dueSoonDays !== 1 ? "s" : ""})</Badge>}

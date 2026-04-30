@@ -32,6 +32,7 @@ type PendingTask = {
   assignmentId?: number;
   studentAssignmentId?: number;
   hasStudentAssignment?: boolean;
+  isReturned?: boolean;
 };
 
 export default function StudentClassroomsPage() {
@@ -114,6 +115,7 @@ export default function StudentClassroomsPage() {
       type: "classwork" as const,
       classroomSlug: a.classroomSlug,
       assignmentSlug: a.slug,
+      isReturned: a.status === "returned",
     })),
     ...pendingLegacy.map(a => ({
       key: `legacy-${a.id}`,
@@ -211,7 +213,12 @@ export default function StudentClassroomsPage() {
                     <div className="flex items-start gap-2.5 min-w-0">
                       <BookOpen className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-amber-900 truncate">{item.title}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-medium text-amber-900 truncate">{item.title}</p>
+                          {item.isReturned && (
+                            <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800">Needs revision</span>
+                          )}
+                        </div>
                         <p className="text-xs text-amber-700">{item.subtitle} · Due {item.dueDate}</p>
                       </div>
                     </div>
