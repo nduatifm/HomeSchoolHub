@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { Logo } from "@/components/Logo";
 import { Link } from "wouter";
+import { ToastAction } from "@/components/ui/toast";
 import { CheckCircle, GraduationCap, LogIn } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 
@@ -60,7 +61,8 @@ export default function StudentSignup() {
       if (msg.toLowerCase().includes("already exists")) {
         toast({
           title: "This email already has an account",
-          description: "Please go to the login page to sign in.",
+          description: "Use your existing login credentials.",
+          action: <ToastAction altText="Log in" onClick={() => setLocation("/login")}>Log in</ToastAction>,
           type: "error",
         });
         setAlreadyRegistered(true);
@@ -85,7 +87,8 @@ export default function StudentSignup() {
       if (msg.toLowerCase().includes("already exists")) {
         toast({
           title: "This email already has an account",
-          description: "Please go to the login page to sign in.",
+          description: "Use your existing login credentials.",
+          action: <ToastAction altText="Log in" onClick={() => setLocation("/login")}>Log in</ToastAction>,
           type: "error",
         });
         setAlreadyRegistered(true);

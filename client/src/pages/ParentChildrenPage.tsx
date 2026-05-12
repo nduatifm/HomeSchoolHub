@@ -182,8 +182,11 @@ export default function ParentChildrenPage() {
       setInviteEmailError(null);
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "";
-      toast({ title: "Could not send invite", description: msg || "Something went wrong.", type: "error" });
+      if (err instanceof ApiError && err.status === 409) {
+        setInviteEmailError(err.message || "This invite could not be sent — check the email and try again.");
+      } else {
+        toast({ title: "Could not send invite", description: "Something went wrong.", type: "error" });
+      }
     },
   });
 
