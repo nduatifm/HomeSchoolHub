@@ -46,6 +46,7 @@ type TeamMember = {
   role: "owner" | "member";
   status: "active" | "pending";
   inviteEmail: string | null;
+  inviteToken: string | null;
   parentName: string | null;
   parentEmail: string | null;
 };
@@ -118,8 +119,8 @@ export default function ParentChildrenPage() {
   // Team queries — only fetched when the panel for that child is open
   const childTeamQueries = useQueries({
     queries: students.map((child) => ({
-      queryKey: ["/api/children", child.id, "team"],
-      queryFn: () => apiRequest(`/api/children/${child.id}/team`) as Promise<TeamMember[]>,
+      queryKey: ["/api/students", child.id, "team"],
+      queryFn: () => apiRequest(`/api/students/${child.id}/team`) as Promise<TeamMember[]>,
       enabled: teamPanelChildId === child.id,
     })),
   });
@@ -167,7 +168,7 @@ export default function ParentChildrenPage() {
 
   const inviteMutation = useMutation({
     mutationFn: ({ childId, email, role }: { childId: number; email: string; role: string }) =>
-      apiRequest(`/api/children/${childId}/team/invite`, {
+      apiRequest(`/api/students/${childId}/team/invite`, {
         method: "POST",
         body: JSON.stringify({ email, role }),
       }),
@@ -185,18 +186,18 @@ export default function ParentChildrenPage() {
 
   const removeMemberMutation = useMutation({
     mutationFn: ({ childId, memberId }: { childId: number; memberId: number }) =>
-      apiRequest(`/api/children/${childId}/team/${memberId}`, { method: "DELETE" }),
+      apiRequest(`/api/students/${childId}/team/${memberId}`, { method: "DELETE" }),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students", vars.childId, "team"] });
       queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
       setLastOwnerErrorChildId(null);
       toast({ title: "Member removed" });
     },
     onError: (err: any, variables) => {
       const msg = err?.message ?? "";
-      if (msg.toLowerCase().includes("last owner")) {
+      if (msg.toLowerCase().includes("at least one owner") || msg.toLowerCase().includes("last owner")) {
         setLastOwnerErrorChildId(variables.childId);
-        toast({ title: "Cannot remove last owner", description: "Assign another owner before leaving.", variant: "destructive" });
+        toast({ title: "At least one Owner is required", description: "Promote another member to Owner before leaving.", variant: "destructive" });
       } else {
         toast({ title: "Could not remove member", description: msg || "Something went wrong.", variant: "destructive" });
       }
@@ -205,20 +206,20 @@ export default function ParentChildrenPage() {
 
   const changeRoleMutation = useMutation({
     mutationFn: ({ childId, memberId, role }: { childId: number; memberId: number; role: string }) =>
-      apiRequest(`/api/children/${childId}/team/${memberId}/role`, {
+      apiRequest(`/api/students/${childId}/team/${memberId}/role`, {
         method: "PATCH",
         body: JSON.stringify({ role }),
       }),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students", vars.childId, "team"] });
       setLastOwnerErrorChildId(null);
       toast({ title: "Role updated" });
     },
     onError: (err: any, variables) => {
       const msg = err?.message ?? "";
-      if (msg.toLowerCase().includes("last owner")) {
+      if (msg.toLowerCase().includes("at least one owner") || msg.toLowerCase().includes("last owner")) {
         setLastOwnerErrorChildId(variables.childId);
-        toast({ title: "Cannot demote last owner", description: "Promote another member to owner first.", variant: "destructive" });
+        toast({ title: "At least one Owner is required", description: "Promote another member to Owner before demoting.", variant: "destructive" });
       } else {
         toast({ title: "Could not update role", description: msg || "Something went wrong.", variant: "destructive" });
       }
@@ -226,11 +227,11 @@ export default function ParentChildrenPage() {
   });
 
   const resendInviteMutation = useMutation({
-    mutationFn: ({ childId, memberId }: { childId: number; memberId: number }) =>
-      apiRequest(`/api/children/${childId}/team/${memberId}/resend`, { method: "POST" }),
+    mutationFn: ({ token }: { token: string; childId: number }) =>
+      apiRequest(`/api/team-invite/${token}/resend`, { method: "POST" }),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
-      toast({ title: "Invite resent!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/students", vars.childId, "team"] });
+      toast({ title: "Invite resent" });
     },
     onError: (err: any) => {
       toast({ title: "Could not resend invite", description: err?.message ?? "Something went wrong.", variant: "destructive" });
@@ -238,10 +239,10 @@ export default function ParentChildrenPage() {
   });
 
   const cancelInviteMutation = useMutation({
-    mutationFn: ({ childId, memberId }: { childId: number; memberId: number }) =>
-      apiRequest(`/api/children/${childId}/team/${memberId}/cancel`, { method: "DELETE" }),
+    mutationFn: ({ token }: { token: string; childId: number }) =>
+      apiRequest(`/api/team-invite/${token}`, { method: "DELETE" }),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students", vars.childId, "team"] });
       toast({ title: "Invite cancelled" });
     },
     onError: (err: any) => {
@@ -376,7 +377,7 @@ export default function ParentChildrenPage() {
                             <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
                               <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
                               <p className="text-xs text-destructive leading-snug">
-                                You are the only owner. Promote another member to owner before leaving the team.
+                                At least one Owner is required — promote another member to Owner before leaving or demoting yourself.
                               </p>
                             </div>
                           )}
@@ -421,14 +422,14 @@ export default function ParentChildrenPage() {
                                       <button
                                         title="Resend invite"
                                         className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
-                                        onClick={() => resendInviteMutation.mutate({ childId: child.id, memberId: member.id })}
+                                        onClick={() => resendInviteMutation.mutate({ childId: child.id, token: member.inviteToken! })}
                                       >
                                         <RefreshCw className="w-3.5 h-3.5" />
                                       </button>
                                       <button
                                         title="Cancel invite"
                                         className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive"
-                                        onClick={() => cancelInviteMutation.mutate({ childId: child.id, memberId: member.id })}
+                                        onClick={() => cancelInviteMutation.mutate({ childId: child.id, token: member.inviteToken! })}
                                       >
                                         <XCircle className="w-3.5 h-3.5" />
                                       </button>

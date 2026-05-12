@@ -32,8 +32,11 @@ export default function Login() {
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-  // Read ?next= query param for post-login redirect (e.g. after team invite).
-  // Strict same-origin validation: only allow paths that start with "/" to prevent open redirects.
+  // ?teamInvite=<token>: redirect to /team-invite/<token> after login (also checks localStorage fallback
+  // for the email-signup → verify → login path). Falls back to ?next= for generic redirects.
+  const teamInviteToken = (() => {
+    try { return new URLSearchParams(window.location.search).get("teamInvite") || null; } catch { return null; }
+  })();
   const nextPath = (() => {
     try {
       const p = new URLSearchParams(window.location.search).get("next") || "/dashboard";
@@ -51,7 +54,13 @@ export default function Login() {
     try {
       await login(email, password);
       toast({ title: "Welcome back!", type: "success" });
-      setLocation(nextPath);
+      if (teamInviteToken) {
+        setLocation(`/team-invite/${teamInviteToken}`);
+      } else {
+        const pending = localStorage.getItem("pendingTeamInvite");
+        if (pending) { localStorage.removeItem("pendingTeamInvite"); setLocation(`/team-invite/${pending}`); }
+        else setLocation(nextPath);
+      }
     } catch (error: any) {
       setIsLoading(false);
       toast({ title: "Login failed — check your credentials and try again.", type: "error", duration: 5000 });
@@ -65,7 +74,13 @@ export default function Login() {
     try {
       await googleSignIn(credential);
       toast({ title: "Welcome back!", type: "success" });
-      setLocation(nextPath);
+      if (teamInviteToken) {
+        setLocation(`/team-invite/${teamInviteToken}`);
+      } else {
+        const pending = localStorage.getItem("pendingTeamInvite");
+        if (pending) { localStorage.removeItem("pendingTeamInvite"); setLocation(`/team-invite/${pending}`); }
+        else setLocation(nextPath);
+      }
     } catch (error: unknown) {
       const apiError = error as ApiError;
       if (apiError.requiresRole) {

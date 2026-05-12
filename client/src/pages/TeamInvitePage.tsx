@@ -8,14 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Users, Shield, Eye, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { Link } from "wouter";
 
 type InviteInfo = {
-  childId: number;
+  status: "pending" | "expired" | "not_found";
+  isExpired: boolean;
+  childId: number | null;
   childName: string | null;
   childGradeLevel: string | null;
   inviterName: string | null;
-  role: "owner" | "member";
+  role: "owner" | "member" | null;
   inviteEmail: string | null;
   expiresAt: string | null;
 };
@@ -29,7 +30,6 @@ export default function TeamInvitePage() {
   const {
     data: invite,
     isLoading: inviteLoading,
-    error: inviteError,
   } = useQuery<InviteInfo>({
     queryKey: ["/api/team-invite", token],
     queryFn: () => apiRequest(`/api/team-invite/${token}`),
@@ -43,18 +43,15 @@ export default function TeamInvitePage() {
       setAccepted(true);
       toast({ title: "Invitation accepted!", description: "You now have access to this child's account." });
     },
-    onError: (err: any) => {
-      toast({ title: "Could not accept invitation", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      toast({ title: "Could not accept invitation", description: msg });
     },
   });
 
-  // Auto-accept when:
-  // 1. User is logged in (just returned from login/signup via ?next= redirect)
-  // 2. Invite is loaded and valid
-  // 3. No email mismatch
-  // 4. Haven't already accepted and mutation isn't running
+  // Auto-accept when the user lands on this page already logged in and the invite is valid
   useEffect(() => {
-    if (!user || !invite || accepted || acceptMutation.isPending || acceptMutation.isError) return;
+    if (!user || !invite || invite.status !== "pending" || accepted || acceptMutation.isPending || acceptMutation.isError) return;
     const emailMismatch =
       !!invite.inviteEmail &&
       user.email.toLowerCase() !== invite.inviteEmail.toLowerCase();
@@ -73,7 +70,6 @@ export default function TeamInvitePage() {
 
   const isLoading = authLoading || inviteLoading;
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -82,27 +78,25 @@ export default function TeamInvitePage() {
     );
   }
 
-  // Error states — show even to unauthenticated users
-  if (inviteError) {
-    const msg = (inviteError as any)?.message ?? "";
-    const isExpired = msg.toLowerCase().includes("expired");
+  // Expired or not found — always a 200 response, check status field
+  if (invite && (invite.status === "not_found" || invite.isExpired)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md text-center">
           <CardContent className="pt-8 pb-8">
             <XCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
             <h2 className="text-lg font-semibold text-foreground mb-2">
-              {isExpired ? "Invitation expired" : "Invitation not found"}
+              {invite.isExpired ? "Invitation expired" : "Invitation not found"}
             </h2>
             <p className="text-sm text-muted-foreground mb-6">
-              {isExpired
+              {invite.isExpired
                 ? "This invitation link has expired. Ask the owner to send a new one."
                 : "This invitation link is invalid or has already been used."}
             </p>
             {user ? (
               <Button variant="outline" onClick={() => navigate("/children")}>Go to my children</Button>
             ) : (
-              <Button variant="outline" asChild><Link href="/login">Sign in</Link></Button>
+              <Button variant="outline" onClick={() => navigate("/login")}>Sign in</Button>
             )}
           </CardContent>
         </Card>
@@ -110,7 +104,6 @@ export default function TeamInvitePage() {
     );
   }
 
-  // Accepted state
   if (accepted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -125,11 +118,10 @@ export default function TeamInvitePage() {
     );
   }
 
-  if (!invite) return null;
+  if (!invite || invite.status !== "pending") return null;
 
   const roleLabel = invite.role === "owner" ? "Owner" : "Member";
   const RoleIcon = invite.role === "owner" ? Shield : Eye;
-  const returnTo = encodeURIComponent(`/team-invite/${token}`);
 
   const emailMismatch =
     !!user &&
@@ -208,23 +200,28 @@ export default function TeamInvitePage() {
             </p>
           )}
 
-          {/* Not logged in: show login/signup buttons */}
           {!user ? (
             <div className="space-y-2">
               <p className="text-sm text-center text-muted-foreground">
                 Sign in or create an account to accept this invitation.
               </p>
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" asChild>
-                  <Link href={`/login?next=${returnTo}`}>Sign in</Link>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => navigate(`/login?teamInvite=${token}`)}
+                >
+                  Sign in
                 </Button>
-                <Button className="flex-1" asChild>
-                  <Link href={`/signup?next=${returnTo}`}>Create account</Link>
+                <Button
+                  className="flex-1"
+                  onClick={() => navigate(`/signup?teamInvite=${token}`)}
+                >
+                  Create account
                 </Button>
               </div>
             </div>
           ) : (
-            /* Logged in: show accept/decline buttons */
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => navigate("/children")}>
                 Decline

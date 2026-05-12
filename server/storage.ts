@@ -55,6 +55,11 @@ import type {
   InsertClassroomMaterial,
 } from "@shared/schema";
 
+export type TeamInviteInfo = ChildTeamMember & {
+  childName: string | null;
+  childGradeLevel: string | null;
+};
+
 export type ConversationSummary = {
   studentId: number;
   teacherUserId: number;
@@ -108,7 +113,7 @@ export interface IStorage {
     inviteExpiresAt?: Date | null;
     acceptedAt?: Date | null;
   }): Promise<ChildTeamMember>;
-  getTeamInviteByToken(token: string): Promise<ChildTeamMember | null>;
+  getTeamInviteByToken(token: string): Promise<TeamInviteInfo | null>;
   acceptTeamInvite(token: string, userId: number): Promise<ChildTeamMember>;
   removeTeamMember(id: number): Promise<void>;
   updateTeamMemberRole(id: number, role: string): Promise<ChildTeamMember>;
@@ -2207,7 +2212,12 @@ class PrismaStorage implements IStorage {
 
   // ── Family team management ───────────────────────────────────────────────
 
-  private formatTeamMember(m: any): ChildTeamMember {
+  private formatTeamMember(m: Prisma.ChildTeamMemberGetPayload<{
+    include: {
+      parent: { select: { id: true; name: true; email: true } };
+      inviter: { select: { id: true; name: true } };
+    };
+  }>): ChildTeamMember {
     return {
       id: m.id,
       childId: m.childId,
@@ -2306,7 +2316,7 @@ class PrismaStorage implements IStorage {
     return this.formatTeamMember(row);
   }
 
-  async getTeamInviteByToken(token: string): Promise<ChildTeamMember | null> {
+  async getTeamInviteByToken(token: string): Promise<TeamInviteInfo | null> {
     const row = await prisma.childTeamMember.findFirst({
       where: { inviteToken: token, status: "pending" },
       include: {
@@ -2318,10 +2328,9 @@ class PrismaStorage implements IStorage {
     if (!row) return null;
     return {
       ...this.formatTeamMember(row),
-      // Include child info for the invite acceptance page
-      childName: (row as any).child?.name,
-      childGradeLevel: (row as any).child?.gradeLevel,
-    } as any;
+      childName: row.child?.name ?? null,
+      childGradeLevel: row.child?.gradeLevel ?? null,
+    };
   }
 
   async acceptTeamInvite(token: string, userId: number): Promise<ChildTeamMember> {

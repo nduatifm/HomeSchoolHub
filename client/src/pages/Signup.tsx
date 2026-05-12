@@ -35,11 +35,13 @@ export default function Signup() {
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-  // Read ?next= query param for post-signup redirect (e.g. after team invite)
+  // ?teamInvite=<token>: store in localStorage so Login.tsx can pick it up after email verification
+  const teamInviteToken = (() => {
+    try { return new URLSearchParams(window.location.search).get("teamInvite") || null; } catch { return null; }
+  })();
   const nextPath = (() => {
     try {
       const p = new URLSearchParams(window.location.search).get("next") || "/dashboard";
-      // Only allow same-origin paths (no external URLs)
       return p.startsWith("/") ? p : "/dashboard";
     } catch { return "/dashboard"; }
   })();
@@ -67,7 +69,12 @@ export default function Signup() {
         type: "success",
       });
       setEmail(""); setPassword(""); setName("");
-      setTimeout(() => setLocation("/login"), 2000);
+      if (teamInviteToken) {
+        localStorage.setItem("pendingTeamInvite", teamInviteToken);
+        setTimeout(() => setLocation(`/login?teamInvite=${teamInviteToken}`), 2000);
+      } else {
+        setTimeout(() => setLocation("/login"), 2000);
+      }
     } catch (error: any) {
       if (error.requiresVerification) {
         setUnverifiedEmail(error.email || email);
@@ -107,7 +114,13 @@ export default function Signup() {
     try {
       await googleSignIn(credential);
       toast({ title: "Welcome back!", type: "success" });
-      setLocation(nextPath);
+      if (teamInviteToken) {
+        setLocation(`/team-invite/${teamInviteToken}`);
+      } else {
+        const pending = localStorage.getItem("pendingTeamInvite");
+        if (pending) { localStorage.removeItem("pendingTeamInvite"); setLocation(`/team-invite/${pending}`); }
+        else setLocation(nextPath);
+      }
     } catch (error: unknown) {
       const apiError = error as ApiError;
       if (apiError.requiresRole) {
@@ -126,7 +139,13 @@ export default function Signup() {
     try {
       await googleSignIn(googleCredential, googleRole as "teacher" | "parent");
       toast({ title: "Account created!", type: "success" });
-      setLocation(nextPath);
+      if (teamInviteToken) {
+        setLocation(`/team-invite/${teamInviteToken}`);
+      } else {
+        const pending = localStorage.getItem("pendingTeamInvite");
+        if (pending) { localStorage.removeItem("pendingTeamInvite"); setLocation(`/team-invite/${pending}`); }
+        else setLocation(nextPath);
+      }
     } catch (error: any) {
       toast({ title: "Google Sign Up failed — try again.", type: "error" });
     } finally {
