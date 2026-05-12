@@ -63,7 +63,19 @@ export default function Login() {
       }
     } catch (error: any) {
       setIsLoading(false);
-      toast({ title: "Login failed — check your credentials and try again.", type: "error", duration: 5000 });
+      if (error.requiresVerification) {
+        const isStudent = error.role === "student";
+        toast({
+          title: "Email verification required",
+          description: isStudent
+            ? "Your account needs to be verified. Ask your parent to send a new invite, or contact support."
+            : "Please check your inbox for a verification link and verify your email before signing in.",
+          type: "error",
+          duration: 8000,
+        });
+      } else {
+        toast({ title: "Login failed — check your credentials and try again.", type: "error", duration: 5000 });
+      }
     }
   }
 

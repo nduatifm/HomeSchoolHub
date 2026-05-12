@@ -312,10 +312,18 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({
           error: "Please verify your email before logging in",
           needsVerification: true,
+          role: user.role, // Fix 4a: let frontend show a role-specific message
         });
       }
 
       const sessionId = await createSession(user.id);
+
+      // Fix 2a: include student profile so the frontend doesn't need a
+      // second /api/auth/me round-trip after login (prevents race condition).
+      let studentProfile = null;
+      if (user.role === "student") {
+        studentProfile = await storage.getStudentByUserId(user.id);
+      }
 
       res.json({
         user: {
@@ -324,7 +332,9 @@ export function registerRoutes(app: Express) {
           name: user.name,
           role: user.role,
           roles: user.roles ?? [],
+          isEmailVerified: user.isEmailVerified,
         },
+        student: studentProfile,
         sessionId,
       });
     } catch (error: any) {
@@ -649,6 +659,13 @@ export function registerRoutes(app: Express) {
       // Create session
       const sessionId = await createSession(user.id);
 
+      // Fix 2b: include student profile for Google-auth students so the
+      // frontend has it immediately without a second /api/auth/me call.
+      let googleStudentProfile = null;
+      if (user.role === "student") {
+        googleStudentProfile = await storage.getStudentByUserId(user.id);
+      }
+
       res.json({
         user: {
           id: user.id,
@@ -657,6 +674,7 @@ export function registerRoutes(app: Express) {
           role: user.role,
           roles: user.roles ?? [],
         },
+        student: googleStudentProfile,
         sessionId,
       });
     } catch (error: any) {

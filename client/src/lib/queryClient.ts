@@ -5,14 +5,16 @@ export class ApiError extends Error {
   requiresVerification?: boolean;
   email?: string;
   status?: number;
-  
-  constructor(message: string, options?: { requiresRole?: boolean; requiresVerification?: boolean; email?: string; status?: number }) {
+  role?: string;
+
+  constructor(message: string, options?: { requiresRole?: boolean; requiresVerification?: boolean; email?: string; status?: number; role?: string }) {
     super(message);
     this.name = 'ApiError';
     this.requiresRole = options?.requiresRole;
     this.requiresVerification = options?.requiresVerification;
     this.email = options?.email;
     this.status = options?.status;
+    this.role = options?.role;
   }
 }
 
@@ -42,6 +44,7 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
       requiresVerification: errorData.requiresVerification,
       email: errorData.email,
       status: response.status,
+      role: errorData.role,
     });
   }
 

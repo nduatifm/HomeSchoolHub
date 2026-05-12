@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, ApiError } from "@/lib/queryClient";
 
 interface User {
   id: number;
@@ -27,7 +27,6 @@ interface User {
 interface Student {
   id: number;
   userId: number;
-  parentId: number;
   name: string;
   gradeLevel: string;
   badges: string[];
@@ -83,10 +82,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user);
       setStudent(data.profile);
     } catch (error) {
-      localStorage.removeItem("sessionId");
-      setSessionId(null);
-      setUser(null);
-      setStudent(null);
+      // Fix 1: only clear auth state for definitive auth failures (session
+      // expired or user deleted). Transient errors like 500s or network
+      // failures must NOT log the user out — doing so creates a race
+      // condition where a brief server hiccup after a successful login
+      // immediately destroys the freshly-created session.
+      const isDefinitiveAuthFailure =
+        error instanceof ApiError &&
+        (error.status === 401 || error.status === 404);
+      if (isDefinitiveAuthFailure) {
+        localStorage.removeItem("sessionId");
+        setSessionId(null);
+        setUser(null);
+        setStudent(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -143,6 +152,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("sessionId", data.sessionId);
     setSessionId(data.sessionId);
     setUser(data.user);
+    // Fix 2c: set student profile immediately for Google-auth students so
+    // pages gated on !!student don't wait for fetchCurrentUser to complete.
+    setStudent(data.student || null);
   }
 
   async function logout() {
