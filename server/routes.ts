@@ -3456,7 +3456,10 @@ export function registerRoutes(app: Express) {
       const participantIds = Array.from(new Set([teacherId, student.userId, ...teamUserIds]));
       const viewerId = req.session.userId!;
 
-      // Mark tagged rows (new messages) and legacy rows (old messages without studentId) as read
+      // Mark tagged rows (new messages) and legacy rows (old messages without studentId) as read.
+      // The legacy branch is anchored to student.userId (sender OR receiver) to prevent
+      // accidentally marking sibling-thread messages as read when the same teacher/parent
+      // pair has multiple children.
       await Promise.all([
         prisma.message.updateMany({
           where: {
@@ -3472,6 +3475,7 @@ export function registerRoutes(app: Express) {
             receiverId: viewerId,
             isRead: false,
             senderId: { in: participantIds },
+            OR: [{ senderId: student.userId }, { receiverId: student.userId }],
           },
           data: { isRead: true },
         }),
