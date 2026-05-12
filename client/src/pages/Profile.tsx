@@ -446,7 +446,8 @@ export default function Profile() {
               editContent={null}
             />
 
-            {/* Role / Context Switcher */}
+            {/* Role / Context Switcher — hidden for students; only parents (and parent-turned-teachers) see this */}
+            {user?.role !== "student" && (
             <div className="px-4 sm:px-6 py-4 sm:py-5">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Role</p>
               <div className="flex flex-wrap items-center gap-2">
@@ -454,9 +455,9 @@ export default function Profile() {
                 <Badge className="capitalize px-2.5 py-0.5 bg-green-50 text-green-800 border border-green-200 hover:bg-green-50">
                   {user?.role}
                 </Badge>
-                {/* Other roles user already has — show switch buttons */}
+                {/* Other roles user already has — show switch buttons (parent↔teacher only) */}
                 {(user?.roles ?? [])
-                  .filter((r) => r !== user?.role)
+                  .filter((r) => r !== user?.role && r !== "student")
                   .map((r) => (
                     <Button
                       key={r}
@@ -474,7 +475,7 @@ export default function Profile() {
                       Switch to {r}
                     </Button>
                   ))}
-                {/* Add teacher role — only users who have parent capability but not teacher yet */}
+                {/* Add teacher role — only parents who don't have the teacher role yet */}
                 {(user?.roles ?? []).includes("parent") && !(user?.roles ?? []).includes("teacher") && (
                   <Button
                     type="button"
@@ -492,12 +493,13 @@ export default function Profile() {
                   </Button>
                 )}
               </div>
-              {(user?.roles ?? []).length > 1 && (
+              {(user?.roles ?? []).filter(r => r !== "student").length > 1 && (
                 <p className="text-xs text-gray-400 mt-2">
                   Switching context redirects you to the appropriate dashboard.
                 </p>
               )}
             </div>
+            )}
           </Section>
 
           {/* ══ Bio & Details ══ */}

@@ -1168,12 +1168,21 @@ export function registerRoutes(app: Express) {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      // Students cannot switch roles at all
+      if (user.role === "student") {
+        return res.status(403).json({ error: "Students cannot switch roles" });
+      }
+      // Nobody can switch into the student role via this endpoint
+      if (targetRole === "student") {
+        return res.status(403).json({ error: "Cannot switch to the student role" });
+      }
+
       let currentRoles: string[] = user.roles ?? [];
       // Ensure current role is always in the roles array
       if (!currentRoles.includes(user.role ?? "")) {
         currentRoles = [...new Set([...currentRoles, user.role ?? ""])];
       }
-      
+
       if (!currentRoles.includes(targetRole)) {
         return res.status(400).json({ error: `You do not have the ${targetRole} role` });
       }
@@ -4823,7 +4832,7 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const updated = await storage.updateUser(id, { role });
+      const updated = await storage.updateUser(id, { role, roles: [role] });
       res.json({ success: true, id: updated.id, role: updated.role });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
