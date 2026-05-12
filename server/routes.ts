@@ -1272,6 +1272,15 @@ export function registerRoutes(app: Express) {
         });
       }
 
+      // Guard: refuse if a pending invite already exists for this email
+      const existingPendingInvite = await storage.getPendingStudentInviteByEmail(data.email);
+      if (existingPendingInvite) {
+        return res.status(409).json({
+          error: "pending_invite_exists",
+          message: "A pending invite was already sent to this email — check your invite list or resend the existing one.",
+        });
+      }
+
       const token = crypto.randomUUID();
       // Generate a unique invite code with collision retry
       let code = generateInviteCode();

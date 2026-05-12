@@ -239,6 +239,7 @@ export interface IStorage {
     invite: Prisma.StudentInviteCreateInput,
   ): Promise<StudentInvite>;
   getStudentInviteByCode(code: string): Promise<StudentInvite | null>;
+  getPendingStudentInviteByEmail(email: string): Promise<StudentInvite | null>;
   getStudentInvitesByParent(parentId: number): Promise<StudentInvite[]>;
   updateStudentInvite(
     id: number,
@@ -1351,6 +1352,12 @@ class PrismaStorage implements IStorage {
   async getStudentInviteByCode(code: string): Promise<StudentInvite | null> {
     return (await prisma.studentInvite.findUnique({
       where: { code },
+    })) as StudentInvite | null;
+  }
+
+  async getPendingStudentInviteByEmail(email: string): Promise<StudentInvite | null> {
+    return (await prisma.studentInvite.findFirst({
+      where: { email, status: "pending" },
     })) as StudentInvite | null;
   }
 

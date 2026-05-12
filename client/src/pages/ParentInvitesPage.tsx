@@ -33,7 +33,11 @@ export default function ParentInvitesPage() {
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError && err.status === 409) {
-        setInviteEmailError("A student account already exists for this email — they can log in directly from the login page.");
+        if (err.message === "pending_invite_exists") {
+          setInviteEmailError("A pending invite was already sent to this email — check your invite list or resend the existing one.");
+        } else {
+          setInviteEmailError("A student account already exists for this email — they can log in directly from the login page.");
+        }
       } else {
         toast({ title: "Could not send invite", description: "Something went wrong. Please try again.", type: "error" });
       }
