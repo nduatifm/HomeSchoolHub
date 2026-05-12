@@ -1013,16 +1013,25 @@ class PrismaStorage implements IStorage {
 
       // Get primary owner for each student (for parentName display)
       const teamMemberships = await prisma.childTeamMember.findMany({
-        where: { childId: { in: studentIds }, status: "active" },
+        where: { childId: { in: studentIds }, status: "active", role: "owner", parentId: { not: null } },
         include: { parent: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "asc" },
+      });
+      // Also fetch all active members (any role) for participant IDs
+      const allTeamMemberships = await prisma.childTeamMember.findMany({
+        where: { childId: { in: studentIds }, status: "active", parentId: { not: null } },
+        select: { childId: true, parentId: true },
         orderBy: { createdAt: "asc" },
       });
       const primaryOwnerMap = new Map<number, { id: number; name: string }>();
       const allTeamUserIdsMap = new Map<number, number[]>();
       for (const m of teamMemberships) {
-        if (!primaryOwnerMap.has(m.childId)) primaryOwnerMap.set(m.childId, { id: m.parentId, name: m.parent.name });
+        if (!primaryOwnerMap.has(m.childId) && m.parentId != null)
+          primaryOwnerMap.set(m.childId, { id: m.parentId, name: m.parent.name });
+      }
+      for (const m of allTeamMemberships) {
         if (!allTeamUserIdsMap.has(m.childId)) allTeamUserIdsMap.set(m.childId, []);
-        allTeamUserIdsMap.get(m.childId)!.push(m.parentId);
+        if (m.parentId != null) allTeamUserIdsMap.get(m.childId)!.push(m.parentId);
       }
 
       const labelMap = new Map(threadLabels.map((l) => [l.studentId, l.name]));

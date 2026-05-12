@@ -382,8 +382,8 @@ export default function ParentChildrenPage() {
 
                           {childTeamQueries[teamIndex]?.isLoading ? (
                             <p className="text-xs text-muted-foreground">Loading team…</p>
-                          ) : teamData.length === 0 ? (
-                            <p className="text-xs text-muted-foreground italic">No team members yet.</p>
+                          ) : teamData.filter(m => m.parentId !== user?.id || m.status === "pending").length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">No co-parents or guardians yet. Use the invite button to add someone.</p>
                           ) : (
                             teamData.map((member) => {
                               const isSelf = member.parentId === user?.id;

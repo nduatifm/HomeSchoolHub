@@ -138,6 +138,17 @@ async function requireSuperAdmin(req: Request, res: Response, next: Function) {
   });
 }
 
+// requireTeamOwner — validates that the authenticated caller is an owner of the given child's team.
+// Returns true and responds with 403 if not; returns false to signal the route handler should continue.
+async function assertTeamOwner(callerId: number, studentId: number, res: Response): Promise<boolean> {
+  const isOwner = await storage.isTeamOwner(callerId, studentId);
+  if (!isOwner) {
+    res.status(403).json({ error: "Only owners can perform this action" });
+    return false;
+  }
+  return true;
+}
+
 // Sync SUPER_ADMIN_EMAIL and ADMIN_EMAIL env vars to DB flags on startup.
 // Enforces exact desired state: promotes target users and demotes previous ones.
 async function syncAdminFlags() {
@@ -1552,8 +1563,7 @@ export function registerRoutes(app: Express) {
       if (!student) return res.status(404).json({ error: "Student not found" });
 
       const callerId = req.session.userId!;
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-      if (!isOwner) return res.status(403).json({ error: "Only owners can invite co-parents" });
+      if (!await assertTeamOwner(callerId, studentId, res)) return;
 
       const schema = z.object({
         email: z.string().email("Valid email required"),
@@ -1652,8 +1662,7 @@ export function registerRoutes(app: Express) {
       const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, childId: studentId, status: "pending" } });
       if (!membership) return res.status(404).json({ error: "Pending invite not found" });
 
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-      if (!isOwner) return res.status(403).json({ error: "Only owners can resend invites" });
+      if (!await assertTeamOwner(callerId, studentId, res)) return;
 
       const newToken = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -1695,8 +1704,7 @@ export function registerRoutes(app: Express) {
       const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, childId: studentId, status: "pending" } });
       if (!membership) return res.status(404).json({ error: "Pending invite not found" });
 
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-      if (!isOwner) return res.status(403).json({ error: "Only owners can cancel invites" });
+      if (!await assertTeamOwner(callerId, studentId, res)) return;
 
       await storage.removeTeamMember(membership.id);
       res.json({ ok: true });
@@ -1767,8 +1775,7 @@ export function registerRoutes(app: Express) {
       const memberId = parseInt(req.params.memberId);
       const callerId = req.session.userId!;
 
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-      if (!isOwner) return res.status(403).json({ error: "Only owners can change roles" });
+      if (!await assertTeamOwner(callerId, studentId, res)) return;
 
       // Validate the membership record belongs to this child (prevent cross-child tampering)
       const membership = await prisma.childTeamMember.findFirst({ where: { id: memberId, childId: studentId } });
@@ -1799,8 +1806,7 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
 
       // Only team owners can remove members (including themselves)
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-      if (!isOwner) return res.status(403).json({ error: "Only team owners can remove members" });
+      if (!await assertTeamOwner(callerId, studentId, res)) return;
 
       // Find the membership record
       const membership = await prisma.childTeamMember.findFirst({
