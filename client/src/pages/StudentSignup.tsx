@@ -57,8 +57,8 @@ export default function StudentSignup() {
       toast({ title: "Welcome to the platform!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      const msg: string = error?.message ?? "";
-      if (msg.toLowerCase().includes("already exists")) {
+      const isAlreadyRegistered = error instanceof ApiError && error.status === 409;
+      if (isAlreadyRegistered) {
         toast({
           title: "This email already has an account",
           description: "Use your existing login credentials.",
@@ -83,8 +83,8 @@ export default function StudentSignup() {
       toast({ title: "Welcome to the platform!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      const msg: string = error?.message ?? "";
-      if (msg.toLowerCase().includes("already exists")) {
+      const isAlreadyRegistered = error instanceof ApiError && error.status === 409;
+      if (isAlreadyRegistered) {
         toast({
           title: "This email already has an account",
           description: "Use your existing login credentials.",

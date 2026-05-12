@@ -368,7 +368,7 @@ export function registerRoutes(app: Express) {
       // Check if email is already registered
       const existingUser = await storage.getUserByEmail(invite.email);
       if (existingUser) {
-        return res.status(400).json({ error: "An account with this email already exists" });
+        return res.status(409).json({ error: "email_already_registered" });
       }
 
       // Create user account - mark as verified since invite code IS the verification
@@ -502,7 +502,7 @@ export function registerRoutes(app: Express) {
       // Check if email is already registered
       const existingUser = await storage.getUserByEmail(invite.email);
       if (existingUser) {
-        return res.status(400).json({ error: "An account with this email already exists" });
+        return res.status(409).json({ error: "email_already_registered" });
       }
 
       // Create user account linked to Google
