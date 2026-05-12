@@ -192,12 +192,10 @@ export default function ParentChildrenPage() {
       setLastOwnerErrorChildId(null);
       toast({ title: "Member removed" });
     },
-    onError: (err: any) => {
+    onError: (err: any, variables) => {
       const msg = err?.message ?? "";
       if (msg.toLowerCase().includes("last owner")) {
-        setLastOwnerErrorChildId(
-          students.find(s => s.id === (err as any)?.childId)?.id ?? null
-        );
+        setLastOwnerErrorChildId(variables.childId);
         toast({ title: "Cannot remove last owner", description: "Assign another owner before leaving.", variant: "destructive" });
       } else {
         toast({ title: "Could not remove member", description: msg || "Something went wrong.", variant: "destructive" });
@@ -216,8 +214,14 @@ export default function ParentChildrenPage() {
       setLastOwnerErrorChildId(null);
       toast({ title: "Role updated" });
     },
-    onError: (err: any) => {
-      toast({ title: "Could not update role", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+    onError: (err: any, variables) => {
+      const msg = err?.message ?? "";
+      if (msg.toLowerCase().includes("last owner")) {
+        setLastOwnerErrorChildId(variables.childId);
+        toast({ title: "Cannot demote last owner", description: "Promote another member to owner first.", variant: "destructive" });
+      } else {
+        toast({ title: "Could not update role", description: msg || "Something went wrong.", variant: "destructive" });
+      }
     },
   });
 

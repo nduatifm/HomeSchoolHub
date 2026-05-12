@@ -15,6 +15,7 @@ type ConversationSummary = {
   lastMessage: string | null;
   lastMessageTimestamp: string | null;
   unreadCount: number;
+  isReadOnly: boolean;
 };
 
 function formatPreviewTime(ts: string): string {
@@ -264,6 +265,7 @@ export default function MessagesPage() {
                 myUserId={user!.id}
                 title={getDisplayName(selected)}
                 customName={selected.customName}
+                readOnly={selected.isReadOnly}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground select-none">

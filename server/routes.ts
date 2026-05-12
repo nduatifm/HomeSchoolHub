@@ -1684,7 +1684,7 @@ export function registerRoutes(app: Express) {
           });
       }
 
-      res.json({ ok: true, member });
+      res.json({ ok: true, member, childId: invite.childId });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -3170,21 +3170,29 @@ export function registerRoutes(app: Express) {
   app.post("/api/messages", requireAuth, async (req, res) => {
     try {
       const callerId = req.session.userId!;
-      // If a studentId is provided (parent messaging a teacher about a specific child),
-      // enforce that only team owners can send — members are read-only.
-      if (req.body.studentId) {
-        const studentId = parseInt(req.body.studentId);
-        if (!isNaN(studentId)) {
-          const isOwner = await storage.isTeamOwner(callerId, studentId);
+      const caller = await storage.getUserById(callerId);
+
+      // Parent callers: enforce owner-only messaging.
+      // Members (read-only team participants) may not send messages through any endpoint.
+      if (caller?.role === "parent") {
+        const sid = req.body.studentId ? parseInt(req.body.studentId) : NaN;
+        if (!isNaN(sid)) {
+          // Per-child check: must be owner (or the student themselves, though unlikely)
+          const isOwner = await storage.isTeamOwner(callerId, sid);
           if (!isOwner) {
-            // Also allow teachers and the student themselves
-            const student = await storage.getStudentById(studentId);
+            const student = await storage.getStudentById(sid);
             const isStudent = student?.userId === callerId;
-            const user = await storage.getUserById(callerId);
-            const isTeacher = user?.role === "teacher";
-            if (!isStudent && !isTeacher) {
+            if (!isStudent) {
               return res.status(403).json({ error: "Members cannot send messages — only owners can" });
             }
+          }
+        } else {
+          // No studentId: check if caller is an owner for at least one child
+          const ownerMembership = await prisma.childTeamMember.findFirst({
+            where: { parentId: callerId, role: "owner", status: "active" },
+          });
+          if (!ownerMembership) {
+            return res.status(403).json({ error: "Members cannot send messages — only owners can" });
           }
         }
       }

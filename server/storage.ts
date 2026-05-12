@@ -65,6 +65,7 @@ export type ConversationSummary = {
   lastMessageTimestamp: string | null;
   unreadCount: number;
   customName: string | null;
+  isReadOnly: boolean;
 };
 
 export interface IStorage {
@@ -1034,6 +1035,7 @@ class PrismaStorage implements IStorage {
         teacherName: teacher.name,
         parentName: primaryOwnerMap.get(s.id)?.name ?? null,
         customName: labelMap.get(s.id) ?? null,
+        isReadOnly: false,
         ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
       }));
     }
@@ -1054,6 +1056,9 @@ class PrismaStorage implements IStorage {
 
       const parentStudents = memberships.map((m) => m.child);
       if (parentStudents.length === 0) return [];
+
+      // Map childId → caller's role on that child's team (owner vs member)
+      const callerRoleMap = new Map(memberships.map((m) => [m.child.id, m.role as string]));
 
       const teacherMap = new Map<number, TeacherRef>();
       for (const r of tutorRequests) {
@@ -1103,6 +1108,7 @@ class PrismaStorage implements IStorage {
           teacherName: teacher?.name ?? "",
           parentName: parentUser?.name ?? null,
           customName: parentLabelMap.get(`${teacherUserId}:${s.id}`) ?? null,
+          isReadOnly: (callerRoleMap.get(s.id) ?? "owner") === "member",
           ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
         };
       });
@@ -1115,6 +1121,7 @@ class PrismaStorage implements IStorage {
           teacherName: "",
           parentName: parentUser?.name ?? null,
           customName: null,
+          isReadOnly: (callerRoleMap.get(s.id) ?? "owner") === "member",
           lastMessage: null,
           lastMessageTimestamp: null,
           unreadCount: 0,
@@ -1165,6 +1172,7 @@ class PrismaStorage implements IStorage {
         teacherName: teacherUser.name,
         parentName: primaryOwner?.parent?.name ?? null,
         customName: studentLabel?.name ?? null,
+        isReadOnly: false,
         ...(stats.get(studentRecord.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
       }];
     }

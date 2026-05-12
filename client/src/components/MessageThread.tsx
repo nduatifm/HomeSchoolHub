@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Send, ArrowLeft, MessageSquare, Pencil, Check, X } from "lucide-react";
+import { Send, ArrowLeft, MessageSquare, Pencil, Check, X, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ interface MessageThreadProps {
   title?: string;
   customName?: string | null;
   onBack?: () => void;
+  readOnly?: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ export default function MessageThread({
   title,
   customName,
   onBack,
+  readOnly = false,
 }: MessageThreadProps) {
   const { toast } = useToast();
   const [text, setText] = useState("");
@@ -469,65 +471,77 @@ export default function MessageThread({
         <div ref={bottomRef} />
       </div>
 
-      {/* ── Input bar ───────────────────────────────────────────────────────── */}
-      <div
-        className="shrink-0 flex items-end gap-2 px-3 py-2.5 border-t border-slate-100"
-        style={{ background: PAGE_BG }}
-      >
-        <textarea
-          ref={textareaRef}
-          placeholder="Message…"
-          value={text}
-          rows={1}
-          onChange={(e) => { setText(e.target.value); autoResize(); }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-          }}
-          className="flex-1 resize-none outline-none leading-6 overflow-y-auto rounded-xl border transition-colors duration-150"
-          style={{
-            fontSize: 13.5,
-            minHeight: 38,
-            maxHeight: 120,
-            padding: "7px 12px",
-            color: RECV_TEXT,
-            fontFamily: "inherit",
-            background: RECV_BG,
-            borderColor: BORDER,
-            display: "block",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = SENT_BG;
-            e.currentTarget.style.boxShadow   = "0 0 0 3px rgba(37,99,235,0.08)";
-            e.currentTarget.style.background   = PAGE_BG;
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = BORDER;
-            e.currentTarget.style.boxShadow   = "none";
-            e.currentTarget.style.background   = RECV_BG;
-          }}
-        />
-
-        <button
-          onClick={handleSend}
-          disabled={!text.trim() || sendMutation.isPending}
-          className="shrink-0 flex items-center justify-center rounded-xl transition-all duration-150"
-          style={{
-            width: 38,
-            height: 38,
-            flexShrink: 0,
-            background: text.trim() && !sendMutation.isPending ? SENT_BG : RECV_BG,
-            color:      text.trim() && !sendMutation.isPending ? "#fff"  : META_TEXT,
-            cursor:     text.trim() && !sendMutation.isPending ? "pointer" : "default",
-            boxShadow:  text.trim() && !sendMutation.isPending
-              ? "0 1px 6px rgba(37,99,235,0.35)"
-              : "none",
-          }}
-          onMouseEnter={(e) => { if (text.trim()) e.currentTarget.style.opacity = "0.85"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+      {/* ── Input bar / read-only notice ────────────────────────────────────── */}
+      {readOnly ? (
+        <div
+          className="shrink-0 flex items-center justify-center gap-2 px-4 py-3 border-t border-slate-100"
+          style={{ background: RECV_BG }}
         >
-          <Send className="w-4 h-4" style={{ transform: "translateX(1px)" }} />
-        </button>
-      </div>
+          <Eye className="w-3.5 h-3.5 shrink-0" style={{ color: META_TEXT }} />
+          <span className="text-xs" style={{ color: META_TEXT }}>
+            You have view-only access to this thread.
+          </span>
+        </div>
+      ) : (
+        <div
+          className="shrink-0 flex items-end gap-2 px-3 py-2.5 border-t border-slate-100"
+          style={{ background: PAGE_BG }}
+        >
+          <textarea
+            ref={textareaRef}
+            placeholder="Message…"
+            value={text}
+            rows={1}
+            onChange={(e) => { setText(e.target.value); autoResize(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+            }}
+            className="flex-1 resize-none outline-none leading-6 overflow-y-auto rounded-xl border transition-colors duration-150"
+            style={{
+              fontSize: 13.5,
+              minHeight: 38,
+              maxHeight: 120,
+              padding: "7px 12px",
+              color: RECV_TEXT,
+              fontFamily: "inherit",
+              background: RECV_BG,
+              borderColor: BORDER,
+              display: "block",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = SENT_BG;
+              e.currentTarget.style.boxShadow   = "0 0 0 3px rgba(37,99,235,0.08)";
+              e.currentTarget.style.background   = PAGE_BG;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = BORDER;
+              e.currentTarget.style.boxShadow   = "none";
+              e.currentTarget.style.background   = RECV_BG;
+            }}
+          />
+
+          <button
+            onClick={handleSend}
+            disabled={!text.trim() || sendMutation.isPending}
+            className="shrink-0 flex items-center justify-center rounded-xl transition-all duration-150"
+            style={{
+              width: 38,
+              height: 38,
+              flexShrink: 0,
+              background: text.trim() && !sendMutation.isPending ? SENT_BG : RECV_BG,
+              color:      text.trim() && !sendMutation.isPending ? "#fff"  : META_TEXT,
+              cursor:     text.trim() && !sendMutation.isPending ? "pointer" : "default",
+              boxShadow:  text.trim() && !sendMutation.isPending
+                ? "0 1px 6px rgba(37,99,235,0.35)"
+                : "none",
+            }}
+            onMouseEnter={(e) => { if (text.trim()) e.currentTarget.style.opacity = "0.85"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+          >
+            <Send className="w-4 h-4" style={{ transform: "translateX(1px)" }} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
