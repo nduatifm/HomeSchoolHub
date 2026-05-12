@@ -2140,17 +2140,25 @@ export function registerRoutes(app: Express) {
         userUpdates.email = trimmedEmail;
       }
 
-      if (Object.keys(userUpdates).length > 0) {
-        await storage.updateUser(student.userId, userUpdates);
-      }
-
       const studentUpdates: Record<string, any> = {};
       if (name?.trim()) studentUpdates.name = name.trim();
       if (gradeLevel !== undefined) studentUpdates.gradeLevel = gradeLevel?.trim() || null;
 
-      const updatedStudent = Object.keys(studentUpdates).length > 0
-        ? await storage.updateStudent(studentId, studentUpdates)
-        : student;
+      const hasUserUpdates = Object.keys(userUpdates).length > 0;
+      const hasStudentUpdates = Object.keys(studentUpdates).length > 0;
+
+      let updatedStudent = student;
+      if (hasUserUpdates || hasStudentUpdates) {
+        [, updatedStudent] = await prisma.$transaction([
+          hasUserUpdates
+            ? prisma.user.update({ where: { id: student.userId }, data: userUpdates })
+            : prisma.user.findUnique({ where: { id: student.userId } }),
+          hasStudentUpdates
+            ? prisma.student.update({ where: { id: studentId }, data: studentUpdates })
+            : prisma.student.findUnique({ where: { id: studentId } }),
+        ]) as [any, any];
+        updatedStudent = updatedStudent ?? student;
+      }
 
       res.json({ student: updatedStudent });
     } catch (error: any) {

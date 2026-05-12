@@ -291,6 +291,7 @@ export default function ParentChildrenPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
       setCreateResult({ email: data.userEmail, password: createForm.password });
+      toast({ title: "Account created", description: "Share these credentials with your child so they can log in." });
     },
     onError: (err: any) => {
       if (err?.status === 409) {
