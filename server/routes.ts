@@ -3254,6 +3254,7 @@ export function registerRoutes(app: Express) {
             message: messageText.trim(),
             timestamp,
             isRead: false,
+            studentId,
           }),
         ),
       );
@@ -3415,15 +3416,26 @@ export function registerRoutes(app: Express) {
       const participantIds = Array.from(new Set([teacherId, student.userId, ...teamUserIds]));
       const viewerId = req.session.userId!;
 
-      // Mark every raw DB row in this thread where the current user is the receiver as read
-      await prisma.message.updateMany({
-        where: {
-          receiverId: viewerId,
-          isRead: false,
-          senderId: { in: participantIds },
-        },
-        data: { isRead: true },
-      });
+      // Mark tagged rows (new messages) and legacy rows (old messages without studentId) as read
+      await Promise.all([
+        prisma.message.updateMany({
+          where: {
+            studentId,
+            receiverId: viewerId,
+            isRead: false,
+          },
+          data: { isRead: true },
+        }),
+        prisma.message.updateMany({
+          where: {
+            studentId: null,
+            receiverId: viewerId,
+            isRead: false,
+            senderId: { in: participantIds },
+          },
+          data: { isRead: true },
+        }),
+      ]);
 
       res.json({ success: true });
     } catch (error: any) {

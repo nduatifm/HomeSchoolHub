@@ -98,6 +98,7 @@ model Student {
   classroomEnrollments       ClassroomEnrollment[]
   classroomSubmissions       ClassroomSubmission[]
   childTeamMembers           ChildTeamMember[]          @relation("ChildTeamChild")
+  threadMessages             Message[]
 
   @@index([userId])
 }
@@ -290,12 +291,15 @@ model Message {
   message    String
   timestamp  String
   isRead     Boolean @default(false)
+  studentId  Int?
 
-  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  student  Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
 
   @@index([senderId])
   @@index([receiverId])
+  @@index([studentId])
 }
 
 model ProgressReport {

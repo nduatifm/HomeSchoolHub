@@ -300,6 +300,7 @@ export const messageSchema = z.object({
   message: z.string(),
   timestamp: z.string(),
   isRead: z.boolean(),
+  studentId: z.number().nullable().optional(),
 });
 
 export const insertMessageSchema = messageSchema.omit({ id: true });

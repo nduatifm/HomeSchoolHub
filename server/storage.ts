@@ -860,22 +860,34 @@ class PrismaStorage implements IStorage {
     if (!student) return [];
     const teamUserIds = await this.getTeamMemberUserIds(studentId);
     const participantIds = Array.from(new Set([teacherUserId, student.userId, ...teamUserIds]));
-    const messages = await prisma.message.findMany({
-      where: {
-        AND: [
-          { senderId: { in: participantIds } },
-          { receiverId: { in: participantIds } },
-        ],
-      },
-      include: { sender: { select: { name: true } } },
-      orderBy: { timestamp: "asc" },
-    });
 
-    // Deduplicate broadcast siblings: a group send writes one row per recipient,
-    // all sharing the same (senderId, timestamp, message). Keep only the first
-    // row per logical send so the thread renders one bubble per send event.
+    // Prefer the studentId tag for precise thread isolation (set on all new messages).
+    // Fall back to the participant-set filter for legacy messages that pre-date the tag.
+    const [tagged, legacy] = await Promise.all([
+      prisma.message.findMany({
+        where: { studentId },
+        include: { sender: { select: { name: true } } },
+        orderBy: { timestamp: "asc" },
+      }),
+      prisma.message.findMany({
+        where: {
+          studentId: null,
+          AND: [
+            { senderId: { in: participantIds } },
+            { receiverId: { in: participantIds } },
+          ],
+        },
+        include: { sender: { select: { name: true } } },
+        orderBy: { timestamp: "asc" },
+      }),
+    ]);
+
+    // Merge and sort; deduplicate legacy broadcast siblings by (senderId|timestamp|message)
     const seen = new Set<string>();
-    const deduped = messages.filter((m) => {
+    const all = [...tagged, ...legacy].sort((a, b) =>
+      a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0,
+    );
+    const deduped = all.filter((m) => {
       const key = `${m.senderId}|${m.timestamp}|${m.message}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -889,6 +901,7 @@ class PrismaStorage implements IStorage {
       message: m.message,
       timestamp: m.timestamp,
       isRead: m.isRead,
+      studentId: m.studentId ?? undefined,
       senderName: m.sender?.name ?? "Deleted user",
     }));
   }
@@ -911,14 +924,33 @@ class PrismaStorage implements IStorage {
         const pids = g.participantIds;
         if (pids.length < 2) continue;
 
-        const [lastMsg, unreadCount] = await Promise.all([
+        // For tagged messages use studentId for precise isolation; for legacy messages fall back
+        // to the participant-set filter so old data still contributes to previews/counts.
+        const [taggedLast, legacyLast, taggedUnread, legacyUnread] = await Promise.all([
           prisma.message.findFirst({
-            where: { senderId: { in: pids }, receiverId: { in: pids } },
+            where: { studentId: g.studentId },
+            orderBy: { timestamp: "desc" },
+            select: { message: true, timestamp: true },
+          }),
+          prisma.message.findFirst({
+            where: {
+              studentId: null,
+              senderId: { in: pids },
+              receiverId: { in: pids },
+            },
             orderBy: { timestamp: "desc" },
             select: { message: true, timestamp: true },
           }),
           prisma.message.count({
             where: {
+              studentId: g.studentId,
+              receiverId: requesterUserId,
+              isRead: false,
+            },
+          }),
+          prisma.message.count({
+            where: {
+              studentId: null,
               senderId: { in: pids },
               receiverId: requesterUserId,
               isRead: false,
@@ -926,10 +958,18 @@ class PrismaStorage implements IStorage {
           }),
         ]);
 
+        // Pick whichever tagged/legacy last message is newer
+        let lastMsg: { message: string; timestamp: string } | null = null;
+        if (taggedLast && legacyLast) {
+          lastMsg = taggedLast.timestamp >= legacyLast.timestamp ? taggedLast : legacyLast;
+        } else {
+          lastMsg = taggedLast ?? legacyLast ?? null;
+        }
+
         result.set(g.studentId, {
           lastMessage: lastMsg?.message ?? null,
           lastMessageTimestamp: lastMsg?.timestamp ? String(lastMsg.timestamp) : null,
-          unreadCount,
+          unreadCount: taggedUnread + legacyUnread,
         });
       }
       return result;
