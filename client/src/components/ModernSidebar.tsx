@@ -94,7 +94,7 @@ export default function ModernSidebar() {
       toast({ title: "Couldn't switch role — try again.", type: "error" }),
   });
 
-  const otherRoles = (user?.roles ?? []).filter((r) => r !== user?.role);
+  const otherRoles = (user?.roles ?? []).filter((r) => r !== user?.role && r !== "student");
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [resetDbOpen, setResetDbOpen] = useState(false);
