@@ -149,6 +149,42 @@ async function assertTeamOwner(callerId: number, studentId: number, res: Respons
   return true;
 }
 
+// generateTempPassword — cryptographically random 10-char alphanumeric (no ambiguous chars).
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.randomBytes(10);
+  return Array.from(bytes as Uint8Array).map((b) => chars[b % chars.length]).join("");
+}
+
+// resetStudentAccount — shared core logic for parent + admin reset paths.
+// Sets a new hashed temp password, force-verifies email, kills all sessions,
+// and fires an in-app notification to the student. Returns the plain-text temp password.
+async function resetStudentAccount(userId: number, callerDesc: string): Promise<string> {
+  const user = await storage.getUserById(userId);
+  if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
+  if (user.role !== "student") {
+    throw Object.assign(new Error("Account reset is only available for student accounts"), { status: 400 });
+  }
+  const tempPassword = generateTempPassword();
+  const hashed = await hashPassword(tempPassword);
+  await storage.updateUser(userId, {
+    password: hashed,
+    isEmailVerified: true,
+    emailVerifyToken: null,
+    emailVerifyExpires: null,
+  });
+  await prisma.authSession.deleteMany({ where: { userId } });
+  storage.createNotification({
+    userId,
+    type: "account_reset",
+    title: "Your login credentials were reset",
+    body: "Your login credentials were reset. Please change your password in your profile settings.",
+    link: "/profile",
+  }).catch(() => {});
+  console.log(`[account-reset] ${callerDesc} reset login for userId=${userId}`);
+  return tempPassword;
+}
+
 // Sync SUPER_ADMIN_EMAIL and ADMIN_EMAIL env vars to DB flags on startup.
 // Enforces exact desired state: promotes target users and demotes previous ones.
 async function syncAdminFlags() {
@@ -1866,6 +1902,29 @@ export function registerRoutes(app: Express) {
   });
 
   // resend and cancel are now token-based: POST /api/team-invite/:token/resend and DELETE /api/team-invite/:token
+
+  // POST /api/students/:studentId/reset-login — reset a student's login credentials (team owner only)
+  app.post("/api/students/:studentId/reset-login", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+
+      const callerId = req.session.userId!;
+      const student = await storage.getStudentById(studentId);
+      if (!student) {
+        return res.status(404).json({ error: "Student account not found — they may not have completed signup yet." });
+      }
+
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+      if (!isOwner) return res.status(403).json({ error: "Only owners can reset login credentials" });
+
+      const caller = await storage.getUserById(callerId);
+      const tempPassword = await resetStudentAccount(student.userId, `parent(${caller?.name ?? callerId})`);
+      res.json({ tempPassword });
+    } catch (error: any) {
+      res.status(error.status ?? 500).json({ error: error.message });
+    }
+  });
 
   // ========== ASSIGNMENT ROUTES ==========
 
@@ -4782,6 +4841,18 @@ export function registerRoutes(app: Express) {
       res.json({ success: true, id: updated.id, isAdmin: updated.isAdmin });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/admin/users/:id/reset-account — reset a student's login credentials (super admin only)
+  app.patch("/api/admin/users/:id/reset-account", requireSuperAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
+      const tempPassword = await resetStudentAccount(id, `superAdmin(${req.session.userId})`);
+      res.json({ tempPassword });
+    } catch (error: any) {
+      res.status(error.status ?? 500).json({ error: error.message });
     }
   });
 

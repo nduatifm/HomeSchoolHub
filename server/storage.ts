@@ -412,6 +412,7 @@ class PrismaStorage implements IStorage {
       return {
         ...m.child,
         email: m.child.user?.email,
+        googleId: m.child.user?.googleId ?? null,
         callerRole: m.role as string,
         ownerName,
         user: undefined,

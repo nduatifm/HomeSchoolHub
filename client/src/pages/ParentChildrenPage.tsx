@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle, AlertCircle } from "lucide-react";
+import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle, AlertCircle, KeyRound, Copy, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
@@ -36,7 +36,7 @@ import type { Student, User, Classroom, ClassroomAssignment, ClassroomSubmission
 
 type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
 type AssignedTeacherRef = { id: number; name: string; email: string } | null;
-type ExtendedStudent = Student & { email?: string; callerRole?: string; ownerName?: string | null };
+type ExtendedStudent = Student & { email?: string; googleId?: string | null; callerRole?: string; ownerName?: string | null };
 type ChildStat = ExtendedStudent & { pct: number | null; completed: number; total: number; classroomCount: number };
 type AssignmentWithStatus = Assignment & { studentAssignment: StudentAssignment | null };
 type TeamMember = {
@@ -69,6 +69,11 @@ export default function ParentChildrenPage() {
   const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
   // Inline last-owner error per child
   const [lastOwnerErrorChildId, setLastOwnerErrorChildId] = useState<number | null>(null);
+
+  // Reset login state
+  const [resetChildId, setResetChildId] = useState<number | null>(null);
+  const [resetTempPassword, setResetTempPassword] = useState<string | null>(null);
+  const [copiedPw, setCopiedPw] = useState(false);
 
   const { data: students = [] } = useQuery<ExtendedStudent[]>({ queryKey: ["/api/students/parent"] });
   const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
@@ -254,6 +259,35 @@ export default function ParentChildrenPage() {
     },
   });
 
+  const resetLoginMutation = useMutation({
+    mutationFn: (childId: number) =>
+      apiRequest(`/api/students/${childId}/reset-login`, { method: "POST" }) as Promise<{ tempPassword: string }>,
+    onSuccess: (data) => {
+      setResetTempPassword(data.tempPassword);
+      setCopiedPw(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not reset login", description: err?.message ?? "Something went wrong.", type: "error" });
+      setResetChildId(null);
+    },
+  });
+
+  const resetChild = resetChildId !== null ? childStats.find(c => c.id === resetChildId) ?? null : null;
+
+  function copyTempPw() {
+    if (!resetTempPassword) return;
+    navigator.clipboard.writeText(resetTempPassword).then(() => {
+      setCopiedPw(true);
+      setTimeout(() => setCopiedPw(false), 2000);
+    });
+  }
+
+  function closeResetDialog() {
+    setResetChildId(null);
+    setResetTempPassword(null);
+    setCopiedPw(false);
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
@@ -304,10 +338,30 @@ export default function ParentChildrenPage() {
                               {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
                             </p>
                           </div>
-                          {iAmMember && (
+                          {iAmMember ? (
                             <Badge variant="secondary" className="flex items-center gap-0.5 text-[10px] px-1.5 h-5 shrink-0">
                               <Eye className="w-2.5 h-2.5" /> View only
                             </Badge>
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-0.5 rounded hover:bg-muted transition-colors shrink-0">
+                                  <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="text-sm">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setResetChildId(child.id);
+                                    setResetTempPassword(null);
+                                    setCopiedPw(false);
+                                  }}
+                                >
+                                  <KeyRound className="w-3.5 h-3.5 mr-2" />
+                                  Reset login
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
 
@@ -659,7 +713,7 @@ export default function ParentChildrenPage() {
                 className="flex-1"
                 disabled={inviteMutation.isPending || !inviteEmail.trim()}
                 onClick={() => {
-                  if (inviteDialogChildId !== null) {
+                  if (inviteDialogChildId) {
                     inviteMutation.mutate({ childId: inviteDialogChildId, email: inviteEmail.trim(), role: inviteRole });
                   }
                 }}
@@ -668,6 +722,81 @@ export default function ParentChildrenPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset login dialog — two steps: confirmation, then temp password reveal */}
+      <Dialog open={resetChildId !== null} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-amber-500" />
+              Reset login for {resetChild?.name ?? "student"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {resetTempPassword === null ? (
+            /* Step 1: Confirmation */
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                This will generate a temporary password for <strong>{resetChild?.name}</strong> and immediately log them out of all devices.
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-4">
+                <li>A new temporary password will be created</li>
+                <li>Their email address will be marked as verified</li>
+                <li>All active sessions will be ended immediately</li>
+                <li>All classwork, grades, and progress are untouched</li>
+              </ul>
+              {resetChild?.googleId && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  This student uses Google Sign-In. A temporary password will be added so they can also log in with email and password — their Google login is not removed.
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">
+                You will share the temporary password with <strong>{resetChild?.name}</strong> directly. They can change it in their profile settings after logging in.
+              </p>
+              <div className="flex gap-3 pt-1">
+                <Button variant="outline" className="flex-1" onClick={closeResetDialog}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={resetLoginMutation.isPending}
+                  onClick={() => resetChildId !== null && resetLoginMutation.mutate(resetChildId)}
+                >
+                  {resetLoginMutation.isPending ? "Resetting…" : "Reset login"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Step 2: Temp password reveal */
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                The login has been reset. Share this temporary password with <strong>{resetChild?.name}</strong> — it will only be shown once.
+              </p>
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
+                <p className="text-[11px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">Temporary password</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 font-mono text-base font-semibold text-foreground tracking-widest select-all">
+                    {resetTempPassword}
+                  </code>
+                  <button
+                    onClick={copyTempPw}
+                    className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                    title="Copy to clipboard"
+                  >
+                    {copiedPw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {resetChild?.name} can log in with their email address and this password, then change it in Profile → Security.
+              </p>
+              <Button className="w-full" onClick={closeResetDialog}>
+                Done
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

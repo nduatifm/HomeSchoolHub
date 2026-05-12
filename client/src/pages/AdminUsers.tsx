@@ -50,6 +50,9 @@ import {
   Crown,
   ChevronLeft,
   Trash2,
+  KeyRound,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Link } from "wouter";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -111,6 +114,9 @@ export default function AdminUsers() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  const [adminTempPassword, setAdminTempPassword] = useState<string | null>(null);
+  const [copiedAdminPw, setCopiedAdminPw] = useState(false);
 
   const { data: users = [], isLoading, refetch } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
@@ -147,6 +153,19 @@ export default function AdminUsers() {
       toast({ title: "Admin status updated", type: "success" });
     },
     onError: () => toast({ title: "Couldn't update admin status — try again.", type: "error" }),
+  });
+
+  const resetAccountMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest(`/api/admin/users/${id}/reset-account`, { method: "PATCH" }) as Promise<{ tempPassword: string }>,
+    onSuccess: (data) => {
+      setAdminTempPassword(data.tempPassword);
+      setCopiedAdminPw(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not reset account", description: err?.message ?? "Something went wrong.", type: "error" });
+      setResetTarget(null);
+    },
   });
 
   const deleteUserMutation = useMutation({
@@ -374,6 +393,19 @@ export default function AdminUsers() {
                                   Change role
                                 </DropdownMenuItem>
 
+                                {u.role === "student" && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setResetTarget(u);
+                                      setAdminTempPassword(null);
+                                      setCopiedAdminPw(false);
+                                    }}
+                                  >
+                                    <KeyRound className="w-4 h-4 mr-2 text-amber-500" />
+                                    Reset account
+                                  </DropdownMenuItem>
+                                )}
+
                                 {!u.isSuperAdmin && (
                                   <>
                                     <DropdownMenuSeparator />
@@ -490,6 +522,86 @@ export default function AdminUsers() {
                   {deleteUserMutation.isPending ? "Deleting…" : "Delete permanently"}
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset account dialog — two steps: confirm → temp password reveal */}
+      <Dialog
+        open={resetTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) { setResetTarget(null); setAdminTempPassword(null); setCopiedAdminPw(false); }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-amber-500" />
+              Reset account for {resetTarget?.name ?? "student"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {adminTempPassword === null ? (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                This will generate a temporary password for <strong>{resetTarget?.name}</strong> and immediately log them out of all devices.
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-4">
+                <li>A new temporary password will be created</li>
+                <li>Their email address will be marked as verified</li>
+                <li>All active sessions will be ended immediately</li>
+                <li>All classwork, grades, and progress are untouched</li>
+              </ul>
+              {resetTarget?.googleId && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  This student uses Google Sign-In. A temporary password will be added so they can also log in with email and password — their Google login is not removed.
+                </div>
+              )}
+              <div className="flex gap-3 pt-1">
+                <Button variant="outline" className="flex-1" onClick={() => setResetTarget(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={resetAccountMutation.isPending}
+                  onClick={() => resetTarget && resetAccountMutation.mutate(resetTarget.id)}
+                >
+                  {resetAccountMutation.isPending ? "Resetting…" : "Reset account"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                The account has been reset. Share this temporary password with <strong>{resetTarget?.name}</strong> — it will only be shown once.
+              </p>
+              <div className="rounded-lg border border-border bg-muted/50 p-3">
+                <p className="text-[11px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">Temporary password</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 font-mono text-base font-semibold text-foreground tracking-widest select-all">
+                    {adminTempPassword}
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(adminTempPassword).then(() => {
+                        setCopiedAdminPw(true);
+                        setTimeout(() => setCopiedAdminPw(false), 2000);
+                      });
+                    }}
+                    className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                    title="Copy to clipboard"
+                  >
+                    {copiedAdminPw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {resetTarget?.name} can log in with their email address and this password, then change it in Profile → Security.
+              </p>
+              <Button className="w-full" onClick={() => { setResetTarget(null); setAdminTempPassword(null); setCopiedAdminPw(false); }}>
+                Done
+              </Button>
             </div>
           )}
         </DialogContent>
