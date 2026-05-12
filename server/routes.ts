@@ -311,7 +311,7 @@ export function registerRoutes(app: Express) {
       if (!user.isEmailVerified) {
         return res.status(403).json({
           error: "Please verify your email before logging in",
-          needsVerification: true,
+          requiresVerification: true,
           role: user.role, // Fix 4a: let frontend show a role-specific message
         });
       }

@@ -162,7 +162,7 @@ export default function ParentChildrenPage() {
       setSendMessageOpen(false);
     },
     onError: (err: any) => {
-      toast({ title: "Could not send message", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+      toast({ title: "Could not send message", description: err?.message ?? "Something went wrong.", type: "error" });
     },
   });
 
@@ -180,7 +180,7 @@ export default function ParentChildrenPage() {
       setInviteRole("member");
     },
     onError: () => {
-      toast({ title: "Could not send invite", description: "Something went wrong.", variant: "destructive" });
+      toast({ title: "Could not send invite", description: "Something went wrong.", type: "error" });
     },
   });
 
@@ -198,7 +198,7 @@ export default function ParentChildrenPage() {
       if (msg.toLowerCase().includes("at least one owner") || msg.toLowerCase().includes("last owner")) {
         setLastOwnerErrorChildId(variables.childId);
       } else {
-        toast({ title: "Could not remove member", description: "Something went wrong.", variant: "destructive" });
+        toast({ title: "Could not remove member", description: "Something went wrong.", type: "error" });
       }
     },
   });
@@ -219,7 +219,7 @@ export default function ParentChildrenPage() {
       if (msg.toLowerCase().includes("at least one owner") || msg.toLowerCase().includes("last owner")) {
         setLastOwnerErrorChildId(variables.childId);
       } else {
-        toast({ title: "Could not update role", description: "Something went wrong.", variant: "destructive" });
+        toast({ title: "Could not update role", description: "Something went wrong.", type: "error" });
       }
     },
   });
@@ -232,7 +232,7 @@ export default function ParentChildrenPage() {
       toast({ title: "Invite resent" });
     },
     onError: () => {
-      toast({ title: "Could not resend invite", description: "Something went wrong.", variant: "destructive" });
+      toast({ title: "Could not resend invite", description: "Something went wrong.", type: "error" });
     },
   });
 
@@ -244,7 +244,7 @@ export default function ParentChildrenPage() {
       toast({ title: "Invite cancelled" });
     },
     onError: () => {
-      toast({ title: "Could not cancel invite", description: "Something went wrong.", variant: "destructive" });
+      toast({ title: "Could not cancel invite", description: "Something went wrong.", type: "error" });
     },
   });
 
