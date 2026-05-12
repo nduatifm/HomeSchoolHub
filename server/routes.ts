@@ -1642,16 +1642,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // POST /api/team-invite/:token/resend — resend invite email (owner only, by invite token)
-  app.post("/api/team-invite/:token/resend", requireAuth, async (req, res) => {
+  // POST /api/students/:studentId/team/invite/:token/resend — resend invite email (owner only)
+  app.post("/api/students/:studentId/team/invite/:token/resend", requireAuth, async (req, res) => {
     try {
       const callerId = req.session.userId!;
       const { token } = req.params;
+      const studentId = parseInt(req.params.studentId);
 
-      const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, status: "pending" } });
+      const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, childId: studentId, status: "pending" } });
       if (!membership) return res.status(404).json({ error: "Pending invite not found" });
 
-      const isOwner = await storage.isTeamOwner(callerId, membership.childId);
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
       if (!isOwner) return res.status(403).json({ error: "Only owners can resend invites" });
 
       const newToken = crypto.randomUUID();
@@ -1684,16 +1685,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // DELETE /api/team-invite/:token — cancel a pending invite (owner only, by invite token)
-  app.delete("/api/team-invite/:token", requireAuth, async (req, res) => {
+  // DELETE /api/students/:studentId/team/invite/:token — cancel a pending invite (owner only)
+  app.delete("/api/students/:studentId/team/invite/:token", requireAuth, async (req, res) => {
     try {
       const callerId = req.session.userId!;
       const { token } = req.params;
+      const studentId = parseInt(req.params.studentId);
 
-      const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, status: "pending" } });
+      const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, childId: studentId, status: "pending" } });
       if (!membership) return res.status(404).json({ error: "Pending invite not found" });
 
-      const isOwner = await storage.isTeamOwner(callerId, membership.childId);
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
       if (!isOwner) return res.status(403).json({ error: "Only owners can cancel invites" });
 
       await storage.removeTeamMember(membership.id);
@@ -1758,8 +1760,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/students/:studentId/team/:memberId/role — change role (owner only)
-  app.patch("/api/students/:studentId/team/:memberId/role", requireAuth, async (req, res) => {
+  // PATCH /api/students/:studentId/team/:memberId — change role (owner only)
+  app.patch("/api/students/:studentId/team/:memberId", requireAuth, async (req, res) => {
     try {
       const studentId = parseInt(req.params.studentId);
       const memberId = parseInt(req.params.memberId);

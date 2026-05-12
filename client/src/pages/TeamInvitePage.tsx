@@ -63,7 +63,7 @@ export default function TeamInvitePage() {
 
   useEffect(() => {
     if (accepted) {
-      const t = setTimeout(() => navigate("/children"), 2000);
+      const t = setTimeout(() => navigate("/dashboard"), 2000);
       return () => clearTimeout(t);
     }
   }, [accepted, navigate]);
@@ -94,7 +94,7 @@ export default function TeamInvitePage() {
                 : "This invitation link is invalid or has already been used."}
             </p>
             {user ? (
-              <Button variant="outline" onClick={() => navigate("/children")}>Go to my children</Button>
+              <Button variant="outline" onClick={() => navigate("/dashboard")}>Go to dashboard</Button>
             ) : (
               <Button variant="outline" onClick={() => navigate("/login")}>Sign in</Button>
             )}
@@ -223,7 +223,7 @@ export default function TeamInvitePage() {
             </div>
           ) : (
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => navigate("/children")}>
+              <Button variant="outline" className="flex-1" onClick={() => navigate("/dashboard")}>
                 Decline
               </Button>
               <Button

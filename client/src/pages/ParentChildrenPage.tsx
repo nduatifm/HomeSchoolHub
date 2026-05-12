@@ -173,14 +173,14 @@ export default function ParentChildrenPage() {
         body: JSON.stringify({ email, role }),
       }),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/children", vars.childId, "team"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/students", vars.childId, "team"] });
       toast({ title: "Invitation sent!", description: `An invite has been sent to ${vars.email}.` });
       setInviteDialogChildId(null);
       setInviteEmail("");
       setInviteRole("member");
     },
-    onError: (err: any) => {
-      toast({ title: "Could not send invite", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+    onError: () => {
+      toast({ title: "Could not send invite", description: "Something went wrong.", variant: "destructive" });
     },
   });
 
@@ -193,20 +193,19 @@ export default function ParentChildrenPage() {
       setLastOwnerErrorChildId(null);
       toast({ title: "Member removed" });
     },
-    onError: (err: any, variables) => {
-      const msg = err?.message ?? "";
+    onError: (err: unknown, variables) => {
+      const msg = err instanceof Error ? err.message : "";
       if (msg.toLowerCase().includes("at least one owner") || msg.toLowerCase().includes("last owner")) {
         setLastOwnerErrorChildId(variables.childId);
-        toast({ title: "At least one Owner is required", description: "Promote another member to Owner before leaving.", variant: "destructive" });
       } else {
-        toast({ title: "Could not remove member", description: msg || "Something went wrong.", variant: "destructive" });
+        toast({ title: "Could not remove member", description: "Something went wrong.", variant: "destructive" });
       }
     },
   });
 
   const changeRoleMutation = useMutation({
     mutationFn: ({ childId, memberId, role }: { childId: number; memberId: number; role: string }) =>
-      apiRequest(`/api/students/${childId}/team/${memberId}/role`, {
+      apiRequest(`/api/students/${childId}/team/${memberId}`, {
         method: "PATCH",
         body: JSON.stringify({ role }),
       }),
@@ -215,38 +214,37 @@ export default function ParentChildrenPage() {
       setLastOwnerErrorChildId(null);
       toast({ title: "Role updated" });
     },
-    onError: (err: any, variables) => {
-      const msg = err?.message ?? "";
+    onError: (err: unknown, variables) => {
+      const msg = err instanceof Error ? err.message : "";
       if (msg.toLowerCase().includes("at least one owner") || msg.toLowerCase().includes("last owner")) {
         setLastOwnerErrorChildId(variables.childId);
-        toast({ title: "At least one Owner is required", description: "Promote another member to Owner before demoting.", variant: "destructive" });
       } else {
-        toast({ title: "Could not update role", description: msg || "Something went wrong.", variant: "destructive" });
+        toast({ title: "Could not update role", description: "Something went wrong.", variant: "destructive" });
       }
     },
   });
 
   const resendInviteMutation = useMutation({
-    mutationFn: ({ token }: { token: string; childId: number }) =>
-      apiRequest(`/api/team-invite/${token}/resend`, { method: "POST" }),
+    mutationFn: ({ childId, token }: { token: string; childId: number }) =>
+      apiRequest(`/api/students/${childId}/team/invite/${token}/resend`, { method: "POST" }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/students", vars.childId, "team"] });
       toast({ title: "Invite resent" });
     },
-    onError: (err: any) => {
-      toast({ title: "Could not resend invite", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+    onError: () => {
+      toast({ title: "Could not resend invite", description: "Something went wrong.", variant: "destructive" });
     },
   });
 
   const cancelInviteMutation = useMutation({
-    mutationFn: ({ token }: { token: string; childId: number }) =>
-      apiRequest(`/api/team-invite/${token}`, { method: "DELETE" }),
+    mutationFn: ({ childId, token }: { token: string; childId: number }) =>
+      apiRequest(`/api/students/${childId}/team/invite/${token}`, { method: "DELETE" }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/students", vars.childId, "team"] });
       toast({ title: "Invite cancelled" });
     },
-    onError: (err: any) => {
-      toast({ title: "Could not cancel invite", description: err?.message ?? "Something went wrong.", variant: "destructive" });
+    onError: () => {
+      toast({ title: "Could not cancel invite", description: "Something went wrong.", variant: "destructive" });
     },
   });
 

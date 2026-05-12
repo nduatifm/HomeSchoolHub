@@ -102,7 +102,7 @@ export type InsertStudent = z.infer<typeof insertStudentSchema>;
 export const childTeamMemberSchema = z.object({
   id: z.number(),
   childId: z.number(),
-  parentId: z.number(),
+  parentId: z.number().nullable(),
   role: z.enum(["owner", "member"]),
   status: z.enum(["active", "pending"]),
   invitedBy: z.number().nullable(),
