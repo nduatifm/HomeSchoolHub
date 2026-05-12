@@ -78,6 +78,7 @@ export interface IStorage {
   getUserById(id: number): Promise<User | null>;
   getUserByEmail(email: string): Promise<User | null>;
   getUserByEmailVerifyToken(token: string): Promise<User | null>;
+  getUserByPasswordResetToken(token: string): Promise<User | null>;
   getUserByGoogleId(googleId: string): Promise<User | null>;
   updateUser(id: number, user: Prisma.UserUpdateInput): Promise<User>;
 
@@ -353,6 +354,12 @@ class PrismaStorage implements IStorage {
   async getUserByEmailVerifyToken(token: string): Promise<User | null> {
     return (await prisma.user.findUnique({
       where: { emailVerifyToken: token },
+    })) as User | null;
+  }
+
+  async getUserByPasswordResetToken(token: string): Promise<User | null> {
+    return (await prisma.user.findUnique({
+      where: { passwordResetToken: token },
     })) as User | null;
   }
 

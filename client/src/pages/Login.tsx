@@ -206,6 +206,11 @@ export default function Login() {
 
           <div className="mt-6 space-y-2 text-center">
             <p className="text-sm text-muted-foreground">
+              <Link href="/forgot-password" className="text-primary font-medium hover:underline" data-testid="link-forgot-password">
+                Forgot your password?
+              </Link>
+            </p>
+            <p className="text-sm text-muted-foreground">
               Don't have an account?{" "}
               <Link href="/signup" className="text-primary font-medium hover:underline" data-testid="link-signup">
                 Sign up

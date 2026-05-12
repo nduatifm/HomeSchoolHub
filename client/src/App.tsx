@@ -17,6 +17,8 @@ import NewAssignmentPage from "./pages/classroom/NewAssignmentPage";
 import EditAssignmentPage from "./pages/classroom/EditAssignmentPage";
 import SubmissionReviewPage from "./pages/classroom/SubmissionReviewPage";
 import Landing from "./pages/Landing";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminUsers from "./pages/AdminUsers";
 import NotificationsPage from "./pages/Notifications";
@@ -150,6 +152,12 @@ function AppRoutes() {
         </Route>
         <Route path="/verify-email">
           <VerifyEmail />
+        </Route>
+        <Route path="/forgot-password">
+          {user ? <Redirect to="/dashboard" /> : <ForgotPassword />}
+        </Route>
+        <Route path="/reset-password">
+          <ResetPassword />
         </Route>
         <Route path="/team-invite/:token">
           <TeamInvitePage />

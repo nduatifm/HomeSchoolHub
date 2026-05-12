@@ -2,13 +2,21 @@ import { useEffect, useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/Logo";
+import { useToast } from "@/hooks/use-toast";
 
 export default function VerifyEmail() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
   const verificationAttempted = useRef(false);
+
+  // Resend state
+  const [resendEmail, setResendEmail] = useState("");
+  const [isResending, setIsResending] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
 
   useEffect(() => {
     if (verificationAttempted.current) return;
@@ -44,6 +52,28 @@ export default function VerifyEmail() {
 
     verifyEmail();
   }, []);
+
+  async function handleResend(e: React.FormEvent) {
+    e.preventDefault();
+    setIsResending(true);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: data.error || "Could not resend — try again.", type: "error" });
+      } else {
+        setResendSent(true);
+      }
+    } catch {
+      toast({ title: "Network error — please try again.", type: "error" });
+    } finally {
+      setIsResending(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
@@ -93,20 +123,40 @@ export default function VerifyEmail() {
               <Link href="/login">
                 <Button data-testid="button-back-to-login" className="w-full">Back to login</Button>
               </Link>
-              <Link href="/signup">
-                <Button data-testid="button-sign-up-again" variant="outline" className="w-full">Sign up again</Button>
-              </Link>
+            </div>
+
+            {/* Resend section */}
+            <div className="mt-8 pt-6 border-t border-border text-left">
+              <div className="flex items-center gap-2 mb-3">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">Request a new verification email</p>
+              </div>
+              {resendSent ? (
+                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-sm text-green-800">
+                    Sent! Check your inbox (and spam folder). The link expires in 24 hours.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleResend} className="flex gap-2">
+                  <Input
+                    type="email"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    required
+                    className="h-9 text-sm"
+                    data-testid="input-resend-email"
+                  />
+                  <Button type="submit" variant="outline" size="sm" disabled={isResending} className="shrink-0" data-testid="button-resend">
+                    {isResending ? "Sending..." : "Resend"}
+                  </Button>
+                </form>
+              )}
             </div>
           </>
         )}
       </div>
-
-      <p className="mt-8 text-xs text-muted-foreground">
-        Having trouble?{" "}
-        <Link href="/signup" className="text-primary hover:underline">
-          Request a new verification email
-        </Link>
-      </p>
     </div>
   );
 }

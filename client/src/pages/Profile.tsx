@@ -778,36 +778,86 @@ export default function Profile() {
 
           {/* ══ Security ══ */}
           <Section title="Security">
-            <Row
-              label="Password"
-              displayValue={user?.googleId ? "Managed by Google" : "••••••••"}
-              isEditing={editingField === "password"}
-              onEdit={() => {
-                setEditingField("password");
-                setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-              }}
-              onCancel={stopEditing}
-              onSave={handlePasswordSave}
-              isPending={changePasswordMutation.isPending}
-              readOnly={!!user?.googleId}
-              readOnlyNote={user?.googleId ? "You signed in with Google — password change is not available" : undefined}
-              editContent={
-                <div className="w-full space-y-3 max-w-sm">
-                  <div className="space-y-1">
-                    <Label htmlFor="current-password" className="text-xs text-gray-500 uppercase tracking-wider">Current Password</Label>
-                    <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-10 border-gray-300" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="new-password" className="text-xs text-gray-500 uppercase tracking-wider">New Password</Label>
-                    <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-10 border-gray-300" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="confirm-password" className="text-xs text-gray-500 uppercase tracking-wider">Confirm New Password</Label>
-                    <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-10 border-gray-300" />
-                  </div>
+            {user?.role === "student" ? (
+              <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Password</p>
+                  {user?.googleId ? (
+                    <p className="text-sm text-gray-500">Your account uses Google Sign-In — no password to manage.</p>
+                  ) : (
+                    <>
+                      <p className="text-base text-gray-900 mb-1">••••••••</p>
+                      <p className="text-sm text-gray-500 leading-relaxed">
+                        To change your password, use the <strong>Current Password</strong> field below if you know it.
+                        If you don't know your password (e.g. after a parent reset), ask your parent to share the
+                        temporary password they received, then come back here to update it.
+                      </p>
+                    </>
+                  )}
                 </div>
-              }
-            />
+                {!user?.googleId && (
+                  <Row
+                    label="Change Password"
+                    displayValue={null}
+                    isEditing={editingField === "password"}
+                    onEdit={() => {
+                      setEditingField("password");
+                      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+                    }}
+                    onCancel={stopEditing}
+                    onSave={handlePasswordSave}
+                    isPending={changePasswordMutation.isPending}
+                    editContent={
+                      <div className="w-full space-y-3 max-w-sm">
+                        <div className="space-y-1">
+                          <Label htmlFor="current-password" className="text-xs text-gray-500 uppercase tracking-wider">Current / Temporary Password</Label>
+                          <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-10 border-gray-300" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="new-password" className="text-xs text-gray-500 uppercase tracking-wider">New Password</Label>
+                          <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-10 border-gray-300" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="confirm-password" className="text-xs text-gray-500 uppercase tracking-wider">Confirm New Password</Label>
+                          <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-10 border-gray-300" />
+                        </div>
+                      </div>
+                    }
+                  />
+                )}
+              </div>
+            ) : (
+              <Row
+                label="Password"
+                displayValue={user?.googleId ? "Managed by Google" : "••••••••"}
+                isEditing={editingField === "password"}
+                onEdit={() => {
+                  setEditingField("password");
+                  setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+                }}
+                onCancel={stopEditing}
+                onSave={handlePasswordSave}
+                isPending={changePasswordMutation.isPending}
+                readOnly={!!user?.googleId}
+                readOnlyNote={user?.googleId ? "You signed in with Google — password change is not available" : undefined}
+                editContent={
+                  <div className="w-full space-y-3 max-w-sm">
+                    <div className="space-y-1">
+                      <Label htmlFor="current-password" className="text-xs text-gray-500 uppercase tracking-wider">Current Password</Label>
+                      <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="h-10 border-gray-300" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="new-password" className="text-xs text-gray-500 uppercase tracking-wider">New Password</Label>
+                      <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="h-10 border-gray-300" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="confirm-password" className="text-xs text-gray-500 uppercase tracking-wider">Confirm New Password</Label>
+                      <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="h-10 border-gray-300" />
+                    </div>
+                  </div>
+                }
+              />
+            )}
           </Section>
 
           <div className="h-10" />

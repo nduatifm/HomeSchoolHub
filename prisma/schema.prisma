@@ -15,10 +15,12 @@ model User {
   name               String
   role               String?
   roles              String[]  @default([])
-  isEmailVerified    Boolean   @default(false)
-  emailVerifyToken   String?   @unique
-  emailVerifyExpires DateTime?
-  googleId           String?   @unique
+  isEmailVerified      Boolean   @default(false)
+  emailVerifyToken     String?   @unique
+  emailVerifyExpires   DateTime?
+  passwordResetToken   String?   @unique
+  passwordResetExpires DateTime?
+  googleId             String?   @unique
   profilePicture     String?
   bio                String?
   
@@ -76,6 +78,7 @@ model User {
   @@index([email])
   @@index([googleId])
   @@index([emailVerifyToken])
+  @@index([passwordResetToken])
 }
 
 model Student {

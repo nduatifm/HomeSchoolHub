@@ -37,6 +37,7 @@ import {
   sendVerificationEmail,
   sendStudentInviteEmail,
   sendTeamInviteEmail,
+  sendPasswordResetEmail,
 } from "./utils/emailService";
 import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
@@ -901,6 +902,96 @@ export function registerRoutes(app: Express) {
         success: true,
         message: "Verification email sent! Please check your inbox.",
       });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== PASSWORD RESET ROUTES ==========
+
+  // POST /api/auth/forgot-password — send a password reset link
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const schema = z.object({ email: z.string().email("Invalid email address") });
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.errors[0].message });
+      }
+      const { email } = validation.data;
+      const user = await storage.getUserByEmail(email);
+
+      // Always return success to prevent email enumeration
+      if (!user) {
+        return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
+      }
+
+      // Students cannot self-reset — their parent/admin must do it
+      if (user.role === "student") {
+        return res.json({ success: true, isStudent: true });
+      }
+
+      // Google-only accounts have no password to reset
+      if (!user.password && user.googleId) {
+        return res.json({ success: true, isGoogleAccount: true });
+      }
+
+      // Generate reset token (1-hour expiry)
+      const resetToken = crypto.randomUUID();
+      const resetExpires = new Date();
+      resetExpires.setHours(resetExpires.getHours() + 1);
+
+      await storage.updateUser(user.id, {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
+      });
+
+      sendPasswordResetEmail(user.email, user.name, resetToken).catch((err) =>
+        console.error("Failed to send password reset email:", err),
+      );
+
+      res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/auth/reset-password — consume token and set new password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const schema = z.object({
+        token: z.string().min(1, "Reset token is required"),
+        newPassword: z.string().min(8, "Password must be at least 8 characters").max(100, "Password too long"),
+      });
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.errors[0].message });
+      }
+      const { token, newPassword } = validation.data;
+
+      const user = await storage.getUserByPasswordResetToken(token);
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+      }
+
+      if (!user.passwordResetExpires || new Date(user.passwordResetExpires) < new Date()) {
+        return res.status(400).json({
+          error: "This reset link has expired. Please request a new one.",
+          expired: true,
+        });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUser(user.id, {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        isEmailVerified: true, // ensure verified in case they were stuck
+      });
+
+      // Kill all active sessions so old sessions can't linger
+      await prisma.authSession.deleteMany({ where: { userId: user.id } });
+
+      res.json({ success: true, message: "Password reset successfully. You can now log in." });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
