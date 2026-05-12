@@ -60,7 +60,7 @@ export default function StudentSignup() {
       if (msg.toLowerCase().includes("already exists")) {
         toast({
           title: "This email already has an account",
-          description: "Please log in instead.",
+          description: "Please go to the login page to sign in.",
           type: "error",
         });
         setAlreadyRegistered(true);
@@ -85,7 +85,7 @@ export default function StudentSignup() {
       if (msg.toLowerCase().includes("already exists")) {
         toast({
           title: "This email already has an account",
-          description: "Please log in instead.",
+          description: "Please go to the login page to sign in.",
           type: "error",
         });
         setAlreadyRegistered(true);

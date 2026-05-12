@@ -182,11 +182,8 @@ export default function ParentChildrenPage() {
       setInviteEmailError(null);
     },
     onError: (err: unknown) => {
-      if (err instanceof ApiError && err.status === 409) {
-        setInviteEmailError("A student account already exists for this email — they can log in directly from the login page.");
-      } else {
-        toast({ title: "Could not send invite", description: "Something went wrong.", type: "error" });
-      }
+      const msg = err instanceof Error ? err.message : "";
+      toast({ title: "Could not send invite", description: msg || "Something went wrong.", type: "error" });
     },
   });
 

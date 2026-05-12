@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, ApiError } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import type { StudentInvite } from "@shared/schema";
 
 export default function ParentInvitesPage() {
   const [inviteForm, setInviteForm] = useState({ email: "", studentName: "", gradeLevel: "" });
+  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
 
   const { data: invites = [] } = useQuery<StudentInvite[]>({ queryKey: ["/api/invites/student/parent"] });
 
@@ -28,6 +29,14 @@ export default function ParentInvitesPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/invites/student/parent"] });
       toast({ title: "Invite sent!", description: "Your child will receive an email with a direct signup link.", type: "success" });
       setInviteForm({ email: "", studentName: "", gradeLevel: "" });
+      setInviteEmailError(null);
+    },
+    onError: (err: unknown) => {
+      if (err instanceof ApiError && err.status === 409) {
+        setInviteEmailError("A student account already exists for this email — they can log in directly from the login page.");
+      } else {
+        toast({ title: "Could not send invite", description: "Something went wrong. Please try again.", type: "error" });
+      }
     },
   });
 
@@ -50,13 +59,22 @@ export default function ParentInvitesPage() {
 
           <div className="rounded-2xl border border-border p-5 mb-6 space-y-4">
             <h2 className="text-sm font-semibold text-foreground">Send an invite</h2>
-            <Input
-              placeholder="Student Email"
-              type="email"
-              value={inviteForm.email}
-              onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-              data-testid="input-invite-email"
-            />
+            <div className="space-y-1">
+              <Input
+                placeholder="Student Email"
+                type="email"
+                value={inviteForm.email}
+                onChange={(e) => {
+                  setInviteForm({ ...inviteForm, email: e.target.value });
+                  setInviteEmailError(null);
+                }}
+                className={inviteEmailError ? "border-destructive focus-visible:ring-destructive" : ""}
+                data-testid="input-invite-email"
+              />
+              {inviteEmailError && (
+                <p className="text-xs text-destructive leading-snug">{inviteEmailError}</p>
+              )}
+            </div>
             <Input
               placeholder="Student Name"
               value={inviteForm.studentName}
