@@ -3320,7 +3320,7 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const summaries = await storage.getConversationSummaries(user.id, user.role);
+      const summaries = await storage.getConversationSummaries(user.id, user.role ?? "");
       res.json(summaries);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

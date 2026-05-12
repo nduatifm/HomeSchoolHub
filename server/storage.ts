@@ -868,7 +868,9 @@ class PrismaStorage implements IStorage {
     const participantIds = Array.from(new Set([teacherUserId, student.userId, ...teamUserIds]));
 
     // Prefer the studentId tag for precise thread isolation (set on all new messages).
-    // Fall back to the participant-set filter for legacy messages that pre-date the tag.
+    // For legacy messages (studentId: null) require that the student's own userId appears
+    // as sender or receiver — this prevents teacher↔parent messages from bleeding
+    // across threads when the same parent/teacher pair has multiple children.
     const [tagged, legacy] = await Promise.all([
       prisma.message.findMany({
         where: { studentId },
@@ -881,6 +883,9 @@ class PrismaStorage implements IStorage {
           AND: [
             { senderId: { in: participantIds } },
             { receiverId: { in: participantIds } },
+            // Anchor to the specific student: the student user must be directly
+            // involved so parent↔teacher messages don't bleed into sibling threads.
+            { OR: [{ senderId: student.userId }, { receiverId: student.userId }] },
           ],
         },
         include: { sender: { select: { name: true } } },
@@ -915,6 +920,7 @@ class PrismaStorage implements IStorage {
   async getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]> {
     type ConvGroup = {
       studentId: number;
+      studentUserId: number; // used to anchor legacy queries to prevent cross-thread bleed
       teacherUserId: number;
       participantIds: number[]; // all participants: teacher + student + team parents
     };
@@ -930,8 +936,14 @@ class PrismaStorage implements IStorage {
         const pids = g.participantIds;
         if (pids.length < 2) continue;
 
-        // For tagged messages use studentId for precise isolation; for legacy messages fall back
-        // to the participant-set filter so old data still contributes to previews/counts.
+        // For tagged messages use studentId for precise isolation.
+        // For legacy messages (studentId: null) require that the student's own userId
+        // appears as sender or receiver — prevents teacher↔parent messages from
+        // bleeding across sibling threads when the same pair has multiple children.
+        const legacyStudentFilter = {
+          OR: [{ senderId: g.studentUserId }, { receiverId: g.studentUserId }],
+        };
+
         const [taggedLast, legacyLast, taggedUnread, legacyUnread] = await Promise.all([
           prisma.message.findFirst({
             where: { studentId: g.studentId },
@@ -943,6 +955,7 @@ class PrismaStorage implements IStorage {
               studentId: null,
               senderId: { in: pids },
               receiverId: { in: pids },
+              ...legacyStudentFilter,
             },
             orderBy: { timestamp: "desc" },
             select: { message: true, timestamp: true },
@@ -957,9 +970,10 @@ class PrismaStorage implements IStorage {
           prisma.message.count({
             where: {
               studentId: null,
-              senderId: { in: pids },
               receiverId: requesterUserId,
               isRead: false,
+              senderId: { in: pids },
+              ...legacyStudentFilter,
             },
           }),
         ]);
@@ -1026,7 +1040,7 @@ class PrismaStorage implements IStorage {
       const primaryOwnerMap = new Map<number, { id: number; name: string }>();
       const allTeamUserIdsMap = new Map<number, number[]>();
       for (const m of teamMemberships) {
-        if (!primaryOwnerMap.has(m.childId) && m.parentId != null)
+        if (!primaryOwnerMap.has(m.childId) && m.parentId != null && m.parent != null)
           primaryOwnerMap.set(m.childId, { id: m.parentId, name: m.parent.name });
       }
       for (const m of allTeamMemberships) {
@@ -1037,6 +1051,7 @@ class PrismaStorage implements IStorage {
       const labelMap = new Map(threadLabels.map((l) => [l.studentId, l.name]));
       const groups: ConvGroup[] = students.map((s) => ({
         studentId: s.id,
+        studentUserId: s.userId,
         teacherUserId: userId,
         participantIds: Array.from(new Set([userId, s.userId, ...(allTeamUserIdsMap.get(s.id) ?? [])])),
       }));
@@ -1087,6 +1102,7 @@ class PrismaStorage implements IStorage {
       });
       const allTeamMap = new Map<number, number[]>();
       for (const m of allMemberships) {
+        if (m.parentId == null) continue;
         if (!allTeamMap.has(m.childId)) allTeamMap.set(m.childId, []);
         allTeamMap.get(m.childId)!.push(m.parentId);
       }
@@ -1106,6 +1122,7 @@ class PrismaStorage implements IStorage {
 
       const groups: ConvGroup[] = assignedStudents.map((s) => ({
         studentId: s.id,
+        studentUserId: s.userId,
         teacherUserId: teacherMap.get(s.id)?.id ?? 0,
         participantIds: Array.from(new Set([teacherMap.get(s.id)?.id ?? 0, s.userId, ...(allTeamMap.get(s.id) ?? [])])),
       }));
@@ -1170,6 +1187,7 @@ class PrismaStorage implements IStorage {
       const teamUserIds = await this.getTeamMemberUserIds(studentRecord.id);
       const groups: ConvGroup[] = [{
         studentId: studentRecord.id,
+        studentUserId: studentRecord.userId,
         teacherUserId: teacherUser.id,
         participantIds: Array.from(new Set([teacherUser.id, userId, ...teamUserIds])),
       }];
