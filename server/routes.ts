@@ -2035,6 +2035,129 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // POST /api/students/create-direct — parent creates a student account directly (no invite needed)
+  app.post("/api/students/create-direct", requireAuth, async (req, res) => {
+    try {
+      const callerId = req.session.userId!;
+      const caller = await storage.getUserById(callerId);
+      if (!caller || !caller.roles?.includes("parent")) {
+        return res.status(403).json({ error: "Only parents can create student accounts directly" });
+      }
+
+      const { name, gradeLevel, email, password } = req.body;
+      if (!name?.trim() || !email?.trim() || !password) {
+        return res.status(400).json({ error: "Name, email, and password are required" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const trimmedEmail = email.trim().toLowerCase();
+      const existing = await storage.getUserByEmail(trimmedEmail);
+      if (existing) {
+        return res.status(409).json({ error: "An account with this email already exists" });
+      }
+
+      const hashedPassword = await hashPassword(password);
+
+      const user = await storage.createUser({
+        email: trimmedEmail,
+        password: hashedPassword,
+        name: name.trim(),
+        role: "student",
+        roles: ["student"],
+        isEmailVerified: true,
+        emailVerifyToken: null,
+        emailVerifyExpires: null,
+        googleId: null,
+        profilePicture: null,
+      });
+
+      const student = await storage.createStudent({
+        userId: user.id,
+        name: name.trim(),
+        gradeLevel: gradeLevel?.trim() || null,
+        badges: [],
+        points: 0,
+      });
+
+      await storage.createChildTeamMember({
+        childId: student.id,
+        parentId: callerId,
+        role: "owner",
+        status: "active",
+        acceptedAt: new Date(),
+      });
+
+      const tutorRequestModeSetting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+      const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
+
+      if (!isTutorRequestMode) {
+        const teacherId = await storage.findFirstAvailableTeacherId(student.id);
+        if (teacherId !== null) {
+          const today = new Date().toISOString().split("T")[0];
+          await storage.createTutorRequest({
+            parentId: callerId,
+            teacherId,
+            studentId: student.id,
+            status: "approved",
+            message: "Auto-assigned on direct account creation",
+            requestDate: today,
+            responseDate: today,
+          });
+        }
+      }
+
+      res.status(201).json({ student, userEmail: user.email });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/students/:studentId/edit-profile — owner edits student name, grade level, email
+  app.patch("/api/students/:studentId/edit-profile", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+
+      const callerId = req.session.userId!;
+      const student = await storage.getStudentById(studentId);
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const isOwner = await storage.isTeamOwner(callerId, studentId);
+      if (!isOwner) return res.status(403).json({ error: "Only owners can edit student details" });
+
+      const { name, gradeLevel, email } = req.body;
+
+      const userUpdates: Record<string, any> = {};
+      if (name?.trim()) userUpdates.name = name.trim();
+      if (email?.trim()) {
+        const trimmedEmail = email.trim().toLowerCase();
+        const existing = await storage.getUserByEmail(trimmedEmail);
+        if (existing && existing.id !== student.userId) {
+          return res.status(409).json({ error: "An account with this email already exists" });
+        }
+        userUpdates.email = trimmedEmail;
+      }
+
+      if (Object.keys(userUpdates).length > 0) {
+        await storage.updateUser(student.userId, userUpdates);
+      }
+
+      const studentUpdates: Record<string, any> = {};
+      if (name?.trim()) studentUpdates.name = name.trim();
+      if (gradeLevel !== undefined) studentUpdates.gradeLevel = gradeLevel?.trim() || null;
+
+      const updatedStudent = Object.keys(studentUpdates).length > 0
+        ? await storage.updateStudent(studentId, studentUpdates)
+        : student;
+
+      res.json({ student: updatedStudent });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ========== ASSIGNMENT ROUTES ==========
 
   app.post("/api/assignments", requireAuth, async (req, res) => {

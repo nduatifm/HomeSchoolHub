@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle, AlertCircle, KeyRound, Copy, Check } from "lucide-react";
+import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle, AlertCircle, KeyRound, Copy, Check, Pencil, PlusCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
@@ -74,6 +74,19 @@ export default function ParentChildrenPage() {
   const [resetChildId, setResetChildId] = useState<number | null>(null);
   const [resetTempPassword, setResetTempPassword] = useState<string | null>(null);
   const [copiedPw, setCopiedPw] = useState(false);
+
+  // Create student state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" });
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createResult, setCreateResult] = useState<{ email: string; password: string } | null>(null);
+  const [copiedCreateEmail, setCopiedCreateEmail] = useState(false);
+  const [copiedCreatePw, setCopiedCreatePw] = useState(false);
+
+  // Edit student state
+  const [editChildId, setEditChildId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", gradeLevel: "", email: "" });
+  const [editError, setEditError] = useState<string | null>(null);
 
   const { data: students = [] } = useQuery<ExtendedStudent[]>({ queryKey: ["/api/students/parent"] });
   const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
@@ -272,7 +285,41 @@ export default function ParentChildrenPage() {
     },
   });
 
+  const createDirectMutation = useMutation({
+    mutationFn: (data: { name: string; gradeLevel: string; email: string; password: string }) =>
+      apiRequest("/api/students/create-direct", { method: "POST", body: JSON.stringify(data) }) as Promise<{ student: any; userEmail: string }>,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
+      setCreateResult({ email: data.userEmail, password: createForm.password });
+    },
+    onError: (err: any) => {
+      if (err?.status === 409) {
+        setCreateError("An account with this email already exists.");
+      } else {
+        setCreateError(err?.message ?? "Something went wrong. Please try again.");
+      }
+    },
+  });
+
+  const editProfileMutation = useMutation({
+    mutationFn: ({ childId, data }: { childId: number; data: { name: string; gradeLevel: string; email: string } }) =>
+      apiRequest(`/api/students/${childId}/edit-profile`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
+      toast({ title: "Profile updated", description: "The student's details have been saved." });
+      setEditChildId(null);
+    },
+    onError: (err: any) => {
+      if (err?.status === 409) {
+        setEditError("An account with this email already exists.");
+      } else {
+        setEditError(err?.message ?? "Something went wrong. Please try again.");
+      }
+    },
+  });
+
   const resetChild = resetChildId !== null ? childStats.find(c => c.id === resetChildId) ?? null : null;
+  const editChild = editChildId !== null ? childStats.find(c => c.id === editChildId) ?? null : null;
 
   function copyTempPw() {
     if (!resetTempPassword) return;
@@ -288,6 +335,37 @@ export default function ParentChildrenPage() {
     setCopiedPw(false);
   }
 
+  function closeCreateDialog() {
+    setCreateOpen(false);
+    setCreateForm({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" });
+    setCreateError(null);
+    setCreateResult(null);
+    setCopiedCreateEmail(false);
+    setCopiedCreatePw(false);
+  }
+
+  function handleCreateSubmit() {
+    setCreateError(null);
+    if (!createForm.name.trim() || !createForm.email.trim() || !createForm.password) {
+      setCreateError("Name, email, and password are all required.");
+      return;
+    }
+    if (createForm.password.length < 6) {
+      setCreateError("Password must be at least 6 characters.");
+      return;
+    }
+    if (createForm.password !== createForm.confirmPassword) {
+      setCreateError("Passwords do not match.");
+      return;
+    }
+    createDirectMutation.mutate({
+      name: createForm.name,
+      gradeLevel: createForm.gradeLevel,
+      email: createForm.email,
+      password: createForm.password,
+    });
+  }
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -301,9 +379,32 @@ export default function ParentChildrenPage() {
             </p>
           </div>
 
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Children</h2>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs h-8"
+                onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" }); }}
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Create account
+              </Button>
+            </div>
+            {childStats.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
+                <p className="text-sm text-muted-foreground mb-3">No children added yet. Create an account for your child or send them an invite to sign up themselves.</p>
+                <Button size="sm" onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); }}>
+                  <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                  Create first account
+                </Button>
+              </div>
+            )}
+          </div>
+
           {childStats.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Your Children</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {childStats.map((child, index) => {
                   const assignedTeacher = (childTeacherQueries[index]?.data ?? null) as AssignedTeacherRef;
@@ -351,6 +452,16 @@ export default function ParentChildrenPage() {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="text-sm">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditChildId(child.id);
+                                    setEditForm({ name: child.name ?? "", gradeLevel: child.gradeLevel ?? "", email: child.email ?? "" });
+                                    setEditError(null);
+                                  }}
+                                >
+                                  <Pencil className="w-3.5 h-3.5 mr-2" />
+                                  Edit details
+                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setResetChildId(child.id);
@@ -790,6 +901,205 @@ export default function ParentChildrenPage() {
                 }}
               >
                 {inviteMutation.isPending ? "Sending…" : "Send invite"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create student account dialog */}
+      <Dialog open={createOpen} onOpenChange={(open) => { if (!open) closeCreateDialog(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-primary" />
+              Create account for your child
+            </DialogTitle>
+          </DialogHeader>
+
+          {createResult === null ? (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                Fill in your child's details and choose a password. You'll share the login credentials with them directly — no email verification needed.
+              </p>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-name">Full name</Label>
+                  <Input
+                    id="create-name"
+                    placeholder="e.g. Alex Johnson"
+                    value={createForm.name}
+                    onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-grade">Grade level <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Select value={createForm.gradeLevel} onValueChange={(v) => setCreateForm(f => ({ ...f, gradeLevel: v === "_none" ? "" : v }))}>
+                    <SelectTrigger id="create-grade">
+                      <SelectValue placeholder="Select a grade…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">No grade / not applicable</SelectItem>
+                      {["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map(g => (
+                        <SelectItem key={g} value={g}>Grade {g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-email">Login email</Label>
+                  <Input
+                    id="create-email"
+                    type="email"
+                    placeholder="student@example.com"
+                    value={createForm.email}
+                    onChange={(e) => { setCreateForm(f => ({ ...f, email: e.target.value })); setCreateError(null); }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="create-pw">Password</Label>
+                    <Input
+                      id="create-pw"
+                      type="password"
+                      placeholder="Min. 6 characters"
+                      value={createForm.password}
+                      onChange={(e) => { setCreateForm(f => ({ ...f, password: e.target.value })); setCreateError(null); }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="create-pw2">Confirm</Label>
+                    <Input
+                      id="create-pw2"
+                      type="password"
+                      placeholder="Repeat password"
+                      value={createForm.confirmPassword}
+                      onChange={(e) => { setCreateForm(f => ({ ...f, confirmPassword: e.target.value })); setCreateError(null); }}
+                    />
+                  </div>
+                </div>
+              </div>
+              {createError && (
+                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+                  <p className="text-xs text-destructive leading-snug">{createError}</p>
+                </div>
+              )}
+              <div className="flex gap-3 pt-1">
+                <Button variant="outline" className="flex-1" onClick={closeCreateDialog}>Cancel</Button>
+                <Button
+                  className="flex-1"
+                  disabled={createDirectMutation.isPending}
+                  onClick={handleCreateSubmit}
+                >
+                  {createDirectMutation.isPending ? "Creating…" : "Create account"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-muted-foreground">
+                Account created! Share these credentials with <strong>{createForm.name}</strong> so they can log in. They can change their password later from their profile.
+              </p>
+              <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground mb-1 font-medium uppercase tracking-wide">Login email</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-sm font-medium text-foreground select-all">{createResult.email}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(createResult.email); setCopiedCreateEmail(true); setTimeout(() => setCopiedCreateEmail(false), 2000); }}
+                      className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                      title="Copy email"
+                    >
+                      {copiedCreateEmail ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="border-t border-border/50 pt-3">
+                  <p className="text-[11px] text-muted-foreground mb-1 font-medium uppercase tracking-wide">Password</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 font-mono text-base font-semibold text-foreground tracking-widest select-all">{createResult.password}</code>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(createResult.password); setCopiedCreatePw(true); setTimeout(() => setCopiedCreatePw(false), 2000); }}
+                      className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                      title="Copy password"
+                    >
+                      {copiedCreatePw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Keep these credentials safe. If your child forgets their password, you can reset it from the child card using "Reset login."
+              </p>
+              <Button className="w-full" onClick={closeCreateDialog}>Done</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit student details dialog */}
+      <Dialog open={editChildId !== null} onOpenChange={(open) => { if (!open) { setEditChildId(null); setEditError(null); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-4 h-4 text-primary" />
+              Edit {editChild?.name ?? "student"}'s details
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Full name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => { setEditForm(f => ({ ...f, name: e.target.value })); setEditError(null); }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-grade">Grade level</Label>
+              <Select value={editForm.gradeLevel || "_none"} onValueChange={(v) => setEditForm(f => ({ ...f, gradeLevel: v === "_none" ? "" : v }))}>
+                <SelectTrigger id="edit-grade">
+                  <SelectValue placeholder="Select a grade…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">No grade / not applicable</SelectItem>
+                  {["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map(g => (
+                    <SelectItem key={g} value={g}>Grade {g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-email">Login email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => { setEditForm(f => ({ ...f, email: e.target.value })); setEditError(null); }}
+              />
+            </div>
+            {editError && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
+                <p className="text-xs text-destructive leading-snug">{editError}</p>
+              </div>
+            )}
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => { setEditChildId(null); setEditError(null); }}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={editProfileMutation.isPending || !editForm.name.trim()}
+                onClick={() => {
+                  if (editChildId !== null) {
+                    setEditError(null);
+                    editProfileMutation.mutate({ childId: editChildId, data: editForm });
+                  }
+                }}
+              >
+                {editProfileMutation.isPending ? "Saving…" : "Save changes"}
               </Button>
             </div>
           </div>
