@@ -288,6 +288,7 @@ export default function ParentChildrenPage() {
     setCopiedPw(false);
   }
 
+
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
@@ -414,6 +415,23 @@ export default function ParentChildrenPage() {
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground">No assignments yet</p>
+                        )}
+
+                        {/* Reset login — owners only */}
+                        {iAmOwner && (
+                          <button
+                            className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-600 transition-colors"
+                            onClick={() => {
+                              setResetChildId(child.id);
+                              setResetTempPassword(null);
+                              setCopiedPw(false);
+                              resetLoginMutation.mutate(child.id);
+                            }}
+                            disabled={resetLoginMutation.isPending && resetChildId === child.id}
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            {resetLoginMutation.isPending && resetChildId === child.id ? "Generating…" : "Reset login"}
+                          </button>
                         )}
 
                         {/* Family team toggle — visible to all roles */}
@@ -647,6 +665,59 @@ export default function ParentChildrenPage() {
               {sendMessageMutation.isPending ? "Sending..." : "Send"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset login dialog */}
+      <Dialog open={resetChildId !== null} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Temporary password generated</DialogTitle>
+          </DialogHeader>
+          {resetLoginMutation.isPending ? (
+            <p className="text-sm text-muted-foreground py-2">Generating temporary password…</p>
+          ) : resetTempPassword ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Share this temporary password with{" "}
+                <strong>{resetChild?.name ?? "your child"}</strong>{" "}
+                so they can log in. They should change their password in their profile right after signing in. All their academic data is untouched.
+              </p>
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between gap-3">
+                <span className="font-mono text-base tracking-widest select-all text-foreground">{resetTempPassword}</span>
+                <button
+                  className="flex items-center gap-1.5 text-xs text-primary hover:underline shrink-0"
+                  onClick={copyTempPw}
+                >
+                  {copiedPw ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedPw ? "Copied!" : "Copy"}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This password is only shown once. If you close this dialog, you'll need to generate a new one.
+              </p>
+              <div className="flex gap-3 pt-1">
+                <Button variant="outline" className="flex-1" onClick={closeResetDialog}>
+                  Done
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    if (resetChildId !== null) {
+                      setResetTempPassword(null);
+                      setCopiedPw(false);
+                      resetLoginMutation.mutate(resetChildId);
+                    }
+                  }}
+                  disabled={resetLoginMutation.isPending}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  Generate new
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 
