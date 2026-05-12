@@ -342,7 +342,7 @@ export default function ParentChildrenPage() {
                             <Badge variant="secondary" className="flex items-center gap-0.5 text-[10px] px-1.5 h-5 shrink-0">
                               <Eye className="w-2.5 h-2.5" /> View only
                             </Badge>
-                          ) : (
+                          ) : iAmOwner ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button className="p-0.5 rounded hover:bg-muted transition-colors shrink-0">
@@ -362,7 +362,7 @@ export default function ParentChildrenPage() {
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          )}
+                          ) : null}
                         </div>
 
                         {iAmMember && child.ownerName && (
