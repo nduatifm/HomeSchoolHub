@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, ApiError } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -66,6 +66,7 @@ export default function ParentChildrenPage() {
   const [inviteDialogChildId, setInviteDialogChildId] = useState<number | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"owner" | "member">("member");
+  const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
   // Inline last-owner error per child
   const [lastOwnerErrorChildId, setLastOwnerErrorChildId] = useState<number | null>(null);
 
@@ -178,9 +179,14 @@ export default function ParentChildrenPage() {
       setInviteDialogChildId(null);
       setInviteEmail("");
       setInviteRole("member");
+      setInviteEmailError(null);
     },
-    onError: () => {
-      toast({ title: "Could not send invite", description: "Something went wrong.", type: "error" });
+    onError: (err: unknown) => {
+      if (err instanceof ApiError && err.status === 409) {
+        setInviteEmailError("A student account already exists for this email — they can log in directly from the login page.");
+      } else {
+        toast({ title: "Could not send invite", description: "Something went wrong.", type: "error" });
+      }
     },
   });
 
@@ -591,7 +597,12 @@ export default function ParentChildrenPage() {
       </Dialog>
 
       {/* Invite co-parent dialog — only triggered by owners */}
-      <Dialog open={inviteDialogChildId !== null} onOpenChange={(open) => { if (!open) setInviteDialogChildId(null); }}>
+      <Dialog open={inviteDialogChildId !== null} onOpenChange={(open) => {
+        if (!open) {
+          setInviteDialogChildId(null);
+          setInviteEmailError(null);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite a co-parent</DialogTitle>
@@ -608,8 +619,15 @@ export default function ParentChildrenPage() {
                 type="email"
                 placeholder="coparent@example.com"
                 value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
+                onChange={(e) => {
+                  setInviteEmail(e.target.value);
+                  setInviteEmailError(null);
+                }}
+                className={inviteEmailError ? "border-destructive focus-visible:ring-destructive" : ""}
               />
+              {inviteEmailError && (
+                <p className="text-xs text-destructive leading-snug">{inviteEmailError}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="invite-role">Role</Label>

@@ -4,10 +4,10 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, ApiError } from "@/lib/queryClient";
 import { Logo } from "@/components/Logo";
 import { Link } from "wouter";
-import { CheckCircle, GraduationCap } from "lucide-react";
+import { CheckCircle, GraduationCap, LogIn } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 
 export default function StudentSignup() {
@@ -15,6 +15,7 @@ export default function StudentSignup() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [inviteInfo, setInviteInfo] = useState<{ studentName: string; gradeLevel: string; email: string } | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingCode, setIsCheckingCode] = useState(false);
   const { signupStudent, signupStudentGoogle } = useAuth();
@@ -25,13 +26,19 @@ export default function StudentSignup() {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
     setIsCheckingCode(true);
+    setAlreadyRegistered(false);
+    setInviteInfo(null);
     try {
       const data = await apiRequest(`/api/invites/student/code/${trimmed}`);
       setInviteInfo(data);
       toast({ title: "Invite found!", description: `Welcome ${data.studentName}`, type: "success" });
     } catch (error: any) {
-      toast({ title: "Invalid invite code", description: "Check the code and try again.", type: "error" });
-      setInviteInfo(null);
+      if (error instanceof ApiError && error.status === 409) {
+        // Student already has an account — show login banner instead of error
+        setAlreadyRegistered(true);
+      } else {
+        toast({ title: "Invalid invite code", description: "Check the code and try again.", type: "error" });
+      }
     } finally {
       setIsCheckingCode(false);
     }
@@ -49,7 +56,18 @@ export default function StudentSignup() {
       toast({ title: "Welcome to the platform!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Signup failed — try again.", type: "error" });
+      const msg: string = error?.message ?? "";
+      if (msg.toLowerCase().includes("already exists")) {
+        toast({
+          title: "This email already has an account",
+          description: "Please log in instead.",
+          type: "error",
+        });
+        setAlreadyRegistered(true);
+        setInviteInfo(null);
+      } else {
+        toast({ title: "Signup failed — try again.", type: "error" });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +81,18 @@ export default function StudentSignup() {
       toast({ title: "Welcome to the platform!", type: "success" });
       setLocation("/dashboard");
     } catch (error: any) {
-      toast({ title: "Google signup failed — try again.", type: "error" });
+      const msg: string = error?.message ?? "";
+      if (msg.toLowerCase().includes("already exists")) {
+        toast({
+          title: "This email already has an account",
+          description: "Please log in instead.",
+          type: "error",
+        });
+        setAlreadyRegistered(true);
+        setInviteInfo(null);
+      } else {
+        toast({ title: "Google signup failed — try again.", type: "error" });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -110,6 +139,7 @@ export default function StudentSignup() {
                   onChange={(e) => {
                     setCode(e.target.value.toUpperCase());
                     setInviteInfo(null);
+                    setAlreadyRegistered(false);
                   }}
                   placeholder="e.g. A3KW9F"
                   maxLength={6}
@@ -127,6 +157,23 @@ export default function StudentSignup() {
                 </Button>
               </div>
             </div>
+
+            {/* Already registered banner */}
+            {alreadyRegistered && (
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 flex items-start gap-3">
+                <LogIn className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-800 mb-0.5">You already have an account</p>
+                  <p className="text-sm text-blue-700">
+                    This email is already registered.{" "}
+                    <Link href="/login" className="font-medium underline hover:no-underline">
+                      Log in here
+                    </Link>
+                    {" "}instead.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Step 2: show invite info + signup options */}
             {inviteInfo && (

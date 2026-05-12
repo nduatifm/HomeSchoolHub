@@ -1226,6 +1226,16 @@ export function registerRoutes(app: Express) {
       }
 
       const data = insertStudentInviteSchema.parse(req.body);
+
+      // Guard: refuse if a student account already exists for this email
+      const existingAccount = await storage.getUserByEmail(data.email);
+      if (existingAccount && existingAccount.role === "student") {
+        return res.status(409).json({
+          error: "student_account_exists",
+          message: "A student account with this email already exists.",
+        });
+      }
+
       const token = crypto.randomUUID();
       // Generate a unique invite code with collision retry
       let code = generateInviteCode();
@@ -1283,7 +1293,15 @@ export function registerRoutes(app: Express) {
   app.get("/api/invites/student/code/:code", async (req, res) => {
     try {
       const invite = await storage.getStudentInviteByCode(req.params.code.toUpperCase());
-      if (!invite || invite.status === "accepted") {
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found or already used" });
+      }
+      if (invite.status === "accepted") {
+        // Check if the student already has an account so the frontend can redirect them to login
+        const existingUser = await storage.getUserByEmail(invite.email);
+        if (existingUser) {
+          return res.status(409).json({ error: "already_registered" });
+        }
         return res.status(404).json({ error: "Invite not found or already used" });
       }
       if (new Date(invite.expiresDate) < new Date()) {
