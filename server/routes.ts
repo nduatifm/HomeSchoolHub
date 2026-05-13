@@ -5163,6 +5163,48 @@ export function registerRoutes(app: Express) {
             await storage.createStudent({ userId: targetUser.id, name: "Sophie Wilson", gradeLevel: "Grade 12", badges: [], points: 0 });
           }
         }
+
+        // After resolving any persona, ensure the demo family links exist
+        // so the parent persona always sees all three children.
+        await (async () => {
+          const demoParentUser = await storage.getUserByEmail("demo.parent@lyraprep.dev");
+          if (!demoParentUser) return; // parent not created yet — nothing to link
+
+          const DEMO_STUDENTS = [
+            { email: "demo.student@lyraprep.dev",  name: "Emily Wilson",  grade: "Grade 10" },
+            { email: "demo.student2@lyraprep.dev", name: "Liam Wilson",   grade: "Grade 7"  },
+            { email: "demo.student3@lyraprep.dev", name: "Sophie Wilson", grade: "Grade 12" },
+          ];
+
+          for (const s of DEMO_STUDENTS) {
+            // Ensure the student user + Student record exist
+            let sUser = await storage.getUserByEmail(s.email);
+            if (!sUser) continue; // not created yet — skip
+
+            let student = await storage.getStudentByUserId(sUser.id);
+            if (!student) {
+              student = await storage.createStudent({
+                userId: sUser.id, name: s.name, gradeLevel: s.grade, badges: [], points: 0,
+              });
+            }
+
+            // Create ChildTeamMember link if it doesn't already exist
+            const existing = await prisma.childTeamMember.findFirst({
+              where: { childId: student.id, parentId: demoParentUser.id },
+            });
+            if (!existing) {
+              await prisma.childTeamMember.create({
+                data: {
+                  childId: student.id,
+                  parentId: demoParentUser.id,
+                  role: "owner",
+                  status: "active",
+                },
+              });
+            }
+          }
+        })();
+
       } else if (targetEmail) {
         targetUser = (await storage.getUserByEmail(targetEmail)) as UserRecord | null;
         if (!targetUser) return res.status(404).json({ error: "User not found" });
