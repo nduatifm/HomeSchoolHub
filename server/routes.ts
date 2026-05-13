@@ -5020,6 +5020,46 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/admin/users/search?email=... — lookup a single user by email (admin only)
+  app.get("/api/admin/users/search", async (req, res) => {
+    try {
+      const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+      if (!email) {
+        return res.status(400).json({ error: "email query parameter is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json(user);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/admin/sql — execute raw SQL query (super admin only)
+  app.post("/api/admin/sql", async (req, res) => {
+    try {
+      const sql = typeof req.body.query === "string" ? req.body.query.trim() : "";
+      if (!sql) {
+        return res.status(400).json({ error: "query is required in request body" });
+      }
+
+      const statement = sql.split(/\s+/)[0].toUpperCase();
+      if (statement === "SELECT" || statement === "WITH") {
+        const rows = await prisma.$queryRawUnsafe(sql);
+        return res.json({ rows });
+      }
+
+      const result = await prisma.$executeRawUnsafe(sql);
+      return res.json({ result });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // PATCH /api/admin/users/:id/role — change role (super admin only; supports teacher, parent, student)
   app.patch("/api/admin/users/:id/role", requireSuperAdmin, async (req, res) => {
     try {
