@@ -164,6 +164,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ignore error
     }
     localStorage.removeItem("sessionId");
+    // Clear any stale impersonation state so the banner doesn't persist
+    // after the impersonated session is explicitly signed out.
+    localStorage.removeItem("adminSessionId");
+    localStorage.removeItem("adminUserName");
+    localStorage.removeItem("impersonatedUserName");
+    localStorage.removeItem("impersonatedUserRole");
     setSessionId(null);
     setUser(null);
     setStudent(null);

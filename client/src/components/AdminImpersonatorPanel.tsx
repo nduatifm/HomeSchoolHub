@@ -43,15 +43,12 @@ export default function AdminImpersonatorPanel() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isImpersonating = !!localStorage.getItem("adminSessionId");
+  // ── All hooks must run unconditionally before any early return ────────────
 
-  // Only visible for super admins who are NOT currently in an impersonated session
-  if (!user?.isSuperAdmin || isImpersonating) return null;
-
-  // Close panel on outside click
+  // Close panel on outside click (no-op when panel is closed)
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
@@ -63,10 +60,13 @@ export default function AdminImpersonatorPanel() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  // Debounced user search
+  // Debounced user search (no-op when search is empty)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!search.trim()) { setResults([]); return; }
+    if (!search.trim()) {
+      setResults([]);
+      return;
+    }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
@@ -78,7 +78,18 @@ export default function AdminImpersonatorPanel() {
         setSearching(false);
       }
     }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [search]);
+
+  // ── Guards (after all hooks) ──────────────────────────────────────────────
+  const isImpersonating = !!localStorage.getItem("adminSessionId");
+
+  // Only visible for super admins who are NOT in an impersonated session
+  if (!user?.isSuperAdmin || isImpersonating) return null;
+
+  const isDevEnv = import.meta.env.DEV;
 
   async function becomeUser(emailOrId: string | number, displayName: string, displayRole: string) {
     if (loading) return;
@@ -109,8 +120,6 @@ export default function AdminImpersonatorPanel() {
       setOpen(false);
     }
   }
-
-  const isDevEnv = import.meta.env.DEV;
 
   return (
     <div
@@ -175,7 +184,7 @@ export default function AdminImpersonatorPanel() {
               )}
               {results.map((u) => {
                 const isLoading = loading === String(u.id);
-                const blocked = u.isSuperAdmin;
+                const blocked = !!u.isSuperAdmin;
                 return (
                   <button
                     key={u.id}
