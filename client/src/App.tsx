@@ -20,6 +20,8 @@ import Landing from "./pages/Landing";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
+import AdminImpersonatorPanel from "./components/AdminImpersonatorPanel";
+import ImpersonationBanner from "./components/ImpersonationBanner";
 import AdminUsers from "./pages/AdminUsers";
 import NotificationsPage from "./pages/Notifications";
 import FormBuilderPage from "./pages/FormBuilderPage";
@@ -273,8 +275,10 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <ImpersonationBanner />
         <AppRoutes />
         {import.meta.env.DEV && <DevRoleSwitcher />}
+        <AdminImpersonatorPanel />
       </AuthProvider>
       <Toaster />
     </QueryClientProvider>

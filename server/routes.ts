@@ -5039,10 +5039,18 @@ export function registerRoutes(app: Express) {
 
   // ========== ADMIN ROUTES ==========
 
-  // GET /api/admin/users — list all users (admin + super admin)
+  // GET /api/admin/users — list all users (admin + super admin). Supports ?search= filter.
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const search = typeof req.query.search === "string" ? req.query.search.trim().toLowerCase() : "";
+      let users = await storage.getAllUsers();
+      if (search) {
+        users = users.filter(
+          (u) =>
+            u.name.toLowerCase().includes(search) ||
+            u.email.toLowerCase().includes(search)
+        );
+      }
       const sanitized = users.map((u) => ({
         id: u.id,
         email: u.email,
@@ -5057,6 +5065,135 @@ export function registerRoutes(app: Express) {
       }));
       res.json(sanitized);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/admin/become — super-admin impersonation (all environments)
+  // Lets a super admin switch into any user's session. Predefined demo personas
+  // are auto-created if they don't exist yet.
+  app.post("/api/admin/become", requireSuperAdmin, async (req, res) => {
+    try {
+      const callerUserId = req.session.userId!;
+      const { email: targetEmail, userId: targetUserId } = req.body as { email?: string; userId?: number };
+      const hash = await hashPassword("Demo1234!");
+
+      type UserRecord = { id: number; email: string; name: string; role: string | null; roles: string[]; isSuperAdmin?: boolean | null };
+
+      // Helper: ensure a demo persona user exists
+      async function ensurePersona(
+        email: string,
+        data: Parameters<typeof storage.createUser>[0]
+      ): Promise<UserRecord> {
+        let u = await storage.getUserByEmail(email);
+        if (!u) u = await storage.createUser(data);
+        return u as UserRecord;
+      }
+
+      // Predefined persona map
+      const PERSONA_EMAILS = [
+        "demo.teacher@lyraprep.dev",
+        "demo.teacher2@lyraprep.dev",
+        "demo.teacher3@lyraprep.dev",
+        "demo.parent@lyraprep.dev",
+        "demo.student@lyraprep.dev",
+        "demo.student2@lyraprep.dev",
+        "demo.student3@lyraprep.dev",
+      ];
+
+      let targetUser: UserRecord | null = null;
+
+      if (targetEmail && PERSONA_EMAILS.includes(targetEmail)) {
+        // Auto-create predefined personas if missing
+        if (targetEmail === "demo.teacher@lyraprep.dev") {
+          targetUser = await ensurePersona(targetEmail, {
+            email: targetEmail, password: hash, name: "Dr. Sarah Chen",
+            role: "teacher", roles: ["teacher"], isEmailVerified: true,
+            bio: "Experienced educator specialising in Mathematics, Physics, and SAT Prep.",
+            teachingSubjects: ["Mathematics", "Physics", "SAT Prep"], yearsExperience: 9,
+            qualifications: "M.Sc. Applied Mathematics, Certified SAT Tutor",
+            specialization: "STEM & College Entrance Exams",
+          });
+        } else if (targetEmail === "demo.teacher2@lyraprep.dev") {
+          targetUser = await ensurePersona(targetEmail, {
+            email: targetEmail, password: hash, name: "Mr. Marcus Johnson",
+            role: "teacher", roles: ["teacher"], isEmailVerified: true,
+            bio: "English Literature and History specialist.", teachingSubjects: ["English", "History"],
+            yearsExperience: 6, qualifications: "B.A. English Literature, PGCE Secondary Education",
+            specialization: "Humanities & Creative Writing",
+          });
+        } else if (targetEmail === "demo.teacher3@lyraprep.dev") {
+          targetUser = await ensurePersona(targetEmail, {
+            email: targetEmail, password: hash, name: "Ms. Aisha Patel",
+            role: "teacher", roles: ["teacher"], isEmailVerified: true,
+            bio: "Biology and Chemistry tutor.", teachingSubjects: ["Biology", "Chemistry", "AP Science"],
+            yearsExperience: 11, qualifications: "Ph.D. Biochemistry, AP Certified Teacher",
+            specialization: "Advanced Sciences & University Prep",
+          });
+        } else if (targetEmail === "demo.parent@lyraprep.dev") {
+          targetUser = await ensurePersona(targetEmail, {
+            email: targetEmail, password: hash, name: "James Wilson",
+            role: "parent", roles: ["parent"], isEmailVerified: true,
+          });
+        } else if (targetEmail === "demo.student@lyraprep.dev") {
+          targetUser = await ensurePersona(targetEmail, {
+            email: targetEmail, password: hash, name: "Emily Wilson",
+            role: "student", roles: ["student"], isEmailVerified: true,
+            favoriteSubject: "Mathematics",
+          });
+          if (targetUser && !await storage.getStudentByUserId(targetUser.id)) {
+            await storage.createStudent({ userId: targetUser.id, name: "Emily Wilson", gradeLevel: "Grade 10", badges: [], points: 0 });
+          }
+        } else if (targetEmail === "demo.student2@lyraprep.dev") {
+          targetUser = await ensurePersona(targetEmail, {
+            email: targetEmail, password: hash, name: "Liam Wilson",
+            role: "student", roles: ["student"], isEmailVerified: true,
+            favoriteSubject: "History",
+          });
+          if (targetUser && !await storage.getStudentByUserId(targetUser.id)) {
+            await storage.createStudent({ userId: targetUser.id, name: "Liam Wilson", gradeLevel: "Grade 7", badges: [], points: 0 });
+          }
+        } else if (targetEmail === "demo.student3@lyraprep.dev") {
+          targetUser = await ensurePersona(targetEmail, {
+            email: targetEmail, password: hash, name: "Sophie Wilson",
+            role: "student", roles: ["student"], isEmailVerified: true,
+            favoriteSubject: "Biology",
+          });
+          if (targetUser && !await storage.getStudentByUserId(targetUser.id)) {
+            await storage.createStudent({ userId: targetUser.id, name: "Sophie Wilson", gradeLevel: "Grade 12", badges: [], points: 0 });
+          }
+        }
+      } else if (targetEmail) {
+        targetUser = (await storage.getUserByEmail(targetEmail)) as UserRecord | null;
+        if (!targetUser) return res.status(404).json({ error: "User not found" });
+      } else if (targetUserId) {
+        targetUser = (await storage.getUserById(Number(targetUserId))) as UserRecord | null;
+        if (!targetUser) return res.status(404).json({ error: "User not found" });
+      } else {
+        return res.status(400).json({ error: "Provide email or userId" });
+      }
+
+      if (!targetUser) return res.status(404).json({ error: "User not found" });
+      if (targetUser.isSuperAdmin) {
+        return res.status(403).json({ error: "Cannot impersonate another super admin" });
+      }
+      if (targetUser.id === callerUserId) {
+        return res.status(400).json({ error: "Cannot impersonate yourself" });
+      }
+
+      const sessionId = await createSession(targetUser.id);
+      res.json({
+        sessionId,
+        user: {
+          id: targetUser.id,
+          email: targetUser.email,
+          name: targetUser.name,
+          role: targetUser.role,
+          roles: targetUser.roles ?? [],
+        },
+      });
+    } catch (error: any) {
+      console.error("[admin-become] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
