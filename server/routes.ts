@@ -336,11 +336,15 @@ export function registerRoutes(app: Express) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
-      // Check if user password exists (for non-Google OAuth users)
+      // Check if user password exists (Google-only account)
+      if (!user.password && user.googleId) {
+        return res.status(401).json({
+          error: "This account uses Google Sign-In. Please use the Google button to sign in.",
+          requiresGoogle: true,
+        });
+      }
       if (!user.password) {
-        return res
-          .status(401)
-          .json({ error: "Invalid credentials. Please use Google Sign In." });
+        return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const isValid = await verifyPassword(password, user.password);
@@ -353,17 +357,28 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({
           error: "Please verify your email before logging in",
           requiresVerification: true,
-          role: user.role, // Fix 4a: let frontend show a role-specific message
+          role: user.role,
         });
       }
 
       const sessionId = await createSession(user.id);
 
-      // Fix 2a: include student profile so the frontend doesn't need a
-      // second /api/auth/me round-trip after login (prevents race condition).
+      // Include student profile so the frontend doesn't need a second /api/auth/me call.
       let studentProfile = null;
       if (user.role === "student") {
         studentProfile = await storage.getStudentByUserId(user.id);
+        if (!studentProfile) {
+          return res.status(500).json({
+            error: "Your account isn't fully set up. Please contact your parent or an administrator.",
+          });
+        }
+      }
+
+      // Self-heal roles array: ensure current role is always present
+      let roles = user.roles ?? [];
+      if (user.role && !roles.includes(user.role)) {
+        roles = [...new Set([...roles, user.role])];
+        await storage.updateUser(user.id, { roles });
       }
 
       res.json({
@@ -372,7 +387,7 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: user.roles ?? [],
+          roles,
           isEmailVerified: user.isEmailVerified,
         },
         student: studentProfile,
@@ -642,10 +657,19 @@ export function registerRoutes(app: Express) {
       }
 
       // Verify Google token
-      const ticket = await googleClient.verifyIdToken({
-        idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
+      let ticket;
+      try {
+        ticket = await googleClient.verifyIdToken({
+          idToken: credential,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+      } catch (verifyErr: any) {
+        console.error("[google-auth] Token verification failed:", verifyErr?.message);
+        if (!process.env.GOOGLE_CLIENT_ID) {
+          console.error("[google-auth] GOOGLE_CLIENT_ID env var is not set — Google Sign-In is misconfigured.");
+        }
+        return res.status(401).json({ error: "Invalid Google token. Please try again." });
+      }
 
       const payload = ticket.getPayload();
       if (!payload) {
@@ -700,11 +724,23 @@ export function registerRoutes(app: Express) {
       // Create session
       const sessionId = await createSession(user.id);
 
-      // Fix 2b: include student profile for Google-auth students so the
-      // frontend has it immediately without a second /api/auth/me call.
+      // Include student profile for Google-auth students so the frontend
+      // has it immediately without a second /api/auth/me call.
       let googleStudentProfile = null;
       if (user.role === "student") {
         googleStudentProfile = await storage.getStudentByUserId(user.id);
+        if (!googleStudentProfile) {
+          return res.status(500).json({
+            error: "Your account isn't fully set up. Please contact your parent or an administrator.",
+          });
+        }
+      }
+
+      // Self-heal roles array: ensure current role is always present
+      let gRoles = user.roles ?? [];
+      if (user.role && !gRoles.includes(user.role)) {
+        gRoles = [...new Set([...gRoles, user.role])];
+        await storage.updateUser(user.id, { roles: gRoles });
       }
 
       res.json({
@@ -713,13 +749,13 @@ export function registerRoutes(app: Express) {
           email: user.email,
           name: user.name,
           role: user.role,
-          roles: user.roles ?? [],
+          roles: gRoles,
         },
         student: googleStudentProfile,
         sessionId,
       });
     } catch (error: any) {
-      console.error("Google auth error:", error);
+      console.error("[google-auth] Unexpected error:", error);
       res.status(500).json({ error: "Failed to authenticate with Google" });
     }
   });

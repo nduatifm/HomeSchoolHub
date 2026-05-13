@@ -22,18 +22,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
 import { ApiError } from "@/lib/queryClient";
 import { Link } from "wouter";
+import { AlertCircle, Mail, CheckCircle } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login, googleSignIn } = useAuth();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
-  // ?teamInvite=<token>: redirect to /team-invite/<token> after login (also checks localStorage fallback
-  // for the email-signup → verify → login path). Falls back to ?next= for generic redirects.
   const teamInviteToken = (() => {
     try { return new URLSearchParams(window.location.search).get("teamInvite") || null; } catch { return null; }
   })();
@@ -48,8 +47,41 @@ export default function Login() {
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
   const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
 
+  // Inline alert states — shown below the form instead of fleeting toasts
+  const [verificationAlert, setVerificationAlert] = useState<{ email: string } | null>(null);
+  const [googleOnlyAlert, setGoogleOnlyAlert] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
+
+  function clearAlerts() {
+    setVerificationAlert(null);
+    setGoogleOnlyAlert(false);
+  }
+
+  async function handleResendVerification() {
+    if (!verificationAlert) return;
+    setResendState("sending");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: verificationAlert.email }),
+      });
+      if (res.ok) {
+        setResendState("sent");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ title: data.error || "Failed to resend — try again.", type: "error" });
+        setResendState("idle");
+      }
+    } catch {
+      toast({ title: "Network error — please try again.", type: "error" });
+      setResendState("idle");
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    clearAlerts();
     setIsLoading(true);
     try {
       await login(email, password);
@@ -64,15 +96,10 @@ export default function Login() {
     } catch (error: any) {
       setIsLoading(false);
       if (error.requiresVerification) {
-        const isStudent = error.role === "student";
-        toast({
-          title: "Email verification required",
-          description: isStudent
-            ? "Your account needs to be verified. Ask your parent to send a new invite, or contact support."
-            : "Please check your inbox for a verification link and verify your email before signing in.",
-          type: "error",
-          duration: 8000,
-        });
+        setVerificationAlert({ email });
+        setResendState("idle");
+      } else if (error.requiresGoogle) {
+        setGoogleOnlyAlert(true);
       } else {
         toast({ title: "Login failed — check your credentials and try again.", type: "error", duration: 5000 });
       }
@@ -82,6 +109,7 @@ export default function Login() {
   async function handleGoogleSuccess(credentialResponse: any) {
     const credential = credentialResponse.credential;
     setGoogleCredential(credential);
+    clearAlerts();
     setIsLoading(true);
     try {
       await googleSignIn(credential);
@@ -122,7 +150,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left panel - branding (hidden on mobile) */}
+      {/* Left panel */}
       <div className="hidden lg:flex lg:w-[420px] bg-primary flex-col justify-between p-10 shrink-0">
         <Logo variant="sidebar" className="text-white [&_span]:text-white" />
         <div>
@@ -134,7 +162,7 @@ export default function Login() {
         <p className="text-white/50 text-xs">© {new Date().getFullYear()} Lyra Preparatory</p>
       </div>
 
-      {/* Right panel - form */}
+      {/* Right panel */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="lg:hidden mb-8">
@@ -155,7 +183,7 @@ export default function Login() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); clearAlerts(); }}
                 placeholder="you@example.com"
                 required
                 data-testid="input-email"
@@ -169,7 +197,7 @@ export default function Login() {
                 id="password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); clearAlerts(); }}
                 placeholder="••••••••"
                 required
                 data-testid="input-password"
@@ -185,7 +213,44 @@ export default function Login() {
             </Button>
           </form>
 
-          {googleClientId && (
+          {/* Inline: email not verified */}
+          {verificationAlert && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3.5 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-amber-800 leading-snug">
+                  <strong>Email not verified.</strong> Check your inbox for the verification link, then sign in.
+                </p>
+              </div>
+              {resendState === "sent" ? (
+                <div className="flex items-center gap-1.5 text-sm text-green-700 pl-6">
+                  <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                  Verification email sent — check your inbox.
+                </div>
+              ) : (
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendState === "sending"}
+                  className="pl-6 text-sm font-medium text-amber-700 hover:text-amber-900 hover:underline disabled:opacity-50"
+                >
+                  {resendState === "sending" ? "Sending…" : "Resend verification email"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Inline: account uses Google Sign-In */}
+          {googleOnlyAlert && (
+            <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3.5 flex items-start gap-2">
+              <Mail className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-blue-800 leading-snug">
+                <strong>This account uses Google Sign-In.</strong> Use the "Continue with Google" button below — there's no password on this account.
+              </p>
+            </div>
+          )}
+
+          {/* Google sign-in section */}
+          {googleClientId ? (
             <>
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">
@@ -202,6 +267,10 @@ export default function Login() {
                 />
               </div>
             </>
+          ) : (
+            <p className="mt-5 text-center text-xs text-muted-foreground">
+              Google Sign-In is not available in this environment.
+            </p>
           )}
 
           <div className="mt-6 space-y-2 text-center">

@@ -3,15 +3,17 @@ import { QueryClient } from "@tanstack/react-query";
 export class ApiError extends Error {
   requiresRole?: boolean;
   requiresVerification?: boolean;
+  requiresGoogle?: boolean;
   email?: string;
   status?: number;
   role?: string;
 
-  constructor(message: string, options?: { requiresRole?: boolean; requiresVerification?: boolean; email?: string; status?: number; role?: string }) {
+  constructor(message: string, options?: { requiresRole?: boolean; requiresVerification?: boolean; requiresGoogle?: boolean; email?: string; status?: number; role?: string }) {
     super(message);
     this.name = 'ApiError';
     this.requiresRole = options?.requiresRole;
     this.requiresVerification = options?.requiresVerification;
+    this.requiresGoogle = options?.requiresGoogle;
     this.email = options?.email;
     this.status = options?.status;
     this.role = options?.role;
@@ -37,11 +39,17 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: "Request failed" }));
     if (response.status === 401) {
-      window.dispatchEvent(new Event("lyra:auth:expired"));
+      // Only treat 401 as a session expiry when it comes from a protected
+      // endpoint, not from auth flows where 401 means "bad credentials/token".
+      const isAuthFlow = url.startsWith("/api/auth/") && url !== "/api/auth/me";
+      if (!isAuthFlow) {
+        window.dispatchEvent(new Event("lyra:auth:expired"));
+      }
     }
     throw new ApiError(errorData.error || "Request failed", {
       requiresRole: errorData.requiresRole,
       requiresVerification: errorData.requiresVerification,
+      requiresGoogle: errorData.requiresGoogle,
       email: errorData.email,
       status: response.status,
       role: errorData.role,
