@@ -1366,7 +1366,7 @@ class PrismaStorage implements IStorage {
 
   async getPendingStudentInviteByEmail(email: string): Promise<StudentInvite | null> {
     return (await prisma.studentInvite.findFirst({
-      where: { email, status: "pending" },
+      where: { email: { equals: email.trim(), mode: "insensitive" }, status: "pending" },
     })) as StudentInvite | null;
   }
 

@@ -46,6 +46,9 @@ import { uploadBufferToCloudinary } from "./utils/cloudinary";
 // Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Normalise any incoming email: trim whitespace and force lowercase
+const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
 // DB-backed session helpers
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -196,8 +199,8 @@ async function syncAdminFlags() {
     const allUsers = await storage.getAllUsers();
 
     for (const u of allUsers) {
-      const shouldBeSuperAdmin = !!superAdminEmail && u.email === superAdminEmail;
-      const shouldBeAdmin = shouldBeSuperAdmin || (!!adminEmail && u.email === adminEmail);
+      const shouldBeSuperAdmin = !!superAdminEmail && u.email.toLowerCase() === superAdminEmail.toLowerCase();
+      const shouldBeAdmin = shouldBeSuperAdmin || (!!adminEmail && u.email.toLowerCase() === adminEmail.toLowerCase());
 
       const currentIsAdmin = u.isAdmin ?? false;
       const currentIsSuperAdmin = u.isSuperAdmin ?? false;
@@ -258,7 +261,8 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      const { email, password, name, role } = validation.data;
+      const { email: rawEmail, password, name, role } = validation.data;
+      const email = normalizeEmail(rawEmail);
 
       const existing = await storage.getUserByEmail(email);
       if (existing) {
@@ -412,7 +416,7 @@ export function registerRoutes(app: Express) {
       const hashedPassword = await hashPassword(password);
 
       const user = await storage.createUser({
-        email: invite.email,
+        email: normalizeEmail(invite.email),
         password: hashedPassword,
         name: invite.studentName,
         role: "student",
@@ -544,7 +548,7 @@ export function registerRoutes(app: Express) {
 
       // Create user account linked to Google
       const user = await storage.createUser({
-        email: invite.email,
+        email: normalizeEmail(invite.email),
         password: null,
         name: invite.studentName,
         role: "student",
@@ -680,7 +684,7 @@ export function registerRoutes(app: Express) {
         }
 
         user = await storage.createUser({
-          email: email || `google_${googleId}@placeholder.com`,
+          email: email ? normalizeEmail(email) : `google_${googleId}@placeholder.com`,
           password: null, // No password for Google users
           name,
           role,
@@ -1393,7 +1397,7 @@ export function registerRoutes(app: Express) {
       expiresDate.setDate(expiresDate.getDate() + 7); // 7 days expiry
 
       const invite = await storage.createStudentInvite({
-        email: data.email,
+        email: normalizeEmail(data.email),
         studentName: data.studentName,
         gradeLevel: data.gradeLevel,
         parent: { connect: { id: user.id } },
@@ -1752,7 +1756,8 @@ export function registerRoutes(app: Express) {
       });
       const parse = schema.safeParse(req.body);
       if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-      const { email, role } = parse.data;
+      const { email: rawInviteEmail, role } = parse.data;
+      const email = normalizeEmail(rawInviteEmail);
 
       // Check if the email is already a team member
       const existingUser = await storage.getUserByEmail(email);
@@ -1763,7 +1768,7 @@ export function registerRoutes(app: Express) {
 
       // Check no duplicate pending invite for this email + child
       const dupeInvite = await prisma.childTeamMember.findFirst({
-        where: { childId: studentId, inviteEmail: email, status: "pending" },
+        where: { childId: studentId, inviteEmail: { equals: email, mode: "insensitive" }, status: "pending" },
       });
       if (dupeInvite) return res.status(409).json({ error: "An invite has already been sent to this email" });
 
