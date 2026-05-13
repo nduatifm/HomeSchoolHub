@@ -226,14 +226,19 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Role selection dialog */}
+      {/* Role selection dialog — only shown for new Google accounts (teacher / parent) */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Select your role</DialogTitle>
-            <DialogDescription>Tell us how you'll be using Lyra Preparatory</DialogDescription>
+            <DialogTitle>Create your account</DialogTitle>
+            <DialogDescription>
+              We don't have an account for this Google address yet. Choose your role to sign up.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+              <strong>Are you a student?</strong> Student accounts can only be created by a parent. Ask your parent to set up your account, then sign in with email and password.
+            </div>
             <div className="space-y-1.5">
               <label htmlFor="google-role" className="text-sm font-medium">I am a...</label>
               <Select value={googleRole} onValueChange={(v) => setGoogleRole(v as "teacher" | "parent")}>
