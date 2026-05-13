@@ -351,6 +351,11 @@ export default function ParentChildrenPage() {
       setCreateError("Name, email, and password are all required.");
       return;
     }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(createForm.email.trim())) {
+      setCreateError("Please enter a valid email address.");
+      return;
+    }
     if (createForm.password.length < 6) {
       setCreateError("Password must be at least 6 characters.");
       return;
@@ -396,7 +401,7 @@ export default function ParentChildrenPage() {
             {childStats.length === 0 && (
               <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
                 <p className="text-sm text-muted-foreground mb-3">No children added yet. Create an account for your child or send them an invite to sign up themselves.</p>
-                <Button size="sm" onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); }}>
+                <Button size="sm" onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" }); }}>
                   <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
                   Create first account
                 </Button>
@@ -527,23 +532,6 @@ export default function ParentChildrenPage() {
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground">No assignments yet</p>
-                        )}
-
-                        {/* Reset login — owners only */}
-                        {iAmOwner && (
-                          <button
-                            className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-600 transition-colors"
-                            onClick={() => {
-                              setResetChildId(child.id);
-                              setResetTempPassword(null);
-                              setCopiedPw(false);
-                              resetLoginMutation.mutate(child.id);
-                            }}
-                            disabled={resetLoginMutation.isPending && resetChildId === child.id}
-                          >
-                            <KeyRound className="w-3.5 h-3.5" />
-                            {resetLoginMutation.isPending && resetChildId === child.id ? "Generating…" : "Reset login"}
-                          </button>
                         )}
 
                         {/* Family team toggle — visible to all roles */}

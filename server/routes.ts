@@ -2060,6 +2060,7 @@ export function registerRoutes(app: Express) {
 
       const hashedPassword = await hashPassword(password);
 
+      // Create user first, then roll back on any subsequent failure
       const user = await storage.createUser({
         email: trimmedEmail,
         password: hashedPassword,
@@ -2073,21 +2074,33 @@ export function registerRoutes(app: Express) {
         profilePicture: null,
       });
 
-      const student = await storage.createStudent({
-        userId: user.id,
-        name: name.trim(),
-        gradeLevel: gradeLevel?.trim() || null,
-        badges: [],
-        points: 0,
-      });
+      let student;
+      try {
+        student = await storage.createStudent({
+          userId: user.id,
+          name: name.trim(),
+          gradeLevel: gradeLevel?.trim() || null,
+          badges: [],
+          points: 0,
+        });
+      } catch (err) {
+        await prisma.user.delete({ where: { id: user.id } });
+        throw err;
+      }
 
-      await storage.createChildTeamMember({
-        childId: student.id,
-        parentId: callerId,
-        role: "owner",
-        status: "active",
-        acceptedAt: new Date(),
-      });
+      try {
+        await storage.createChildTeamMember({
+          childId: student.id,
+          parentId: callerId,
+          role: "owner",
+          status: "active",
+          acceptedAt: new Date(),
+        });
+      } catch (err) {
+        await prisma.student.delete({ where: { id: student.id } });
+        await prisma.user.delete({ where: { id: user.id } });
+        throw err;
+      }
 
       const tutorRequestModeSetting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
       const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
