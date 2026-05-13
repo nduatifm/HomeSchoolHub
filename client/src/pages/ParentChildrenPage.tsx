@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -898,129 +899,125 @@ export default function ParentChildrenPage() {
 
       {/* Create student account dialog */}
       <Dialog open={createOpen} onOpenChange={(open) => { if (!open) closeCreateDialog(); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 text-primary" />
-              Create account for your child
+            <DialogTitle>
+              {createResult === null ? "Create student account" : "Account ready"}
             </DialogTitle>
+            <DialogDescription>
+              {createResult === null
+                ? "Set up login credentials your child can use right away."
+                : `Share these credentials with ${createForm.name} to log in.`}
+            </DialogDescription>
           </DialogHeader>
 
           {createResult === null ? (
-            <div className="space-y-4 pt-1">
-              <p className="text-sm text-muted-foreground">
-                Fill in your child's details and choose a password. You'll share the login credentials with them directly — no email verification needed.
-              </p>
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="create-name">Full name</Label>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <Label htmlFor="create-name">Child's name</Label>
                   <Input
                     id="create-name"
-                    placeholder="e.g. Alex Johnson"
+                    autoFocus
+                    placeholder="Alex Johnson"
                     value={createForm.name}
                     onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="create-grade">Grade level <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                  <Select value={createForm.gradeLevel} onValueChange={(v) => setCreateForm(f => ({ ...f, gradeLevel: v === "_none" ? "" : v }))}>
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <Label htmlFor="create-grade">
+                    Grade <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                  </Label>
+                  <Select value={createForm.gradeLevel || "_none"} onValueChange={(v) => setCreateForm(f => ({ ...f, gradeLevel: v === "_none" ? "" : v }))}>
                     <SelectTrigger id="create-grade">
-                      <SelectValue placeholder="Select a grade…" />
+                      <SelectValue placeholder="Select…" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="_none">No grade / not applicable</SelectItem>
+                      <SelectItem value="_none">Not set</SelectItem>
                       {["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map(g => (
                         <SelectItem key={g} value={g}>Grade {g}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="create-email">Login email</Label>
-                  <Input
-                    id="create-email"
-                    type="email"
-                    placeholder="student@example.com"
-                    value={createForm.email}
-                    onChange={(e) => { setCreateForm(f => ({ ...f, email: e.target.value })); setCreateError(null); }}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="create-pw">Password</Label>
-                    <Input
-                      id="create-pw"
-                      type="password"
-                      placeholder="Min. 6 characters"
-                      value={createForm.password}
-                      onChange={(e) => { setCreateForm(f => ({ ...f, password: e.target.value })); setCreateError(null); }}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="create-pw2">Confirm</Label>
-                    <Input
-                      id="create-pw2"
-                      type="password"
-                      placeholder="Repeat password"
-                      value={createForm.confirmPassword}
-                      onChange={(e) => { setCreateForm(f => ({ ...f, confirmPassword: e.target.value })); setCreateError(null); }}
-                    />
-                  </div>
-                </div>
               </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-email">Login email</Label>
+                <Input
+                  id="create-email"
+                  type="email"
+                  placeholder="student@example.com"
+                  value={createForm.email}
+                  onChange={(e) => { setCreateForm(f => ({ ...f, email: e.target.value })); setCreateError(null); }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-pw">Password</Label>
+                <Input
+                  id="create-pw"
+                  type="password"
+                  placeholder="Min. 6 characters"
+                  value={createForm.password}
+                  onChange={(e) => { setCreateForm(f => ({ ...f, password: e.target.value })); setCreateError(null); }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-pw2">Confirm password</Label>
+                <Input
+                  id="create-pw2"
+                  type="password"
+                  placeholder="Repeat password"
+                  value={createForm.confirmPassword}
+                  onChange={(e) => { setCreateForm(f => ({ ...f, confirmPassword: e.target.value })); setCreateError(null); }}
+                />
+              </div>
+
               {createError && (
-                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
-                  <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
-                  <p className="text-xs text-destructive leading-snug">{createError}</p>
-                </div>
+                <p className="text-xs text-destructive flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {createError}
+                </p>
               )}
-              <div className="flex gap-3 pt-1">
+
+              <div className="flex gap-2 pt-1">
                 <Button variant="outline" className="flex-1" onClick={closeCreateDialog}>Cancel</Button>
-                <Button
-                  className="flex-1"
-                  disabled={createDirectMutation.isPending}
-                  onClick={handleCreateSubmit}
-                >
+                <Button className="flex-1" disabled={createDirectMutation.isPending} onClick={handleCreateSubmit}>
                   {createDirectMutation.isPending ? "Creating…" : "Create account"}
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="space-y-4 pt-1">
-              <p className="text-sm text-muted-foreground">
-                Account created! Share these credentials with <strong>{createForm.name}</strong> so they can log in. They can change their password later from their profile.
-              </p>
-              <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-3">
-                <div>
-                  <p className="text-[11px] text-muted-foreground mb-1 font-medium uppercase tracking-wide">Login email</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-sm font-medium text-foreground select-all">{createResult.email}</code>
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(createResult.email); setCopiedCreateEmail(true); setTimeout(() => setCopiedCreateEmail(false), 2000); }}
-                      className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
-                      title="Copy email"
-                    >
-                      {copiedCreateEmail ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                    </button>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Email</p>
+                    <p className="text-sm font-medium text-foreground truncate select-all">{createResult.email}</p>
                   </div>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(createResult.email); setCopiedCreateEmail(true); setTimeout(() => setCopiedCreateEmail(false), 2000); }}
+                    className="ml-3 p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    {copiedCreateEmail ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
                 </div>
-                <div className="border-t border-border/50 pt-3">
-                  <p className="text-[11px] text-muted-foreground mb-1 font-medium uppercase tracking-wide">Password</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 font-mono text-base font-semibold text-foreground tracking-widest select-all">{createResult.password}</code>
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(createResult.password); setCopiedCreatePw(true); setTimeout(() => setCopiedCreatePw(false), 2000); }}
-                      className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
-                      title="Copy password"
-                    >
-                      {copiedCreatePw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                    </button>
+                <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Password</p>
+                    <p className="font-mono text-base font-bold text-foreground tracking-widest select-all">{createResult.password}</p>
                   </div>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(createResult.password); setCopiedCreatePw(true); setTimeout(() => setCopiedCreatePw(false), 2000); }}
+                    className="ml-3 p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    {copiedCreatePw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Keep these credentials safe. If your child forgets their password, you can reset it from the child card using "Reset login."
-              </p>
+              <p className="text-xs text-muted-foreground">These are shown once. Save them before closing.</p>
               <Button className="w-full" onClick={closeCreateDialog}>Done</Button>
             </div>
           )}
