@@ -45,7 +45,7 @@ export default function ImpersonationBanner() {
     >
       <Shield className="w-4 h-4 shrink-0" />
       <span className="text-sm font-medium flex-1 truncate">
-        Viewing as <strong>{impersonatedName || "user"}</strong>
+        Impersonating <strong>{impersonatedName || "user"}</strong>
         {impersonatedRole && (
           <span className="ml-1 text-amber-100 capitalize">({impersonatedRole})</span>
         )}
