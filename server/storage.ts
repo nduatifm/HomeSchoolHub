@@ -349,6 +349,7 @@ class PrismaStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
+    if (!email?.trim()) return null;
     return (await prisma.user.findFirst({
       where: { email: { equals: email.trim(), mode: "insensitive" } },
     })) as User | null;

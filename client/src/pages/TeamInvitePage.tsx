@@ -54,7 +54,7 @@ export default function TeamInvitePage() {
     if (!user || !invite || invite.status !== "pending" || accepted || acceptMutation.isPending || acceptMutation.isError) return;
     const emailMismatch =
       !!invite.inviteEmail &&
-      user.email.toLowerCase() !== invite.inviteEmail.toLowerCase();
+      (user.email ?? "").toLowerCase() !== invite.inviteEmail.toLowerCase();
     if (!emailMismatch) {
       acceptMutation.mutate();
     }
@@ -126,7 +126,7 @@ export default function TeamInvitePage() {
   const emailMismatch =
     !!user &&
     !!invite.inviteEmail &&
-    user.email.toLowerCase() !== invite.inviteEmail.toLowerCase();
+    (user.email ?? "").toLowerCase() !== invite.inviteEmail.toLowerCase();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

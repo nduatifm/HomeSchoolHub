@@ -3,7 +3,7 @@ import { apiRequest, ApiError } from "@/lib/queryClient";
 
 interface User {
   id: number;
-  email: string;
+  email: string | null;
   name: string;
   role: "teacher" | "parent" | "student" | null;
   roles?: string[];

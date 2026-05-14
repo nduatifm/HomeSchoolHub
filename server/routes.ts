@@ -2120,12 +2120,11 @@ export function registerRoutes(app: Express) {
 
       const hashedPassword = await hashPassword(password);
       const username = await generateUniqueUsername(name.trim());
-      // Internal placeholder email — never shown to users or used for login
-      const placeholderEmail = `managed-${crypto.randomUUID()}@internal.lyraprep`;
 
       // Create user first, then roll back on any subsequent failure
+      // Managed accounts have no email — they log in with username only
       const user = await storage.createUser({
-        email: placeholderEmail,
+        email: null,
         username,
         password: hashedPassword,
         name: name.trim(),
@@ -2144,7 +2143,7 @@ export function registerRoutes(app: Express) {
         student = await storage.createStudent({
           userId: user.id,
           name: name.trim(),
-          gradeLevel: gradeLevel?.trim() || null,
+          gradeLevel: gradeLevel?.trim() || "",
           badges: [],
           points: 0,
         });

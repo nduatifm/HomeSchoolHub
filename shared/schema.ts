@@ -7,7 +7,7 @@ export type UserRole = (typeof userRoles)[number];
 // User schema
 export const userSchema = z.object({
   id: z.number(),
-  email: z.string().email(),
+  email: z.string().email().nullable(),
   username: z.string().nullable(),
   password: z.string().nullable(),
   name: z.string(),
