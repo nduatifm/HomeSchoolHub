@@ -39,7 +39,7 @@ export default function ManagedChildBanner() {
   return (
     <div
       style={{ height: BANNER_HEIGHT }}
-      className="fixed top-0 left-0 right-0 z-[300] flex items-center gap-3 bg-violet-600 text-white px-4 shadow-md"
+      className="fixed top-0 left-0 right-0 z-[300] flex items-center gap-3 bg-amber-500 text-white px-4 shadow-md"
     >
       <Users className="w-4 h-4 shrink-0" />
       <span className="text-sm font-medium flex-1 truncate">

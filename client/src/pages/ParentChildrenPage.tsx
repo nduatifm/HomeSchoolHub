@@ -486,15 +486,13 @@ export default function ParentChildrenPage() {
                                   <KeyRound className="w-3.5 h-3.5 mr-2" />
                                   Reset login
                                 </DropdownMenuItem>
-                                {child.isManaged && (
-                                  <DropdownMenuItem
-                                    disabled={becomeChildMutation.isPending}
-                                    onClick={() => becomeChildMutation.mutate(child.id)}
-                                  >
-                                    <Eye className="w-3.5 h-3.5 mr-2" />
-                                    View as child
-                                  </DropdownMenuItem>
-                                )}
+                                <DropdownMenuItem
+                                  disabled={becomeChildMutation.isPending}
+                                  onClick={() => becomeChildMutation.mutate(child.id)}
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-2" />
+                                  View as child
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           ) : null}

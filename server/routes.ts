@@ -2137,7 +2137,7 @@ export function registerRoutes(app: Express) {
         emailVerifyExpires: null,
         googleId: null,
         profilePicture: null,
-      } as any);
+      });
 
       let student;
       try {
