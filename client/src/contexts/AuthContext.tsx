@@ -170,6 +170,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("adminUserName");
     localStorage.removeItem("impersonatedUserName");
     localStorage.removeItem("impersonatedUserRole");
+    // Clear managed-child view state
+    localStorage.removeItem("parentSessionId");
+    localStorage.removeItem("parentUserName");
+    localStorage.removeItem("parentChildName");
     setSessionId(null);
     setUser(null);
     setStudent(null);

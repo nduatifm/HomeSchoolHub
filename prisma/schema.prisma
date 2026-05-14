@@ -37,6 +37,7 @@ model User {
   // Admin flags
   isAdmin            Boolean   @default(false)
   isSuperAdmin       Boolean   @default(false)
+  isManaged          Boolean   @default(false)
   slug               String?   @unique
 
   // Timestamps

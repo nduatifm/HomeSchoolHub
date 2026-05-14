@@ -31,6 +31,8 @@ export const userSchema = z.object({
   // Admin flags
   isAdmin: z.boolean(),
   isSuperAdmin: z.boolean(),
+  // Managed child account (no email, username login only)
+  isManaged: z.boolean().optional().default(false),
   // Student-specific fields
   interests: z.array(z.string()),
   favoriteSubject: z.string().nullable(),
@@ -60,7 +62,8 @@ export const signupSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  // Accepts an email address OR a plain username (for managed child accounts)
+  email: z.string().min(1, "Email or username is required"),
   password: z.string().min(1, "Password is required"),
 });
 

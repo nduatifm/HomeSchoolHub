@@ -37,7 +37,7 @@ import type { Student, User, Classroom, ClassroomAssignment, ClassroomSubmission
 
 type PublicUser = Pick<User, "id" | "name" | "email" | "role" | "profilePicture">;
 type AssignedTeacherRef = { id: number; name: string; email: string } | null;
-type ExtendedStudent = Student & { email?: string; googleId?: string | null; callerRole?: string; ownerName?: string | null };
+type ExtendedStudent = Student & { email?: string; username?: string | null; isManaged?: boolean; googleId?: string | null; callerRole?: string; ownerName?: string | null };
 type ChildStat = ExtendedStudent & { pct: number | null; completed: number; total: number; classroomCount: number };
 type AssignmentWithStatus = Assignment & { studentAssignment: StudentAssignment | null };
 type TeamMember = {
@@ -78,10 +78,10 @@ export default function ParentChildrenPage() {
 
   // Create student state
   const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" });
+  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
   const [createError, setCreateError] = useState<string | null>(null);
-  const [createResult, setCreateResult] = useState<{ email: string; password: string } | null>(null);
-  const [copiedCreateEmail, setCopiedCreateEmail] = useState(false);
+  const [createResult, setCreateResult] = useState<{ username: string; password: string } | null>(null);
+  const [copiedCreateUsername, setCopiedCreateUsername] = useState(false);
   const [copiedCreatePw, setCopiedCreatePw] = useState(false);
 
   // Edit student state
@@ -287,19 +287,32 @@ export default function ParentChildrenPage() {
   });
 
   const createDirectMutation = useMutation({
-    mutationFn: (data: { name: string; gradeLevel: string; email: string; password: string }) =>
-      apiRequest("/api/students/create-direct", { method: "POST", body: JSON.stringify(data) }) as Promise<{ student: any; userEmail: string }>,
+    mutationFn: (data: { name: string; gradeLevel: string; password: string }) =>
+      apiRequest("/api/students/create-direct", { method: "POST", body: JSON.stringify(data) }) as Promise<{ student: any; username: string }>,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
-      setCreateResult({ email: data.userEmail, password: createForm.password });
-      toast({ title: "Account created", description: "Share these credentials with your child so they can log in." });
+      setCreateResult({ username: data.username, password: createForm.password });
+      toast({ title: "Account created", description: "Share these login details with your child." });
     },
     onError: (err: any) => {
-      if (err?.status === 409) {
-        setCreateError("An account with this email already exists.");
-      } else {
-        setCreateError(err?.message ?? "Something went wrong. Please try again.");
-      }
+      setCreateError(err?.message ?? "Something went wrong. Please try again.");
+    },
+  });
+
+  const becomeChildMutation = useMutation({
+    mutationFn: (studentId: number) =>
+      apiRequest("/api/parent/become-child", { method: "POST", body: JSON.stringify({ studentId }) }) as Promise<{ sessionId: string; childName: string }>,
+    onSuccess: (data, studentId) => {
+      const child = childStats.find(c => c.id === studentId);
+      localStorage.setItem("parentSessionId", localStorage.getItem("sessionId") ?? "");
+      localStorage.setItem("parentUserName", user?.name ?? "");
+      localStorage.setItem("parentChildName", child?.name ?? data.childName);
+      localStorage.setItem("sessionId", data.sessionId);
+      queryClient.clear();
+      window.location.href = "/dashboard";
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not switch to child view", description: err?.message ?? "Something went wrong.", type: "error" });
     },
   });
 
@@ -339,22 +352,17 @@ export default function ParentChildrenPage() {
 
   function closeCreateDialog() {
     setCreateOpen(false);
-    setCreateForm({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" });
+    setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
     setCreateError(null);
     setCreateResult(null);
-    setCopiedCreateEmail(false);
+    setCopiedCreateUsername(false);
     setCopiedCreatePw(false);
   }
 
   function handleCreateSubmit() {
     setCreateError(null);
-    if (!createForm.name.trim() || !createForm.email.trim() || !createForm.password) {
-      setCreateError("Name, email, and password are all required.");
-      return;
-    }
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRe.test(createForm.email.trim())) {
-      setCreateError("Please enter a valid email address.");
+    if (!createForm.name.trim() || !createForm.password) {
+      setCreateError("Name and password are required.");
       return;
     }
     if (createForm.password.length < 6) {
@@ -368,7 +376,6 @@ export default function ParentChildrenPage() {
     createDirectMutation.mutate({
       name: createForm.name,
       gradeLevel: createForm.gradeLevel,
-      email: createForm.email,
       password: createForm.password,
     });
   }
@@ -393,7 +400,7 @@ export default function ParentChildrenPage() {
                 size="sm"
                 variant="outline"
                 className="gap-1.5 text-xs h-8"
-                onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" }); }}
+                onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" }); }}
               >
                 <PlusCircle className="w-3.5 h-3.5" />
                 Create account
@@ -402,7 +409,7 @@ export default function ParentChildrenPage() {
             {childStats.length === 0 && (
               <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
                 <p className="text-sm text-muted-foreground mb-3">No children added yet. Create an account for your child or send them an invite to sign up themselves.</p>
-                <Button size="sm" onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", email: "", password: "", confirmPassword: "" }); }}>
+                <Button size="sm" onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" }); }}>
                   <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
                   Create first account
                 </Button>
@@ -479,6 +486,15 @@ export default function ParentChildrenPage() {
                                   <KeyRound className="w-3.5 h-3.5 mr-2" />
                                   Reset login
                                 </DropdownMenuItem>
+                                {child.isManaged && (
+                                  <DropdownMenuItem
+                                    disabled={becomeChildMutation.isPending}
+                                    onClick={() => becomeChildMutation.mutate(child.id)}
+                                  >
+                                    <Eye className="w-3.5 h-3.5 mr-2" />
+                                    View as child
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           ) : null}
@@ -942,16 +958,9 @@ export default function ParentChildrenPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="create-email">Login email</Label>
-                <Input
-                  id="create-email"
-                  type="email"
-                  placeholder="student@example.com"
-                  value={createForm.email}
-                  onChange={(e) => { setCreateForm(f => ({ ...f, email: e.target.value })); setCreateError(null); }}
-                />
-              </div>
+              <p className="text-xs text-muted-foreground rounded-md bg-muted/50 border border-border/60 px-3 py-2 leading-relaxed">
+                We'll generate a unique username your child can use to log in — no email needed.
+              </p>
 
               <div className="space-y-1.5">
                 <Label htmlFor="create-pw">Password</Label>
@@ -994,14 +1003,14 @@ export default function ParentChildrenPage() {
               <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Email</p>
-                    <p className="text-sm font-medium text-foreground truncate select-all">{createResult.email}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Username</p>
+                    <p className="text-sm font-medium text-foreground truncate select-all font-mono">{createResult.username}</p>
                   </div>
                   <button
-                    onClick={() => { navigator.clipboard.writeText(createResult.email); setCopiedCreateEmail(true); setTimeout(() => setCopiedCreateEmail(false), 2000); }}
+                    onClick={() => { navigator.clipboard.writeText(createResult.username); setCopiedCreateUsername(true); setTimeout(() => setCopiedCreateUsername(false), 2000); }}
                     className="ml-3 p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
                   >
-                    {copiedCreateEmail ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    {copiedCreateUsername ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
                 <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">

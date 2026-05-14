@@ -171,20 +171,20 @@ export default function Login() {
 
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-foreground mb-1">Sign in</h1>
-            <p className="text-sm text-muted-foreground">Enter your email and password to continue</p>
+            <p className="text-sm text-muted-foreground">Enter your email or username and password to continue</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <label htmlFor="email" className="text-sm font-medium text-foreground">
-                Email address
+                Email or username
               </label>
               <Input
                 id="email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); clearAlerts(); }}
-                placeholder="you@example.com"
+                placeholder="you@example.com or username"
                 required
                 data-testid="input-email"
               />

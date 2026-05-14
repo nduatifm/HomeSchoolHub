@@ -77,6 +77,7 @@ export interface IStorage {
   createUser(user: Prisma.UserCreateInput): Promise<User>;
   getUserById(id: number): Promise<User | null>;
   getUserByEmail(email: string): Promise<User | null>;
+  getUserByUsername(username: string): Promise<User | null>;
   getUserByEmailVerifyToken(token: string): Promise<User | null>;
   getUserByPasswordResetToken(token: string): Promise<User | null>;
   getUserByGoogleId(googleId: string): Promise<User | null>;
@@ -353,6 +354,12 @@ class PrismaStorage implements IStorage {
     })) as User | null;
   }
 
+  async getUserByUsername(username: string): Promise<User | null> {
+    return (await prisma.user.findFirst({
+      where: { username: { equals: username.trim(), mode: "insensitive" } },
+    })) as User | null;
+  }
+
   async getUserByEmailVerifyToken(token: string): Promise<User | null> {
     return (await prisma.user.findUnique({
       where: { emailVerifyToken: token },
@@ -422,6 +429,8 @@ class PrismaStorage implements IStorage {
       return {
         ...m.child,
         email: m.child.user?.email,
+        username: m.child.user?.username ?? null,
+        isManaged: m.child.user?.isManaged ?? false,
         googleId: m.child.user?.googleId ?? null,
         callerRole: m.role as string,
         ownerName,

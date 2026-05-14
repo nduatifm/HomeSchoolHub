@@ -153,6 +153,27 @@ async function assertTeamOwner(callerId: number, studentId: number, res: Respons
   return true;
 }
 
+// generateUniqueUsername — slugify a name into a username, append suffix if taken.
+async function generateUniqueUsername(name: string): Promise<string> {
+  const base = name.trim().toLowerCase()
+    .replace(/\s+/g, ".")
+    .replace(/[^a-z0-9.]/g, "")
+    .replace(/\.+/g, ".")
+    .replace(/^\.|\.$/g, "")
+    || "student";
+
+  const existing = await storage.getUserByUsername(base);
+  if (!existing) return base;
+
+  for (let i = 0; i < 20; i++) {
+    const suffix = String(Math.floor(Math.random() * 90) + 10);
+    const candidate = `${base}${suffix}`;
+    const taken = await storage.getUserByUsername(candidate);
+    if (!taken) return candidate;
+  }
+  return `${base}${Date.now() % 10000}`;
+}
+
 // generateTempPassword — cryptographically random 10-char alphanumeric (no ambiguous chars).
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
@@ -331,7 +352,11 @@ export function registerRoutes(app: Express) {
 
       const { email, password } = validation.data;
 
-      const user = await storage.getUserByEmail(email);
+      // Try email first; fall back to username for managed child accounts
+      let user = await storage.getUserByEmail(email);
+      if (!user) {
+        user = await storage.getUserByUsername(email);
+      }
       if (!user) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
@@ -2076,7 +2101,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // POST /api/students/create-direct — parent creates a student account directly (no invite needed)
+  // POST /api/students/create-direct — parent creates a managed student account (username login, no email needed)
   app.post("/api/students/create-direct", requireAuth, async (req, res) => {
     try {
       const callerId = req.session.userId!;
@@ -2085,35 +2110,34 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Only parents can create student accounts directly" });
       }
 
-      const { name, gradeLevel, email, password } = req.body;
-      if (!name?.trim() || !email?.trim() || !password) {
-        return res.status(400).json({ error: "Name, email, and password are required" });
+      const { name, gradeLevel, password } = req.body;
+      if (!name?.trim() || !password) {
+        return res.status(400).json({ error: "Name and password are required" });
       }
       if (password.length < 6) {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
 
-      const trimmedEmail = email.trim().toLowerCase();
-      const existing = await storage.getUserByEmail(trimmedEmail);
-      if (existing) {
-        return res.status(409).json({ error: "An account with this email already exists" });
-      }
-
       const hashedPassword = await hashPassword(password);
+      const username = await generateUniqueUsername(name.trim());
+      // Internal placeholder email — never shown to users or used for login
+      const placeholderEmail = `managed-${crypto.randomUUID()}@internal.lyraprep`;
 
       // Create user first, then roll back on any subsequent failure
       const user = await storage.createUser({
-        email: trimmedEmail,
+        email: placeholderEmail,
+        username,
         password: hashedPassword,
         name: name.trim(),
         role: "student",
         roles: ["student"],
         isEmailVerified: true,
+        isManaged: true,
         emailVerifyToken: null,
         emailVerifyExpires: null,
         googleId: null,
         profilePicture: null,
-      });
+      } as any);
 
       let student;
       try {
@@ -2162,7 +2186,34 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      res.status(201).json({ student, userEmail: user.email });
+      res.status(201).json({ student, username });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/parent/become-child — parent switches into a child's student view
+  app.post("/api/parent/become-child", requireAuth, async (req, res) => {
+    try {
+      const callerId = req.session.userId!;
+      const caller = await storage.getUserById(callerId);
+      if (!caller || !caller.roles?.includes("parent")) {
+        return res.status(403).json({ error: "Only parents can use this endpoint" });
+      }
+
+      const { studentId } = req.body as { studentId?: number };
+      if (!studentId) return res.status(400).json({ error: "studentId is required" });
+
+      const student = await storage.getStudentById(Number(studentId));
+      if (!student) return res.status(404).json({ error: "Student not found" });
+
+      const isOwner = await storage.isTeamOwner(callerId, student.id);
+      if (!isOwner) {
+        return res.status(403).json({ error: "You are not an owner of this child's account" });
+      }
+
+      const sessionId = await createSession(student.userId);
+      res.json({ sessionId, childName: student.name });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

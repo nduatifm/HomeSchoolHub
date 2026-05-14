@@ -22,6 +22,7 @@ import ResetPassword from "./pages/ResetPassword";
 import DevRoleSwitcher from "./components/DevRoleSwitcher";
 import AdminImpersonatorPanel from "./components/AdminImpersonatorPanel";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import ManagedChildBanner from "./components/ManagedChildBanner";
 import AdminUsers from "./pages/AdminUsers";
 import NotificationsPage from "./pages/Notifications";
 import FormBuilderPage from "./pages/FormBuilderPage";
@@ -276,6 +277,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ImpersonationBanner />
+        <ManagedChildBanner />
         <AppRoutes />
         {import.meta.env.DEV && <DevRoleSwitcher />}
         <AdminImpersonatorPanel />
