@@ -1,8 +1,5 @@
-import { useEffect } from "react";
 import { Shield, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
-
-const BANNER_HEIGHT = 40;
 
 export function getIsImpersonating(): boolean {
   return !!localStorage.getItem("adminSessionId");
@@ -10,22 +7,10 @@ export function getIsImpersonating(): boolean {
 
 export default function ImpersonationBanner() {
   const adminSessionId = localStorage.getItem("adminSessionId");
-  const adminUserName = localStorage.getItem("adminUserName") ?? "Admin";
   const impersonatedName = localStorage.getItem("impersonatedUserName") ?? "";
   const impersonatedRole = localStorage.getItem("impersonatedUserRole") ?? "";
 
-  const isImpersonating = !!adminSessionId;
-
-  useEffect(() => {
-    if (isImpersonating) {
-      document.documentElement.style.paddingTop = `${BANNER_HEIGHT}px`;
-    }
-    return () => {
-      document.documentElement.style.paddingTop = "";
-    };
-  }, [isImpersonating]);
-
-  if (!isImpersonating) return null;
+  if (!adminSessionId) return null;
 
   function handleReturn() {
     const orig = localStorage.getItem("adminSessionId")!;
@@ -39,26 +24,20 @@ export default function ImpersonationBanner() {
   }
 
   return (
-    <div
-      style={{ height: BANNER_HEIGHT }}
-      className="fixed top-0 left-0 right-0 z-[300] flex items-center gap-3 bg-amber-500 text-white px-4 shadow-md"
-    >
-      <Shield className="w-4 h-4 shrink-0" />
-      <span className="text-sm font-medium flex-1 truncate">
-        Impersonating <strong>{impersonatedName || "user"}</strong>
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg">
+      <Shield className="w-3 h-3 shrink-0" />
+      <span className="truncate max-w-[180px]">
+        {impersonatedName || "user"}
         {impersonatedRole && (
           <span className="ml-1 text-amber-100 capitalize">({impersonatedRole})</span>
         )}
-        <span className="ml-2 text-amber-100 text-xs hidden sm:inline">
-          — signed in as {adminUserName}
-        </span>
       </span>
       <button
         onClick={handleReturn}
-        className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors shrink-0"
+        className="flex items-center gap-1 bg-white/25 hover:bg-white/40 px-2 py-0.5 rounded-full transition-colors shrink-0"
       >
         <X className="w-3 h-3" />
-        Return to Admin
+        Return
       </button>
     </div>
   );
