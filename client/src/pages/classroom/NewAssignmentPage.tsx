@@ -128,7 +128,15 @@ export default function NewAssignmentPage() {
     serverDraftAppliedRef.current = true;
     if (!serverDraft) return;
     const d = serverDraft;
-    const hasContent = (d.title ?? "").trim() || (d.description ?? "").trim() || d.dueDate || d.assignmentType;
+    const hasContent =
+      (d.title ?? "").trim() ||
+      (d.description ?? "").trim() ||
+      d.dueDate ||
+      d.assignmentType ||
+      (d.linkUrl ?? "").trim() ||
+      (d.linkedMaterialIds?.length ?? 0) > 0 ||
+      (d.formSchema?.length ?? 0) > 0 ||
+      (d.answerKey && Object.keys(d.answerKey).length > 0);
     if (!hasContent) return;
     setForm({
       title: d.title ?? "",
@@ -154,7 +162,15 @@ export default function NewAssignmentPage() {
   // Debounce server save when fields change
   useEffect(() => {
     if (!classroomId || !serverDraftAppliedRef.current) return;
-    const hasContent = form.title.trim() || form.description.trim() || form.dueDate || assignmentType;
+    const hasContent =
+      form.title.trim() ||
+      form.description.trim() ||
+      form.dueDate ||
+      assignmentType ||
+      linkUrl.trim() ||
+      selectedMaterialIds.length > 0 ||
+      formQuestions.length > 0 ||
+      Object.keys(answerKey).length > 0;
     if (!hasContent) return;
     if (serverDebounceTimerRef.current) clearTimeout(serverDebounceTimerRef.current);
     serverDebounceTimerRef.current = setTimeout(() => {

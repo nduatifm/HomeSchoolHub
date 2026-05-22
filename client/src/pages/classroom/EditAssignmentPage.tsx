@@ -88,6 +88,7 @@ export default function EditAssignmentPage() {
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const serverDraftAppliedRef = useRef(false);
   const serverDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
 
   // True only when current state differs from the original seeded snapshot.
   const isDirty = useMemo(() => {
@@ -192,29 +193,65 @@ export default function EditAssignmentPage() {
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(answerKey));
   }, [answerKey, initialized]);
 
-  // Apply server draft after initialization — silently restore if different from snapshot
+  // After initialization, check if server draft differs from published — offer to restore
   useEffect(() => {
     if (!initialized || !serverDraftLoaded || serverDraftAppliedRef.current) return;
     serverDraftAppliedRef.current = true;
     if (!serverDraft || !assignment) return;
     const d = serverDraft;
-    const hasContent = (d.title ?? "").trim() || (d.description ?? "").trim() || d.dueDate;
+    // Broader hasContent — any saved field counts
+    const hasContent =
+      (d.title ?? "").trim() ||
+      (d.description ?? "").trim() ||
+      d.dueDate ||
+      d.assignmentType ||
+      (d.linkUrl ?? "").trim() ||
+      (d.linkedMaterialIds?.length ?? 0) > 0 ||
+      (d.formSchema?.length ?? 0) > 0 ||
+      (d.answerKey && Object.keys(d.answerKey).length > 0);
     if (!hasContent) return;
-    const newForm = {
-      title: d.title ?? form.title,
-      description: d.description ?? form.description,
-      dueDate: d.dueDate ?? form.dueDate,
-      points: d.points != null ? String(d.points) : form.points,
+    // Compare server draft against every field in the published snapshot
+    const pubForm = {
+      title: assignment.title,
+      description: assignment.description ?? "",
+      dueDate: assignment.dueDate,
+      points: String(assignment.points),
     };
-    const newType = (d.assignmentType as ItemType) ?? assignmentType;
-    const newLink = d.linkUrl ?? linkUrl;
-    // Only restore if server draft differs from the saved assignment (the snapshot)
-    const snapshot_ = { form: { title: assignment.title, description: assignment.description ?? "", dueDate: assignment.dueDate, points: String(assignment.points) } };
-    const serverDiffersFromPublished = JSON.stringify(newForm) !== JSON.stringify(snapshot_.form) || newType !== assignmentType || newLink !== linkUrl;
+    const pubType = (assignment.assignmentType as ItemType) ?? "assignment";
+    const pubLink = assignment.linkUrl ?? "";
+    const pubMaterials = assignment.linkedMaterialIds ?? [];
+    const pubSchema = (assignment.formSchema as FormQuestion[] | null) ?? [];
+    const pubKey = (assignment.answerKey as Record<string, string | string[]> | null) ?? {};
+    const draftForm = {
+      title: d.title ?? pubForm.title,
+      description: d.description ?? pubForm.description,
+      dueDate: d.dueDate ?? pubForm.dueDate,
+      points: d.points != null ? String(d.points) : pubForm.points,
+    };
+    const serverDiffersFromPublished =
+      JSON.stringify(draftForm) !== JSON.stringify(pubForm) ||
+      ((d.assignmentType as ItemType) ?? pubType) !== pubType ||
+      (d.linkUrl ?? pubLink) !== pubLink ||
+      JSON.stringify(d.linkedMaterialIds ?? pubMaterials) !== JSON.stringify(pubMaterials) ||
+      JSON.stringify(d.formSchema ?? pubSchema) !== JSON.stringify(pubSchema) ||
+      JSON.stringify(d.answerKey ?? pubKey) !== JSON.stringify(pubKey);
     if (!serverDiffersFromPublished) return;
-    setForm(newForm);
-    setAssignmentType(newType);
-    setLinkUrl(newLink);
+    // Surface restore prompt — user must explicitly choose to restore
+    setShowRestorePrompt(true);
+  }, [initialized, serverDraftLoaded, serverDraft, assignment]);
+
+  // Apply the server draft when the user clicks "Restore"
+  function applyServerDraft() {
+    if (!serverDraft || !assignment) return;
+    const d = serverDraft;
+    setForm({
+      title: d.title ?? assignment.title,
+      description: d.description ?? assignment.description ?? "",
+      dueDate: d.dueDate ?? assignment.dueDate,
+      points: d.points != null ? String(d.points) : String(assignment.points),
+    });
+    if (d.assignmentType) setAssignmentType(d.assignmentType as ItemType);
+    if (d.linkUrl !== undefined) setLinkUrl(d.linkUrl ?? "");
     if (d.linkedMaterialIds?.length) setSelectedMaterialIds(d.linkedMaterialIds);
     if (d.formSchema?.length) {
       setFormQuestions(d.formSchema);
@@ -224,7 +261,9 @@ export default function EditAssignmentPage() {
       setAnswerKey(d.answerKey);
       localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(d.answerKey));
     }
-  }, [initialized, serverDraftLoaded, serverDraft, assignment]);
+    setShowRestorePrompt(false);
+    setTimeout(autoGrowTitle, 0);
+  }
 
   // Debounce server save when fields change (only after initialization)
   useEffect(() => {
@@ -446,26 +485,27 @@ export default function EditAssignmentPage() {
               <p className="text-sm text-muted-foreground mt-0.5">{classroom.name} · {classroom.subject}</p>
             </div>
 
-            {isDirty && serverDraftAppliedRef.current && (
-              <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
-                <span className="text-sm text-primary font-medium">Unsaved changes restored from another session</span>
+            {showRestorePrompt && (
+              <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5">
+                <span className="text-sm text-amber-800 font-medium flex-1">You have unsaved changes from another session — restore them?</span>
+                <button
+                  type="button"
+                  onClick={applyServerDraft}
+                  className="text-xs font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+                >
+                  Restore
+                </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (!assignment) return;
-                    setForm({ title: assignment.title, description: assignment.description ?? "", dueDate: assignment.dueDate, points: String(assignment.points) });
-                    setAssignmentType((assignment.assignmentType as ItemType) ?? "assignment");
-                    setLinkUrl(assignment.linkUrl ?? "");
-                    setSelectedMaterialIds(assignment.linkedMaterialIds ?? []);
-                    const orig = (assignment.formSchema as FormQuestion[] | null) ?? [];
-                    setFormQuestions(orig);
-                    setAnswerKey((assignment.answerKey as Record<string, string | string[]> | null) ?? {});
-                    serverDraftAppliedRef.current = false;
-                    if (classroomId) apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, { method: "DELETE" }).catch(() => {});
+                    setShowRestorePrompt(false);
+                    if (classroomId && assignment?.id) {
+                      apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, { method: "DELETE" }).catch(() => {});
+                    }
                   }}
-                  className="ml-auto text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                 >
-                  Discard
+                  Dismiss
                 </button>
               </div>
             )}

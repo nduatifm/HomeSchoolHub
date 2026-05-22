@@ -6803,11 +6803,9 @@ export function registerRoutes(app: Express) {
   // GET /api/classrooms/:id/assignment-draft  — load "new assignment" draft
   app.get("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUserById(userId);
-      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
-      const classroomId = parseInt(req.params.id, 10);
-      const draft = await storage.getAssignmentDraft(userId, classroomId, null);
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      const draft = await storage.getAssignmentDraft(req.session.userId!, classroom.id, null);
       res.json(draft ?? null);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -6817,12 +6815,10 @@ export function registerRoutes(app: Express) {
   // PUT /api/classrooms/:id/assignment-draft  — save "new assignment" draft
   app.put("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUserById(userId);
-      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
-      const classroomId = parseInt(req.params.id, 10);
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
       const { title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds } = req.body;
-      const draft = await storage.upsertAssignmentDraft(userId, classroomId, null, {
+      const draft = await storage.upsertAssignmentDraft(req.session.userId!, classroom.id, null, {
         title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds,
       });
       res.json(draft);
@@ -6834,11 +6830,9 @@ export function registerRoutes(app: Express) {
   // DELETE /api/classrooms/:id/assignment-draft  — clear "new assignment" draft
   app.delete("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUserById(userId);
-      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
-      const classroomId = parseInt(req.params.id, 10);
-      await storage.deleteAssignmentDraft(userId, classroomId, null);
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
+      await storage.deleteAssignmentDraft(req.session.userId!, classroom.id, null);
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -6848,12 +6842,10 @@ export function registerRoutes(app: Express) {
   // GET /api/classrooms/:id/assignment-draft/:aId  — load "edit assignment" draft
   app.get("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUserById(userId);
-      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
-      const classroomId = parseInt(req.params.id, 10);
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
       const assignmentId = parseInt(req.params.aId, 10);
-      const draft = await storage.getAssignmentDraft(userId, classroomId, assignmentId);
+      const draft = await storage.getAssignmentDraft(req.session.userId!, classroom.id, assignmentId);
       res.json(draft ?? null);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -6863,13 +6855,11 @@ export function registerRoutes(app: Express) {
   // PUT /api/classrooms/:id/assignment-draft/:aId  — save "edit assignment" draft
   app.put("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUserById(userId);
-      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
-      const classroomId = parseInt(req.params.id, 10);
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
       const assignmentId = parseInt(req.params.aId, 10);
       const { title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds } = req.body;
-      const draft = await storage.upsertAssignmentDraft(userId, classroomId, assignmentId, {
+      const draft = await storage.upsertAssignmentDraft(req.session.userId!, classroom.id, assignmentId, {
         title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds,
       });
       res.json(draft);
@@ -6881,12 +6871,10 @@ export function registerRoutes(app: Express) {
   // DELETE /api/classrooms/:id/assignment-draft/:aId  — clear "edit assignment" draft
   app.delete("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.userId!;
-      const user = await storage.getUserById(userId);
-      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
-      const classroomId = parseInt(req.params.id, 10);
+      const classroom = await requireClassroomOwner(req, res);
+      if (!classroom) return;
       const assignmentId = parseInt(req.params.aId, 10);
-      await storage.deleteAssignmentDraft(userId, classroomId, assignmentId);
+      await storage.deleteAssignmentDraft(req.session.userId!, classroom.id, assignmentId);
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
