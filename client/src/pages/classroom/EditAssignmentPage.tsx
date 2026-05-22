@@ -274,12 +274,18 @@ export default function EditAssignmentPage() {
     });
     if (d.assignmentType) setAssignmentType(d.assignmentType as ItemType);
     if (d.linkUrl !== undefined) setLinkUrl(d.linkUrl ?? "");
-    if (d.linkedMaterialIds?.length) setSelectedMaterialIds(d.linkedMaterialIds);
-    if (d.formSchema?.length) {
-      setFormQuestions(d.formSchema);
-      localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(d.formSchema));
+    // Restore material IDs even when intentionally cleared to empty
+    if (d.linkedMaterialIds !== undefined && d.linkedMaterialIds !== null) {
+      setSelectedMaterialIds(d.linkedMaterialIds);
     }
-    if (d.answerKey && Object.keys(d.answerKey).length) {
+    // Restore form questions — even if draft has empty schema (user cleared all questions)
+    if (d.formSchema !== undefined && d.formSchema !== null) {
+      const qs = Array.isArray(d.formSchema) ? d.formSchema : [];
+      setFormQuestions(qs);
+      localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(qs));
+    }
+    // Restore answer key — even if cleared
+    if (d.answerKey !== undefined && d.answerKey !== null) {
       setAnswerKey(d.answerKey);
       localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(d.answerKey));
     }
@@ -369,6 +375,7 @@ export default function EditAssignmentPage() {
     onSuccess: () => {
       localStorage.removeItem(getDraftKey(draftId.current));
       localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+      localStorage.removeItem(getMainDraftKey(draftId.current));
       // Delete server draft (fire-and-forget)
       if (assignment) {
         apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, { method: "DELETE" }).catch(() => {});
@@ -393,6 +400,7 @@ export default function EditAssignmentPage() {
       pendingLeave.current = () => {
         localStorage.removeItem(getDraftKey(draftId.current));
         localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+        localStorage.removeItem(getMainDraftKey(draftId.current));
         if (classroomId && assignment?.id) {
           apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, { method: "DELETE" }).catch(() => {});
         }
@@ -403,6 +411,7 @@ export default function EditAssignmentPage() {
     }
     localStorage.removeItem(getDraftKey(draftId.current));
     localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+    localStorage.removeItem(getMainDraftKey(draftId.current));
     goBack();
   }
 

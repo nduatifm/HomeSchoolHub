@@ -118,7 +118,7 @@ export default function NewAssignmentPage() {
   });
 
   // Fetch server draft for this classroom's "new assignment" slot
-  const { data: serverDraft, isSuccess: serverDraftLoaded } = useQuery<any | null>({
+  const { data: serverDraft, isSuccess: serverDraftLoaded, isError: serverDraftFailed } = useQuery<any | null>({
     queryKey: ["/api/classrooms", classroomId, "assignment-draft"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignment-draft`),
     enabled: !!classroomId,
@@ -143,8 +143,9 @@ export default function NewAssignmentPage() {
   }, [form, assignmentType, linkUrl, selectedMaterialIds]);
 
   // Restore on first load: server draft wins; if server has no draft, fall back to localStorage
+  // Also fires when server query errors so the save debounce is unblocked
   useEffect(() => {
-    if (!serverDraftLoaded || serverDraftAppliedRef.current || !classroomId) return;
+    if ((!serverDraftLoaded && !serverDraftFailed) || serverDraftAppliedRef.current || !classroomId) return;
     serverDraftAppliedRef.current = true;
 
     const applyDraftData = (d: any) => {
@@ -198,7 +199,7 @@ export default function NewAssignmentPage() {
         }
       }
     } catch { /* ignore */ }
-  }, [serverDraftLoaded, serverDraft, classroomId]);
+  }, [serverDraftLoaded, serverDraftFailed, serverDraft, classroomId]);
 
   // Debounce server save when fields change
   useEffect(() => {
@@ -296,6 +297,7 @@ export default function NewAssignmentPage() {
     onSuccess: () => {
       localStorage.removeItem(getDraftKey(draftId.current));
       localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+      localStorage.removeItem(getMainDraftKey(draftId.current));
       // Delete server draft (fire-and-forget)
       apiRequest(`/api/classrooms/${classroomId}/assignment-draft`, { method: "DELETE" }).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
@@ -318,6 +320,7 @@ export default function NewAssignmentPage() {
       pendingLeave.current = () => {
         localStorage.removeItem(getDraftKey(draftId.current));
         localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+        localStorage.removeItem(getMainDraftKey(draftId.current));
         if (classroomId) apiRequest(`/api/classrooms/${classroomId}/assignment-draft`, { method: "DELETE" }).catch(() => {});
         goBack();
       };
@@ -326,6 +329,7 @@ export default function NewAssignmentPage() {
     }
     localStorage.removeItem(getDraftKey(draftId.current));
     localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+    localStorage.removeItem(getMainDraftKey(draftId.current));
     goBack();
   }
 
@@ -438,6 +442,7 @@ export default function NewAssignmentPage() {
                     setFormQuestions([]);
                     setAnswerKey({});
                     setDraftRestored(false);
+                    localStorage.removeItem(getMainDraftKey(draftId.current));
                     if (classroomId) apiRequest(`/api/classrooms/${classroomId}/assignment-draft`, { method: "DELETE" }).catch(() => {});
                   }}
                   className="ml-auto text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
