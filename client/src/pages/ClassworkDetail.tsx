@@ -477,9 +477,12 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
 
             {/* Step 1 — Answer */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                {hasFormSchema ? "Answer the questions" : "Write your answer"}
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center shrink-0">1</span>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {hasFormSchema ? "Answer the questions" : "Write your answer"}
+                </p>
+              </div>
               {hasFormSchema ? (
                 <FormResponse
                   questions={assignment.formSchema!}
@@ -500,9 +503,12 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
 
             {/* Step 2 — File (optional) */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                Add a file <span className="font-normal normal-case text-muted-foreground/70">(optional)</span>
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="h-5 w-5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Add a file <span className="font-normal normal-case text-muted-foreground/70">(optional)</span>
+                </p>
+              </div>
               {file ? (
                 <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
                   <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
