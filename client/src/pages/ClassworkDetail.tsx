@@ -865,25 +865,24 @@ export default function ClassworkDetail() {
 
             {assignmentHeader}
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-              {/* Left: instructions */}
-              <div className="lg:col-span-3 space-y-4">
-                {assignmentInfoBlocks}
-                {!assignment.description && !assignment.fileUrl && !assignment.linkUrl && linkedMaterials.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
-                    <p className="text-sm text-muted-foreground">No instructions provided for this assignment.</p>
-                  </div>
-                )}
-              </div>
-              {/* Right: submission panel */}
-              <div className="lg:col-span-2">
-                <StudentPanel
-                  assignment={assignment}
-                  classroomId={classroomId}
-                  studentId={studentData?.id ?? 0}
-                  isArchived={isArchived}
-                />
-              </div>
+            {/* Instructions — full width */}
+            <div className="space-y-4">
+              {assignmentInfoBlocks}
+              {!assignment.description && !assignment.fileUrl && !assignment.linkUrl && linkedMaterials.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">No instructions provided for this assignment.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Submission panel — centered */}
+            <div className="max-w-xl mx-auto w-full">
+              <StudentPanel
+                assignment={assignment}
+                classroomId={classroomId}
+                studentId={studentData?.id ?? 0}
+                isArchived={isArchived}
+              />
             </div>
           </div>
         ) : (
