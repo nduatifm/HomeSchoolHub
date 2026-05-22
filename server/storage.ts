@@ -335,6 +335,20 @@ export interface IStorage {
   }>>; // pendingCount = assignments pending + new materials + new posts
 
   getTeacherClassroomStats(userId: number): Promise<Record<number, { toGradeCount: number }>>;
+
+  // ─── Submission drafts (student) ─────────────────────────────────────────
+  upsertSubmissionDraft(studentId: number, assignmentId: number, classroomId: number, content: string, formAnswers?: Record<string, string | string[]> | null): Promise<any>;
+  getSubmissionDraft(studentId: number, assignmentId: number): Promise<any | null>;
+  deleteSubmissionDraft(studentId: number, assignmentId: number): Promise<void>;
+
+  // ─── Assignment drafts (teacher) ──────────────────────────────────────────
+  upsertAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null, data: {
+    title?: string; description?: string; dueDate?: string; points?: number;
+    assignmentType?: string; linkUrl?: string | null;
+    formSchema?: any; answerKey?: any; linkedMaterialIds?: number[];
+  }): Promise<any>;
+  getAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<any | null>;
+  deleteAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<void>;
 }
 
 class PrismaStorage implements IStorage {
@@ -2419,6 +2433,73 @@ class PrismaStorage implements IStorage {
       },
     });
     return this.formatTeamMember(row);
+  }
+
+  // ─── Submission drafts (student) ─────────────────────────────────────────
+
+  async upsertSubmissionDraft(studentId: number, assignmentId: number, classroomId: number, content: string, formAnswers?: Record<string, string | string[]> | null): Promise<any> {
+    return prisma.submissionDraft.upsert({
+      where: { studentId_assignmentId: { studentId, assignmentId } },
+      update: { content, formAnswers: formAnswers ?? Prisma.JsonNull },
+      create: { studentId, assignmentId, classroomId, content, formAnswers: formAnswers ?? Prisma.JsonNull },
+    });
+  }
+
+  async getSubmissionDraft(studentId: number, assignmentId: number): Promise<any | null> {
+    return prisma.submissionDraft.findUnique({
+      where: { studentId_assignmentId: { studentId, assignmentId } },
+    });
+  }
+
+  async deleteSubmissionDraft(studentId: number, assignmentId: number): Promise<void> {
+    await prisma.submissionDraft.deleteMany({ where: { studentId, assignmentId } });
+  }
+
+  // ─── Assignment drafts (teacher) ─────────────────────────────────────────
+
+  async upsertAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null, data: {
+    title?: string; description?: string; dueDate?: string; points?: number;
+    assignmentType?: string; linkUrl?: string | null;
+    formSchema?: any; answerKey?: any; linkedMaterialIds?: number[];
+  }): Promise<any> {
+    const where = assignmentId !== null
+      ? { teacherId_classroomId_assignmentId: { teacherId, classroomId, assignmentId } }
+      : undefined;
+
+    if (assignmentId !== null && where) {
+      return prisma.assignmentDraft.upsert({
+        where,
+        update: { ...data },
+        create: { teacherId, classroomId, assignmentId, ...data },
+      });
+    }
+    // For new-assignment drafts (assignmentId = null), use findFirst + update/create
+    const existing = await prisma.assignmentDraft.findFirst({
+      where: { teacherId, classroomId, assignmentId: null },
+    });
+    if (existing) {
+      return prisma.assignmentDraft.update({ where: { id: existing.id }, data });
+    }
+    return prisma.assignmentDraft.create({ data: { teacherId, classroomId, assignmentId: null, ...data } });
+  }
+
+  async getAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<any | null> {
+    if (assignmentId !== null) {
+      return prisma.assignmentDraft.findUnique({
+        where: { teacherId_classroomId_assignmentId: { teacherId, classroomId, assignmentId } },
+      });
+    }
+    return prisma.assignmentDraft.findFirst({
+      where: { teacherId, classroomId, assignmentId: null },
+    });
+  }
+
+  async deleteAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<void> {
+    if (assignmentId !== null) {
+      await prisma.assignmentDraft.deleteMany({ where: { teacherId, classroomId, assignmentId } });
+    } else {
+      await prisma.assignmentDraft.deleteMany({ where: { teacherId, classroomId, assignmentId: null } });
+    }
   }
 }
 

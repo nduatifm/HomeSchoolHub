@@ -75,6 +75,7 @@ model User {
   seenContent                ClassroomContentSeen[]
   childTeamMemberships       ChildTeamMember[]           @relation("TeamMemberUser")
   childTeamInvitesSent       ChildTeamMember[]           @relation("TeamInvitedBy")
+  assignmentDrafts           AssignmentDraft[]           @relation("TeacherAssignmentDrafts")
 
   @@index([email])
   @@index([googleId])
@@ -103,6 +104,7 @@ model Student {
   classroomSubmissions       ClassroomSubmission[]
   childTeamMembers           ChildTeamMember[]          @relation("ChildTeamChild")
   threadMessages             Message[]
+  submissionDrafts           SubmissionDraft[]
 
   @@index([userId])
 }
@@ -475,11 +477,13 @@ model Classroom {
 
   teacher         User                  @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
   gradeFolder     GradeFolder?          @relation(fields: [gradeFolderId], references: [id], onDelete: SetNull)
-  enrollments     ClassroomEnrollment[]
-  posts           ClassroomPost[]
-  assignments     ClassroomAssignment[]
-  materials       ClassroomMaterial[]
-  gradingPolicies GradingPolicy[]
+  enrollments       ClassroomEnrollment[]
+  posts             ClassroomPost[]
+  assignments       ClassroomAssignment[]
+  materials         ClassroomMaterial[]
+  gradingPolicies   GradingPolicy[]
+  submissionDrafts  SubmissionDraft[]
+  assignmentDrafts  AssignmentDraft[]     @relation("ClassroomAssignmentDrafts")
 
   @@index([teacherId])
   @@index([slug])
@@ -529,9 +533,10 @@ model ClassroomAssignment {
   answerKey      Json?
   createdAt      DateTime @default(now())
 
-  classroom     Classroom                    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  submissions   ClassroomSubmission[]
-  materialLinks ClassroomAssignmentMaterial[]
+  classroom        Classroom                    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  submissions      ClassroomSubmission[]
+  materialLinks    ClassroomAssignmentMaterial[]
+  submissionDrafts SubmissionDraft[]
 
   @@unique([classroomId, slug])
   @@index([classroomId])
@@ -617,6 +622,52 @@ model Notification {
 
   @@index([userId])
   @@index([isRead])
+}
+
+// ─── Drafts ──────────────────────────────────────────────────────────────────
+
+model SubmissionDraft {
+  id          Int      @id @default(autoincrement())
+  studentId   Int
+  assignmentId Int
+  classroomId Int
+  content     String   @default("")
+  formAnswers Json?
+  savedAt     DateTime @updatedAt
+
+  student    Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignment ClassroomAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  classroom  Classroom           @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, assignmentId])
+  @@index([studentId])
+  @@index([assignmentId])
+  @@map("submission_drafts")
+}
+
+model AssignmentDraft {
+  id               Int      @id @default(autoincrement())
+  teacherId        Int
+  classroomId      Int
+  assignmentId     Int?
+  title            String   @default("")
+  description      String   @default("")
+  dueDate          String   @default("")
+  points           Int      @default(100)
+  assignmentType   String   @default("")
+  linkUrl          String?
+  formSchema       Json?
+  answerKey        Json?
+  linkedMaterialIds Int[]   @default([])
+  savedAt          DateTime @updatedAt
+
+  teacher   User      @relation("TeacherAssignmentDrafts", fields: [teacherId], references: [id], onDelete: Cascade)
+  classroom Classroom @relation("ClassroomAssignmentDrafts", fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, classroomId, assignmentId])
+  @@index([teacherId])
+  @@index([classroomId])
+  @@map("assignment_drafts")
 }
 
 // ─── Grading Policy ──────────────────────────────────────────────────────────

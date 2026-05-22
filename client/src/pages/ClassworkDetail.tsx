@@ -236,6 +236,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   const lastSavedRef = useRef<string | null>(null);
   const isDirtyRef = useRef(false);
   const currentDraftRef = useRef<string | null>(null);
+  const serverDraftAppliedRef = useRef(false);
 
   const { data: submissions = [] } = useQuery<ClassroomSubmission[]>({
     queryKey: ["/api/classrooms", classroomId, "my-submissions"],
@@ -244,6 +245,15 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   });
 
   const mySubmission = submissions.find((s) => s.assignmentId === assignment.id);
+
+  // Fetch server draft — source of truth across devices
+  const { data: serverDraft, isSuccess: serverDraftLoaded } = useQuery<any | null>({
+    queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "draft"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments/${assignment.id}/draft`),
+    enabled: !!classroomId && !!assignment.id,
+    retry: false,
+    staleTime: Infinity,
+  });
 
   useEffect(() => {
     if (mySubmission?.status === "returned") {
@@ -254,6 +264,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     }
   }, [mySubmission?.id, mySubmission?.status]);
 
+  // Restore from localStorage (fast, on mount)
   useEffect(() => {
     if (mySubmission && mySubmission.status !== "returned") return;
     const saved = localStorage.getItem(draftKey);
@@ -266,9 +277,27 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
         setDraftRestored(true);
       }
       lastSavedRef.current = saved;
-    } catch {
-    }
+    } catch {}
   }, [draftKey]);
+
+  // Apply server draft when it loads — server copy wins over localStorage
+  useEffect(() => {
+    if (!serverDraftLoaded) return;
+    if (serverDraftAppliedRef.current) return;
+    serverDraftAppliedRef.current = true;
+    if (!serverDraft) return;
+    if (mySubmission && mySubmission.status !== "returned") return;
+    const serverContent = serverDraft.content ?? "";
+    const serverAnswers = (serverDraft.formAnswers as Record<string, string | string[]>) ?? {};
+    const hasServerContent = serverContent.trim().length > 0 || Object.keys(serverAnswers).length > 0;
+    if (!hasServerContent) return;
+    setText(serverContent);
+    setFormAnswers(serverAnswers);
+    setDraftRestored(true);
+    const snapshot = JSON.stringify({ text: serverContent, formAnswers: serverAnswers });
+    lastSavedRef.current = snapshot;
+    localStorage.setItem(draftKey, snapshot);
+  }, [serverDraftLoaded, serverDraft, mySubmission?.status, draftKey]);
 
   useEffect(() => {
     const currentSnapshot = JSON.stringify({ text, formAnswers });
@@ -294,6 +323,11 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       setAutoSaveStatus("saved");
       if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
       savedStatusTimerRef.current = setTimeout(() => setAutoSaveStatus("idle"), 2500);
+      // Also persist to server (fire-and-forget, network failures are silent)
+      apiRequest(`/api/classrooms/${classroomId}/assignments/${assignment.id}/draft`, {
+        method: "PUT",
+        body: JSON.stringify({ content: text, formAnswers: Object.keys(formAnswers).length > 0 ? formAnswers : null }),
+      }).catch(() => {});
     }, 2000);
 
     return () => {
@@ -362,7 +396,10 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       isDirtyRef.current = false;
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+      // Delete server draft (fire-and-forget)
+      apiRequest(`/api/classrooms/${classroomId}/assignments/${assignment.id}/draft`, { method: "DELETE" }).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "draft"] });
       setText("");
       setFile(null);
       setFormAnswers({});

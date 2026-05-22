@@ -86,6 +86,8 @@ export default function EditAssignmentPage() {
   const draftId = useRef(Math.random().toString(36).slice(2, 14));
   const pendingLeave = useRef<(() => void) | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const serverDraftAppliedRef = useRef(false);
+  const serverDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // True only when current state differs from the original seeded snapshot.
   const isDirty = useMemo(() => {
@@ -142,6 +144,15 @@ export default function EditAssignmentPage() {
     enabled: !!classroomId && !!assignmentSlug,
   });
 
+  // Fetch server edit draft for this assignment
+  const { data: serverDraft, isSuccess: serverDraftLoaded } = useQuery<any | null>({
+    queryKey: ["/api/classrooms", classroomId, "assignment-draft", assignment?.id],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment!.id}`),
+    enabled: !!classroomId && !!assignment?.id,
+    retry: false,
+    staleTime: Infinity,
+  });
+
   // Seed form state + snapshot once assignment is loaded
   useEffect(() => {
     if (!assignment || initialized) return;
@@ -180,6 +191,64 @@ export default function EditAssignmentPage() {
     if (!initialized) return;
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(answerKey));
   }, [answerKey, initialized]);
+
+  // Apply server draft after initialization — silently restore if different from snapshot
+  useEffect(() => {
+    if (!initialized || !serverDraftLoaded || serverDraftAppliedRef.current) return;
+    serverDraftAppliedRef.current = true;
+    if (!serverDraft || !assignment) return;
+    const d = serverDraft;
+    const hasContent = (d.title ?? "").trim() || (d.description ?? "").trim() || d.dueDate;
+    if (!hasContent) return;
+    const newForm = {
+      title: d.title ?? form.title,
+      description: d.description ?? form.description,
+      dueDate: d.dueDate ?? form.dueDate,
+      points: d.points != null ? String(d.points) : form.points,
+    };
+    const newType = (d.assignmentType as ItemType) ?? assignmentType;
+    const newLink = d.linkUrl ?? linkUrl;
+    // Only restore if server draft differs from the saved assignment (the snapshot)
+    const snapshot_ = { form: { title: assignment.title, description: assignment.description ?? "", dueDate: assignment.dueDate, points: String(assignment.points) } };
+    const serverDiffersFromPublished = JSON.stringify(newForm) !== JSON.stringify(snapshot_.form) || newType !== assignmentType || newLink !== linkUrl;
+    if (!serverDiffersFromPublished) return;
+    setForm(newForm);
+    setAssignmentType(newType);
+    setLinkUrl(newLink);
+    if (d.linkedMaterialIds?.length) setSelectedMaterialIds(d.linkedMaterialIds);
+    if (d.formSchema?.length) {
+      setFormQuestions(d.formSchema);
+      localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(d.formSchema));
+    }
+    if (d.answerKey && Object.keys(d.answerKey).length) {
+      setAnswerKey(d.answerKey);
+      localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(d.answerKey));
+    }
+  }, [initialized, serverDraftLoaded, serverDraft, assignment]);
+
+  // Debounce server save when fields change (only after initialization)
+  useEffect(() => {
+    if (!initialized || !classroomId || !assignment?.id) return;
+    if (!isDirty) return;
+    if (serverDebounceTimerRef.current) clearTimeout(serverDebounceTimerRef.current);
+    serverDebounceTimerRef.current = setTimeout(() => {
+      apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          dueDate: form.dueDate,
+          points: parseInt(form.points, 10) || 100,
+          assignmentType,
+          linkUrl: linkUrl || null,
+          formSchema: formQuestions.length > 0 ? formQuestions : null,
+          answerKey: Object.keys(answerKey).length > 0 ? answerKey : null,
+          linkedMaterialIds: selectedMaterialIds,
+        }),
+      }).catch(() => {});
+    }, 2000);
+    return () => { if (serverDebounceTimerRef.current) clearTimeout(serverDebounceTimerRef.current); };
+  }, [form, assignmentType, linkUrl, formQuestions, answerKey, selectedMaterialIds, initialized, classroomId, assignment?.id, isDirty]);
 
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
@@ -239,7 +308,12 @@ export default function EditAssignmentPage() {
     onSuccess: () => {
       localStorage.removeItem(getDraftKey(draftId.current));
       localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+      // Delete server draft (fire-and-forget)
+      if (assignment) {
+        apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, { method: "DELETE" }).catch(() => {});
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignment-draft", assignment?.id] });
       toast({ title: "Assignment updated", type: "success" });
       navigate(`/classrooms/${classroomSlug}/assignments`);
     },
@@ -258,6 +332,9 @@ export default function EditAssignmentPage() {
       pendingLeave.current = () => {
         localStorage.removeItem(getDraftKey(draftId.current));
         localStorage.removeItem(getAnswerKeyDraftKey(draftId.current));
+        if (classroomId && assignment?.id) {
+          apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, { method: "DELETE" }).catch(() => {});
+        }
         goBack();
       };
       setLeaveDialogOpen(true);
@@ -368,6 +445,30 @@ export default function EditAssignmentPage() {
               <h1 className="text-xl font-bold text-foreground">Edit Assignment</h1>
               <p className="text-sm text-muted-foreground mt-0.5">{classroom.name} · {classroom.subject}</p>
             </div>
+
+            {isDirty && serverDraftAppliedRef.current && (
+              <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
+                <span className="text-sm text-primary font-medium">Unsaved changes restored from another session</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!assignment) return;
+                    setForm({ title: assignment.title, description: assignment.description ?? "", dueDate: assignment.dueDate, points: String(assignment.points) });
+                    setAssignmentType((assignment.assignmentType as ItemType) ?? "assignment");
+                    setLinkUrl(assignment.linkUrl ?? "");
+                    setSelectedMaterialIds(assignment.linkedMaterialIds ?? []);
+                    const orig = (assignment.formSchema as FormQuestion[] | null) ?? [];
+                    setFormQuestions(orig);
+                    setAnswerKey((assignment.answerKey as Record<string, string | string[]> | null) ?? {});
+                    serverDraftAppliedRef.current = false;
+                    if (classroomId) apiRequest(`/api/classrooms/${classroomId}/assignment-draft/${assignment.id}`, { method: "DELETE" }).catch(() => {});
+                  }}
+                  className="ml-auto text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  Discard
+                </button>
+              </div>
+            )}
 
             {/* ── Two-column layout ── */}
             <div className="flex flex-col lg:flex-row gap-6 items-start">

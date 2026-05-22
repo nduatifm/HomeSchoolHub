@@ -6747,4 +6747,149 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DRAFT ROUTES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── Student submission drafts ───────────────────────────────────────────────
+
+  // GET /api/classrooms/:id/assignments/:aId/draft  — load student draft
+  app.get("/api/classrooms/:id/assignments/:aId/draft", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) return res.status(403).json({ error: "Students only" });
+      const assignmentId = parseInt(req.params.aId, 10);
+      const draft = await storage.getSubmissionDraft(student.id, assignmentId);
+      res.json(draft ?? null);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/classrooms/:id/assignments/:aId/draft  — save/update student draft
+  app.put("/api/classrooms/:id/assignments/:aId/draft", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) return res.status(403).json({ error: "Students only" });
+      const classroomId = parseInt(req.params.id, 10);
+      const assignmentId = parseInt(req.params.aId, 10);
+      const { content = "", formAnswers } = req.body;
+      const draft = await storage.upsertSubmissionDraft(student.id, assignmentId, classroomId, content, formAnswers ?? null);
+      res.json(draft);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:id/assignments/:aId/draft  — clear student draft
+  app.delete("/api/classrooms/:id/assignments/:aId/draft", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) return res.status(403).json({ error: "Students only" });
+      const assignmentId = parseInt(req.params.aId, 10);
+      await storage.deleteSubmissionDraft(student.id, assignmentId);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Teacher assignment drafts ───────────────────────────────────────────────
+
+  // GET /api/classrooms/:id/assignment-draft  — load "new assignment" draft
+  app.get("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
+      const classroomId = parseInt(req.params.id, 10);
+      const draft = await storage.getAssignmentDraft(userId, classroomId, null);
+      res.json(draft ?? null);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/classrooms/:id/assignment-draft  — save "new assignment" draft
+  app.put("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
+      const classroomId = parseInt(req.params.id, 10);
+      const { title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds } = req.body;
+      const draft = await storage.upsertAssignmentDraft(userId, classroomId, null, {
+        title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds,
+      });
+      res.json(draft);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:id/assignment-draft  — clear "new assignment" draft
+  app.delete("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
+      const classroomId = parseInt(req.params.id, 10);
+      await storage.deleteAssignmentDraft(userId, classroomId, null);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/classrooms/:id/assignment-draft/:aId  — load "edit assignment" draft
+  app.get("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
+      const classroomId = parseInt(req.params.id, 10);
+      const assignmentId = parseInt(req.params.aId, 10);
+      const draft = await storage.getAssignmentDraft(userId, classroomId, assignmentId);
+      res.json(draft ?? null);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/classrooms/:id/assignment-draft/:aId  — save "edit assignment" draft
+  app.put("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
+      const classroomId = parseInt(req.params.id, 10);
+      const assignmentId = parseInt(req.params.aId, 10);
+      const { title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds } = req.body;
+      const draft = await storage.upsertAssignmentDraft(userId, classroomId, assignmentId, {
+        title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds,
+      });
+      res.json(draft);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/classrooms/:id/assignment-draft/:aId  — clear "edit assignment" draft
+  app.delete("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teachers only" });
+      const classroomId = parseInt(req.params.id, 10);
+      const assignmentId = parseInt(req.params.aId, 10);
+      await storage.deleteAssignmentDraft(userId, classroomId, assignmentId);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
