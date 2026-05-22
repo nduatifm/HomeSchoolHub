@@ -453,7 +453,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
 
       {!isSubmitted && !isArchived && (
         <Card>
-          <CardHeader className="pb-3 px-4 pt-4">
+          <CardHeader className="pb-4 px-6 pt-6">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold">
                 {isReturned ? "Turn It In Again" : "Turn In Your Work"}
@@ -473,7 +473,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-3">
+          <CardContent className="px-6 pb-6 space-y-5">
 
             {/* Step 1 — Answer */}
             <div>
