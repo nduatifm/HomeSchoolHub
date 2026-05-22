@@ -223,11 +223,14 @@ function formatBytes(bytes: number) {
 function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   assignment: ClassroomAssignment; classroomId: number; studentId: number; isArchived: boolean;
 }) {
+  const draftKey = `draft:${classroomId}:${assignment.id}`;
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
 
   const { data: submissions = [] } = useQuery<ClassroomSubmission[]>({
     queryKey: ["/api/classrooms", classroomId, "my-submissions"],
@@ -245,6 +248,21 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       }
     }
   }, [mySubmission?.id, mySubmission?.status]);
+
+  useEffect(() => {
+    if (mySubmission && mySubmission.status !== "returned") return;
+    const saved = localStorage.getItem(draftKey);
+    if (!saved) return;
+    try {
+      const { text: savedText, formAnswers: savedAnswers } = JSON.parse(saved);
+      if (savedText) { setText(savedText); setDraftRestored(true); }
+      if (savedAnswers && Object.keys(savedAnswers).length > 0) {
+        setFormAnswers(savedAnswers);
+        setDraftRestored(true);
+      }
+    } catch {
+    }
+  }, [draftKey]);
 
   const hasFormSchema = !!(assignment.formSchema && assignment.formSchema.length > 0);
 
@@ -282,10 +300,13 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       return apiUpload(`/api/classrooms/${classroomId}/assignments/${assignment.id}/submit`, formData);
     },
     onSuccess: () => {
+      localStorage.removeItem(draftKey);
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       setText("");
       setFile(null);
       setFormAnswers({});
+      setDraftRestored(false);
+      setDraftSaved(false);
       toast({ title: "Submitted!", type: "success" });
     },
     onError: () => toast({ title: "Couldn't submit — try again.", type: "error" }),
@@ -367,7 +388,14 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       {!isSubmitted && !isArchived && (
         <Card>
           <CardHeader className="pb-2 px-4 pt-4">
-            <CardTitle className="text-sm font-semibold">{isReturned ? "Resubmit Your Work" : "Submit Your Work"}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">{isReturned ? "Resubmit Your Work" : "Submit Your Work"}</CardTitle>
+              {draftRestored && (
+                <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium">
+                  Draft restored
+                </span>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
             {hasFormSchema ? (
@@ -454,18 +482,36 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                 {missingRequiredQuestions.map((q) => q.label || "Untitled").join(", ")}
               </p>
             )}
-            <Button
-              className="w-full"
-              disabled={
-                submitMutation.isPending ||
-                missingRequiredQuestions.length > 0 ||
-                (!hasFormSchema && !text.trim() && !file)
-              }
-              onClick={() => submitMutation.mutate()}
-            >
-              {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isReturned ? "Resubmit Assignment" : "Submit Assignment"}
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button
+                className="w-full"
+                disabled={
+                  submitMutation.isPending ||
+                  missingRequiredQuestions.length > 0 ||
+                  (!hasFormSchema && !text.trim() && !file)
+                }
+                onClick={() => submitMutation.mutate()}
+              >
+                {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {isReturned ? "Resubmit Assignment" : "Submit Assignment"}
+              </Button>
+              {!hasFormSchema && (
+                <Button
+                  variant="outline"
+                  className="w-full text-muted-foreground"
+                  disabled={!text.trim()}
+                  onClick={() => {
+                    localStorage.setItem(draftKey, JSON.stringify({ text, formAnswers }));
+                    setDraftRestored(false);
+                    setDraftSaved(true);
+                    setTimeout(() => setDraftSaved(false), 2500);
+                  }}
+                >
+                  {draftSaved ? <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> : null}
+                  {draftSaved ? "Draft saved" : "Save draft"}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
