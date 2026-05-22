@@ -1,10 +1,6 @@
 import { Shield, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 
-export function getIsImpersonating(): boolean {
-  return !!localStorage.getItem("adminSessionId");
-}
-
 export default function ImpersonationBanner() {
   const adminSessionId = localStorage.getItem("adminSessionId");
   const impersonatedName = localStorage.getItem("impersonatedUserName") ?? "";

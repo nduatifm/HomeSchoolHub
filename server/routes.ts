@@ -1975,7 +1975,7 @@ export function registerRoutes(app: Express) {
       // Verify the user's email matches the invite email
       const user = await storage.getUserById(userId);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      if (invite.inviteEmail && user.email.toLowerCase() !== invite.inviteEmail.toLowerCase()) {
+      if (invite.inviteEmail && (user.email ?? "").toLowerCase() !== invite.inviteEmail.toLowerCase()) {
         return res.status(403).json({ error: "This invite was sent to a different email address" });
       }
 
@@ -2246,7 +2246,7 @@ export function registerRoutes(app: Express) {
 
       const studentUpdates: Record<string, any> = {};
       if (name?.trim()) studentUpdates.name = name.trim();
-      if (gradeLevel !== undefined) studentUpdates.gradeLevel = gradeLevel?.trim() || null;
+      if (gradeLevel !== undefined) studentUpdates.gradeLevel = gradeLevel?.trim() || "";
 
       const hasUserUpdates = Object.keys(userUpdates).length > 0;
       const hasStudentUpdates = Object.keys(studentUpdates).length > 0;

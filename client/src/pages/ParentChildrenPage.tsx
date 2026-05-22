@@ -304,8 +304,11 @@ export default function ParentChildrenPage() {
       apiRequest("/api/parent/become-child", { method: "POST", body: JSON.stringify({ studentId }) }) as Promise<{ sessionId: string; childName: string }>,
     onSuccess: (data, studentId) => {
       const child = childStats.find(c => c.id === studentId);
-      localStorage.setItem("parentSessionId", localStorage.getItem("sessionId") ?? "");
-      localStorage.setItem("parentUserName", user?.name ?? "");
+      // Don't overwrite a parent session that's already stored (avoid double-nesting)
+      if (!localStorage.getItem("parentSessionId")) {
+        localStorage.setItem("parentSessionId", localStorage.getItem("sessionId") ?? "");
+        localStorage.setItem("parentUserName", user?.name ?? "");
+      }
       localStorage.setItem("parentChildName", child?.name ?? data.childName);
       localStorage.setItem("sessionId", data.sessionId);
       queryClient.clear();
@@ -1063,15 +1066,26 @@ export default function ParentChildrenPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-email">Login email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={editForm.email}
-                onChange={(e) => { setEditForm(f => ({ ...f, email: e.target.value })); setEditError(null); }}
-              />
-            </div>
+            {!editChild?.isManaged && (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-email">Login email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => { setEditForm(f => ({ ...f, email: e.target.value })); setEditError(null); }}
+                />
+              </div>
+            )}
+            {editChild?.isManaged && (
+              <div className="rounded-md bg-muted/50 border border-border/60 px-3 py-2">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Username: </span>
+                  <span className="font-mono">{editChild.username ?? "—"}</span>
+                  <span className="ml-2 text-muted-foreground/70">(login via username, no email)</span>
+                </p>
+              </div>
+            )}
             {editError && (
               <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
                 <AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 shrink-0" />
@@ -1117,7 +1131,7 @@ export default function ParentChildrenPage() {
               </p>
               <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-4">
                 <li>A new temporary password will be created</li>
-                <li>Their email address will be marked as verified</li>
+                {!resetChild?.isManaged && <li>Their email address will be marked as verified</li>}
                 <li>All active sessions will be ended immediately</li>
                 <li>All classwork, grades, and progress are untouched</li>
               </ul>

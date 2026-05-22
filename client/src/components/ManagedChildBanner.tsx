@@ -1,10 +1,6 @@
 import { Users, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 
-export function getIsViewingAsChild(): boolean {
-  return !!localStorage.getItem("parentSessionId");
-}
-
 export default function ManagedChildBanner() {
   const parentSessionId = localStorage.getItem("parentSessionId");
   const childName = localStorage.getItem("parentChildName") ?? "child";
