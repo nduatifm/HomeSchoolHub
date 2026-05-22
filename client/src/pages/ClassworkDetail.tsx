@@ -204,9 +204,29 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
   );
 }
 
-function StudentPanel({ assignment, classroomId, studentId }: { assignment: ClassroomAssignment; classroomId: number; studentId: number }) {
+const ACCEPTED_MIME = new Set([
+  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+const ACCEPTED_EXT = /\.(jpe?g|png|gif|webp|pdf|docx?|txt)$/i;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
+  assignment: ClassroomAssignment; classroomId: number; studentId: number; isArchived: boolean;
+}) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
 
   const { data: submissions = [] } = useQuery<ClassroomSubmission[]>({
@@ -236,6 +256,20 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
         return !answer || (typeof answer === "string" && !answer.trim());
       })
     : [];
+
+  function validateAndSetFile(f: File | null | undefined) {
+    setFileError(null);
+    if (!f) return;
+    if (!ACCEPTED_MIME.has(f.type) && !ACCEPTED_EXT.test(f.name)) {
+      setFileError("Only images, PDFs, Word docs, and text files are allowed.");
+      return;
+    }
+    if (f.size > MAX_FILE_BYTES) {
+      setFileError("File must be 10 MB or smaller.");
+      return;
+    }
+    setFile(f);
+  }
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -298,7 +332,8 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
               <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
             ) : null}
             {mySubmission.fileUrl && (
-              <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+              <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
                 <FileText className="h-3.5 w-3.5" />View your file
               </a>
             )}
@@ -321,12 +356,20 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
         </Card>
       )}
 
-      {!isSubmitted && (
+      {/* Archived notice — no submission form */}
+      {isArchived && !isSubmitted && (
+        <div className="rounded-xl border border-border bg-muted/40 px-4 py-5 text-center space-y-1">
+          <p className="text-sm font-medium text-muted-foreground">Submissions are closed</p>
+          <p className="text-xs text-muted-foreground/70">This classroom has been archived.</p>
+        </div>
+      )}
+
+      {!isSubmitted && !isArchived && (
         <Card>
           <CardHeader className="pb-2 px-4 pt-4">
             <CardTitle className="text-sm font-semibold">{isReturned ? "Resubmit Your Work" : "Submit Your Work"}</CardTitle>
           </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-3">
+          <CardContent className="px-4 pb-4 space-y-4">
             {hasFormSchema ? (
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 mb-2">
@@ -347,19 +390,64 @@ function StudentPanel({ assignment, classroomId, studentId }: { assignment: Clas
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Type your answer or notes here…"
-                  rows={5}
+                  rows={6}
                   className="resize-none text-sm"
                 />
               </div>
             )}
+
+            {/* Drag-and-drop file upload zone */}
             <div>
-              <Label className="text-xs text-gray-500 mb-1.5 block">Attach File (optional)</Label>
-              <label className="flex items-center gap-2 cursor-pointer border border-dashed rounded px-3 py-2 text-sm text-gray-500 hover:border-primary/50 hover:text-primary transition-colors">
-                <Upload className="h-4 w-4" />
-                {file ? file.name : "Choose a file…"}
-                <input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-              </label>
+              <Label className="text-xs text-gray-500 mb-1.5 block">
+                Attach File <span className="font-normal text-muted-foreground">(optional · images, PDF, Word, TXT · max 10 MB)</span>
+              </Label>
+              {file ? (
+                <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setFile(null); setFileError(null); }}
+                    className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-md hover:bg-destructive/10 shrink-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <label
+                  className={`flex flex-col items-center justify-center gap-2 cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 transition-colors ${
+                    dragOver
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-primary/70"
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    validateAndSetFile(e.dataTransfer.files?.[0]);
+                  }}
+                >
+                  <Upload className="h-6 w-6" />
+                  <span className="text-sm font-medium">Drop a file here or click to browse</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                    onChange={(e) => validateAndSetFile(e.target.files?.[0])}
+                  />
+                </label>
+              )}
+              {fileError && (
+                <p className="mt-1.5 text-xs text-destructive">{fileError}</p>
+              )}
             </div>
+
             {missingRequiredQuestions.length > 0 && (
               <p className="text-xs text-red-500">
                 Please answer required question{missingRequiredQuestions.length > 1 ? "s" : ""}:{" "}
@@ -525,139 +613,190 @@ export default function ClassworkDetail() {
 
   const linkedMaterials = classworkMaterials.filter((m) => (m.linkedAssignmentIds ?? []).includes(assignment?.id ?? -1));
 
+  const isArchived = classroom.status === "archived";
+
+  // Shared assignment info blocks reused in both layouts
+  const assignmentInfoBlocks = (
+    <>
+      {/* Description / Attachment */}
+      {(assignment.description || assignment.fileUrl) && (
+        <Card>
+          <CardContent className="px-4 py-4 space-y-3">
+            {assignment.description && (
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{assignment.description}</p>
+            )}
+            {assignment.fileUrl && (
+              <a
+                href={assignment.fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <FileText className="h-3.5 w-3.5" />View attached resource
+              </a>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Assignment Link */}
+      {assignment.linkUrl && (
+        <Card>
+          <CardContent className="px-4 py-3">
+            <a
+              href={assignment.linkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 group"
+            >
+              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                <Link2 className="h-4 w-4 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground group-hover:text-blue-600 transition-colors truncate">
+                  {assignment.linkUrl}
+                </p>
+                <p className="text-xs text-muted-foreground">Opens in a new tab</p>
+              </div>
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-blue-600 transition-colors" />
+            </a>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Linked Classwork Materials */}
+      {linkedMaterials.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-800">Classwork Materials</h2>
+          {linkedMaterials.map((material) => (
+            <button
+              key={material.id}
+              type="button"
+              onClick={() => {
+                setMaterialDialogOpen(material);
+                if (!isTeacher) {
+                  apiRequest(`/api/classrooms/${classroomId}/materials/${material.id}/seen`, { method: "POST" }).catch(() => {});
+                }
+              }}
+              className="w-full text-left"
+            >
+              <Card className="hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
+                <CardContent className="px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <BookOpen className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-foreground">{material.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {new Date(material.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {(() => {
+                          const atts = material.attachments ?? [];
+                          const urlKind = material.url ? getAttachmentKind(material.url) : null;
+                          const pdfCount = atts.length + (urlKind === "pdf" && !atts.includes(material.url!) ? 1 : 0);
+                          if (pdfCount > 0) return ` · ${pdfCount} PDF${pdfCount > 1 ? "s" : ""} attached`;
+                          if (urlKind === "link") return " · Link attached";
+                          return "";
+                        })()}
+                      </p>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  // Shared assignment header
+  const assignmentHeader = (
+    <div className="space-y-1">
+      <div className="flex items-start gap-2 flex-wrap">
+        <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
+        {isArchived && <Badge variant="secondary" className="text-xs self-center">Archived</Badge>}
+        {assignment.formSchema && assignment.formSchema.length > 0 && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full font-medium self-center">
+            <ClipboardList className="h-3 w-3" />{assignment.formSchema.length} form {assignment.formSchema.length === 1 ? "question" : "questions"}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-gray-500">{classroom.name} · {classroom.subject}</p>
+      <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
+        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Due {assignment.dueDate}</span>
+        <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{assignment.points} pts</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
       <div className="md:ml-[228px]">
-        <div className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-5">
-          {/* Breadcrumbs */}
-          <Breadcrumb crumbs={buildClassroomCrumbs({
-            role: user?.role ?? undefined,
-            classroomName: classroom.name,
-            classroomHref: `/classrooms/${classroomSlug}/feed`,
-            tabLabel: "Assignments & Tests",
-            tabHref: `/classrooms/${classroomSlug}/assignments${window.location.search}`,
-            search: window.location.search,
-            folderName: classroom.gradeFolderName ?? undefined,
-            folderHref: classroom.gradeFolderId
-              ? `/classrooms/folders/${classroom.gradeFolderId}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`
-              : undefined,
-          }).concat({ label: assignment.title, current: true })} />
+        {isStudent ? (
+          /* Two-column layout for students: info left, submission right */
+          <div className="p-4 sm:p-6 pt-20 md:pt-6 max-w-6xl mx-auto space-y-5">
+            <Breadcrumb crumbs={buildClassroomCrumbs({
+              role: user?.role ?? undefined,
+              classroomName: classroom.name,
+              classroomHref: `/classrooms/${classroomSlug}/feed`,
+              tabLabel: "Assignments & Tests",
+              tabHref: `/classrooms/${classroomSlug}/assignments${window.location.search}`,
+              search: window.location.search,
+              folderName: classroom.gradeFolderName ?? undefined,
+              folderHref: classroom.gradeFolderId
+                ? `/classrooms/folders/${classroom.gradeFolderId}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`
+                : undefined,
+            }).concat({ label: assignment.title, current: true })} />
 
-          {/* Assignment header */}
-          <div className="space-y-1">
-            <div className="flex items-start gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
-              {classroom.status === "archived" && <Badge variant="secondary" className="text-xs">Archived</Badge>}
-              {assignment.formSchema && assignment.formSchema.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded-full font-medium self-center">
-                  <ClipboardList className="h-3 w-3" />{assignment.formSchema.length} form {assignment.formSchema.length === 1 ? "question" : "questions"}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-gray-500">{classroom.name} · {classroom.subject}</p>
-            <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
-              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Due {assignment.dueDate}</span>
-              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{assignment.points} pts</span>
+            {assignmentHeader}
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+              {/* Left: instructions */}
+              <div className="lg:col-span-3 space-y-4">
+                {assignmentInfoBlocks}
+                {!assignment.description && !assignment.fileUrl && !assignment.linkUrl && linkedMaterials.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+                    <p className="text-sm text-muted-foreground">No instructions provided for this assignment.</p>
+                  </div>
+                )}
+              </div>
+              {/* Right: submission panel */}
+              <div className="lg:col-span-2">
+                <StudentPanel
+                  assignment={assignment}
+                  classroomId={classroomId}
+                  studentId={studentData?.id ?? 0}
+                  isArchived={isArchived}
+                />
+              </div>
             </div>
           </div>
+        ) : (
+          /* Single-column layout for teachers and parents */
+          <div className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto space-y-5">
+            <Breadcrumb crumbs={buildClassroomCrumbs({
+              role: user?.role ?? undefined,
+              classroomName: classroom.name,
+              classroomHref: `/classrooms/${classroomSlug}/feed`,
+              tabLabel: "Assignments & Tests",
+              tabHref: `/classrooms/${classroomSlug}/assignments${window.location.search}`,
+              search: window.location.search,
+              folderName: classroom.gradeFolderName ?? undefined,
+              folderHref: classroom.gradeFolderId
+                ? `/classrooms/folders/${classroom.gradeFolderId}${isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""}`
+                : undefined,
+            }).concat({ label: assignment.title, current: true })} />
 
-          {/* Description / Attachment */}
-          {(assignment.description || assignment.fileUrl) && (
-            <Card>
-              <CardContent className="px-4 py-4 space-y-3">
-                {assignment.description && (
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{assignment.description}</p>
-                )}
-                {assignment.fileUrl && (
-                  <a
-                    href={assignment.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-                  >
-                    <FileText className="h-3.5 w-3.5" />View attached resource
-                  </a>
-                )}
-              </CardContent>
-            </Card>
-          )}
+            {assignmentHeader}
+            {assignmentInfoBlocks}
 
-          {/* Assignment Link */}
-          {assignment.linkUrl && (
-            <Card>
-              <CardContent className="px-4 py-3">
-                <a
-                  href={assignment.linkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 group"
-                >
-                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                    <Link2 className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground group-hover:text-blue-600 transition-colors truncate">
-                      {assignment.linkUrl}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Opens in a new tab</p>
-                  </div>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-blue-600 transition-colors" />
-                </a>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Linked Classwork Materials */}
-          {linkedMaterials.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-800">Classwork Materials</h2>
-              {linkedMaterials.map((material) => (
-                <button
-                  key={material.id}
-                  type="button"
-                  onClick={() => {
-                    setMaterialDialogOpen(material);
-                    if (!isTeacher) {
-                      apiRequest(`/api/classrooms/${classroomId}/materials/${material.id}/seen`, { method: "POST" }).catch(() => {});
-                    }
-                  }}
-                  className="w-full text-left"
-                >
-                  <Card className="hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
-                    <CardContent className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <BookOpen className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-foreground">{material.title}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {new Date(material.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            {(() => {
-                              const atts = material.attachments ?? [];
-                              const urlKind = material.url ? getAttachmentKind(material.url) : null;
-                              const pdfCount = atts.length + (urlKind === "pdf" && !atts.includes(material.url!) ? 1 : 0);
-                              if (pdfCount > 0) return ` · ${pdfCount} PDF${pdfCount > 1 ? "s" : ""} attached`;
-                              if (urlKind === "link") return " · Link attached";
-                              return "";
-                            })()}
-                          </p>
-                        </div>
-                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Role panel */}
-          {isTeacher && <TeacherPanel assignment={assignment} classroomId={classroomId} />}
-          {isStudent && <StudentPanel assignment={assignment} classroomId={classroomId} studentId={studentData?.id ?? 0} />}
-          {isParent && <ParentPanel assignment={assignment} classroomId={classroomId} studentId={parentStudentId} />}
-        </div>
+            {isTeacher && <TeacherPanel assignment={assignment} classroomId={classroomId} />}
+            {isParent && <ParentPanel assignment={assignment} classroomId={classroomId} studentId={parentStudentId} />}
+          </div>
+        )}
       </div>
 
       {/* Material preview dialog */}

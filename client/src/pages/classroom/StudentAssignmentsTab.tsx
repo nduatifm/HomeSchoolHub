@@ -1,20 +1,15 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { toast } from "@/hooks/use-toast";
 import { Loader2, BarChart2, ChevronRight, BookOpen, FileText, ExternalLink, ClipboardList } from "lucide-react";
 import DOMPurify from "dompurify";
 import type { ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
@@ -25,9 +20,6 @@ import StatusBadge from "./StatusBadge";
 export default function StudentAssignmentsTab({ classroomId, classroomSlug, studentId, isArchived }: {
   classroomId: number; classroomSlug: string | number; studentId: number; isArchived: boolean;
 }) {
-  const [submitOpen, setSubmitOpen] = useState<number | null>(null);
-  const [submissionText, setSubmissionText] = useState("");
-  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [materialOpen, setMaterialOpen] = useState<ClassroomMaterial | null>(null);
   const [, navigate] = useLocation();
 
@@ -42,26 +34,6 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
   const { data: materials = [] } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
-  });
-
-  const submitMutation = useMutation({
-    mutationFn: ({ assignmentId }: { assignmentId: number }) => {
-      const fd = new FormData();
-      fd.append("content", submissionText);
-      if (submissionFile) fd.append("file", submissionFile);
-      const token = localStorage.getItem("sessionId");
-      return fetch(`/api/classrooms/${classroomId}/assignments/${assignmentId}/submit`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: fd,
-      }).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error ?? "Submission failed"); return d; });
-    },
-    onSuccess: () => {
-      setSubmitOpen(null); setSubmissionText(""); setSubmissionFile(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
-      toast({ title: "Submitted!", type: "success" });
-    },
-    onError: () => toast({ title: "Couldn't submit — try again.", type: "error" }),
   });
 
   const subMap = Object.fromEntries(mySubmissions.map((s) => [s.assignmentId, s]));
@@ -167,6 +139,8 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
           const cardAccent = isLate || isReturned ? "border-l-amber-400" : accent;
           const cardBgHover = isLate || isReturned ? "hover:bg-amber-50/40" : bgHover;
 
+          const detailUrl = `/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`;
+
           return (
             <div
               key={a.id}
@@ -177,7 +151,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
+                      onClick={() => navigate(detailUrl)}
                       className="font-semibold text-sm text-foreground hover:text-primary text-left transition-colors leading-snug"
                     >{a.title}</button>
                     {isReturned && <Badge className="text-[11px] px-1.5 py-0 h-5 bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 font-semibold">Needs revision</Badge>}
@@ -249,53 +223,18 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
                     <Button
                       size="sm"
                       className="text-xs h-9 px-4 font-semibold bg-amber-600 hover:bg-amber-700"
-                      onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
+                      onClick={() => navigate(detailUrl)}
                     >
                       Revise
                     </Button>
                   ) : (!sub || sub.status === "pending") && !isArchived ? (
-                    a.formSchema && a.formSchema.length > 0 ? (
-                      <Button
-                        size="sm"
-                        className="text-xs h-9 px-4 font-semibold"
-                        onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
-                      >
-                        Open
-                      </Button>
-                    ) : (
-                      <Dialog
-                        open={submitOpen === a.id}
-                        onOpenChange={(v) => { setSubmitOpen(v ? a.id : null); if (!v) { setSubmissionText(""); setSubmissionFile(null); } }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button size="sm" className="text-xs h-9 px-4 font-semibold">Submit</Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                          <DialogHeader><DialogTitle>Submit: {a.title}</DialogTitle></DialogHeader>
-                          <div className="space-y-3 pt-2">
-                            <p className="text-xs text-muted-foreground">Due {a.dueDate} · {a.points} pts</p>
-                            <div>
-                              <Label>Your answer or link</Label>
-                              <Textarea placeholder="Write your answer or paste a link…" value={submissionText}
-                                onChange={(e) => setSubmissionText(e.target.value)} rows={4} />
-                            </div>
-                            <div>
-                              <Label>Attachment <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                              <Input type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="mt-1 cursor-pointer"
-                                onChange={(e) => setSubmissionFile(e.target.files?.[0] ?? null)} />
-                            </div>
-                            <Button className="w-full"
-                              disabled={
-                                submitMutation.isPending ||
-                                (!submissionText.trim() && !submissionFile)
-                              }
-                              onClick={() => submitMutation.mutate({ assignmentId: a.id })}>
-                              {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Submit
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )
+                    <Button
+                      size="sm"
+                      className="text-xs h-9 px-4 font-semibold"
+                      onClick={() => navigate(detailUrl)}
+                    >
+                      {a.formSchema && a.formSchema.length > 0 ? "Open" : "Start"}
+                    </Button>
                   ) : sub && sub.status !== "pending" && !isGraded ? (
                     <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
                   ) : null}
@@ -321,7 +260,6 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
           </DialogHeader>
 
           <div className="flex-1 overflow-auto px-6 py-5 space-y-5">
-            {/* Rich content body */}
             {materialOpen?.description &&
               materialOpen.description !== "<p></p>" &&
               materialOpen.description.trim() !== "" && (
@@ -342,7 +280,6 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug, stud
               />
             )}
 
-            {/* Attachments */}
             {materialOpen && (() => {
               const urlKind = materialOpen.url ? getAttachmentKind(materialOpen.url) : null;
               const legacyPdf = urlKind === "pdf" ? materialOpen.url! : null;
