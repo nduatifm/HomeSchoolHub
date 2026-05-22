@@ -294,7 +294,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       setAutoSaveStatus("saved");
       if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
       savedStatusTimerRef.current = setTimeout(() => setAutoSaveStatus("idle"), 2500);
-    }, 1000);
+    }, 2000);
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
