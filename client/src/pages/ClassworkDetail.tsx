@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -230,7 +230,12 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   const [dragOver, setDragOver] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
   const [draftRestored, setDraftRestored] = useState(false);
-  const [draftSaved, setDraftSaved] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef<string | null>(null);
+  const isDirtyRef = useRef(false);
+  const currentDraftRef = useRef<string | null>(null);
 
   const { data: submissions = [] } = useQuery<ClassroomSubmission[]>({
     queryKey: ["/api/classrooms", classroomId, "my-submissions"],
@@ -260,9 +265,61 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
         setFormAnswers(savedAnswers);
         setDraftRestored(true);
       }
+      lastSavedRef.current = saved;
     } catch {
     }
   }, [draftKey]);
+
+  useEffect(() => {
+    const currentSnapshot = JSON.stringify({ text, formAnswers });
+    currentDraftRef.current = currentSnapshot;
+
+    if (currentSnapshot === lastSavedRef.current) return;
+
+    const submitted = mySubmission && (mySubmission.status === "submitted" || mySubmission.status === "graded" || mySubmission.status === "late");
+    if (submitted) return;
+
+    const hasContent = text.trim().length > 0 || Object.keys(formAnswers).length > 0;
+    if (!hasContent) return;
+
+    isDirtyRef.current = true;
+    setAutoSaveStatus("saving");
+
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      const snapshot = JSON.stringify({ text, formAnswers });
+      localStorage.setItem(draftKey, snapshot);
+      lastSavedRef.current = snapshot;
+      isDirtyRef.current = false;
+      setAutoSaveStatus("saved");
+      if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+      savedStatusTimerRef.current = setTimeout(() => setAutoSaveStatus("idle"), 2500);
+    }, 1000);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [text, formAnswers, draftKey, mySubmission?.status]);
+
+  useEffect(() => {
+    return () => {
+      if (isDirtyRef.current && currentDraftRef.current !== null) {
+        localStorage.setItem(draftKey, currentDraftRef.current);
+      }
+      if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   const hasFormSchema = !!(assignment.formSchema && assignment.formSchema.length > 0);
 
@@ -301,12 +358,16 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     },
     onSuccess: () => {
       localStorage.removeItem(draftKey);
+      lastSavedRef.current = null;
+      isDirtyRef.current = false;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       setText("");
       setFile(null);
       setFormAnswers({});
       setDraftRestored(false);
-      setDraftSaved(false);
+      setAutoSaveStatus("idle");
       toast({ title: "Submitted!", type: "success" });
     },
     onError: () => toast({ title: "Couldn't submit — try again.", type: "error" }),
@@ -390,11 +451,25 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
           <CardHeader className="pb-2 px-4 pt-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-semibold">{isReturned ? "Resubmit Your Work" : "Submit Your Work"}</CardTitle>
-              {draftRestored && (
-                <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium">
-                  Draft restored
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {draftRestored && autoSaveStatus === "idle" && (
+                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium">
+                    Draft restored
+                  </span>
+                )}
+                {autoSaveStatus === "saving" && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving…
+                  </span>
+                )}
+                {autoSaveStatus === "saved" && (
+                  <span className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Saved
+                  </span>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
@@ -494,20 +569,6 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               >
                 {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {isReturned ? "Resubmit Assignment" : "Submit Assignment"}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full text-muted-foreground"
-                disabled={hasFormSchema ? Object.keys(formAnswers).length === 0 : !text.trim()}
-                onClick={() => {
-                  localStorage.setItem(draftKey, JSON.stringify({ text, formAnswers }));
-                  setDraftRestored(false);
-                  setDraftSaved(true);
-                  setTimeout(() => setDraftSaved(false), 2500);
-                }}
-              >
-                {draftSaved ? <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> : null}
-                {draftSaved ? "Draft saved" : "Save draft"}
               </Button>
             </div>
           </CardContent>
