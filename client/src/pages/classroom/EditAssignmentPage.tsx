@@ -52,6 +52,10 @@ function getAnswerKeyDraftKey(draftId: string) {
   return `lyra_form_answerkey_${draftId}`;
 }
 
+function getMainDraftKey(draftId: string) {
+  return `lyra_main_draft_${draftId}`;
+}
+
 export default function EditAssignmentPage() {
   const [, params] = useRoute("/classrooms/:slug/assignments/:assignmentSlug/edit");
   const [, navigate] = useLocation();
@@ -193,7 +197,21 @@ export default function EditAssignmentPage() {
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(answerKey));
   }, [answerKey, initialized]);
 
-  // After initialization, check if server draft differs from published — offer to restore
+  // Persist all core fields to localStorage after initialization (offline / crash fallback)
+  useEffect(() => {
+    if (!initialized) return;
+    localStorage.setItem(getMainDraftKey(draftId.current), JSON.stringify({
+      title: form.title,
+      description: form.description,
+      dueDate: form.dueDate,
+      points: form.points,
+      assignmentType,
+      linkUrl,
+      selectedMaterialIds,
+    }));
+  }, [form, assignmentType, linkUrl, selectedMaterialIds, initialized]);
+
+  // After initialization, check if server draft is newer than published and differs — offer to restore
   useEffect(() => {
     if (!initialized || !serverDraftLoaded || serverDraftAppliedRef.current) return;
     serverDraftAppliedRef.current = true;
@@ -210,6 +228,10 @@ export default function EditAssignmentPage() {
       (d.formSchema?.length ?? 0) > 0 ||
       (d.answerKey && Object.keys(d.answerKey).length > 0);
     if (!hasContent) return;
+    // Recency check: only offer restore if draft is newer than when assignment was created/published
+    const draftSavedAt = d.savedAt ? new Date(d.savedAt).getTime() : 0;
+    const assignmentCreatedAt = assignment.createdAt ? new Date(assignment.createdAt).getTime() : 0;
+    if (draftSavedAt <= assignmentCreatedAt) return;
     // Compare server draft against every field in the published snapshot
     const pubForm = {
       title: assignment.title,

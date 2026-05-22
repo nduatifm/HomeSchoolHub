@@ -52,6 +52,10 @@ function getAnswerKeyDraftKey(draftId: string) {
   return `lyra_form_answerkey_${draftId}`;
 }
 
+function getMainDraftKey(draftId: string) {
+  return `lyra_main_draft_${draftId}`;
+}
+
 export default function NewAssignmentPage() {
   const [, params] = useRoute("/classrooms/:slug/assignments/new");
   const [, navigate] = useLocation();
@@ -122,41 +126,78 @@ export default function NewAssignmentPage() {
     staleTime: Infinity,
   });
 
-  // Restore from server draft on first load (server wins)
+  // Persist all core fields to localStorage on every change (local backup / offline fallback)
+  useEffect(() => {
+    const hasAny = form.title.trim() || form.description.trim() || form.dueDate || assignmentType || linkUrl.trim() || selectedMaterialIds.length > 0;
+    if (hasAny) {
+      localStorage.setItem(getMainDraftKey(draftId.current), JSON.stringify({
+        title: form.title,
+        description: form.description,
+        dueDate: form.dueDate,
+        points: form.points,
+        assignmentType,
+        linkUrl,
+        selectedMaterialIds,
+      }));
+    }
+  }, [form, assignmentType, linkUrl, selectedMaterialIds]);
+
+  // Restore on first load: server draft wins; if server has no draft, fall back to localStorage
   useEffect(() => {
     if (!serverDraftLoaded || serverDraftAppliedRef.current || !classroomId) return;
     serverDraftAppliedRef.current = true;
-    if (!serverDraft) return;
-    const d = serverDraft;
-    const hasContent =
-      (d.title ?? "").trim() ||
-      (d.description ?? "").trim() ||
-      d.dueDate ||
-      d.assignmentType ||
-      (d.linkUrl ?? "").trim() ||
-      (d.linkedMaterialIds?.length ?? 0) > 0 ||
-      (d.formSchema?.length ?? 0) > 0 ||
-      (d.answerKey && Object.keys(d.answerKey).length > 0);
-    if (!hasContent) return;
-    setForm({
-      title: d.title ?? "",
-      description: d.description ?? "",
-      dueDate: d.dueDate ?? "",
-      points: d.points != null ? String(d.points) : "100",
-    });
-    if (d.assignmentType) setAssignmentType(d.assignmentType as ItemType);
-    if (d.linkUrl) setLinkUrl(d.linkUrl);
-    if (d.linkedMaterialIds?.length) setSelectedMaterialIds(d.linkedMaterialIds);
-    if (d.formSchema?.length) {
-      setFormQuestions(d.formSchema);
-      localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(d.formSchema));
+
+    const applyDraftData = (d: any) => {
+      setForm({
+        title: d.title ?? "",
+        description: d.description ?? "",
+        dueDate: d.dueDate ?? "",
+        points: d.points != null ? String(d.points) : "100",
+      });
+      if (d.assignmentType) setAssignmentType(d.assignmentType as ItemType);
+      if (d.linkUrl) setLinkUrl(d.linkUrl);
+      if (d.linkedMaterialIds?.length) setSelectedMaterialIds(d.linkedMaterialIds);
+      if (d.formSchema?.length) {
+        setFormQuestions(d.formSchema);
+        localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(d.formSchema));
+      }
+      if (d.answerKey && Object.keys(d.answerKey).length) {
+        setAnswerKey(d.answerKey);
+        localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(d.answerKey));
+      }
+      setDraftRestored(true);
+      setTimeout(autoGrowTitle, 0);
+    };
+
+    // Try server draft first
+    if (serverDraft) {
+      const d = serverDraft;
+      const hasContent =
+        (d.title ?? "").trim() ||
+        (d.description ?? "").trim() ||
+        d.dueDate ||
+        d.assignmentType ||
+        (d.linkUrl ?? "").trim() ||
+        (d.linkedMaterialIds?.length ?? 0) > 0 ||
+        (d.formSchema?.length ?? 0) > 0 ||
+        (d.answerKey && Object.keys(d.answerKey).length > 0);
+      if (hasContent) { applyDraftData(d); return; }
     }
-    if (d.answerKey && Object.keys(d.answerKey).length) {
-      setAnswerKey(d.answerKey);
-      localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(d.answerKey));
-    }
-    setDraftRestored(true);
-    setTimeout(autoGrowTitle, 0);
+
+    // Fallback: localStorage (covers offline / server-error scenarios)
+    try {
+      const raw = localStorage.getItem(getMainDraftKey(draftId.current));
+      if (raw) {
+        const local = JSON.parse(raw);
+        const localHasContent = (local.title ?? "").trim() || (local.description ?? "").trim() || local.dueDate || local.assignmentType;
+        if (localHasContent) {
+          // Merge with formQuestions/answerKey already in localStorage
+          const formSchema = (() => { try { return JSON.parse(localStorage.getItem(getDraftKey(draftId.current)) ?? "[]"); } catch { return []; } })();
+          const answerKeyLocal = (() => { try { return JSON.parse(localStorage.getItem(getAnswerKeyDraftKey(draftId.current)) ?? "{}"); } catch { return {}; } })();
+          applyDraftData({ ...local, formSchema: formSchema.length ? formSchema : null, answerKey: Object.keys(answerKeyLocal).length ? answerKeyLocal : null });
+        }
+      }
+    } catch { /* ignore */ }
   }, [serverDraftLoaded, serverDraft, classroomId]);
 
   // Debounce server save when fields change
