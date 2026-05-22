@@ -377,14 +377,19 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   const isSubmitted = mySubmission && (mySubmission.status === "submitted" || mySubmission.status === "graded" || mySubmission.status === "late");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {isReturned && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3.5 space-y-1">
-          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Returned for revision</p>
-          {mySubmission.returnNote && (
-            <p className="text-sm text-amber-800">{mySubmission.returnNote}</p>
-          )}
-          <p className="text-xs text-amber-600 mt-1">Please revise your work and resubmit below.</p>
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex gap-3 items-start">
+          <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+            <span className="text-base">✏️</span>
+          </div>
+          <div className="space-y-0.5 flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">Your teacher sent this back for you to fix</p>
+            {mySubmission.returnNote && (
+              <p className="text-sm text-amber-700">{mySubmission.returnNote}</p>
+            )}
+            <p className="text-xs text-amber-600">Make your changes below and turn it in again.</p>
+          </div>
         </div>
       )}
 
@@ -448,62 +453,56 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
 
       {!isSubmitted && !isArchived && (
         <Card>
-          <CardHeader className="pb-2 px-4 pt-4">
+          <CardHeader className="pb-3 px-4 pt-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">{isReturned ? "Resubmit Your Work" : "Submit Your Work"}</CardTitle>
-              <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-semibold">
+                {isReturned ? "Turn It In Again" : "Turn In Your Work"}
+              </CardTitle>
+              <div className="flex items-center gap-1.5">
                 {draftRestored && autoSaveStatus === "idle" && (
-                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium">
+                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 font-medium">
                     Draft restored
                   </span>
                 )}
                 {autoSaveStatus === "saving" && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Saving…
-                  </span>
+                  <Loader2 className="h-3.5 w-3.5 text-muted-foreground/60 animate-spin" />
                 )}
                 {autoSaveStatus === "saved" && (
-                  <span className="text-xs text-green-600 flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Saved
-                  </span>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                 )}
               </div>
             </div>
           </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-4">
-            {hasFormSchema ? (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <ClipboardList className="h-3.5 w-3.5 text-primary" />
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assignment Form</p>
-                </div>
+          <CardContent className="px-4 pb-4 space-y-3">
+
+            {/* Step 1 — Answer */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                {hasFormSchema ? "Answer the questions" : "Write your answer"}
+              </p>
+              {hasFormSchema ? (
                 <FormResponse
                   questions={assignment.formSchema!}
                   answers={formAnswers}
                   onChange={setFormAnswers}
                   stepByStep
                 />
-              </div>
-            ) : (
-              <div>
-                <Label className="text-xs text-gray-500 mb-1.5 block">Response</Label>
+              ) : (
                 <Textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  placeholder="Type your answer or notes here…"
-                  rows={6}
+                  placeholder="Write your answer here…"
+                  rows={4}
                   className="resize-none text-sm"
                 />
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Drag-and-drop file upload zone */}
+            {/* Step 2 — File (optional) */}
             <div>
-              <Label className="text-xs text-gray-500 mb-1.5 block">
-                Attach File <span className="font-normal text-muted-foreground">(optional · images, PDF, Word, TXT · max 10 MB)</span>
-              </Label>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                Add a file <span className="font-normal normal-case text-muted-foreground/70">(optional)</span>
+              </p>
               {file ? (
                 <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
                   <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -538,6 +537,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                 >
                   <Upload className="h-6 w-6" />
                   <span className="text-sm font-medium">Drop a file here or click to browse</span>
+                  <span className="text-xs text-muted-foreground/70">Photos, PDFs, Word docs — up to 10 MB</span>
                   <input
                     type="file"
                     className="hidden"
@@ -552,25 +552,26 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
             </div>
 
             {missingRequiredQuestions.length > 0 && (
-              <p className="text-xs text-red-500">
-                Please answer required question{missingRequiredQuestions.length > 1 ? "s" : ""}:{" "}
-                {missingRequiredQuestions.map((q) => q.label || "Untitled").join(", ")}
+              <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                Still needed: {missingRequiredQuestions.map((q) => q.label || "Untitled").join(", ")}
               </p>
             )}
-            <div className="flex flex-col gap-2">
-              <Button
-                className="w-full"
-                disabled={
-                  submitMutation.isPending ||
-                  missingRequiredQuestions.length > 0 ||
-                  (!hasFormSchema && !text.trim() && !file)
-                }
-                onClick={() => submitMutation.mutate()}
-              >
-                {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {isReturned ? "Resubmit Assignment" : "Submit Assignment"}
-              </Button>
-            </div>
+
+            {/* Step 3 — Submit */}
+            <Button
+              className="w-full h-11 text-base font-semibold"
+              disabled={
+                submitMutation.isPending ||
+                missingRequiredQuestions.length > 0 ||
+                (!hasFormSchema && !text.trim() && !file)
+              }
+              onClick={() => submitMutation.mutate()}
+            >
+              {submitMutation.isPending
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Turning in…</>
+                : isReturned ? "Turn In Again" : "Turn In"
+              }
+            </Button>
           </CardContent>
         </Card>
       )}
