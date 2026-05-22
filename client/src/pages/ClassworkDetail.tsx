@@ -495,22 +495,20 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                 {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {isReturned ? "Resubmit Assignment" : "Submit Assignment"}
               </Button>
-              {!hasFormSchema && (
-                <Button
-                  variant="outline"
-                  className="w-full text-muted-foreground"
-                  disabled={!text.trim()}
-                  onClick={() => {
-                    localStorage.setItem(draftKey, JSON.stringify({ text, formAnswers }));
-                    setDraftRestored(false);
-                    setDraftSaved(true);
-                    setTimeout(() => setDraftSaved(false), 2500);
-                  }}
-                >
-                  {draftSaved ? <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> : null}
-                  {draftSaved ? "Draft saved" : "Save draft"}
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                className="w-full text-muted-foreground"
+                disabled={hasFormSchema ? Object.keys(formAnswers).length === 0 : !text.trim()}
+                onClick={() => {
+                  localStorage.setItem(draftKey, JSON.stringify({ text, formAnswers }));
+                  setDraftRestored(false);
+                  setDraftSaved(true);
+                  setTimeout(() => setDraftSaved(false), 2500);
+                }}
+              >
+                {draftSaved ? <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> : null}
+                {draftSaved ? "Draft saved" : "Save draft"}
+              </Button>
             </div>
           </CardContent>
         </Card>
