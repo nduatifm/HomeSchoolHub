@@ -10,7 +10,6 @@ import {
   Plus,
   Trash2,
   Pencil,
-  ExternalLink,
   Paperclip,
   ClipboardList,
   Link2,
@@ -72,7 +71,6 @@ export default function TeacherAssignmentsTab({
         method: "DELETE",
       }),
     onSuccess: () => {
-      setExpanded(null);
       queryClient.invalidateQueries({
         queryKey: ["/api/classrooms", classroomId, "assignments"],
       });
@@ -163,38 +161,20 @@ export default function TeacherAssignmentsTab({
                   </div>
 
                   {hasStats && (toGrade > 0 || graded > 0) && (
-                    <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
-                      {toGrade > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                          {toGrade} to grade
-                        </span>
-                      )}
-                      {graded > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                          {graded} graded
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      {toGrade} submitted · {graded} graded
+                    </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                  {toGrade > 0 && (
-                    <Button
-                      size="sm"
-                      className="h-8 px-3 text-xs gap-1.5 bg-amber-600 hover:bg-amber-700"
-                      onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
-                    >
-                      Review
-                    </Button>
-                  )}
                   <Button
-                    variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    className={`h-8 px-3 text-xs gap-1.5 ${toGrade > 0 ? "bg-amber-600 hover:bg-amber-700" : ""}`}
+                    variant={toGrade > 0 ? "default" : "ghost"}
                     onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
+                    Review
                   </Button>
                   {!isArchived && (
                     <>

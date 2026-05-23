@@ -30,7 +30,6 @@ type SubmissionWithName = ClassroomSubmission & { studentName: string };
 
 function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssignment; classroomId: number }) {
   const [gradeInputs, setGradeInputs] = useState<Record<number, { grade: string; feedback: string }>>({});
-  const [showFormPreview, setShowFormPreview] = useState(false);
 
   const { data: submissions = [], isLoading } = useQuery<SubmissionWithName[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"],
@@ -57,41 +56,6 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
 
   return (
     <div className="space-y-4">
-      {assignment.formSchema && assignment.formSchema.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2 px-4 pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-violet-500" />
-                <CardTitle className="text-sm font-semibold">Form Preview</CardTitle>
-                <span className="text-[11px] text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-full font-medium">
-                  {assignment.formSchema.length} {assignment.formSchema.length === 1 ? "question" : "questions"}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFormPreview((v) => !v)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {showFormPreview ? "Hide" : "Show form"}
-              </button>
-            </div>
-          </CardHeader>
-          {showFormPreview && (
-            <CardContent className="px-4 pb-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <FormResponse
-                  questions={assignment.formSchema}
-                  answers={{}}
-                  onChange={() => {}}
-                  disabled
-                />
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      )}
-
       <h2 className="text-base font-semibold text-gray-800">Student Submissions ({submissions.length})</h2>
       {submissions.length === 0 ? (
         <p className="text-sm text-gray-400 py-6 text-center">No submissions yet.</p>
@@ -434,7 +398,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
         <Card>
           <CardHeader className="pb-2 px-4 pt-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">Your Submission</CardTitle>
+              <CardTitle className="text-sm font-semibold">Your answer</CardTitle>
               <StatusBadge status={mySubmission.status} />
             </div>
           </CardHeader>
@@ -543,7 +507,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               <div className="flex items-center gap-2 mb-2">
                 <span className="h-5 w-5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Add a file <span className="font-normal normal-case text-muted-foreground/70">(optional)</span>
+                  Add a file
                 </p>
               </div>
               {file ? (
@@ -675,14 +639,12 @@ function ParentPanel({ assignment, classroomId, studentId }: { assignment: Class
                 </div>
               </div>
             )}
-            {mySubmission.status === "graded" && mySubmission.grade !== null ? (
+            {mySubmission.status === "graded" && mySubmission.grade !== null && (
               <div className="flex items-center gap-2 pt-1">
                 <span className="text-sm font-medium text-green-700">{mySubmission.grade}/{assignment.points} pts</span>
                 {mySubmission.feedback && <span className="text-xs text-gray-500">— {mySubmission.feedback}</span>}
               </div>
-            ) : mySubmission.status !== "returned" ? (
-              <p className="text-xs text-gray-400">Not graded yet.</p>
-            ) : null}
+            )}
           </CardContent>
         </Card>
       )}
@@ -905,11 +867,6 @@ export default function ClassworkDetail() {
             {/* Instructions — full width */}
             <div className="space-y-4">
               {assignmentInfoBlocks}
-              {!assignment.description && !assignment.fileUrl && !assignment.linkUrl && linkedMaterials.length === 0 && (
-                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
-                  <p className="text-sm text-muted-foreground">No instructions provided for this assignment.</p>
-                </div>
-              )}
             </div>
 
             {/* Submission panel — centered */}

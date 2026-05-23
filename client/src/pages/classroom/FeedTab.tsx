@@ -184,9 +184,7 @@ export default function FeedTab({
                     <p className="text-xs text-muted-foreground mt-0.5">{formatPostTime(post.createdAt)}</p>
                   </div>
                   {isUnseen && (
-                    <span className="shrink-0 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                      New
-                    </span>
+                    <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
                   )}
                 </div>
                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-[2.625rem]">

@@ -4,18 +4,6 @@ import type { ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
 import GradeBreakdownPanel from "./GradeBreakdownPanel";
 
-const TYPE_BADGE: Record<string, string> = {
-  assignment: "bg-blue-100 text-blue-700",
-  test: "bg-orange-100 text-orange-700",
-  quiz: "bg-purple-100 text-purple-700",
-  project: "bg-teal-100 text-teal-700",
-};
-const TYPE_LABEL: Record<string, string> = {
-  assignment: "Assignment",
-  test: "Test",
-  quiz: "Quiz",
-  project: "Project",
-};
 
 export default function ParentGradesTab({ classroomId, studentId, seenAssignmentIds, onAssignmentSeen }: {
   classroomId: number; studentId: number;
@@ -68,7 +56,6 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
           <thead className="bg-muted/40 border-b border-border">
             <tr>
               <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Assignment</th>
-              <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground">Due</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground">Status</th>
               <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground">Grade</th>
               <th className="text-left px-3 py-3 text-xs font-semibold text-muted-foreground">Feedback</th>
@@ -85,17 +72,11 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
                   className={`transition-colors ${isUnseen ? "bg-primary/5 hover:bg-primary/10 cursor-pointer" : "hover:bg-muted/20"}`}
                 >
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5">
-                        {isUnseen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
-                        {a.title}
-                      </div>
-                      <span className={`text-[10px] font-medium px-1.5 py-0 rounded-full self-start ${TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment}`}>
-                        {TYPE_LABEL[a.assignmentType] ?? a.assignmentType}
-                      </span>
+                    <div className="flex items-center gap-1.5">
+                      {isUnseen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                      {a.title}
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">{a.dueDate}</td>
                   <td className="px-3 py-3 text-center"><StatusBadge status={sub?.status ?? "pending"} /></td>
                   <td className="px-3 py-3 text-center">
                     {sub?.grade !== null && sub?.grade !== undefined

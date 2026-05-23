@@ -58,7 +58,7 @@ export default function ClassworkTab({
         </div>
       )}
       {!isLoading && classwork.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
+        <div className="text-center py-12 text-muted-foreground text-sm">
           No classwork yet.
         </div>
       )}
