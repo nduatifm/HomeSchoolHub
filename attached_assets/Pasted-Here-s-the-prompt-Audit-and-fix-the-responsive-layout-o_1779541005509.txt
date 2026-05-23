@@ -1,0 +1,100 @@
+Here's the prompt:
+
+---
+
+> Audit and fix the responsive layout of the entire LyraPrep application so it works correctly and looks polished on all screen sizes: phone (360px–480px), tablet/iPad (768px–1024px), laptop (1280px–1440px), and desktop (1440px+). Do not change any functionality, API calls, or business logic — only layout, spacing, typography sizing, and responsive breakpoints.
+>
+> **Guiding principles for this audit:**
+> - Mobile-first: every component should work at 360px before adding breakpoints upward
+> - Touch targets: all tappable elements (buttons, rows, links) must be at least 44px tall on mobile
+> - No horizontal scroll: nothing should overflow its container at any breakpoint
+> - Sidebar behavior: `ModernSidebar` is the primary navigation — it must collapse on mobile, show as a slide-in drawer on tablet, and be permanently visible on laptop/desktop
+> - Content max-width: main content columns should never stretch wider than a comfortable reading/working width. Use `max-w-2xl` (672px) for single-column reading content, `max-w-4xl` (896px) for single-column admin/teacher views, `max-w-6xl` (1152px) for two-column layouts
+> - Typography: heading sizes should scale down on mobile. A `text-2xl` or `text-3xl` heading on desktop should drop to `text-xl` or `text-2xl` on mobile
+>
+> ---
+>
+> **Work through each layout context below:**
+>
+> **1. ModernSidebar**
+>
+> - On mobile (`< md`): sidebar must be fully hidden by default. A hamburger menu button (top-left, `h-10 w-10`, always visible) toggles a slide-in drawer from the left with a dark overlay backdrop. Tapping the overlay closes it.
+> - On tablet (`md` to `lg`): sidebar can be icon-only (collapsed to ~60px wide showing only icons) or hidden with the hamburger. Ensure the main content area fills the remaining width correctly.
+> - On laptop/desktop (`lg+`): sidebar is permanently visible at its full width (228px). All page content has `md:ml-[228px]` to offset correctly.
+> - Verify the sidebar does not cover page content on any breakpoint when open.
+> - The sidebar's navigation items must have `h-11` minimum height on mobile for touch targets.
+>
+> **2. StudentDashboard**
+>
+> - The greeting, hero banner, and Today's Tasks list are single-column — verify they look correct from 360px up.
+> - Today's Tasks rows: on very small screens (360px), the task title and "Go" button must not overlap. Add `min-w-0` and `truncate` on the title, and `shrink-0` on the button.
+> - The "All Classes" grid: `grid-cols-1` on mobile, `grid-cols-2` on tablet, `grid-cols-3` on laptop/desktop.
+> - The illustrated classroom banner SVGs must scale with their container — ensure they use `w-full h-full` and their container has a fixed height (`h-24` or `h-28`) that doesn't collapse.
+> - Messages panel: the two-pane layout (conversation list + thread) should stack vertically on mobile/tablet and go side-by-side on `lg+`. The conversation list should have a `max-h-48` cap on mobile to avoid pushing the thread off screen.
+>
+> **3. ClassroomDetail**
+>
+> - The tab navigation (`TabNav`) must scroll horizontally on mobile if tabs overflow — use `overflow-x-auto` with `whitespace-nowrap` on the tab container. No tab should wrap or be hidden.
+> - The illustrated classroom header banner should be `h-24` on mobile and `h-36` on laptop+.
+> - Tab content panels (Feed, Assignments, Students, Grades, Classwork) should all have consistent horizontal padding: `px-4` on mobile, `px-0` on desktop (let the outer container handle margins).
+> - The Grades table (`TeacherGradesTab`): on mobile, allow horizontal scroll with `overflow-x-auto` wrapping the table. The student name column should be sticky left (`sticky left-0 bg-card`) so it stays visible while scrolling.
+> - The Students tab enrollment list: each student row should have `min-h-[44px]` and the Remove button must be reachable on mobile.
+>
+> **4. ClassworkDetail (assignment page)**
+>
+> - Student view uses a two-column grid (`lg:grid-cols-5`). On mobile and tablet this should be a single column with instructions first, then the submission panel below.
+> - The submission card should be full-width on all breakpoints. No fixed widths.
+> - The file drop zone should have `min-h-[100px]` on mobile so it's easy to tap, not just drag-and-drop.
+> - The material preview dialog: on mobile it should take up `95vw` width and `90vh` max height, with proper scroll on content overflow.
+>
+> **5. NewAssignmentPage**
+>
+> - Two-column layout (`lg:flex-row`): on mobile and tablet this should stack to a single column with the metadata sidebar (due date, points, attachment) appearing below the main content, not above.
+> - The Typeform-style FormBuilder (`h-[520px]` fixed height three-panel): on mobile, collapse to a single-column view. Hide the right settings panel and left question list simultaneously on small screens, showing only the active question editor with previous/next navigation buttons. On tablet (`md`), show the left panel + center only, hiding the right settings panel (move settings into a bottom sheet or inline below the editor).
+> - The sticky top bar (`h-14`) must account for the mobile sidebar hamburger button — don't let them overlap.
+>
+> **6. ClassroomMaterialPage (Substack-style editor)**
+>
+> - The writing canvas (`max-w-[680px]`) should be full-width with `px-4` padding on mobile — do not constrain it to 680px on screens smaller than 680px.
+> - The right settings panel (`w-72 xl:w-80`) is `hidden lg:flex` — on mobile, it's replaced by the bottom sheet (`<details>` element). Verify the bottom sheet is accessible and doesn't cover the keyboard on iOS (add `pb-safe` or enough bottom padding).
+> - The toolbar in the top bar: on mobile, wrap or scroll the toolbar icons rather than letting them overflow. Consider showing only the most-used icons (Bold, Italic, Link) on screens below `sm`, with a "More" dropdown for the rest.
+>
+> **7. FeedTab**
+>
+> - The compose area (sticky bottom): on mobile, the frosted bottom bar should not conflict with the iOS home indicator. Add `pb-safe` (`pb-[env(safe-area-inset-bottom)]`) or at minimum `pb-4` below the compose box.
+> - The "Conversations" sidebar in Messages (StudentDashboard) should be `max-h-48` on mobile with `overflow-y-auto` so it doesn't push the thread off-screen.
+> - Post cards should have `px-4 py-4` minimum padding so content doesn't touch the card edge on small screens.
+>
+> **8. Typography and spacing scale**
+>
+> Go through these specific patterns and fix them everywhere they appear:
+>
+> - Page titles (`h1`): `text-xl font-bold` on mobile, `text-2xl font-bold` on `sm+`
+> - Section headers (`h2`): `text-base font-semibold` on mobile, `text-lg font-semibold` on `sm+`
+> - Card padding: `p-4` on mobile, `p-5` or `p-6` on `sm+`
+> - Button height: all primary/outline buttons must be at least `h-10` (40px) on mobile for touch — use `h-9 sm:h-8` pattern where smaller sizes are used on desktop
+> - Form inputs: all `<input>` and `<textarea>` elements must be at least `h-10` on mobile to prevent iOS zoom-on-focus (font-size below 16px triggers zoom — ensure `text-base` or `text-sm` with explicit `font-size: 16px` on mobile inputs)
+>
+> **9. Global padding and container patterns**
+>
+> - All page-level containers should follow: `px-4 sm:px-6` for horizontal padding
+> - Top padding for mobile (to clear the mobile top bar / sidebar toggle): `pt-20 md:pt-6`
+> - Never use fixed pixel widths on elements that contain user content — use `max-w-*` with `w-full` instead
+> - Check for any `w-[Npx]` fixed widths that could cause overflow at smaller breakpoints and replace with responsive equivalents
+>
+> **10. Testing checkpoints**
+>
+> After making changes, verify each of these scenarios renders correctly:
+>
+> - 360px wide phone: StudentDashboard loads, sidebar is hidden, hamburger is visible, hero banner renders, tasks are tappable
+> - 375px iPhone: NewAssignmentPage form scrolls correctly, sticky top bar doesn't overlap content, FormBuilder collapses gracefully
+> - 768px iPad portrait: ClassroomDetail tabs fit without overflow, two-column layouts where appropriate
+> - 1024px iPad landscape: sidebar visible or icon-only, content fills remaining width
+> - 1280px laptop: full sidebar, two-column layouts render, max-width constraints apply
+> - 1440px+ desktop: content centered within max-width, no excessive whitespace on very wide screens
+>
+> For each file changed: list the specific Tailwind classes added or modified and the breakpoint they target. Do not change any component logic, query keys, mutations, or non-layout TypeScript. If a layout change requires a new wrapper `<div>`, add only what's needed and no more.
+
+---
+
+This is scoped tightly to layout only — no risk of breaking API or business logic — and gives Replit a clear checklist to work through rather than "make it responsive" which is too vague to act on reliably.
