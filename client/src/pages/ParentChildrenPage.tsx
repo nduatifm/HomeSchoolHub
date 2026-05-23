@@ -391,9 +391,6 @@ export default function ParentChildrenPage() {
         <main className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto">
           <div className="mb-5">
             <h1 className="text-xl font-semibold text-foreground">{greeting}, {firstName} 👋</h1>
-            <p className="text-sm text-muted-foreground">
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-            </p>
           </div>
 
           <div className="mb-6">

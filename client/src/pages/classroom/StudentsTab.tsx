@@ -106,7 +106,7 @@ export default function StudentsTab({ classroomId, isArchived }: { classroomId: 
           const earned = subs.reduce((s, sub) => s + (sub.grade ?? 0), 0);
           const pct = totalPoints > 0 ? Math.round((earned / totalPoints) * 100) : null;
           return (
-            <div key={e.studentId} className="flex items-center justify-between rounded-2xl border border-border px-4 py-3 bg-card">
+            <div key={e.studentId} className="group flex items-center justify-between rounded-2xl border border-border px-4 py-3 bg-card">
               <div>
                 <p className="text-sm font-medium text-foreground">{e.student.name}</p>
                 {pct !== null && (
@@ -114,7 +114,7 @@ export default function StudentsTab({ classroomId, isArchived }: { classroomId: 
                 )}
               </div>
               {!isArchived && (
-                <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600"
+                <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => removeMutation.mutate(e.studentId)} disabled={removeMutation.isPending}>
                   Remove
                 </Button>
@@ -124,19 +124,6 @@ export default function StudentsTab({ classroomId, isArchived }: { classroomId: 
         })}
       </div>
 
-      {!isArchived && unenrolledAssigned.length > 0 && (
-        <div className="pt-2 border-t border-border">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Your students not yet enrolled</p>
-          <div className="space-y-1.5">
-            {unenrolledAssigned.map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded-2xl border border-border px-4 py-2.5 bg-card">
-                <span className="text-sm text-foreground">{s.name}</span>
-                <Button size="sm" variant="outline" onClick={() => enrollMutation.mutate(s.id)} disabled={enrollMutation.isPending}>+ Enroll</Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -48,7 +48,7 @@ export default function ClassworkTab({
             className="gap-1.5"
             onClick={() => navigate(`/classrooms/${classroomSlug}/materials/new`)}
           >
-            <Plus className="h-3.5 w-3.5" />Add Classwork
+            <Plus className="h-3.5 w-3.5" />Add Materials
           </Button>
         </div>
       )}

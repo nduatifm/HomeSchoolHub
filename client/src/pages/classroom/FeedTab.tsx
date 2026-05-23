@@ -91,6 +91,47 @@ export default function FeedTab({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Compose box — teacher only, at top */}
+      {isTeacher && !isArchived && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="flex items-end gap-3 p-3">
+            <span className="mb-0.5 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Megaphone className="h-4 w-4 text-primary" />
+            </span>
+            <textarea
+              placeholder="Post an announcement to the class…"
+              value={content}
+              onChange={(e) => {
+                setContent(e.target.value.slice(0, MAX_CHARS + 20));
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+              }}
+              rows={1}
+              style={{ height: "36px" }}
+              className="flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm focus:outline-none placeholder:text-muted-foreground leading-relaxed overflow-hidden"
+            />
+            <div className="flex items-end gap-2 shrink-0 mb-0.5">
+              {charsLeft < 200 && (
+                <span className={`text-xs tabular-nums ${isOverLimit ? "text-red-500 font-semibold" : charsLeft < 100 ? "text-amber-500" : "text-muted-foreground"}`}>
+                  {charsLeft}
+                </span>
+              )}
+              <Button
+                size="sm"
+                disabled={!content.trim() || isOverLimit || postMutation.isPending}
+                onClick={() => postMutation.mutate()}
+                className="gap-1.5 h-9 px-4 rounded-xl"
+              >
+                {postMutation.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Send className="h-3.5 w-3.5" />}
+                Post
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Unread banner — student only */}
       {unseenCount > 0 && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/8 border border-primary/20">
@@ -110,12 +151,12 @@ export default function FeedTab({
 
       {/* Empty state */}
       {!isLoading && posts.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-3 py-14 text-center rounded-2xl border border-dashed border-border">
+        <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
           <span className="text-3xl">📢</span>
           <div>
             <p className="text-sm font-medium text-foreground">No announcements yet</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {isTeacher ? "Use the box below to post your first announcement." : "Your teacher hasn't posted anything yet."}
+              {isTeacher ? "Post your first announcement above." : "Your teacher hasn't posted anything yet."}
             </p>
           </div>
         </div>
@@ -136,7 +177,6 @@ export default function FeedTab({
                     : "border-border"
                 }`}
               >
-                {/* Author row */}
                 <div className="flex items-center gap-2.5 mb-3">
                   <AuthorAvatar name={post.authorName} />
                   <div className="flex-1 min-w-0">
@@ -144,63 +184,17 @@ export default function FeedTab({
                     <p className="text-xs text-muted-foreground mt-0.5">{formatPostTime(post.createdAt)}</p>
                   </div>
                   {isUnseen && (
-                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    <span className="shrink-0 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                       New
                     </span>
                   )}
                 </div>
-
-                {/* Content */}
                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed pl-[2.625rem]">
                   {post.content}
                 </p>
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Compose box — teacher only, pinned to bottom */}
-      {isTeacher && !isArchived && (
-        <div className="sticky bottom-0 pt-2 pb-1 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6">
-          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-md">
-            <div className="flex items-end gap-3 p-3">
-              <span className="mb-0.5 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Megaphone className="h-4 w-4 text-primary" />
-              </span>
-              <textarea
-                placeholder="Post an announcement to the class…"
-                value={content}
-                onChange={(e) => {
-                  setContent(e.target.value.slice(0, MAX_CHARS + 20));
-                  // Auto-grow
-                  e.target.style.height = "auto";
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-                }}
-                rows={1}
-                style={{ height: "36px" }}
-                className="flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm focus:outline-none placeholder:text-muted-foreground leading-relaxed overflow-hidden"
-              />
-              <div className="flex items-end gap-2 shrink-0 mb-0.5">
-                {charsLeft < 200 && (
-                  <span className={`text-xs tabular-nums ${isOverLimit ? "text-red-500 font-semibold" : charsLeft < 100 ? "text-amber-500" : "text-muted-foreground"}`}>
-                    {charsLeft}
-                  </span>
-                )}
-                <Button
-                  size="sm"
-                  disabled={!content.trim() || isOverLimit || postMutation.isPending}
-                  onClick={() => postMutation.mutate()}
-                  className="gap-1.5 h-9 px-4 rounded-xl"
-                >
-                  {postMutation.isPending
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <Send className="h-3.5 w-3.5" />}
-                  Post
-                </Button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
