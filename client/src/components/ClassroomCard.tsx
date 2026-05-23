@@ -1,4 +1,5 @@
 import { ChevronRight, GraduationCap } from "lucide-react";
+import { useLocation } from "wouter";
 import { getSubjectTheme } from "@/lib/subjectTheme";
 import type { Classroom } from "@shared/schema";
 import type { ClassroomNotification } from "@/lib/classroomNotifications";
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Class", notification }: Props) {
+  const [, navigate] = useLocation();
   const theme = getSubjectTheme(c.subject || "");
 
   const pendingCount = notification?.pendingCount ?? 0;
@@ -38,7 +40,7 @@ export default function ClassroomCard({ classroom: c, href, ctaLabel = "Go to Cl
   return (
     <button
       className={`relative text-left rounded-2xl border border-border overflow-hidden flex flex-col cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 active:scale-[0.985] ${theme.bg} group w-full`}
-      onClick={() => { window.location.href = href; }}
+      onClick={() => navigate(href)}
     >
       {showBadge && (
         <span

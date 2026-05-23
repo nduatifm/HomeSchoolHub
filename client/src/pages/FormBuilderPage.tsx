@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGoBack } from "@/hooks/useGoBack";
 import FormBuilder from "@/components/FormBuilder";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft, ClipboardList, Loader2 } from "lucide-react";
@@ -43,6 +44,7 @@ function saveAnswerKey(draftId: string, answerKey: Record<string, string | strin
 
 export default function FormBuilderPage() {
   const { isLoading } = useAuth();
+  const goBack = useGoBack("/classrooms");
 
   const params = new URLSearchParams(window.location.search);
   const draftId = params.get("draft") ?? "";
@@ -70,7 +72,7 @@ export default function FormBuilderPage() {
     if (window.opener) {
       window.close();
     } else {
-      window.history.back();
+      goBack();
     }
   }
 

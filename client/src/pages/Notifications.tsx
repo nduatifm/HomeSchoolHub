@@ -140,13 +140,10 @@ export default function NotificationsPage() {
     }
     if (n.link) {
       const resolved = normalizeLink(n.link);
-      const isSpaPath = ["/dashboard", "/notifications", "/settings", "/admin", "/messages"].some(
-        (p) => resolved === p || resolved.startsWith(p + "/")
-      ) || resolved.startsWith("/classrooms/");
-      if (isSpaPath) {
+      if (resolved.startsWith("/")) {
         setLocation(resolved);
       } else {
-        window.location.href = resolved;
+        window.open(resolved, "_blank", "noopener,noreferrer");
       }
     }
   };
