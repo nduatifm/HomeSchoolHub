@@ -3819,6 +3819,82 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ── Direct messaging (teacher↔parent, no student anchor) ──────────────────
+  // Must come before the wildcard /:userId route to avoid match conflicts.
+
+  app.get("/api/messages/direct-contacts", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      if (user.role !== "teacher" && user.role !== "parent") {
+        return res.status(403).json({ error: "Only teachers and parents can use direct messaging" });
+      }
+      const contacts = await storage.getDirectContacts(user.id, user.role);
+      res.json(contacts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/messages/direct/:otherUserId", requireAuth, async (req, res) => {
+    try {
+      const myId = req.session.userId!;
+      const otherId = parseInt(req.params.otherUserId);
+      if (!otherId) return res.status(400).json({ error: "Invalid otherUserId" });
+      const messages = await storage.getDirectMessages(myId, otherId);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/messages/direct", requireAuth, async (req, res) => {
+    try {
+      const myId = req.session.userId!;
+      const caller = await storage.getUserById(myId);
+      if (!caller) return res.status(401).json({ error: "Unauthorized" });
+      if (caller.role !== "teacher" && caller.role !== "parent") {
+        return res.status(403).json({ error: "Only teachers and parents can send direct messages" });
+      }
+      const schema = z.object({
+        receiverId: z.number().int().positive(),
+        message: z.string().min(1).max(5000),
+      });
+      const parse = schema.safeParse(req.body);
+      if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+      const { receiverId, message } = parse.data;
+      const contacts = await storage.getDirectContacts(myId, caller.role);
+      const isValidContact = contacts.some((c) => c.id === receiverId);
+      if (!isValidContact) {
+        return res.status(403).json({ error: "You can only send direct messages to connected teachers or parents" });
+      }
+      const created = await storage.createDirectMessage(myId, receiverId, message);
+      res.json(created);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/messages/direct-read/:otherUserId", requireAuth, async (req, res) => {
+    try {
+      const myId = req.session.userId!;
+      const otherId = parseInt(req.params.otherUserId);
+      if (!otherId) return res.status(400).json({ error: "Invalid otherUserId" });
+      await prisma.message.updateMany({
+        where: {
+          conversationType: "direct",
+          senderId: otherId,
+          receiverId: myId,
+          isRead: false,
+        },
+        data: { isRead: true },
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/messages/:userId", requireAuth, async (req, res) => {
     try {
       const messages = await storage.getMessagesBetweenUsers(

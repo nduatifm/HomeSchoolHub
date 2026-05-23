@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, PenSquare, Search, X } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import MessageThread from "@/components/MessageThread";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type ConversationSummary = {
+  type?: "student" | "direct";
   studentId: number;
   teacherUserId: number;
   studentName: string;
@@ -16,7 +18,11 @@ type ConversationSummary = {
   lastMessageTimestamp: string | null;
   unreadCount: number;
   isReadOnly: boolean;
+  otherUserId?: number;
+  otherUserName?: string;
 };
+
+type DirectContact = { id: number; name: string };
 
 function formatPreviewTime(ts: string): string {
   const date = new Date(ts);
@@ -40,56 +46,102 @@ function getInitials(name: string): string {
 }
 
 function convKey(conv: ConversationSummary) {
+  if (conv.type === "direct") return `direct-${conv.otherUserId}`;
   return `${conv.teacherUserId}-${conv.studentId}`;
 }
 
 export default function MessagesPage() {
   const { user } = useAuth();
   const [selected, setSelected] = useState<ConversationSummary | null>(null);
+  const [newDirectOpen, setNewDirectOpen] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
 
   const { data: conversations = [], isLoading } = useQuery<ConversationSummary[]>({
     queryKey: ["/api/messages/conversations"],
     refetchInterval: 15000,
     staleTime: 10000,
+    select: (data) => {
+      // Auto-select first active conversation on load
+      return data;
+    },
   });
 
-  useEffect(() => {
-    if (conversations.length === 0) return;
-    if (!selected) {
-      const first = conversations.find((c) => c.teacherUserId !== 0) ?? null;
-      setSelected(first);
-      return;
-    }
-    const stillExists = conversations.some(
-      (c) => c.studentId === selected.studentId && c.teacherUserId === selected.teacherUserId,
-    );
-    if (!stillExists) {
-      const first = conversations.find((c) => c.teacherUserId !== 0) ?? null;
-      setSelected(first);
-    }
-  }, [conversations]);
+  // Auto-select first valid conversation when list loads/changes
+  const visibleConvs = conversations.filter(
+    (c) => c.type === "direct" || c.teacherUserId !== 0,
+  );
+
+  // Keep selected in sync when conversations refresh
+  const selectedKey = selected ? convKey(selected) : null;
+  const selectedStillExists = selectedKey
+    ? visibleConvs.some((c) => convKey(c) === selectedKey)
+    : false;
+
+  const effectiveSelected: ConversationSummary | null =
+    selected && (selectedStillExists || selected.type === "direct")
+      ? selected
+      : visibleConvs[0] ?? null;
+
+  // Direct contacts for "New Direct Message" dialog
+  const canUseDirect = user?.role === "teacher" || user?.role === "parent";
+  const { data: directContacts = [], isLoading: contactsLoading } = useQuery<DirectContact[]>({
+    queryKey: ["/api/messages/direct-contacts"],
+    enabled: newDirectOpen && canUseDirect,
+    staleTime: 60000,
+  });
+
+  const filteredContacts = directContacts.filter((c) =>
+    c.name.toLowerCase().includes(contactSearch.toLowerCase()),
+  );
+
+  const startDirect = (contact: DirectContact) => {
+    setNewDirectOpen(false);
+    setContactSearch("");
+    setSelected({
+      type: "direct",
+      studentId: 0,
+      teacherUserId: 0,
+      studentName: "",
+      teacherName: "",
+      parentName: null,
+      customName: null,
+      lastMessage: null,
+      lastMessageTimestamp: null,
+      unreadCount: 0,
+      isReadOnly: false,
+      otherUserId: contact.id,
+      otherUserName: contact.name,
+    });
+  };
 
   const getDisplayName = (conv: ConversationSummary): string => {
+    if (conv.type === "direct") return conv.otherUserName ?? "Direct Message";
     if (conv.customName) return conv.customName;
-    if (user?.role === "teacher") {
-      return conv.parentName
-        ? `${conv.studentName} & ${conv.parentName}`
-        : conv.studentName;
-    }
-    if (user?.role === "parent") {
-      return conv.studentName;
-    }
+    if (user?.role === "teacher") return conv.studentName || "Student";
+    if (user?.role === "parent") return conv.studentName || "Student";
     return conv.teacherName || "Teacher";
   };
 
-  const canMessage = (conv: ConversationSummary): boolean =>
-    conv.teacherUserId !== 0;
+  const getSubtitle = (conv: ConversationSummary): string | null => {
+    if (conv.type === "direct") {
+      return user?.role === "teacher" ? "Parent" : "Teacher";
+    }
+    if (user?.role === "teacher") {
+      return conv.parentName ? `w/ ${conv.parentName}` : null;
+    }
+    if (user?.role === "parent") {
+      return conv.teacherName ? `w/ ${conv.teacherName}` : null;
+    }
+    return null;
+  };
 
   const getEmptyLabel = (): string => {
     if (user?.role === "teacher") return "No students assigned yet";
     if (user?.role === "parent") return "No children with a teacher assigned yet";
     return "No teacher assigned yet";
   };
+
+  const SENT_BG = "#2563eb";
 
   return (
     <div className="bg-background">
@@ -109,12 +161,37 @@ export default function MessagesPage() {
         <div className="flex flex-1 min-h-0 overflow-hidden">
 
           {/* ── Left: conversation list ── */}
-          <div className="w-full md:w-[300px] shrink-0 border-r border-border/40 flex flex-col overflow-hidden max-h-56 md:max-h-none">
+          <div className="w-full md:w-[300px] shrink-0 border-r border-border/40 flex flex-col overflow-hidden">
             {/* Desktop header */}
-            <div className="px-5 py-4 border-b border-border/30 shrink-0 hidden md:flex items-center gap-2">
+            <div className="px-4 py-3 border-b border-border/30 shrink-0 hidden md:flex items-center gap-2">
               <Send className="w-3.5 h-3.5 text-primary" />
-              <h1 className="text-sm font-semibold text-foreground">Messages</h1>
+              <h1 className="text-sm font-semibold text-foreground flex-1">Messages</h1>
+              {canUseDirect && (
+                <button
+                  onClick={() => setNewDirectOpen(true)}
+                  title="New direct message"
+                  className="flex items-center justify-center w-7 h-7 rounded-lg transition-colors"
+                  style={{ color: "#64748b" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <PenSquare className="w-4 h-4" />
+                </button>
+              )}
             </div>
+
+            {/* Mobile "New Direct Message" strip */}
+            {canUseDirect && (
+              <div className="md:hidden px-4 py-2 border-b border-border/20">
+                <button
+                  onClick={() => setNewDirectOpen(true)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-primary"
+                >
+                  <PenSquare className="w-3.5 h-3.5" />
+                  New Direct Message
+                </button>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto">
               {isLoading && (
@@ -131,29 +208,35 @@ export default function MessagesPage() {
                 </div>
               )}
 
-              {!isLoading && conversations.length === 0 && (
+              {!isLoading && visibleConvs.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full gap-3 py-12 px-4 text-center">
                   <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
                     <MessageSquare className="w-5 h-5 text-muted-foreground/40" />
                   </div>
                   <p className="text-xs text-muted-foreground">{getEmptyLabel()}</p>
+                  {canUseDirect && (
+                    <button
+                      onClick={() => setNewDirectOpen(true)}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Start a direct message
+                    </button>
+                  )}
                 </div>
               )}
 
               {!isLoading &&
-                conversations.map((conv) => {
-                  const isActive =
-                    selected?.studentId === conv.studentId &&
-                    selected?.teacherUserId === conv.teacherUserId;
-                  const disabled = !canMessage(conv);
+                visibleConvs.map((conv) => {
+                  const isActive = effectiveSelected ? convKey(conv) === convKey(effectiveSelected) : false;
                   const displayName = getDisplayName(conv);
+                  const subtitle = getSubtitle(conv);
+                  const isDirect = conv.type === "direct";
 
                   return (
                     <button
                       key={convKey(conv)}
-                      onClick={() => !disabled && setSelected(conv)}
-                      disabled={disabled}
-                      className="w-full text-left transition-colors duration-100 disabled:cursor-default"
+                      onClick={() => setSelected(conv)}
+                      className="w-full text-left transition-colors duration-100"
                       style={
                         isActive
                           ? {
@@ -163,7 +246,7 @@ export default function MessagesPage() {
                           : { paddingLeft: "3px" }
                       }
                       onMouseEnter={(e) => {
-                        if (!isActive && !disabled)
+                        if (!isActive)
                           e.currentTarget.style.background = "hsl(var(--muted))";
                       }}
                       onMouseLeave={(e) => {
@@ -175,14 +258,12 @@ export default function MessagesPage() {
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xs font-bold select-none"
                           style={{
-                            background: disabled
-                              ? "hsl(var(--muted))"
-                              : isActive
+                            background: isActive
                               ? "hsl(var(--primary) / 0.15)"
+                              : isDirect
+                              ? "#eff6ff"
                               : "hsl(var(--muted))",
-                            color: disabled
-                              ? "hsl(var(--muted-foreground) / 0.4)"
-                              : isActive
+                            color: isActive || isDirect
                               ? "hsl(var(--primary))"
                               : "hsl(var(--muted-foreground))",
                           }}
@@ -193,19 +274,27 @@ export default function MessagesPage() {
                         {/* Text */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-0.5">
-                            <span
-                              className={`text-sm truncate ${
-                                disabled
-                                  ? "text-muted-foreground/50"
-                                  : isActive || conv.unreadCount > 0
-                                  ? "font-semibold text-foreground"
-                                  : "font-medium text-foreground/90"
-                              }`}
-                            >
-                              {displayName}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span
+                                className={`text-sm truncate ${
+                                  isActive || conv.unreadCount > 0
+                                    ? "font-semibold text-foreground"
+                                    : "font-medium text-foreground/90"
+                                }`}
+                              >
+                                {displayName}
+                              </span>
+                              {isDirect && (
+                                <span
+                                  className="shrink-0 text-[9px] font-semibold px-1 py-px rounded-full"
+                                  style={{ background: "#eff6ff", color: SENT_BG }}
+                                >
+                                  Direct
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              {conv.lastMessageTimestamp && !disabled && (
+                              {conv.lastMessageTimestamp && (
                                 <span className="text-[11px] text-muted-foreground">
                                   {formatPreviewTime(conv.lastMessageTimestamp)}
                                 </span>
@@ -227,22 +316,14 @@ export default function MessagesPage() {
                             </div>
                           </div>
 
-                          {user?.role === "parent" && (
+                          {subtitle && (
                             <p className="text-[11px] text-muted-foreground/60 truncate mb-0.5">
-                              {disabled ? "No teacher assigned" : `w/ ${conv.teacherName}`}
+                              {subtitle}
                             </p>
                           )}
 
-                          <p
-                            className={`text-xs truncate ${
-                              disabled
-                                ? "text-muted-foreground/40 italic"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {disabled
-                              ? "No teacher assigned yet"
-                              : conv.lastMessage
+                          <p className="text-xs text-muted-foreground truncate">
+                            {conv.lastMessage
                               ? conv.lastMessage.length > 52
                                 ? conv.lastMessage.slice(0, 52) + "…"
                                 : conv.lastMessage
@@ -258,21 +339,30 @@ export default function MessagesPage() {
 
           {/* ── Right: message thread ── */}
           <div className="flex-1 min-w-0 flex flex-col min-h-[320px] md:min-h-0">
-            {selected && canMessage(selected) ? (
-              <MessageThread
-                teacherId={selected.teacherUserId}
-                studentId={selected.studentId}
-                myUserId={user!.id}
-                title={getDisplayName(selected)}
-                customName={selected.customName}
-                readOnly={selected.isReadOnly}
-              />
+            {effectiveSelected ? (
+              effectiveSelected.type === "direct" ? (
+                <MessageThread
+                  directMode={{ otherUserId: effectiveSelected.otherUserId! }}
+                  myUserId={user!.id}
+                  title={effectiveSelected.otherUserName!}
+                  readOnly={false}
+                />
+              ) : (
+                <MessageThread
+                  teacherId={effectiveSelected.teacherUserId}
+                  studentId={effectiveSelected.studentId}
+                  myUserId={user!.id}
+                  title={getDisplayName(effectiveSelected)}
+                  customName={effectiveSelected.customName}
+                  readOnly={effectiveSelected.isReadOnly}
+                />
+              )
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground select-none">
                 <div className="w-12 h-12 rounded-2xl bg-muted/40 flex items-center justify-center">
                   <Send className="w-5 h-5 opacity-25" />
                 </div>
-                {conversations.length > 0 && (
+                {visibleConvs.length > 0 && (
                   <p className="text-sm text-muted-foreground/70">
                     Select a conversation to start messaging
                   </p>
@@ -282,6 +372,76 @@ export default function MessagesPage() {
           </div>
         </div>
       </div>
+
+      {/* ── New Direct Message Dialog ── */}
+      <Dialog open={newDirectOpen} onOpenChange={(o) => { setNewDirectOpen(o); if (!o) setContactSearch(""); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">New Direct Message</DialogTitle>
+          </DialogHeader>
+
+          {/* Search */}
+          <div
+            className="flex items-center gap-2 rounded-lg border px-3 py-2"
+            style={{ borderColor: "#e2e8f0" }}
+          >
+            <Search className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            <input
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              placeholder={user?.role === "teacher" ? "Search parents…" : "Search teachers…"}
+              className="flex-1 text-sm outline-none bg-transparent"
+              autoFocus
+            />
+            {contactSearch && (
+              <button onClick={() => setContactSearch("")}>
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
+          {/* Contact list */}
+          <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto -mx-1">
+            {contactsLoading && (
+              <div className="flex flex-col gap-2 px-1 py-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3 py-1.5 px-2">
+                    <div className="w-8 h-8 rounded-full bg-muted animate-pulse shrink-0" />
+                    <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!contactsLoading && filteredContacts.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6 px-4">
+                {directContacts.length === 0
+                  ? user?.role === "teacher"
+                    ? "No parents connected to your students yet."
+                    : "No teachers assigned to your children yet."
+                  : "No contacts match your search."}
+              </p>
+            )}
+
+            {!contactsLoading &&
+              filteredContacts.map((contact) => (
+                <button
+                  key={contact.id}
+                  onClick={() => startDirect(contact)}
+                  className="flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors hover:bg-muted/60 mx-1"
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                    style={{ background: "#eff6ff", color: SENT_BG }}
+                  >
+                    {getInitials(contact.name)}
+                  </div>
+                  <span className="text-sm font-medium text-foreground">{contact.name}</span>
+                </button>
+              ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

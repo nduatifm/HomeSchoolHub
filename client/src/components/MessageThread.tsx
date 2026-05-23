@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Send, ArrowLeft, MessageSquare, Pencil, Check, X, Eye } from "lucide-react";
+import { Send, ArrowLeft, MessageSquare, Pencil, Check, X, Eye, ArrowRightLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -17,13 +17,14 @@ interface ThreadMessage {
 }
 
 interface MessageThreadProps {
-  teacherId: number;
-  studentId: number;
+  teacherId?: number;
+  studentId?: number;
   myUserId: number;
   title?: string;
   customName?: string | null;
   onBack?: () => void;
   readOnly?: boolean;
+  directMode?: { otherUserId: number };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,24 +73,20 @@ type Group = {
 };
 
 // ─── Bubble radius helper ─────────────────────────────────────────────────────
-// Gives a grouped "stack" feel: full radius on outer corners,
-// tighter on the inner (sender-side) corners for mid-group bubbles.
 
 function bubbleRadius(isMe: boolean, isFirst: boolean, isLast: boolean, isSingle: boolean): string {
-  const R = 18; // outer corner
-  const r = 5;  // inner corner (grouped edge)
+  const R = 18;
+  const r = 5;
 
   if (isSingle) return `${R}px`;
 
   if (isMe) {
-    // Sent: tail is bottom-right
     const tl = R;
     const tr = isFirst ? R : r;
     const br = isLast  ? R : r;
     const bl = R;
     return `${tl}px ${tr}px ${br}px ${bl}px`;
   } else {
-    // Received: tail is bottom-left
     const tl = isFirst ? R : r;
     const tr = R;
     const br = R;
@@ -108,6 +105,7 @@ export default function MessageThread({
   customName,
   onBack,
   readOnly = false,
+  directMode,
 }: MessageThreadProps) {
   const { toast } = useToast();
   const [text, setText] = useState("");
@@ -119,23 +117,31 @@ export default function MessageThread({
   const [draftName, setDraftName] = useState("");
   const [overrideName, setOverrideName] = useState<string | null | undefined>(undefined);
 
+  const isDirectMode = !!directMode;
+
   useEffect(() => {
     setOverrideName(undefined);
     setIsEditing(false);
-  }, [teacherId, studentId]);
+  }, [teacherId, studentId, directMode?.otherUserId]);
 
   useEffect(() => {
     if (isEditing) renameInputRef.current?.focus();
   }, [isEditing]);
 
-  const displayedTitle = overrideName !== undefined
-    ? (overrideName || title || "")
-    : (customName || title || "");
+  const displayedTitle = isDirectMode
+    ? (title || "Direct Message")
+    : (overrideName !== undefined
+        ? (overrideName || title || "")
+        : (customName || title || ""));
 
   const { data: messages = [], isLoading } = useQuery<ThreadMessage[]>({
-    queryKey: ["/api/messages/thread", teacherId, studentId],
+    queryKey: isDirectMode
+      ? ["/api/messages/direct", directMode!.otherUserId]
+      : ["/api/messages/thread", teacherId, studentId],
     queryFn: () =>
-      apiRequest(`/api/messages/thread?teacherId=${teacherId}&studentId=${studentId}`),
+      isDirectMode
+        ? apiRequest(`/api/messages/direct/${directMode!.otherUserId}`)
+        : apiRequest(`/api/messages/thread?teacherId=${teacherId}&studentId=${studentId}`),
     refetchInterval: 10000,
   });
 
@@ -143,21 +149,26 @@ export default function MessageThread({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  // Mark ALL raw DB rows for this viewer as read when thread is opened or new messages arrive.
-  // Uses the /thread-read endpoint (not per-message PATCH) so broadcast duplicates
-  // (e.g. the parent's copy of a teacher→student message) also get cleared.
-  // messages.length in deps ensures newly-polled messages are marked read while user is on the thread.
   useEffect(() => {
-    if (!teacherId || !studentId || messages.length === 0) return;
-    apiRequest(
-      `/api/messages/thread-read?teacherId=${teacherId}&studentId=${studentId}`,
-      { method: "PATCH" }
-    )
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
-      })
-      .catch(console.error);
-  }, [teacherId, studentId, messages.length]);
+    if (isDirectMode) {
+      if (!directMode!.otherUserId || messages.length === 0) return;
+      apiRequest(`/api/messages/direct-read/${directMode!.otherUserId}`, { method: "PATCH" })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+        })
+        .catch(console.error);
+    } else {
+      if (!teacherId || !studentId || messages.length === 0) return;
+      apiRequest(
+        `/api/messages/thread-read?teacherId=${teacherId}&studentId=${studentId}`,
+        { method: "PATCH" }
+      )
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
+        })
+        .catch(console.error);
+    }
+  }, [isDirectMode, directMode?.otherUserId, teacherId, studentId, messages.length]);
 
   const autoResize = () => {
     const el = textareaRef.current;
@@ -168,12 +179,21 @@ export default function MessageThread({
 
   const sendMutation = useMutation({
     mutationFn: () =>
-      apiRequest("/api/messages/thread", {
-        method: "POST",
-        body: JSON.stringify({ teacherUserId: teacherId, studentId, message: text }),
-      }),
+      isDirectMode
+        ? apiRequest("/api/messages/direct", {
+            method: "POST",
+            body: JSON.stringify({ receiverId: directMode!.otherUserId, message: text }),
+          })
+        : apiRequest("/api/messages/thread", {
+            method: "POST",
+            body: JSON.stringify({ teacherUserId: teacherId, studentId, message: text }),
+          }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
+      if (isDirectMode) {
+        queryClient.invalidateQueries({ queryKey: ["/api/messages/direct", directMode!.otherUserId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/messages/thread", teacherId, studentId] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/messages/unread-count"] });
       queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       setText("");
@@ -216,7 +236,6 @@ export default function MessageThread({
     sendMutation.mutate();
   };
 
-  // Build groups: consecutive messages from same sender on same day
   const groups: Group[] = [];
   for (const msg of messages) {
     const isMe = msg.senderId === myUserId;
@@ -232,7 +251,7 @@ export default function MessageThread({
   // ── Tokens ──────────────────────────────────────────────────────────────────
   const SENT_BG    = "#2563eb";
   const SENT_TEXT  = "#ffffff";
-  const RECV_BG    = "#f1f5f9";   // cool slate, not flat gray
+  const RECV_BG    = "#f1f5f9";
   const RECV_TEXT  = "#0f172a";
   const META_TEXT  = "#94a3b8";
   const BORDER     = "#e2e8f0";
@@ -245,63 +264,72 @@ export default function MessageThread({
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div
-        className="flex items-center gap-2 px-3 py-2.5 shrink-0"
-        style={{ background: PAGE_BG }}
+        className="flex items-center gap-2 px-3 py-2.5 shrink-0 border-b"
+        style={{ background: PAGE_BG, borderColor: BORDER }}
       >
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors shrink-0"
-              style={{ color: META_TEXT }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = RECV_BG)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors shrink-0"
+            style={{ color: META_TEXT }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = RECV_BG)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        )}
 
-          {isEditing ? (
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <input
-                ref={renameInputRef}
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value.slice(0, 60))}
-                onKeyDown={handleRenameKeyDown}
-                placeholder={title || "Thread name…"}
-                maxLength={60}
-                className="flex-1 min-w-0 text-sm font-semibold rounded-md border px-2 py-0.5 outline-none"
-                style={{
-                  color: RECV_TEXT,
-                  borderColor: SENT_BG,
-                  boxShadow: "0 0 0 2px rgba(37,99,235,0.1)",
-                  background: PAGE_BG,
-                  letterSpacing: "-0.015em",
-                }}
-              />
-              <button
-                onClick={handleRenameSubmit}
-                disabled={renameMutation.isPending}
-                className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-colors"
-                style={{ background: SENT_BG, color: "#fff" }}
-              >
-                <Check className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setIsEditing(false)}
-                className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-colors"
-                style={{ background: RECV_BG, color: META_TEXT }}
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 flex-1 min-w-0 group">
+        {isEditing && !isDirectMode ? (
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <input
+              ref={renameInputRef}
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value.slice(0, 60))}
+              onKeyDown={handleRenameKeyDown}
+              placeholder={title || "Thread name…"}
+              maxLength={60}
+              className="flex-1 min-w-0 text-sm font-semibold rounded-md border px-2 py-0.5 outline-none"
+              style={{
+                color: RECV_TEXT,
+                borderColor: SENT_BG,
+                boxShadow: "0 0 0 2px rgba(37,99,235,0.1)",
+                background: PAGE_BG,
+                letterSpacing: "-0.015em",
+              }}
+            />
+            <button
+              onClick={handleRenameSubmit}
+              disabled={renameMutation.isPending}
+              className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-colors"
+              style={{ background: SENT_BG, color: "#fff" }}
+            >
+              <Check className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setIsEditing(false)}
+              className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 transition-colors"
+              style={{ background: RECV_BG, color: META_TEXT }}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span
+              className="text-sm font-semibold truncate flex-1 min-w-0"
+              style={{ color: RECV_TEXT, letterSpacing: "-0.015em" }}
+            >
+              {displayedTitle}
+            </span>
+            {isDirectMode && (
               <span
-                className="text-sm font-semibold truncate flex-1 min-w-0"
-                style={{ color: RECV_TEXT, letterSpacing: "-0.015em" }}
+                className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                style={{ background: "#eff6ff", color: SENT_BG }}
               >
-                {displayedTitle}
+                Direct
               </span>
+            )}
+            {!isDirectMode && (
               <button
                 onClick={() => {
                   setDraftName(overrideName !== undefined ? (overrideName || "") : (customName || ""));
@@ -315,16 +343,16 @@ export default function MessageThread({
               >
                 <Pencil className="w-3 h-3" />
               </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Message list ────────────────────────────────────────────────────── */}
       <div
         className="flex-1 overflow-y-auto min-h-0 px-4 py-3"
         style={{ background: PAGE_BG }}
       >
-        {/* Loading skeletons */}
         {isLoading && (
           <div className="flex flex-col gap-4 pt-1">
             {([
@@ -352,22 +380,23 @@ export default function MessageThread({
           </div>
         )}
 
-        {/* Empty state */}
         {!isLoading && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: "#eff6ff" }}
+              style={{ background: isDirectMode ? "#eff6ff" : "#eff6ff" }}
             >
-              <MessageSquare className="w-4.5 h-4.5" style={{ color: SENT_BG }} />
+              {isDirectMode
+                ? <ArrowRightLeft className="w-4 h-4" style={{ color: SENT_BG }} />
+                : <MessageSquare className="w-4 h-4" style={{ color: SENT_BG }} />
+              }
             </div>
             <p className="text-xs font-medium" style={{ color: META_TEXT }}>
-              No messages yet
+              {isDirectMode ? "Start a direct conversation" : "No messages yet"}
             </p>
           </div>
         )}
 
-        {/* Message groups */}
         {!isLoading && messages.length > 0 && (() => {
           const els: React.ReactNode[] = [];
           const seenDays = new Set<string>();
@@ -375,7 +404,6 @@ export default function MessageThread({
           for (let gi = 0; gi < groups.length; gi++) {
             const group = groups[gi];
 
-            // Day divider
             if (!seenDays.has(group.dayKey)) {
               seenDays.add(group.dayKey);
               els.push(
@@ -399,7 +427,6 @@ export default function MessageThread({
                 key={`g-${gi}`}
                 className={`flex gap-2.5 mb-3 ${group.isMe ? "flex-row-reverse" : ""}`}
               >
-                {/* Avatar — visible only, not sized differently */}
                 <div className="shrink-0 flex flex-col justify-end" style={{ width: 28 }}>
                   <div
                     className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold select-none"
@@ -412,7 +439,6 @@ export default function MessageThread({
                   </div>
                 </div>
 
-                {/* Content */}
                 <div
                   className="flex flex-col min-w-0 flex-1"
                   style={{
@@ -420,7 +446,6 @@ export default function MessageThread({
                     gap: 3,
                   }}
                 >
-                  {/* Name + time — shown once per group */}
                   <div
                     className={`flex items-center gap-1.5 ${group.isMe ? "flex-row-reverse" : ""}`}
                   >
@@ -435,7 +460,6 @@ export default function MessageThread({
                     </span>
                   </div>
 
-                  {/* Bubbles — stacked with grouped radii */}
                   {group.messages.map((msg, mi) => {
                     const isFirst  = mi === 0;
                     const isLast   = mi === total - 1;

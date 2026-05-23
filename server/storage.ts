@@ -61,6 +61,7 @@ export type TeamInviteInfo = ChildTeamMember & {
 };
 
 export type ConversationSummary = {
+  type: "student" | "direct";
   studentId: number;
   teacherUserId: number;
   studentName: string;
@@ -71,6 +72,8 @@ export type ConversationSummary = {
   unreadCount: number;
   customName: string | null;
   isReadOnly: boolean;
+  otherUserId?: number;
+  otherUserName?: string;
 };
 
 export interface IStorage {
@@ -205,6 +208,9 @@ export interface IStorage {
   markMessageAsRead(id: number): Promise<Message>;
   getThreadMessages(teacherUserId: number, studentId: number): Promise<(Message & { senderName?: string })[]>;
   getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]>;
+  getDirectMessages(userIdA: number, userIdB: number): Promise<(Message & { senderName?: string })[]>;
+  createDirectMessage(senderId: number, receiverId: number, message: string): Promise<Message>;
+  getDirectContacts(userId: number, role: string): Promise<{ id: number; name: string }[]>;
 
   createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
   getProgressReportsByStudent(studentId: number): Promise<ProgressReport[]>;
@@ -953,6 +959,60 @@ class PrismaStorage implements IStorage {
   }
 
   async getConversationSummaries(userId: number, role: string): Promise<ConversationSummary[]> {
+    // ── Direct conversation helper (teacher↔parent, no student anchor) ──────
+    const fetchDirectSummaries = async (): Promise<ConversationSummary[]> => {
+      const allDirect = await prisma.message.findMany({
+        where: {
+          conversationType: "direct",
+          OR: [{ senderId: userId }, { receiverId: userId }],
+        },
+        select: {
+          senderId: true,
+          receiverId: true,
+          message: true,
+          timestamp: true,
+          isRead: true,
+          sender: { select: { name: true } },
+          receiver: { select: { name: true } },
+        },
+        orderBy: { timestamp: "desc" },
+      });
+      if (allDirect.length === 0) return [];
+
+      const unreadMap = new Map<number, number>();
+      for (const m of allDirect) {
+        if (m.receiverId === userId && !m.isRead) {
+          unreadMap.set(m.senderId, (unreadMap.get(m.senderId) ?? 0) + 1);
+        }
+      }
+
+      const seen = new Set<number>();
+      const summaries: ConversationSummary[] = [];
+      for (const m of allDirect) {
+        const otherId = m.senderId === userId ? m.receiverId : m.senderId;
+        const otherName = m.senderId === userId ? m.receiver.name : m.sender.name;
+        if (!seen.has(otherId)) {
+          seen.add(otherId);
+          summaries.push({
+            type: "direct",
+            studentId: 0,
+            teacherUserId: 0,
+            studentName: "",
+            teacherName: "",
+            parentName: null,
+            customName: null,
+            isReadOnly: false,
+            lastMessage: m.message,
+            lastMessageTimestamp: m.timestamp,
+            unreadCount: unreadMap.get(otherId) ?? 0,
+            otherUserId: otherId,
+            otherUserName: otherName,
+          });
+        }
+      }
+      return summaries;
+    };
+
     type ConvGroup = {
       studentId: number;
       studentUserId: number; // used to anchor legacy queries to prevent cross-thread bleed
@@ -1045,7 +1105,7 @@ class PrismaStorage implements IStorage {
         }
       }
 
-      if (studentIds.length === 0) return [];
+      if (studentIds.length === 0) return fetchDirectSummaries();
 
       const [students, teacher, threadLabels] = await Promise.all([
         prisma.student.findMany({
@@ -1092,16 +1152,21 @@ class PrismaStorage implements IStorage {
       }));
 
       const stats = await fetchThreadStats(groups, userId);
-      return students.map((s) => ({
-        studentId: s.id,
-        teacherUserId: userId,
-        studentName: s.name,
-        teacherName: teacher.name,
-        parentName: primaryOwnerMap.get(s.id)?.name ?? null,
-        customName: labelMap.get(s.id) ?? null,
-        isReadOnly: false,
-        ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
-      }));
+      const directSummaries = await fetchDirectSummaries();
+      return [
+        ...students.map((s) => ({
+          type: "student" as const,
+          studentId: s.id,
+          teacherUserId: userId,
+          studentName: s.name,
+          teacherName: teacher.name,
+          parentName: primaryOwnerMap.get(s.id)?.name ?? null,
+          customName: labelMap.get(s.id) ?? null,
+          isReadOnly: false,
+          ...(stats.get(s.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
+        })),
+        ...directSummaries,
+      ];
     }
 
     if (role === "parent") {
@@ -1168,6 +1233,7 @@ class PrismaStorage implements IStorage {
         const teacher = teacherMap.get(s.id);
         const teacherUserId = teacher?.id ?? 0;
         return {
+          type: "student" as const,
           studentId: s.id,
           teacherUserId,
           studentName: s.name,
@@ -1181,6 +1247,7 @@ class PrismaStorage implements IStorage {
 
       for (const s of unassignedStudents) {
         summaries.push({
+          type: "student" as const,
           studentId: s.id,
           teacherUserId: 0,
           studentName: s.name,
@@ -1194,7 +1261,8 @@ class PrismaStorage implements IStorage {
         });
       }
 
-      return summaries;
+      const directSummaries = await fetchDirectSummaries();
+      return [...summaries, ...directSummaries];
     }
 
     if (role === "student") {
@@ -1233,6 +1301,7 @@ class PrismaStorage implements IStorage {
         select: { name: true },
       });
       return [{
+        type: "student" as const,
         studentId: studentRecord.id,
         teacherUserId: teacherUser.id,
         studentName: studentRecord.name,
@@ -1242,6 +1311,92 @@ class PrismaStorage implements IStorage {
         isReadOnly: false,
         ...(stats.get(studentRecord.id) ?? { lastMessage: null, lastMessageTimestamp: null, unreadCount: 0 }),
       }];
+    }
+
+    return [];
+  }
+
+  async getDirectMessages(userIdA: number, userIdB: number): Promise<(Message & { senderName?: string })[]> {
+    const messages = await prisma.message.findMany({
+      where: {
+        conversationType: "direct",
+        OR: [
+          { senderId: userIdA, receiverId: userIdB },
+          { senderId: userIdB, receiverId: userIdA },
+        ],
+      },
+      include: { sender: { select: { name: true } } },
+      orderBy: { timestamp: "asc" },
+    });
+    return messages.map((m) => ({
+      id: m.id,
+      senderId: m.senderId,
+      receiverId: m.receiverId,
+      message: m.message,
+      timestamp: m.timestamp,
+      isRead: m.isRead,
+      studentId: m.studentId ?? undefined,
+      conversationType: m.conversationType,
+      senderName: (m as any).sender?.name ?? "Deleted user",
+    }));
+  }
+
+  async createDirectMessage(senderId: number, receiverId: number, message: string): Promise<Message> {
+    return (await prisma.message.create({
+      data: {
+        senderId,
+        receiverId,
+        message,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        conversationType: "direct",
+      },
+    })) as Message;
+  }
+
+  async getDirectContacts(userId: number, role: string): Promise<{ id: number; name: string }[]> {
+    if (role === "teacher") {
+      const requests = await prisma.tutorRequest.findMany({
+        where: { teacherId: userId, status: "approved", studentId: { not: null } },
+        select: { studentId: true },
+      });
+      const studentIds = Array.from(new Set(requests.map((r) => r.studentId!)));
+      if (studentIds.length === 0) return [];
+      const members = await prisma.childTeamMember.findMany({
+        where: { childId: { in: studentIds }, status: "active", role: "owner", parentId: { not: null } },
+        include: { parent: { select: { id: true, name: true } } },
+      });
+      const seen = new Set<number>();
+      const contacts: { id: number; name: string }[] = [];
+      for (const m of members) {
+        if (m.parentId && m.parent && !seen.has(m.parentId)) {
+          seen.add(m.parentId);
+          contacts.push({ id: m.parentId, name: m.parent.name });
+        }
+      }
+      return contacts;
+    }
+
+    if (role === "parent") {
+      const memberships = await prisma.childTeamMember.findMany({
+        where: { parentId: userId, status: "active" },
+        select: { childId: true },
+      });
+      const childIds = memberships.map((m) => m.childId);
+      if (childIds.length === 0) return [];
+      const requests = await prisma.tutorRequest.findMany({
+        where: { studentId: { in: childIds }, status: "approved" },
+        select: { teacher: { select: { id: true, name: true } } },
+      });
+      const seen = new Set<number>();
+      const contacts: { id: number; name: string }[] = [];
+      for (const r of requests) {
+        if (!seen.has(r.teacher.id)) {
+          seen.add(r.teacher.id);
+          contacts.push({ id: r.teacher.id, name: r.teacher.name });
+        }
+      }
+      return contacts;
     }
 
     return [];

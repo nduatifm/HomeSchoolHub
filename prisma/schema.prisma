@@ -291,13 +291,14 @@ model TutorRequest {
 }
 
 model Message {
-  id         Int     @id @default(autoincrement())
-  senderId   Int
-  receiverId Int
-  message    String
-  timestamp  String
-  isRead     Boolean @default(false)
-  studentId  Int?
+  id               Int     @id @default(autoincrement())
+  senderId         Int
+  receiverId       Int
+  message          String
+  timestamp        String
+  isRead           Boolean @default(false)
+  studentId        Int?
+  conversationType String  @default("student")
 
   sender   User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
@@ -306,6 +307,7 @@ model Message {
   @@index([senderId])
   @@index([receiverId])
   @@index([studentId])
+  @@index([conversationType])
 }
 
 model ProgressReport {

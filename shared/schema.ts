@@ -304,6 +304,7 @@ export const messageSchema = z.object({
   timestamp: z.string(),
   isRead: z.boolean(),
   studentId: z.number().nullable().optional(),
+  conversationType: z.string().optional(),
 });
 
 export const insertMessageSchema = messageSchema.omit({ id: true });
