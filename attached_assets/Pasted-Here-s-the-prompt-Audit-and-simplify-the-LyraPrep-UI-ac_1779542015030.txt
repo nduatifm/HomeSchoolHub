@@ -1,0 +1,227 @@
+Here's the prompt:
+
+---
+
+> Audit and simplify the LyraPrep UI across all three user roles — student, teacher, and parent. The goal is radical simplicity: every screen should show only what that user needs to act on right now. Remove visual clutter, reduce cognitive load, and make the most important action on every page unmissable. Do not change any API calls, data fetching, mutations, or business logic. Only change what is rendered and how it is presented.
+>
+> **Guiding principles:**
+> - One primary action per screen. Every page should have one thing that's obviously the next step.
+> - Remove, don't reorganize. If content is not essential to the user's goal on that screen, remove it entirely — don't move it somewhere else.
+> - Labels should be plain English. No uppercase tracking labels, no technical jargon, no "optional" in parentheses unless the user actually needs to know.
+> - Empty states should be encouraging, not clinical. "No submissions yet" → "Nothing submitted yet — check back soon."
+> - Never show a feature to a role that can't use it. If a component is conditionally hidden with CSS, restructure it so it's not rendered at all for that role.
+> - Reduce nesting. Aim for flat layouts. Avoid cards inside cards, panels inside panels, modals that launch other modals.
+>
+> ---
+>
+> **STUDENT EXPERIENCE**
+>
+> **StudentDashboard**
+>
+> The student lands here every session. It should answer one question: "What do I need to do today?"
+>
+> Keep:
+> - Greeting with first name
+> - "Up next" hero banner — the single most urgent pending task, one tap to start it
+> - Today's Tasks list — max 5 items, sorted by due date, each row tappable end-to-end
+> - All Classes grid — illustrated cards, tap to enter a classroom
+> - Messages tab — only if they have an assigned teacher
+>
+> Remove:
+> - The Feedback tab from the sidebar/tabs entirely — surface feedback inside the assignment detail page where it's contextually relevant, not as a standalone tab students have to seek out
+> - Any stat cards, points counters, streak counts, or badge displays — these add noise without helping students know what to do
+> - The date line in the greeting — replace it with the task count nudge already implemented ("You have 3 things to do today")
+> - "You're all caught up" messaging that appears in multiple places — show it once in the hero banner, not repeated in the task list too
+>
+> **ClassworkDetail (assignment page — student view)**
+>
+> Students come here to read instructions and submit. That's it.
+>
+> Keep:
+> - Assignment title and due date — prominent, at the top
+> - Instructions / description — plain text, no card wrapper needed, just readable prose
+> - Attached file or link — one clear "Open" button
+> - Linked classwork materials — simple list, each item tappable
+> - The submission panel — this is the primary action, it should be the most visually prominent thing on the page
+> - Form questions (if present) — clean, one question visible focus at a time
+> - Draft autosave indicator — keep but make it subtle ("Saved" in muted text, not a badge)
+> - Already-submitted read-only state — show clearly with a green banner, then show their answers below
+>
+> Remove:
+> - The "Form Preview" toggle in the teacher panel leaking into student view — verify it never renders for students
+> - The points display ("100 pts") in the assignment header for students — they don't need to see this; the grade appears after grading
+> - The raw timestamp ("Submitted Mon Jan 6") in the submission card — replace with a relative time ("Submitted 2 days ago")
+> - The "No instructions provided for this assignment" empty state inside a dashed border card — just show nothing; absence of instructions is self-evident
+> - The file upload zone label text ("optional · images, PDF, Word, TXT · max 10 MB") — shorten to "Attach a file (optional)" with a tooltip or smaller note on tap
+> - Repeated "Submit Assignment" / "Resubmit Assignment" button label inconsistency — pick one pattern and apply it everywhere
+>
+> Simplify:
+> - The two-column layout (instructions left, submission right) is good on desktop. On mobile, collapse to single column: title + instructions + materials first, submission panel pinned or scrolled to below.
+> - The submission card header ("Submit Your Work") should just say "Your answer" — it's shorter and less formal, which suits the student audience
+> - If the assignment has a form schema, hide the free-text response textarea entirely — don't show both
+> - The "Draft restored" badge should appear for 3 seconds then fade, not persist permanently
+>
+> **ClassroomDetail — student tabs**
+>
+> Students only need three tabs: Feed, Assignments, Classwork. That's all that's here for them — keep it.
+>
+> Remove from the student tab view:
+> - Any debug or admin information that might render conditionally
+> - The "Submitted" text label next to assignments that are already submitted — the StatusBadge communicates this; the text is redundant
+>
+> Simplify:
+> - Assignment rows in the student tab should show: title, due date, status badge. Nothing else. No description preview, no points.
+> - Classwork items in the student tab should show: title, date added. Tap to open. No expand/collapse accordion — just navigate to the material page directly.
+>
+> ---
+>
+> **TEACHER EXPERIENCE**
+>
+> Teachers have two jobs: create content and review student work. The UI should make both of those fast.
+>
+> **TeacherDashboard (or wherever teachers land)**
+>
+> Keep:
+> - Classrooms list — the teacher's primary workspace
+> - Pending submissions count per classroom — the most actionable signal
+> - Quick "New Assignment" entry point per classroom
+>
+> Remove:
+> - Any stat widgets, total student counts, or aggregate numbers that don't lead to action
+> - Greeting date line — replace with "X submissions waiting for review" if any exist, otherwise nothing
+>
+> **ClassroomDetail — teacher tabs**
+>
+> Keep all five tabs (Feed, Assignments, Grades, Classwork, Students) but simplify what's inside each.
+>
+> Feed tab:
+> - The compose box should be the first thing visible, always — teachers post announcements, that's the primary action here
+> - Post cards should show author initial avatar, post content, and relative time. Nothing else.
+> - Remove the "Hide / Show form" toggle on the form preview inside TeacherPanel — just show the form inline, collapsed by default with a single "Preview form" disclosure
+>
+> Assignments tab:
+> - Each assignment row: title, due date, submission count badge, one "Review" button that goes to the assignment detail. That's it.
+> - Remove the inline expand/collapse submissions table from the assignment list — submissions live on the assignment detail page, not the list
+> - The "New Assignment" button should be the only prominent action at the top of this tab, right-aligned, always visible
+>
+> Grades tab:
+> - The grade matrix is appropriate — keep it
+> - Remove the percentage column if screen space is tight on tablet/mobile — earned/total is sufficient
+> - Sticky student name column must work — do not remove it
+>
+> Classwork tab:
+> - Each classwork item: title and date. Tap to open the material page. No accordion expand/collapse on the list — navigation is cleaner than inline expansion.
+> - The "Add Classwork" button stays at the top right
+>
+> Students tab:
+> - Each student row: name, grade summary (e.g. "72 / 100 pts"), and a "Remove" button only visible on hover/long-press — not always shown
+> - Remove the "Your students not yet enrolled" quick-add section — it duplicates the "Add Students" dialog and adds visual noise
+>
+> **TeacherPanel on ClassworkDetail (assignment detail)**
+>
+> This is where teachers grade. Make grading fast.
+>
+> Keep:
+> - Student name + submission status badge
+> - Submitted content (form answers or text response)
+> - Grade input + feedback input + Save button in one row
+> - Current grade display after saving
+>
+> Remove:
+> - The "Form Preview" card entirely from TeacherPanel — the teacher built the form, they don't need a preview on the grading page
+> - The "Student has not submitted yet" italic text — the absence of a submission is communicated by the StatusBadge; the italic text adds nothing
+> - The `Clock` icon before submission timestamps — the timestamp is already contextually obvious; the icon is decoration
+>
+> Simplify:
+> - Collapse all submission cards by default — show student name + status, expand on tap to see content and grade. This makes scanning a class of 20 students fast instead of one long scroll.
+> - Inline grade + feedback fields should autofocus the grade input when the card is expanded
+> - After a grade is saved, automatically collapse the card and move focus to the next ungraded submission
+>
+> ---
+>
+> **PARENT EXPERIENCE**
+>
+> Parents are observers. They want to know: is my child keeping up, and did they get graded?
+>
+> **ParentDashboard**
+>
+> Keep:
+> - Child's name at the top
+> - Classes their child is enrolled in
+> - A simple progress indicator per class: submitted vs total assignments
+>
+> Remove:
+> - Anything that requires the parent to take action — parents don't submit, don't post, don't grade
+> - Points and streak gamification — irrelevant to parents
+> - The Messages tab unless parent-teacher messaging is implemented — if it's not functional, remove it entirely
+>
+> **ClassroomDetail — parent tabs**
+>
+> Parents see three tabs: Feed (read-only), Grades, Classwork (read-only).
+>
+> Feed tab:
+> - Read-only. No compose box. No "New Post" affordance. Just the announcements list.
+> - If there are no posts, show: "No announcements yet."
+>
+> Grades tab:
+> - Show a simple list: assignment name, status badge, grade (if graded), feedback (if any). That's it.
+> - Add a total at the top: "Overall: 72 / 100 pts" — one number parents can point to.
+> - If nothing is graded yet: "No grades yet — check back after assignments are reviewed."
+>
+> Classwork tab:
+> - List of classwork materials. Read-only. Tap to open. No editing affordances.
+> - No "Add Classwork" button rendered for parents under any condition.
+>
+> **ParentPanel on ClassworkDetail**
+>
+> This is the parent's view of a specific assignment.
+>
+> Keep:
+> - Submission status badge
+> - Their child's submitted content (text or form answers, read-only)
+> - Grade and feedback if graded
+> - The "Returned for revision" warning if applicable
+>
+> Remove:
+> - The "Not graded yet" gray italic text — the absence of a grade is self-evident from the StatusBadge
+> - The file link label ("View file") — rename to the actual filename if available, otherwise "View attached file"
+> - Raw form responses rendered without context — add a subtle question label above each answer so parents understand what was asked
+>
+> ---
+>
+> **GLOBAL SIMPLIFICATIONS — apply everywhere**
+>
+> Copy and labels:
+> - Replace all instances of "classwork" in user-facing labels with "materials" or "resources" — "classwork" is jargon
+> - Replace "Student has not submitted yet" → "Not submitted"
+> - Replace "No assignments yet" → "Nothing here yet"
+> - Replace "Classroom not found" → "We couldn't find that classroom"
+> - Replace "Assignment not found" → "We couldn't find that assignment"
+> - Remove all labels that say "(optional)" — if it's optional, the user will figure it out; the label adds friction
+> - Remove all uppercase tracking labels (e.g. `text-xs uppercase tracking-widest`) from user-facing content — reserve these only for internal section dividers visible to teachers
+>
+> Empty states:
+> - Every empty state should have: one short sentence, optionally one action button. Never more than that.
+> - Remove dashed-border empty state boxes for content that genuinely might be empty (e.g. "no announcements") — just show the sentence inline without a box
+> - Keep dashed-border boxes only for upload zones and builder areas where a drop target is needed
+>
+> Cards and nesting:
+> - Remove `Card` wrappers from content that is already inside a padded page container — plain `<div>` with a `border-b border-border` separator is sufficient for list items
+> - Reduce card padding from `p-6` to `p-4` on mobile — content inside cards should not feel cramped against card edges on small screens
+> - Remove `CardHeader` / `CardTitle` from cards that have only one piece of content — the title is redundant when the content speaks for itself
+>
+> Buttons and actions:
+> - Primary action buttons should always be the rightmost or bottom-most element on the page — never buried mid-page
+> - Destructive actions (Remove, Delete, Archive) should never be the same visual weight as primary actions — use `variant="ghost"` with red hover state, not `variant="destructive"` as a visible button
+> - Icon-only buttons must have a `title` attribute at minimum — add `aria-label` to all of them
+> - Remove any button that duplicates a navigation element — e.g. if a card is fully tappable, remove the "Go to Class" button inside it
+>
+> Colors and visual noise:
+> - Replace all `bg-gray-50`, `text-gray-*`, `border-gray-*` with design token equivalents (`bg-muted`, `text-muted-foreground`, `border-border`) — hardcoded gray values break dark mode and are inconsistent
+> - Status badges should use exactly four states with four colors: pending (gray), submitted (blue), graded (green), late (amber). No other badge variants.
+> - Remove decorative icons that appear next to text labels where the label alone is sufficient — e.g. a `Clock` icon next to "Due date" adds no information
+> - Remove all `shadow-sm` from cards that are already inside a bordered container — double depth cues (border + shadow) add visual noise
+
+---
+
+This is scoped to rendering and copy only — no mutations, queries, or routing logic touched. The goal is that after this runs, every role lands on a page that tells them exactly what to do with no scanning required.
