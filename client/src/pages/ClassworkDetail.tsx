@@ -30,6 +30,9 @@ type SubmissionWithName = ClassroomSubmission & { studentName: string };
 
 function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssignment; classroomId: number }) {
   const [gradeInputs, setGradeInputs] = useState<Record<number, { grade: string; feedback: string }>>({});
+  const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
+  const toggleSub = (id: number) =>
+    setExpandedSubs((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const { data: submissions = [], isLoading } = useQuery<SubmissionWithName[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"],
@@ -64,28 +67,34 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
           const inputs = gradeInputs[sub.id] ?? { grade: sub.grade?.toString() ?? "", feedback: sub.feedback ?? "" };
           const setInput = (field: "grade" | "feedback", value: string) =>
             setGradeInputs((prev) => ({ ...prev, [sub.id]: { ...inputs, [field]: value } }));
+          const isExpanded = expandedSubs.has(sub.id);
+          const canGrade = sub.status === "submitted" || sub.status === "graded" || sub.status === "late";
 
           return (
             <Card key={sub.id} className="overflow-hidden">
-              <CardHeader className="pb-2 px-4 pt-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">{sub.studentName}</p>
-                    {sub.submittedAt && (
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        <Clock className="h-3 w-3 inline mr-1" />
-                        Submitted {new Date(sub.submittedAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                  <StatusBadge status={sub.status} />
+              <button
+                type="button"
+                className="w-full text-left px-4 py-3.5 flex items-center justify-between gap-2 hover:bg-muted/30 transition-colors"
+                onClick={() => toggleSub(sub.id)}
+              >
+                <div>
+                  <p className="font-medium text-sm text-gray-900">{sub.studentName}</p>
+                  {sub.submittedAt && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Submitted {new Date(sub.submittedAt).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent className="px-4 pb-4 space-y-3">
-                {assignment.formSchema && assignment.formSchema.length > 0 && sub.formAnswers ? (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Form Responses</p>
-                    <div className="bg-gray-50 rounded p-3">
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={sub.status} />
+                  <span className="text-xs text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
+                </div>
+              </button>
+
+              {isExpanded && (
+                <CardContent className="px-4 pb-4 pt-0 space-y-3 border-t border-border">
+                  {assignment.formSchema && assignment.formSchema.length > 0 && sub.formAnswers ? (
+                    <div className="bg-gray-50 rounded p-3 mt-3">
                       <FormResponse
                         questions={assignment.formSchema}
                         answers={sub.formAnswers as Record<string, string | string[]>}
@@ -93,73 +102,70 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                         disabled
                       />
                     </div>
-                  </div>
-                ) : sub.content ? (
-                  <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">
-                    {sub.content}
-                  </div>
-                ) : null}
-                {sub.fileUrl && (
-                  <a href={sub.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
-                    <FileText className="h-3.5 w-3.5" />View attached file
-                  </a>
-                )}
-                {(sub.status === "submitted" || sub.status === "graded" || sub.status === "late") && (
-                  <div className="border-t pt-3 space-y-2">
-                    <div className="flex gap-2 items-end">
-                      <div className="w-24">
-                        <Label className="text-xs text-gray-500 mb-1 block">Grade / {assignment.points}</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={assignment.points}
-                          value={inputs.grade}
-                          onChange={(e) => setInput("grade", e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label className="text-xs text-gray-500 mb-1 block">Feedback</Label>
-                        <Input
-                          value={inputs.feedback}
-                          onChange={(e) => setInput("feedback", e.target.value)}
-                          placeholder="Optional feedback…"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        className="h-8"
-                        disabled={
-                          gradeMutation.isPending ||
-                          !inputs.grade ||
-                          isNaN(parseInt(inputs.grade, 10)) ||
-                          parseInt(inputs.grade, 10) < 0 ||
-                          parseInt(inputs.grade, 10) > assignment.points
-                        }
-                        onClick={() =>
-                          gradeMutation.mutate({
-                            submissionId: sub.id,
-                            grade: parseInt(inputs.grade, 10),
-                            feedback: inputs.feedback,
-                          })
-                        }
-                      >
-                        {gradeMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
-                      </Button>
+                  ) : sub.content ? (
+                    <div className="bg-gray-50 rounded p-3 mt-3 text-sm text-gray-700 whitespace-pre-wrap">
+                      {sub.content}
                     </div>
-                    {sub.grade !== null && (
-                      <p className="text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Current grade: {sub.grade}/{assignment.points}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {sub.status === "pending" && (
-                  <p className="text-xs text-gray-400 italic">Student has not submitted yet.</p>
-                )}
-              </CardContent>
+                  ) : null}
+                  {sub.fileUrl && (
+                    <a href={sub.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+                      <FileText className="h-3.5 w-3.5" />View attached file
+                    </a>
+                  )}
+                  {canGrade && (
+                    <div className="border-t pt-3 space-y-2">
+                      <div className="flex gap-2 items-end">
+                        <div className="w-24">
+                          <Label className="text-xs text-gray-500 mb-1 block">Grade / {assignment.points}</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={assignment.points}
+                            value={inputs.grade}
+                            onChange={(e) => setInput("grade", e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-xs text-gray-500 mb-1 block">Feedback</Label>
+                          <Input
+                            value={inputs.feedback}
+                            onChange={(e) => setInput("feedback", e.target.value)}
+                            placeholder="Optional feedback…"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          className="h-8"
+                          disabled={
+                            gradeMutation.isPending ||
+                            !inputs.grade ||
+                            isNaN(parseInt(inputs.grade, 10)) ||
+                            parseInt(inputs.grade, 10) < 0 ||
+                            parseInt(inputs.grade, 10) > assignment.points
+                          }
+                          onClick={() =>
+                            gradeMutation.mutate({
+                              submissionId: sub.id,
+                              grade: parseInt(inputs.grade, 10),
+                              feedback: inputs.feedback,
+                            })
+                          }
+                        >
+                          {gradeMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+                        </Button>
+                      </div>
+                      {sub.grade !== null && (
+                        <p className="text-xs text-green-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Current grade: {sub.grade}/{assignment.points}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              )}
             </Card>
           );
         })
@@ -243,6 +249,13 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       lastSavedRef.current = saved;
     } catch {}
   }, [draftKey]);
+
+  // Auto-fade "Draft restored" banner after 3s
+  useEffect(() => {
+    if (!draftRestored) return;
+    const t = setTimeout(() => setDraftRestored(false), 3000);
+    return () => clearTimeout(t);
+  }, [draftRestored]);
 
   // Apply server draft when it loads — server copy wins over localStorage
   useEffect(() => {
@@ -457,7 +470,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
           <CardHeader className="pb-4 px-6 pt-6">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-semibold">
-                {isReturned ? "Turn It In Again" : "Turn In Your Work"}
+                {isReturned ? "Revise your answer" : "Your answer"}
               </CardTitle>
               <div className="flex items-center gap-1.5">
                 {draftRestored && autoSaveStatus === "idle" && (
@@ -623,7 +636,7 @@ function ParentPanel({ assignment, classroomId, studentId }: { assignment: Class
             ) : null}
             {mySubmission.fileUrl && (
               <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
-                <FileText className="h-3.5 w-3.5" />View file
+                <FileText className="h-3.5 w-3.5" />{mySubmission.fileUrl.split("/").pop()?.split("?")[0] || "View attached file"}
               </a>
             )}
             {mySubmission.status === "returned" && (
@@ -837,7 +850,9 @@ export default function ClassworkDetail() {
       <p className="text-sm text-gray-500">{classroom.name} · {classroom.subject}</p>
       <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Due {assignment.dueDate}</span>
-        <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{assignment.points} pts</span>
+        {!isStudent && (
+          <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{assignment.points} pts</span>
+        )}
       </div>
     </div>
   );
