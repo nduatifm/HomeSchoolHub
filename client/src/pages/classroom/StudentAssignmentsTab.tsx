@@ -26,7 +26,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug }: {
   }
 
   if (assignments.length === 0) {
-    return <div className="text-center py-12 text-muted-foreground text-sm">No assignments yet.</div>;
+    return <div className="text-center py-12 text-muted-foreground text-sm">Nothing here yet.</div>;
   }
 
   return (

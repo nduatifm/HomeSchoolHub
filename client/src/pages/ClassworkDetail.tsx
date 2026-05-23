@@ -222,6 +222,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string | null>(null);
   const isDirtyRef = useRef(false);
   const currentDraftRef = useRef<string | null>(null);
@@ -309,6 +310,11 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
 
     isDirtyRef.current = true;
     setAutoSaveStatus("saving");
+    // "Saving…" auto-resets to idle after 3s even if debounce hasn't fired yet
+    if (savingTimerRef.current) clearTimeout(savingTimerRef.current);
+    savingTimerRef.current = setTimeout(() => {
+      setAutoSaveStatus((prev) => (prev === "saving" ? "idle" : prev));
+    }, 3000);
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
@@ -337,6 +343,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
         localStorage.setItem(draftKey, currentDraftRef.current);
       }
       if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
+      if (savingTimerRef.current) clearTimeout(savingTimerRef.current);
     };
   }, [draftKey]);
 
@@ -510,7 +517,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center shrink-0">1</span>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <p className="text-xs font-semibold text-muted-foreground">
                   {hasFormSchema ? "Answer the questions" : "Write your answer"}
                 </p>
               </div>
@@ -638,7 +645,7 @@ function ParentPanel({ assignment, classroomId, studentId }: { assignment: Class
           <CardContent className="px-4 pb-4 space-y-2">
             {assignment.formSchema && assignment.formSchema.length > 0 && mySubmission.formAnswers ? (
               <div className="bg-gray-50 rounded p-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Form Responses</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">Your answers</p>
                 <FormResponse
                   questions={assignment.formSchema}
                   answers={mySubmission.formAnswers as Record<string, string | string[]>}
@@ -806,7 +813,7 @@ export default function ClassworkDetail() {
       {/* Linked Classwork Materials */}
       {linkedMaterials.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-800">Classwork Materials</h2>
+          <h2 className="text-sm font-semibold text-foreground">Materials</h2>
           {linkedMaterials.map((material) => (
             <button
               key={material.id}

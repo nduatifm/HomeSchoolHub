@@ -407,7 +407,7 @@ export default function ParentChildrenPage() {
               </Button>
             </div>
             {childStats.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
+              <div className="py-8 text-center">
                 <p className="text-sm text-muted-foreground mb-3">No children added yet. Create an account for your child or send them an invite to sign up themselves.</p>
                 <Button size="sm" onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" }); }}>
                   <PlusCircle className="w-3.5 h-3.5 mr-1.5" />

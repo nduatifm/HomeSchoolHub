@@ -28,7 +28,7 @@ export default function ParentGradesTab({ classroomId, studentId, seenAssignment
   if (assignments.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground text-sm">
-        No assignments yet — check back soon.
+        Nothing here yet — check back after assignments are reviewed.
       </div>
     );
   }

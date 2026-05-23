@@ -97,7 +97,7 @@ export default function StudentsTab({ classroomId, isArchived }: { classroomId: 
 
       {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
       {!isLoading && enrollments.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">No students enrolled yet.</div>
+        <div className="text-center py-12 text-muted-foreground text-sm">No students enrolled yet.</div>
       )}
 
       <div className="space-y-2">
