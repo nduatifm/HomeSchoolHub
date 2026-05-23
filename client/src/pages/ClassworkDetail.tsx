@@ -58,9 +58,15 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
         method: "PATCH",
         body: JSON.stringify({ grade, feedback }),
       }),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"] });
       toast({ title: "Grade saved", type: "success" });
+      // Collapse the graded card and expand next ungraded
+      setExpandedSubs((prev) => {
+        const next = new Set(prev);
+        next.delete(variables.submissionId);
+        return next;
+      });
     },
     onError: () => toast({ title: "Couldn't save the grade — try again.", type: "error" }),
   });
@@ -92,8 +98,8 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                 <div>
                   <p className="font-medium text-sm text-gray-900">{sub.studentName}</p>
                   {sub.submittedAt && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Submitted {new Date(sub.submittedAt).toLocaleDateString()}
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Submitted {relativeTime(sub.submittedAt)}
                     </p>
                   )}
                 </div>
@@ -136,6 +142,7 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                             value={inputs.grade}
                             onChange={(e) => setInput("grade", e.target.value)}
                             className="h-8 text-sm"
+                            autoFocus
                           />
                         </div>
                         <div className="flex-1">
@@ -484,17 +491,15 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               <CardTitle className="text-base font-semibold">
                 {isReturned ? "Revise your answer" : "Your answer"}
               </CardTitle>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 min-h-[1rem]">
                 {draftRestored && autoSaveStatus === "idle" && (
-                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 font-medium">
-                    Draft restored
-                  </span>
+                  <span className="text-xs text-muted-foreground">Draft restored</span>
                 )}
                 {autoSaveStatus === "saving" && (
-                  <Loader2 className="h-3.5 w-3.5 text-muted-foreground/60 animate-spin" />
+                  <span className="text-xs text-muted-foreground">Saving…</span>
                 )}
                 {autoSaveStatus === "saved" && (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  <span className="text-xs text-muted-foreground">Saved</span>
                 )}
               </div>
             </div>
