@@ -55,23 +55,19 @@ export default function MessagesPage() {
   const [selected, setSelected] = useState<ConversationSummary | null>(null);
   const [newDirectOpen, setNewDirectOpen] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
+  // Mobile: "list" shows the conversation list; "thread" shows the open thread
+  const [mobileView, setMobileView] = useState<"list" | "thread">("list");
 
   const { data: conversations = [], isLoading } = useQuery<ConversationSummary[]>({
     queryKey: ["/api/messages/conversations"],
     refetchInterval: 15000,
     staleTime: 10000,
-    select: (data) => {
-      // Auto-select first active conversation on load
-      return data;
-    },
   });
 
-  // Auto-select first valid conversation when list loads/changes
   const visibleConvs = conversations.filter(
     (c) => c.type === "direct" || c.teacherUserId !== 0,
   );
 
-  // Keep selected in sync when conversations refresh
   const selectedKey = selected ? convKey(selected) : null;
   const selectedStillExists = selectedKey
     ? visibleConvs.some((c) => convKey(c) === selectedKey)
@@ -82,7 +78,6 @@ export default function MessagesPage() {
       ? selected
       : visibleConvs[0] ?? null;
 
-  // Direct contacts for "New Direct Message" dialog
   const canUseDirect = user?.role === "teacher" || user?.role === "parent";
   const { data: directContacts = [], isLoading: contactsLoading } = useQuery<DirectContact[]>({
     queryKey: ["/api/messages/direct-contacts"],
@@ -94,10 +89,15 @@ export default function MessagesPage() {
     c.name.toLowerCase().includes(contactSearch.toLowerCase()),
   );
 
+  const selectConv = (conv: ConversationSummary) => {
+    setSelected(conv);
+    setMobileView("thread");
+  };
+
   const startDirect = (contact: DirectContact) => {
     setNewDirectOpen(false);
     setContactSearch("");
-    setSelected({
+    selectConv({
       type: "direct",
       studentId: 0,
       teacherUserId: 0,
@@ -143,6 +143,9 @@ export default function MessagesPage() {
 
   const SENT_BG = "#2563eb";
 
+  // Students cannot rename threads
+  const canRename = user?.role !== "student";
+
   return (
     <div className="bg-background">
       <ModernSidebar />
@@ -151,17 +154,31 @@ export default function MessagesPage() {
         className="md:ml-[228px] flex flex-col overflow-hidden"
         style={{ height: "100dvh" }}
       >
-        {/* Mobile top bar */}
-        <div className="h-14 shrink-0 md:hidden border-b border-border/40 flex items-center px-4 gap-2">
+        {/* Mobile top bar — only shown on list view */}
+        <div className={`h-14 shrink-0 md:hidden border-b border-border/40 flex items-center px-4 gap-2 ${mobileView === "thread" ? "hidden" : ""}`}>
           <Send className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">Messages</span>
+          <span className="font-semibold text-sm flex-1">Messages</span>
+          {canUseDirect && (
+            <button
+              onClick={() => setNewDirectOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-primary"
+            >
+              <PenSquare className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Two-pane area */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
 
           {/* ── Left: conversation list ── */}
-          <div className="w-full md:w-[300px] shrink-0 border-r border-border/40 flex flex-col overflow-hidden">
+          <div
+            className={`
+              border-r border-border/40 flex flex-col overflow-hidden
+              ${mobileView === "thread" ? "hidden md:flex" : "flex"}
+              w-full md:w-[300px] shrink-0
+            `}
+          >
             {/* Desktop header */}
             <div className="px-4 py-3 border-b border-border/30 shrink-0 hidden md:flex items-center gap-2">
               <Send className="w-3.5 h-3.5 text-primary" />
@@ -179,19 +196,6 @@ export default function MessagesPage() {
                 </button>
               )}
             </div>
-
-            {/* Mobile "New Direct Message" strip */}
-            {canUseDirect && (
-              <div className="md:hidden px-4 py-2 border-b border-border/20">
-                <button
-                  onClick={() => setNewDirectOpen(true)}
-                  className="flex items-center gap-1.5 text-xs font-medium text-primary"
-                >
-                  <PenSquare className="w-3.5 h-3.5" />
-                  New Direct Message
-                </button>
-              </div>
-            )}
 
             <div className="flex-1 overflow-y-auto">
               {isLoading && (
@@ -235,7 +239,7 @@ export default function MessagesPage() {
                   return (
                     <button
                       key={convKey(conv)}
-                      onClick={() => setSelected(conv)}
+                      onClick={() => selectConv(conv)}
                       className="w-full text-left transition-colors duration-100"
                       style={
                         isActive
@@ -338,7 +342,12 @@ export default function MessagesPage() {
           </div>
 
           {/* ── Right: message thread ── */}
-          <div className="flex-1 min-w-0 flex flex-col min-h-[320px] md:min-h-0">
+          <div
+            className={`
+              flex-1 min-w-0 flex flex-col min-h-[320px] md:min-h-0
+              ${mobileView === "list" ? "hidden md:flex" : "flex"}
+            `}
+          >
             {effectiveSelected ? (
               effectiveSelected.type === "direct" ? (
                 <MessageThread
@@ -346,6 +355,8 @@ export default function MessagesPage() {
                   myUserId={user!.id}
                   title={effectiveSelected.otherUserName!}
                   readOnly={false}
+                  canRename={false}
+                  onBack={mobileView === "thread" ? () => setMobileView("list") : undefined}
                 />
               ) : (
                 <MessageThread
@@ -355,6 +366,8 @@ export default function MessagesPage() {
                   title={getDisplayName(effectiveSelected)}
                   customName={effectiveSelected.customName}
                   readOnly={effectiveSelected.isReadOnly}
+                  canRename={canRename}
+                  onBack={mobileView === "thread" ? () => setMobileView("list") : undefined}
                 />
               )
             ) : (

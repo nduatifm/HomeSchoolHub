@@ -24,6 +24,7 @@ interface MessageThreadProps {
   customName?: string | null;
   onBack?: () => void;
   readOnly?: boolean;
+  canRename?: boolean;
   directMode?: { otherUserId: number };
 }
 
@@ -105,6 +106,7 @@ export default function MessageThread({
   customName,
   onBack,
   readOnly = false,
+  canRename = true,
   directMode,
 }: MessageThreadProps) {
   const { toast } = useToast();
@@ -329,7 +331,7 @@ export default function MessageThread({
                 Direct
               </span>
             )}
-            {!isDirectMode && (
+            {!isDirectMode && canRename && (
               <button
                 onClick={() => {
                   setDraftName(overrideName !== undefined ? (overrideName || "") : (customName || ""));

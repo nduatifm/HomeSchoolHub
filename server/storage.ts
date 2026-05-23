@@ -1105,6 +1105,20 @@ class PrismaStorage implements IStorage {
         }
       }
 
+      // Fallback: direct-assignment mode uses TeacherStudentAssignment instead of TutorRequest
+      if (studentIds.length === 0) {
+        const assignments = await prisma.teacherStudentAssignment.findMany({
+          where: { teacherId: userId, status: "active" },
+          select: { studentId: true },
+        });
+        for (const a of assignments) {
+          if (!seen.has(a.studentId)) {
+            seen.add(a.studentId);
+            studentIds.push(a.studentId);
+          }
+        }
+      }
+
       if (studentIds.length === 0) return fetchDirectSummaries();
 
       const [students, teacher, threadLabels] = await Promise.all([
@@ -1184,7 +1198,7 @@ class PrismaStorage implements IStorage {
       ]);
 
       const parentStudents = memberships.map((m) => m.child);
-      if (parentStudents.length === 0) return [];
+      if (parentStudents.length === 0) return fetchDirectSummaries();
 
       // Map childId → caller's role on that child's team (owner vs member)
       const callerRoleMap = new Map(memberships.map((m) => [m.child.id, m.role as string]));
@@ -1284,7 +1298,15 @@ class PrismaStorage implements IStorage {
         }),
       ]);
 
-      const teacherUser = tutorRequest?.teacher ?? null;
+      // Prefer tutorRequest; fallback to direct-assignment (TeacherStudentAssignment)
+      let teacherUser: { id: number; name: string } | null = tutorRequest?.teacher ?? null;
+      if (!teacherUser) {
+        const assignment = await prisma.teacherStudentAssignment.findFirst({
+          where: { studentId: studentRecord.id, status: "active" },
+          include: { teacher: { select: { id: true, name: true } } },
+        });
+        if (assignment) teacherUser = { id: assignment.teacher.id, name: assignment.teacher.name };
+      }
       if (!teacherUser) return [];
 
       const teamUserIds = await this.getTeamMemberUserIds(studentRecord.id);
@@ -1360,7 +1382,17 @@ class PrismaStorage implements IStorage {
         where: { teacherId: userId, status: "approved", studentId: { not: null } },
         select: { studentId: true },
       });
-      const studentIds = Array.from(new Set(requests.map((r) => r.studentId!)));
+      let studentIds = Array.from(new Set(requests.map((r) => r.studentId!)));
+
+      // Fallback: direct-assignment mode — find students via TeacherStudentAssignment
+      if (studentIds.length === 0) {
+        const assignments = await prisma.teacherStudentAssignment.findMany({
+          where: { teacherId: userId, status: "active" },
+          select: { studentId: true },
+        });
+        studentIds = Array.from(new Set(assignments.map((a) => a.studentId)));
+      }
+
       if (studentIds.length === 0) return [];
       const members = await prisma.childTeamMember.findMany({
         where: { childId: { in: studentIds }, status: "active", role: "owner", parentId: { not: null } },
@@ -1384,6 +1416,7 @@ class PrismaStorage implements IStorage {
       });
       const childIds = memberships.map((m) => m.childId);
       if (childIds.length === 0) return [];
+
       const requests = await prisma.tutorRequest.findMany({
         where: { studentId: { in: childIds }, status: "approved" },
         select: { teacher: { select: { id: true, name: true } } },
@@ -1396,6 +1429,21 @@ class PrismaStorage implements IStorage {
           contacts.push({ id: r.teacher.id, name: r.teacher.name });
         }
       }
+
+      // Fallback: direct-assignment mode — find teachers via TeacherStudentAssignment
+      if (contacts.length === 0) {
+        const assignments = await prisma.teacherStudentAssignment.findMany({
+          where: { studentId: { in: childIds }, status: "active" },
+          include: { teacher: { select: { id: true, name: true } } },
+        });
+        for (const a of assignments) {
+          if (!seen.has(a.teacher.id)) {
+            seen.add(a.teacher.id);
+            contacts.push({ id: a.teacher.id, name: a.teacher.name });
+          }
+        }
+      }
+
       return contacts;
     }
 
