@@ -10,19 +10,9 @@ import {
   Plus,
   Trash2,
   Pencil,
-  Paperclip,
-  ClipboardList,
-  Link2,
 } from "lucide-react";
 import type { ClassroomAssignment } from "@shared/schema";
 import type { SubmissionWithName } from "./types";
-
-const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
-  assignment: { label: "Assignment", cls: "bg-blue-100 text-blue-700" },
-  test:       { label: "Test",       cls: "bg-orange-100 text-orange-700" },
-  quiz:       { label: "Quiz",       cls: "bg-purple-100 text-purple-700" },
-  project:    { label: "Project",    cls: "bg-teal-100 text-teal-700" },
-};
 
 export default function TeacherAssignmentsTab({
   classroomId,
@@ -111,7 +101,6 @@ export default function TeacherAssignmentsTab({
           const graded = stats?.graded ?? 0;
           const submitted = stats?.submitted ?? 0;
           const hasStats = stats !== undefined;
-          const typeMeta = TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment;
 
           return (
             <div
@@ -135,30 +124,6 @@ export default function TeacherAssignmentsTab({
 
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
-                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                      {a.points} pts
-                    </span>
-                    <span className={`inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full ${typeMeta.cls}`}>
-                      {typeMeta.label}
-                    </span>
-                    {a.formSchema && a.formSchema.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full font-medium">
-                        <ClipboardList className="h-2.5 w-2.5" />
-                        {a.formSchema.length} form {a.formSchema.length === 1 ? "question" : "questions"}
-                      </span>
-                    )}
-                    {a.fileUrl && (
-                      <a href={a.fileUrl} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
-                        <Paperclip className="h-2.5 w-2.5" />Attachment
-                      </a>
-                    )}
-                    {a.linkUrl && (
-                      <a href={a.linkUrl} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline">
-                        <Link2 className="h-2.5 w-2.5" />Link
-                      </a>
-                    )}
                   </div>
 
                   {hasStats && submitted > 0 && (

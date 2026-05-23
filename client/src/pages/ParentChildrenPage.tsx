@@ -713,29 +713,6 @@ export default function ParentChildrenPage() {
             </div>
           )}
 
-          <div className="rounded-2xl border border-border overflow-hidden">
-            <div className="px-4 py-3 bg-muted/30 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground">My Students</h2>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Grade Level</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((s: any) => (
-                  <TableRow key={s.id} data-testid={`row-student-${s.id}`}>
-                    <TableCell data-testid={`text-student-name-${s.id}`}>{s.name}</TableCell>
-                    <TableCell>{s.email}</TableCell>
-                    <TableCell>{s.gradeLevel}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
         </main>
       </div>
 

@@ -517,12 +517,11 @@ export default function NewAssignmentPage() {
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
                 </div>
 
-                {/* Classwork — mobile only */}
+                {/* Materials — mobile only */}
                 {materials.length > 0 && (
                   <div className="rounded-2xl border border-border bg-card p-5 space-y-3 lg:hidden">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <BookOpen className="h-3.5 w-3.5" /> Classwork
-                      <span className="normal-case font-normal tracking-normal ml-1 text-muted-foreground/60 text-xs">optional</span>
+                      <BookOpen className="h-3.5 w-3.5" /> Materials
                     </p>
                     {selectedMaterialIds.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
@@ -786,12 +785,11 @@ export default function NewAssignmentPage() {
                   )}
                 </div>
 
-                {/* Classwork */}
+                {/* Materials */}
                 {materials.length > 0 && (
                   <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <BookOpen className="h-3.5 w-3.5" /> Classwork
-                      <span className="normal-case font-normal tracking-normal ml-1 text-muted-foreground/60 text-xs">optional</span>
+                      <BookOpen className="h-3.5 w-3.5" /> Materials
                     </p>
                     {selectedMaterialIds.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">

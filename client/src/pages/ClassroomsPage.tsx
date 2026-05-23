@@ -498,26 +498,21 @@ export default function ClassroomsPage() {
               </p>
             </div>
             {isTeacher && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="gap-1.5 h-8 text-sm">
-                    <Plus className="h-3.5 w-3.5" />
-                    New
-                    <ChevronDown className="h-3 w-3 ml-0.5 opacity-70" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem className="gap-2" onClick={() => openNewClassroom(null)}>
-                    <School className="h-4 w-4 text-muted-foreground shrink-0" />
-                    Add Subject
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="gap-2" onClick={() => setNewFolderOpen(true)}>
-                    <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                    New Grade Folder
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 h-8 text-xs text-muted-foreground"
+                  onClick={() => setNewFolderOpen(true)}
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  New Folder
+                </Button>
+                <Button size="sm" className="gap-1.5 h-8 text-sm" onClick={() => openNewClassroom(null)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  New Classroom
+                </Button>
+              </div>
             )}
           </div>
 
