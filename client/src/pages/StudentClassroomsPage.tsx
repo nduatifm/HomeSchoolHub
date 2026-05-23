@@ -191,7 +191,7 @@ export default function StudentClassroomsPage() {
                 <span className="text-sm font-semibold text-amber-800">Things to do</span>
               </div>
               <ul className="divide-y divide-amber-100">
-                {allPendingItems.slice(0, 8).map(item => (
+                {allPendingItems.slice(0, 5).map(item => (
                   <li
                     key={item.key}
                     className="flex items-center justify-between px-4 py-3 hover:bg-amber-100/60 cursor-pointer transition-colors group"

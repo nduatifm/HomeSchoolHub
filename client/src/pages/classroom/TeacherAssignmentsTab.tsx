@@ -14,6 +14,13 @@ import {
 import type { ClassroomAssignment } from "@shared/schema";
 import type { SubmissionWithName } from "./types";
 
+const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
+  assignment: { label: "Assignment", cls: "bg-blue-100 text-blue-700" },
+  test:       { label: "Test",       cls: "bg-orange-100 text-orange-700" },
+  quiz:       { label: "Quiz",       cls: "bg-purple-100 text-purple-700" },
+  project:    { label: "Project",    cls: "bg-teal-100 text-teal-700" },
+};
+
 export default function TeacherAssignmentsTab({
   classroomId,
   classroomSlug,
@@ -101,6 +108,7 @@ export default function TeacherAssignmentsTab({
           const graded = stats?.graded ?? 0;
           const submitted = stats?.submitted ?? 0;
           const hasStats = stats !== undefined;
+          const typeMeta = TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment;
 
           return (
             <div
@@ -123,14 +131,16 @@ export default function TeacherAssignmentsTab({
                   </button>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
-                  </div>
-
-                  {hasStats && submitted > 0 && (
-                    <span className="text-[11px] text-muted-foreground">
-                      {submitted} submitted / {graded} graded
+                    <span className={`inline-flex items-center text-[11px] font-medium px-1.5 py-0.5 rounded-full ${typeMeta.cls}`}>
+                      {typeMeta.label}
                     </span>
-                  )}
+                    <span className="text-xs text-muted-foreground">Due {a.dueDate}</span>
+                    {hasStats && submitted > 0 && (
+                      <span className="inline-flex items-center text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                        {submitted} submitted / {graded} graded
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0 mt-0.5">

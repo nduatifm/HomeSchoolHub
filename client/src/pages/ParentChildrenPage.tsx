@@ -395,7 +395,7 @@ export default function ParentChildrenPage() {
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Your Children</h2>
+              <h2 className="text-sm font-semibold text-muted-foreground">Your Children</h2>
               <Button
                 size="sm"
                 variant="outline"

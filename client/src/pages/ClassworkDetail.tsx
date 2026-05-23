@@ -536,9 +536,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="h-5 w-5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Add a file
-                </p>
+                <p className="text-xs font-semibold text-muted-foreground">Attach a file</p>
               </div>
               {file ? (
                 <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
@@ -574,7 +572,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                 >
                   <Upload className="h-6 w-6" />
                   <span className="text-sm font-medium">Drop a file here or click to browse</span>
-                  <span className="text-xs text-muted-foreground/70">Photos, PDFs, Word docs — up to 10 MB</span>
+                  <span className="text-xs text-muted-foreground/70">Photos, PDFs, or Word docs — up to 10 MB</span>
                   <input
                     type="file"
                     className="hidden"
