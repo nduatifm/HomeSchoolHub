@@ -28,6 +28,18 @@ import StatusBadge from "./classroom/StatusBadge";
 
 type SubmissionWithName = ClassroomSubmission & { studentName: string };
 
+function relativeTime(ts: string): string {
+  const diffMs = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
 function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssignment; classroomId: number }) {
   const [gradeInputs, setGradeInputs] = useState<Record<number, { grade: string; feedback: string }>>({});
   const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
@@ -722,7 +734,7 @@ export default function ClassworkDetail() {
       <div className="min-h-screen bg-background">
         <ModernSidebar />
         <div className="md:ml-[228px] flex flex-col items-center justify-center gap-3 min-h-screen">
-          <p className="text-gray-500 text-sm">{!classroom ? "Classroom not found." : "Assignment not found."}</p>
+          <p className="text-muted-foreground text-sm">{!classroom ? "We couldn't find that classroom." : "We couldn't find that assignment."}</p>
           <Button variant="outline" size="sm" onClick={goBack}>
             Back to Dashboard
           </Button>

@@ -53,16 +53,16 @@ export default function TeacherAssignmentsTab({
     })),
   });
 
-  // Build per-assignment stats: toGrade (submitted/late/returned) + graded counts
-  const statsMap: Record<number, { toGrade: number; graded: number }> = {};
+  // Build per-assignment stats: submitted (any non-pending) + graded counts
+  const statsMap: Record<number, { submitted: number; graded: number; toGrade: number }> = {};
   allSubResults.forEach((q, i) => {
     const id = assignments[i]?.id;
     if (!id) return;
     const subs = q.data ?? [];
-    statsMap[id] = {
-      toGrade: subs.filter((s) => s.status === "submitted" || s.status === "late" || s.status === "returned").length,
-      graded: subs.filter((s) => s.status === "graded").length,
-    };
+    const graded = subs.filter((s) => s.status === "graded").length;
+    const submitted = subs.filter((s) => s.status !== "pending").length;
+    const toGrade = subs.filter((s) => s.status === "submitted" || s.status === "late").length;
+    statsMap[id] = { submitted, graded, toGrade };
   });
 
   const deleteMutation = useMutation({
@@ -100,7 +100,7 @@ export default function TeacherAssignmentsTab({
       )}
       {!isLoading && assignments.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">
-          No assignments yet.
+          Nothing here yet.
         </div>
       )}
 
@@ -109,6 +109,7 @@ export default function TeacherAssignmentsTab({
           const stats = statsMap[a.id];
           const toGrade = stats?.toGrade ?? 0;
           const graded = stats?.graded ?? 0;
+          const submitted = stats?.submitted ?? 0;
           const hasStats = stats !== undefined;
           const typeMeta = TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment;
 
@@ -160,9 +161,9 @@ export default function TeacherAssignmentsTab({
                     )}
                   </div>
 
-                  {hasStats && (toGrade > 0 || graded > 0) && (
+                  {hasStats && submitted > 0 && (
                     <span className="text-[11px] text-muted-foreground">
-                      {toGrade} submitted · {graded} graded
+                      {submitted} submitted / {graded} graded
                     </span>
                   )}
                 </div>
