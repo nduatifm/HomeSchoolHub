@@ -1723,6 +1723,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/students/check-username?username=X — check if a username is available
+  app.get("/api/students/check-username", requireAuth, async (req, res) => {
+    try {
+      const username = String(req.query.username ?? "").trim().toLowerCase();
+      if (!username) return res.status(400).json({ error: "username is required" });
+      const existing = await storage.getUserByUsername(username);
+      res.json({ available: !existing });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/students/suggest-username?name=X — return a unique username suggestion
   app.get("/api/students/suggest-username", requireAuth, async (req, res) => {
     try {

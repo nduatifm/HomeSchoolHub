@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, ApiError } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,9 @@ export default function ParentInvitesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [createResult, setCreateResult] = useState<{ username: string; password: string } | null>(null);
   const [copiedCreateUsername, setCopiedCreateUsername] = useState(false);
   const [copiedCreatePw, setCopiedCreatePw] = useState(false);
@@ -138,6 +141,37 @@ export default function ParentInvitesPage() {
       }
     },
   });
+
+  useEffect(() => {
+    const raw = createForm.username.trim();
+    if (!raw) {
+      setUsernameAvailable(null);
+      setIsCheckingUsername(false);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      return;
+    }
+    const valid = /^[a-z0-9][a-z0-9.]{1,18}[a-z0-9]$/i.test(raw);
+    if (!valid) {
+      setUsernameAvailable(null);
+      return;
+    }
+    setIsCheckingUsername(true);
+    setUsernameAvailable(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const data = await apiRequest(`/api/students/check-username?username=${encodeURIComponent(raw.toLowerCase())}`) as { available: boolean };
+        setUsernameAvailable(data.available);
+        if (!data.available) setUsernameError("That username is already taken.");
+        else setUsernameError(null);
+      } catch {
+        setUsernameAvailable(null);
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    }, 450);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [createForm.username]);
 
   const isInviteFormValid =
     inviteForm.email.trim() &&
@@ -389,17 +423,35 @@ export default function ParentInvitesPage() {
                       Suggest
                     </button>
                   </Label>
-                  <Input
-                    id="create-username"
-                    placeholder="e.g. alex.j — leave blank to auto-generate"
-                    value={createForm.username}
-                    onChange={(e) => { setCreateForm(f => ({ ...f, username: e.target.value })); setUsernameError(null); }}
-                    className={`h-10 font-mono ${usernameError ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="create-username"
+                      placeholder="e.g. alex.j — leave blank to auto-generate"
+                      value={createForm.username}
+                      onChange={(e) => { setCreateForm(f => ({ ...f, username: e.target.value })); setUsernameError(null); setUsernameAvailable(null); }}
+                      className={`h-10 font-mono pr-8 ${usernameError ? "border-destructive focus-visible:ring-destructive" : usernameAvailable === true ? "border-green-500 focus-visible:ring-green-500" : ""}`}
+                    />
+                    {createForm.username.trim() && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        {isCheckingUsername ? (
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin inline-block" />
+                        ) : usernameAvailable === true ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                        ) : usernameAvailable === false ? (
+                          <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
                   {usernameError ? (
                     <p className="text-xs text-destructive flex items-center gap-1.5">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       {usernameError}
+                    </p>
+                  ) : usernameAvailable === true ? (
+                    <p className="text-xs text-green-600 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3 h-3 shrink-0" />
+                      Username is available
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
