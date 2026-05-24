@@ -49,18 +49,10 @@ export const ROLE_HOME_CRUMBS: Record<string, { label: string; href: string }> =
   parent: { label: "My Children", href: "/children" },
 };
 
-const BANNER_HEIGHT_PX = 40;
-
 export default function ModernSidebar() {
   const { user, setUser, logout } = useAuth();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
-
-  // When the super admin is impersonating, the ImpersonationBanner sits at the
-  // very top of the viewport (40px tall) and shifts the document down via
-  // html padding-top. Fixed elements (sidebar, mobile topbar) must be nudged
-  // down explicitly so they don't sit behind the banner.
-  const isImpersonating = !!localStorage.getItem("adminSessionId");
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/messages/unread-count"],
@@ -354,11 +346,7 @@ export default function ModernSidebar() {
     <>
       {/* Desktop */}
       <aside
-        className="fixed left-0 w-[228px] bg-white border-r border-gray-100 z-50 hidden md:flex flex-col"
-        style={{
-          top: isImpersonating ? BANNER_HEIGHT_PX : 0,
-          height: isImpersonating ? `calc(100vh - ${BANNER_HEIGHT_PX}px)` : "100vh",
-        }}
+        className="fixed left-0 top-0 w-[228px] h-screen bg-white border-r border-gray-100 z-50 hidden md:flex flex-col"
         data-testid="sidebar"
       >
         <SidebarContent />
@@ -366,8 +354,7 @@ export default function ModernSidebar() {
 
       {/* Mobile top bar */}
       <div
-        className="md:hidden fixed left-0 right-0 h-14 bg-white border-b border-gray-100 z-50 flex items-center px-4 gap-3"
-        style={{ top: isImpersonating ? BANNER_HEIGHT_PX : 0 }}
+        className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 z-50 flex items-center px-4 gap-3"
       >
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
