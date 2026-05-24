@@ -414,6 +414,9 @@ export const insertStudentInviteSchema = studentInviteSchema.omit({
   status: true,
   createdDate: true,
   expiresDate: true,
+}).extend({
+  studentName: z.string().optional().default(""),
+  gradeLevel: z.string().optional().default(""),
 });
 export type StudentInvite = z.infer<typeof studentInviteSchema>;
 export type InsertStudentInvite = z.infer<typeof insertStudentInviteSchema>;

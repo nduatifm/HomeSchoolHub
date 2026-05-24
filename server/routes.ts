@@ -1459,8 +1459,8 @@ export function registerRoutes(app: Express) {
 
       const invite = await storage.createStudentInvite({
         email: normalizeEmail(data.email),
-        studentName: data.studentName,
-        gradeLevel: data.gradeLevel,
+        studentName: data.studentName ?? "",
+        gradeLevel: data.gradeLevel ?? "",
         parent: { connect: { id: user.id } },
         token,
         code,

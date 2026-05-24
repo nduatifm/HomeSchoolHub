@@ -12,8 +12,6 @@ import {
   CheckCircle2,
   Clock,
   Mail,
-  User,
-  GraduationCap,
   Copy,
   Check,
   KeyRound,
@@ -67,7 +65,7 @@ function StatusChip({ status }: { status: string }) {
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function ParentInvitesPage() {
   // Invite state
-  const [inviteForm, setInviteForm] = useState({ email: "", studentName: "", gradeLevel: "" });
+  const [inviteForm, setInviteForm] = useState({ email: "" });
   const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
 
   // Create account state
@@ -96,7 +94,7 @@ export default function ParentInvitesPage() {
         description: "Your child will receive an email with a signup link.",
         type: "success",
       });
-      setInviteForm({ email: "", studentName: "", gradeLevel: "" });
+      setInviteForm({ email: "" });
       setInviteEmailError(null);
     },
     onError: (err: unknown) => {
@@ -175,7 +173,6 @@ export default function ParentInvitesPage() {
 
   const isInviteFormValid =
     inviteForm.email.trim() &&
-    inviteForm.studentName.trim() &&
     !inviteStudentMutation.isPending;
 
   const pendingInvites = invites.filter((i: any) => i.status === "pending");
@@ -265,7 +262,7 @@ export default function ParentInvitesPage() {
               </div>
             </div>
 
-            <div className="px-6 py-5 space-y-4">
+            <div className="px-6 py-5">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
@@ -276,44 +273,15 @@ export default function ParentInvitesPage() {
                   placeholder="child@example.com"
                   value={inviteForm.email}
                   onChange={(e) => {
-                    setInviteForm({ ...inviteForm, email: e.target.value });
+                    setInviteForm({ email: e.target.value });
                     setInviteEmailError(null);
                   }}
                   className={`h-10 ${inviteEmailError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   data-testid="input-invite-email"
                 />
                 {inviteEmailError && (
-                  <p className="text-xs text-destructive leading-snug">{inviteEmailError}</p>
+                  <p className="text-xs text-destructive leading-snug mt-1.5">{inviteEmailError}</p>
                 )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5 text-muted-foreground" />
-                    Student name
-                  </label>
-                  <Input
-                    placeholder="First Last"
-                    value={inviteForm.studentName}
-                    onChange={(e) => setInviteForm({ ...inviteForm, studentName: e.target.value })}
-                    className="h-10"
-                    data-testid="input-invite-name"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
-                    Grade level
-                  </label>
-                  <Input
-                    placeholder="e.g. 4th grade"
-                    value={inviteForm.gradeLevel}
-                    onChange={(e) => setInviteForm({ ...inviteForm, gradeLevel: e.target.value })}
-                    className="h-10"
-                    data-testid="input-invite-grade"
-                  />
-                </div>
               </div>
             </div>
 
@@ -521,11 +489,15 @@ export default function ParentInvitesPage() {
                       className="flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border bg-card"
                     >
                       <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0 text-xs font-bold text-amber-700">
-                        {(invite.studentName as string)?.[0]?.toUpperCase() ?? "?"}
+                        {(invite.studentName as string)?.[0]?.toUpperCase() || (invite.email as string)?.[0]?.toUpperCase() || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{invite.studentName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {(invite.studentName as string) || (invite.email as string)}
+                        </p>
+                        {(invite.studentName as string) && (
+                          <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {invite.code && <CopyCode code={invite.code} />}
@@ -558,11 +530,15 @@ export default function ParentInvitesPage() {
                       className="flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border bg-muted/30"
                     >
                       <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center shrink-0 text-xs font-bold text-green-700">
-                        {(invite.studentName as string)?.[0]?.toUpperCase() ?? "?"}
+                        {(invite.studentName as string)?.[0]?.toUpperCase() || (invite.email as string)?.[0]?.toUpperCase() || "?"}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{invite.studentName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {(invite.studentName as string) || (invite.email as string)}
+                        </p>
+                        {(invite.studentName as string) && (
+                          <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
+                        )}
                       </div>
                       <StatusChip status={invite.status} />
                     </div>
