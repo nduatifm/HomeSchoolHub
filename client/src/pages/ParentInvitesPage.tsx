@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, ApiError } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   UserPlus,
   Send,
@@ -14,6 +16,8 @@ import {
   GraduationCap,
   Copy,
   Check,
+  KeyRound,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -61,8 +65,16 @@ function StatusChip({ status }: { status: string }) {
 
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function ParentInvitesPage() {
+  // Invite state
   const [inviteForm, setInviteForm] = useState({ email: "", studentName: "", gradeLevel: "" });
   const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
+
+  // Create account state
+  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createResult, setCreateResult] = useState<{ username: string; password: string } | null>(null);
+  const [copiedCreateUsername, setCopiedCreateUsername] = useState(false);
+  const [copiedCreatePw, setCopiedCreatePw] = useState(false);
 
   const { data: invites = [] } = useQuery<StudentInvite[]>({
     queryKey: ["/api/invites/student/parent"],
@@ -107,13 +119,51 @@ export default function ParentInvitesPage() {
     },
   });
 
-  const isFormValid =
+  const createDirectMutation = useMutation({
+    mutationFn: (data: { name: string; gradeLevel: string; password: string }) =>
+      apiRequest("/api/students/create-direct", { method: "POST", body: JSON.stringify(data) }) as Promise<{ student: any; username: string }>,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
+      setCreateResult({ username: data.username, password: createForm.password });
+      toast({ title: "Account created", description: "Share these login details with your child." });
+    },
+    onError: (err: any) => {
+      setCreateError(err?.message ?? "Something went wrong. Please try again.");
+    },
+  });
+
+  const isInviteFormValid =
     inviteForm.email.trim() &&
     inviteForm.studentName.trim() &&
     !inviteStudentMutation.isPending;
 
   const pendingInvites = invites.filter((i: any) => i.status === "pending");
   const acceptedInvites = invites.filter((i: any) => i.status === "accepted");
+
+  function handleCreateSubmit() {
+    setCreateError(null);
+    if (!createForm.name.trim() || !createForm.password) {
+      setCreateError("Name and password are required.");
+      return;
+    }
+    if (createForm.password.length < 6) {
+      setCreateError("Password must be at least 6 characters.");
+      return;
+    }
+    if (createForm.password !== createForm.confirmPassword) {
+      setCreateError("Passwords do not match.");
+      return;
+    }
+    createDirectMutation.mutate({ name: createForm.name, gradeLevel: createForm.gradeLevel, password: createForm.password });
+  }
+
+  function resetCreateForm() {
+    setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
+    setCreateError(null);
+    setCreateResult(null);
+    setCopiedCreateUsername(false);
+    setCopiedCreatePw(false);
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -123,30 +173,27 @@ export default function ParentInvitesPage() {
 
           {/* ── Page header ── */}
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Invite Your Child</h1>
+            <h1 className="text-2xl font-bold text-foreground">Add a Child</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Send your child an invite link to create their student account and join your classrooms.
+              Send your child an invite link, or create a managed account for them directly.
             </p>
           </div>
 
           {/* ── Invite form ── */}
           <div className="rounded-2xl border border-border bg-card overflow-hidden">
-            {/* Form header */}
             <div className="px-6 pt-5 pb-4 border-b border-border flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <UserPlus className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-foreground">New invite</p>
+                <p className="text-sm font-semibold text-foreground">Send an invite</p>
                 <p className="text-xs text-muted-foreground">
                   They'll receive an email with a personal signup link.
                 </p>
               </div>
             </div>
 
-            {/* Fields */}
             <div className="px-6 py-5 space-y-4">
-              {/* Email */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
@@ -168,7 +215,6 @@ export default function ParentInvitesPage() {
                 )}
               </div>
 
-              {/* Name + Grade in a row */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
@@ -199,11 +245,10 @@ export default function ParentInvitesPage() {
               </div>
             </div>
 
-            {/* Submit */}
             <div className="px-6 pb-5">
               <Button
                 onClick={() => inviteStudentMutation.mutate(inviteForm)}
-                disabled={!isFormValid}
+                disabled={!isInviteFormValid}
                 className="w-full h-10 gap-2"
                 data-testid="button-send-invite"
               >
@@ -222,6 +267,135 @@ export default function ParentInvitesPage() {
             </div>
           </div>
 
+          {/* ── Divider ── */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground px-1">or</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* ── Create account directly ── */}
+          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="px-6 pt-5 pb-4 border-b border-border flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <KeyRound className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Create an account directly</p>
+                <p className="text-xs text-muted-foreground">
+                  For younger children — you set the password, no email needed.
+                </p>
+              </div>
+            </div>
+
+            {createResult ? (
+              <div className="px-6 py-5 space-y-3">
+                <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground mb-0.5">Username</p>
+                      <p className="text-sm font-medium text-foreground truncate select-all font-mono">{createResult.username}</p>
+                    </div>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(createResult.username); setCopiedCreateUsername(true); setTimeout(() => setCopiedCreateUsername(false), 2000); }}
+                      className="ml-3 p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      {copiedCreateUsername ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground mb-0.5">Password</p>
+                      <p className="font-mono text-base font-bold text-foreground tracking-widest select-all">{createResult.password}</p>
+                    </div>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(createResult.password); setCopiedCreatePw(true); setTimeout(() => setCopiedCreatePw(false), 2000); }}
+                      className="ml-3 p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      {copiedCreatePw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">These are shown once. Save them before closing.</p>
+                <Button className="w-full h-10" onClick={resetCreateForm}>Done</Button>
+              </div>
+            ) : (
+              <div className="px-6 py-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                    <Label htmlFor="create-name">Child's name</Label>
+                    <Input
+                      id="create-name"
+                      placeholder="Alex Johnson"
+                      value={createForm.name}
+                      onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                    <Label htmlFor="create-grade">
+                      Grade <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                    </Label>
+                    <Select value={createForm.gradeLevel || "_none"} onValueChange={(v) => setCreateForm(f => ({ ...f, gradeLevel: v === "_none" ? "" : v }))}>
+                      <SelectTrigger id="create-grade" className="h-10">
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">Not set</SelectItem>
+                        {["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map(g => (
+                          <SelectItem key={g} value={g}>Grade {g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground rounded-md bg-muted/50 border border-border/60 px-3 py-2 leading-relaxed">
+                  We'll generate a unique username your child can use to log in — no email needed.
+                </p>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-pw">Password</Label>
+                  <Input
+                    id="create-pw"
+                    type="password"
+                    placeholder="Min. 6 characters"
+                    value={createForm.password}
+                    onChange={(e) => { setCreateForm(f => ({ ...f, password: e.target.value })); setCreateError(null); }}
+                    className="h-10"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-pw2">Confirm password</Label>
+                  <Input
+                    id="create-pw2"
+                    type="password"
+                    placeholder="Repeat password"
+                    value={createForm.confirmPassword}
+                    onChange={(e) => { setCreateForm(f => ({ ...f, confirmPassword: e.target.value })); setCreateError(null); }}
+                    className="h-10"
+                  />
+                </div>
+
+                {createError && (
+                  <p className="text-xs text-destructive flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {createError}
+                  </p>
+                )}
+
+                <Button
+                  onClick={handleCreateSubmit}
+                  disabled={createDirectMutation.isPending}
+                  className="w-full h-10 gap-2"
+                >
+                  {createDirectMutation.isPending ? "Creating…" : "Create account"}
+                </Button>
+              </div>
+            )}
+          </div>
+
           {/* ── Sent invites ── */}
           {invites.length > 0 && (
             <div className="space-y-3">
@@ -232,7 +406,6 @@ export default function ParentInvitesPage() {
                 </span>
               </h2>
 
-              {/* Pending */}
               {pendingInvites.length > 0 && (
                 <div className="space-y-2">
                   {pendingInvites.map((invite: any) => (
@@ -241,18 +414,13 @@ export default function ParentInvitesPage() {
                       data-testid={`row-invite-${invite.id}`}
                       className="flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border bg-card"
                     >
-                      {/* Avatar */}
                       <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0 text-xs font-bold text-amber-700">
                         {(invite.studentName as string)?.[0]?.toUpperCase() ?? "?"}
                       </div>
-
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{invite.studentName}</p>
                         <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
                       </div>
-
-                      {/* Code + status */}
                       <div className="flex items-center gap-2 shrink-0">
                         {invite.code && <CopyCode code={invite.code} />}
                         <StatusChip status={invite.status} />
@@ -272,7 +440,6 @@ export default function ParentInvitesPage() {
                 </div>
               )}
 
-              {/* Accepted */}
               {acceptedInvites.length > 0 && (
                 <div className="space-y-2">
                   {acceptedInvites.length > 0 && pendingInvites.length > 0 && (
@@ -284,17 +451,13 @@ export default function ParentInvitesPage() {
                       data-testid={`row-invite-${invite.id}`}
                       className="flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-border bg-muted/30"
                     >
-                      {/* Avatar */}
                       <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center shrink-0 text-xs font-bold text-green-700">
                         {(invite.studentName as string)?.[0]?.toUpperCase() ?? "?"}
                       </div>
-
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{invite.studentName}</p>
                         <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
                       </div>
-
                       <StatusChip status={invite.status} />
                     </div>
                   ))}
@@ -303,7 +466,6 @@ export default function ParentInvitesPage() {
             </div>
           )}
 
-          {/* ── Empty state ── */}
           {invites.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">

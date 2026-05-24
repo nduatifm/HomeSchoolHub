@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle, AlertCircle, KeyRound, Copy, Check, Pencil, PlusCircle } from "lucide-react";
+import { GraduationCap, MessageSquare, School, Users, Shield, Eye, MoreVertical, UserPlus, Trash2, RefreshCw, XCircle, AlertCircle, KeyRound, Copy, Check, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
@@ -75,14 +75,6 @@ export default function ParentChildrenPage() {
   const [resetChildId, setResetChildId] = useState<number | null>(null);
   const [resetTempPassword, setResetTempPassword] = useState<string | null>(null);
   const [copiedPw, setCopiedPw] = useState(false);
-
-  // Create student state
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createResult, setCreateResult] = useState<{ username: string; password: string } | null>(null);
-  const [copiedCreateUsername, setCopiedCreateUsername] = useState(false);
-  const [copiedCreatePw, setCopiedCreatePw] = useState(false);
 
   // Edit student state
   const [editChildId, setEditChildId] = useState<number | null>(null);
@@ -286,19 +278,6 @@ export default function ParentChildrenPage() {
     },
   });
 
-  const createDirectMutation = useMutation({
-    mutationFn: (data: { name: string; gradeLevel: string; password: string }) =>
-      apiRequest("/api/students/create-direct", { method: "POST", body: JSON.stringify(data) }) as Promise<{ student: any; username: string }>,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
-      setCreateResult({ username: data.username, password: createForm.password });
-      toast({ title: "Account created", description: "Share these login details with your child." });
-    },
-    onError: (err: any) => {
-      setCreateError(err?.message ?? "Something went wrong. Please try again.");
-    },
-  });
-
   const becomeChildMutation = useMutation({
     mutationFn: (studentId: number) =>
       apiRequest("/api/parent/become-child", { method: "POST", body: JSON.stringify({ studentId }) }) as Promise<{ sessionId: string; childName: string }>,
@@ -353,37 +332,6 @@ export default function ParentChildrenPage() {
     setCopiedPw(false);
   }
 
-  function closeCreateDialog() {
-    setCreateOpen(false);
-    setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
-    setCreateError(null);
-    setCreateResult(null);
-    setCopiedCreateUsername(false);
-    setCopiedCreatePw(false);
-  }
-
-  function handleCreateSubmit() {
-    setCreateError(null);
-    if (!createForm.name.trim() || !createForm.password) {
-      setCreateError("Name and password are required.");
-      return;
-    }
-    if (createForm.password.length < 6) {
-      setCreateError("Password must be at least 6 characters.");
-      return;
-    }
-    if (createForm.password !== createForm.confirmPassword) {
-      setCreateError("Passwords do not match.");
-      return;
-    }
-    createDirectMutation.mutate({
-      name: createForm.name,
-      gradeLevel: createForm.gradeLevel,
-      password: createForm.password,
-    });
-  }
-
-
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
@@ -396,23 +344,10 @@ export default function ParentChildrenPage() {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-muted-foreground">Your Children</h2>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs h-8"
-                onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" }); }}
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                Create account
-              </Button>
             </div>
             {childStats.length === 0 && (
               <div className="py-8 text-center">
-                <p className="text-sm text-muted-foreground mb-3">No children added yet. Create an account for your child or send them an invite to sign up themselves.</p>
-                <Button size="sm" onClick={() => { setCreateOpen(true); setCreateResult(null); setCreateError(null); setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" }); }}>
-                  <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
-                  Create first account
-                </Button>
+                <p className="text-sm text-muted-foreground">No children added yet. Go to <a href="/invites" className="text-primary underline underline-offset-2">Invites</a> to add a child.</p>
               </div>
             )}
           </div>
@@ -885,126 +820,6 @@ export default function ParentChildrenPage() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create student account dialog */}
-      <Dialog open={createOpen} onOpenChange={(open) => { if (!open) closeCreateDialog(); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>
-              {createResult === null ? "Create student account" : "Account ready"}
-            </DialogTitle>
-            <DialogDescription>
-              {createResult === null
-                ? "Set up login credentials your child can use right away."
-                : `Share these credentials with ${createForm.name} to log in.`}
-            </DialogDescription>
-          </DialogHeader>
-
-          {createResult === null ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                  <Label htmlFor="create-name">Child's name</Label>
-                  <Input
-                    id="create-name"
-                    autoFocus
-                    placeholder="Alex Johnson"
-                    value={createForm.name}
-                    onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
-                  />
-                </div>
-                <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                  <Label htmlFor="create-grade">
-                    Grade <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                  </Label>
-                  <Select value={createForm.gradeLevel || "_none"} onValueChange={(v) => setCreateForm(f => ({ ...f, gradeLevel: v === "_none" ? "" : v }))}>
-                    <SelectTrigger id="create-grade">
-                      <SelectValue placeholder="Select…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">Not set</SelectItem>
-                      {["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map(g => (
-                        <SelectItem key={g} value={g}>Grade {g}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground rounded-md bg-muted/50 border border-border/60 px-3 py-2 leading-relaxed">
-                We'll generate a unique username your child can use to log in — no email needed.
-              </p>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="create-pw">Password</Label>
-                <Input
-                  id="create-pw"
-                  type="password"
-                  placeholder="Min. 6 characters"
-                  value={createForm.password}
-                  onChange={(e) => { setCreateForm(f => ({ ...f, password: e.target.value })); setCreateError(null); }}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="create-pw2">Confirm password</Label>
-                <Input
-                  id="create-pw2"
-                  type="password"
-                  placeholder="Repeat password"
-                  value={createForm.confirmPassword}
-                  onChange={(e) => { setCreateForm(f => ({ ...f, confirmPassword: e.target.value })); setCreateError(null); }}
-                />
-              </div>
-
-              {createError && (
-                <p className="text-xs text-destructive flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  {createError}
-                </p>
-              )}
-
-              <div className="flex gap-2 pt-1">
-                <Button variant="outline" className="flex-1" onClick={closeCreateDialog}>Cancel</Button>
-                <Button className="flex-1" disabled={createDirectMutation.isPending} onClick={handleCreateSubmit}>
-                  {createDirectMutation.isPending ? "Creating…" : "Create account"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Username</p>
-                    <p className="text-sm font-medium text-foreground truncate select-all font-mono">{createResult.username}</p>
-                  </div>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(createResult.username); setCopiedCreateUsername(true); setTimeout(() => setCopiedCreateUsername(false), 2000); }}
-                    className="ml-3 p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
-                  >
-                    {copiedCreateUsername ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Password</p>
-                    <p className="font-mono text-base font-bold text-foreground tracking-widest select-all">{createResult.password}</p>
-                  </div>
-                  <button
-                    onClick={() => { navigator.clipboard.writeText(createResult.password); setCopiedCreatePw(true); setTimeout(() => setCopiedCreatePw(false), 2000); }}
-                    className="ml-3 p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
-                  >
-                    {copiedCreatePw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">These are shown once. Save them before closing.</p>
-              <Button className="w-full" onClick={closeCreateDialog}>Done</Button>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
 
