@@ -815,16 +815,17 @@ export default function ClassworkDetail() {
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-foreground">Materials</h2>
           {linkedMaterials.map((material) => (
-            <button
+            <a
               key={material.id}
-              type="button"
+              href={`/classrooms/${classroomSlug}/materials/${material.slug}`}
+              target="_blank"
+              rel="noreferrer"
               onClick={() => {
-                setMaterialDialogOpen(material);
                 if (!isTeacher) {
                   apiRequest(`/api/classrooms/${classroomId}/materials/${material.id}/seen`, { method: "POST" }).catch(() => {});
                 }
               }}
-              className="w-full text-left"
+              className="w-full text-left block"
             >
               <Card className="hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer">
                 <CardContent className="px-4 py-4">
@@ -850,7 +851,7 @@ export default function ClassworkDetail() {
                   </div>
                 </CardContent>
               </Card>
-            </button>
+            </a>
           ))}
         </div>
       )}
