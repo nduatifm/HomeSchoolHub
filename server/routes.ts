@@ -2101,6 +2101,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/students/suggest-username?name=X — return a unique username suggestion
+  app.get("/api/students/suggest-username", requireAuth, async (req, res) => {
+    try {
+      const name = String(req.query.name ?? "").trim();
+      if (!name) return res.status(400).json({ error: "name is required" });
+      const username = await generateUniqueUsername(name);
+      res.json({ username });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // POST /api/students/create-direct — parent creates a managed student account (username login, no email needed)
   app.post("/api/students/create-direct", requireAuth, async (req, res) => {
     try {
@@ -2110,7 +2122,7 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Only parents can create student accounts directly" });
       }
 
-      const { name, gradeLevel, password } = req.body;
+      const { name, gradeLevel, password, username: requestedUsername } = req.body;
       if (!name?.trim() || !password) {
         return res.status(400).json({ error: "Name and password are required" });
       }
@@ -2118,8 +2130,22 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
 
+      let username: string;
+      if (requestedUsername?.trim()) {
+        const cleaned = requestedUsername.trim().toLowerCase();
+        if (!/^[a-z0-9][a-z0-9.]{1,18}[a-z0-9]$/.test(cleaned)) {
+          return res.status(400).json({ error: "Username must be 3–20 characters, letters/numbers/dots only, and cannot start or end with a dot." });
+        }
+        const taken = await storage.getUserByUsername(cleaned);
+        if (taken) {
+          return res.status(409).json({ error: "username_taken" });
+        }
+        username = cleaned;
+      } else {
+        username = await generateUniqueUsername(name.trim());
+      }
+
       const hashedPassword = await hashPassword(password);
-      const username = await generateUniqueUsername(name.trim());
 
       // Create user first, then roll back on any subsequent failure
       // Managed accounts have no email — they log in with username only

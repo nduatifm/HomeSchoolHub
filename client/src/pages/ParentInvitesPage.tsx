@@ -18,6 +18,7 @@ import {
   Check,
   KeyRound,
   AlertCircle,
+  Wand2,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -70,8 +71,10 @@ export default function ParentInvitesPage() {
   const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
 
   // Create account state
-  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
+  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", username: "", password: "", confirmPassword: "" });
   const [createError, setCreateError] = useState<string | null>(null);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const [createResult, setCreateResult] = useState<{ username: string; password: string } | null>(null);
   const [copiedCreateUsername, setCopiedCreateUsername] = useState(false);
   const [copiedCreatePw, setCopiedCreatePw] = useState(false);
@@ -120,7 +123,7 @@ export default function ParentInvitesPage() {
   });
 
   const createDirectMutation = useMutation({
-    mutationFn: (data: { name: string; gradeLevel: string; password: string }) =>
+    mutationFn: (data: { name: string; gradeLevel: string; username: string; password: string }) =>
       apiRequest("/api/students/create-direct", { method: "POST", body: JSON.stringify(data) }) as Promise<{ student: any; username: string }>,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/students/parent"] });
@@ -128,7 +131,11 @@ export default function ParentInvitesPage() {
       toast({ title: "Account created", description: "Share these login details with your child." });
     },
     onError: (err: any) => {
-      setCreateError(err?.message ?? "Something went wrong. Please try again.");
+      if (err?.message === "username_taken") {
+        setUsernameError("That username is already taken. Try a different one.");
+      } else {
+        setCreateError(err?.message ?? "Something went wrong. Please try again.");
+      }
     },
   });
 
@@ -140,8 +147,26 @@ export default function ParentInvitesPage() {
   const pendingInvites = invites.filter((i: any) => i.status === "pending");
   const acceptedInvites = invites.filter((i: any) => i.status === "accepted");
 
+  async function handleSuggestUsername() {
+    if (!createForm.name.trim()) {
+      setUsernameError("Enter a name first so we can suggest a username.");
+      return;
+    }
+    setIsSuggesting(true);
+    setUsernameError(null);
+    try {
+      const data = await apiRequest(`/api/students/suggest-username?name=${encodeURIComponent(createForm.name.trim())}`) as { username: string };
+      setCreateForm(f => ({ ...f, username: data.username }));
+    } catch {
+      setUsernameError("Couldn't generate a suggestion. Try typing one manually.");
+    } finally {
+      setIsSuggesting(false);
+    }
+  }
+
   function handleCreateSubmit() {
     setCreateError(null);
+    setUsernameError(null);
     if (!createForm.name.trim() || !createForm.password) {
       setCreateError("Name and password are required.");
       return;
@@ -154,12 +179,25 @@ export default function ParentInvitesPage() {
       setCreateError("Passwords do not match.");
       return;
     }
-    createDirectMutation.mutate({ name: createForm.name, gradeLevel: createForm.gradeLevel, password: createForm.password });
+    if (createForm.username.trim()) {
+      const u = createForm.username.trim().toLowerCase();
+      if (!/^[a-z0-9][a-z0-9.]{1,18}[a-z0-9]$/.test(u)) {
+        setUsernameError("3–20 characters, letters/numbers/dots only, cannot start or end with a dot.");
+        return;
+      }
+    }
+    createDirectMutation.mutate({
+      name: createForm.name,
+      gradeLevel: createForm.gradeLevel,
+      username: createForm.username.trim().toLowerCase(),
+      password: createForm.password,
+    });
   }
 
   function resetCreateForm() {
-    setCreateForm({ name: "", gradeLevel: "", password: "", confirmPassword: "" });
+    setCreateForm({ name: "", gradeLevel: "", username: "", password: "", confirmPassword: "" });
     setCreateError(null);
+    setUsernameError(null);
     setCreateResult(null);
     setCopiedCreateUsername(false);
     setCopiedCreatePw(false);
@@ -350,9 +388,43 @@ export default function ParentInvitesPage() {
                   </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground rounded-md bg-muted/50 border border-border/60 px-3 py-2 leading-relaxed">
-                  We'll generate a unique username your child can use to log in — no email needed.
-                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-username" className="flex items-center justify-between">
+                    <span>
+                      Username <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSuggestUsername}
+                      disabled={isSuggesting}
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium disabled:opacity-50 transition-colors"
+                    >
+                      {isSuggesting ? (
+                        <span className="h-3 w-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin inline-block" />
+                      ) : (
+                        <Wand2 className="h-3 w-3" />
+                      )}
+                      Suggest
+                    </button>
+                  </Label>
+                  <Input
+                    id="create-username"
+                    placeholder="e.g. alex.j — leave blank to auto-generate"
+                    value={createForm.username}
+                    onChange={(e) => { setCreateForm(f => ({ ...f, username: e.target.value })); setUsernameError(null); }}
+                    className={`h-10 font-mono ${usernameError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  {usernameError ? (
+                    <p className="text-xs text-destructive flex items-center gap-1.5">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {usernameError}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Letters, numbers and dots only. Leave blank to auto-generate.
+                    </p>
+                  )}
+                </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="create-pw">Password</Label>
