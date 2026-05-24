@@ -359,33 +359,15 @@ export default function ParentInvitesPage() {
               </div>
             ) : (
               <div className="px-6 py-5 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                    <Label htmlFor="create-name">Child's name</Label>
-                    <Input
-                      id="create-name"
-                      placeholder="Alex Johnson"
-                      value={createForm.name}
-                      onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
-                      className="h-10"
-                    />
-                  </div>
-                  <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                    <Label htmlFor="create-grade">
-                      Grade <span className="text-muted-foreground font-normal text-xs">(optional)</span>
-                    </Label>
-                    <Select value={createForm.gradeLevel || "_none"} onValueChange={(v) => setCreateForm(f => ({ ...f, gradeLevel: v === "_none" ? "" : v }))}>
-                      <SelectTrigger id="create-grade" className="h-10">
-                        <SelectValue placeholder="Select…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_none">Not set</SelectItem>
-                        {["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map(g => (
-                          <SelectItem key={g} value={g}>Grade {g}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-name">Child's name</Label>
+                  <Input
+                    id="create-name"
+                    placeholder="Alex Johnson"
+                    value={createForm.name}
+                    onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
+                    className="h-10"
+                  />
                 </div>
 
                 <div className="space-y-1.5">

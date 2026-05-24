@@ -1723,6 +1723,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/students/suggest-username?name=X — return a unique username suggestion
+  app.get("/api/students/suggest-username", requireAuth, async (req, res) => {
+    try {
+      const name = String(req.query.name ?? "").trim();
+      if (!name) return res.status(400).json({ error: "name is required" });
+      const username = await generateUniqueUsername(name);
+      res.json({ username });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/students/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -2098,18 +2110,6 @@ export function registerRoutes(app: Express) {
       res.json({ tempPassword });
     } catch (error: any) {
       res.status(error.status ?? 500).json({ error: error.message });
-    }
-  });
-
-  // GET /api/students/suggest-username?name=X — return a unique username suggestion
-  app.get("/api/students/suggest-username", requireAuth, async (req, res) => {
-    try {
-      const name = String(req.query.name ?? "").trim();
-      if (!name) return res.status(400).json({ error: "name is required" });
-      const username = await generateUniqueUsername(name);
-      res.json({ username });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
     }
   });
 
