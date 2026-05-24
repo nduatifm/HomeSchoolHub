@@ -168,7 +168,7 @@ export default function ParentInvitesPage() {
       apiRequest("/api/invites/student", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/invites/student/parent"] });
-      toast({ title: "Invite sent!", description: "Your child will receive an email with a signup link.", type: "success" });
+      toast({ title: "Invite sent!", description: "They'll get an email with a sign-up link.", type: "success" });
       setInviteForm({ email: "" });
       setInviteEmailError(null);
     },
@@ -176,8 +176,8 @@ export default function ParentInvitesPage() {
       if (err instanceof ApiError && err.status === 409) {
         setInviteEmailError(
           err.message === "pending_invite_exists"
-            ? "An invite was already sent to this email — check your list below or revoke and resend."
-            : "A student account already exists for this email — they can log in directly.",
+            ? "Already sent. Check below, or revoke it to resend."
+            : "Already has an account — they can log in directly.",
         );
       } else {
         toast({ title: "Couldn't send invite", description: "Something went wrong. Please try again.", type: "error" });
@@ -279,9 +279,6 @@ export default function ParentInvitesPage() {
           {/* ── Header ── */}
           <div>
             <h1 className="text-2xl font-bold text-foreground">Add a Child</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Choose how you want to add your child to LyraPrep.
-            </p>
           </div>
 
           {/* ── Path selector ── */}
@@ -291,13 +288,13 @@ export default function ParentInvitesPage() {
                 key: "invite" as const,
                 icon: <Mail className="h-4 w-4" />,
                 title: "Send invite",
-                sub: "Email link — child signs up themselves",
+                sub: "Child signs up with the link",
               },
               {
                 key: "create" as const,
                 icon: <KeyRound className="h-4 w-4" />,
                 title: "Create account",
-                sub: "You set the password — great for young kids",
+                sub: "You set the login — best for young kids",
               },
             ].map(({ key, icon, title, sub }) => (
               <button
@@ -382,7 +379,7 @@ export default function ParentInvitesPage() {
                     <p className="text-sm font-semibold text-foreground">Account created!</p>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Share these details with your child. Save them somewhere safe — the password won't be shown again.
+                    Share with your child — the password won't appear again.
                   </p>
                   <div className="space-y-2">
                     <CredentialRow label="Username" value={createResult.username} mono />
@@ -561,7 +558,7 @@ export default function ParentInvitesPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">No invites sent yet</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Use the options above to add your child.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Pick an option above to get started.</p>
               </div>
             </div>
           )}
