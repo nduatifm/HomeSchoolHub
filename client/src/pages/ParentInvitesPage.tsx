@@ -152,7 +152,7 @@ export default function ParentInvitesPage() {
   const [inviteEmailError, setInviteEmailError] = useState<string | null>(null);
 
   // Create form
-  const [createForm, setCreateForm] = useState({ name: "", gradeLevel: "", username: "", password: "", confirmPassword: "" });
+  const [createForm, setCreateForm] = useState({ name: "", username: "", password: "", confirmPassword: "" });
   const [createError, setCreateError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -254,14 +254,14 @@ export default function ParentInvitesPage() {
     }
     createDirectMutation.mutate({
       name: createForm.name,
-      gradeLevel: createForm.gradeLevel,
+      gradeLevel: "",
       username: createForm.username.trim().toLowerCase(),
       password: createForm.password,
     });
   }
 
   function resetCreateForm() {
-    setCreateForm({ name: "", gradeLevel: "", username: "", password: "", confirmPassword: "" });
+    setCreateForm({ name: "", username: "", password: "", confirmPassword: "" });
     setCreateError(null);
     setUsernameError(null);
     setCreateResult(null);
@@ -392,30 +392,16 @@ export default function ParentInvitesPage() {
               ) : (
                 /* Create form */
                 <div className="px-5 py-5 space-y-4">
-                  {/* Name + Grade */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="create-name">Name</Label>
-                      <Input
-                        id="create-name"
-                        placeholder="First Last"
-                        value={createForm.name}
-                        onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
-                        className="h-10"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="create-grade">
-                        Grade <span className="text-muted-foreground font-normal text-xs">optional</span>
-                      </Label>
-                      <Input
-                        id="create-grade"
-                        placeholder="e.g. 4th"
-                        value={createForm.gradeLevel}
-                        onChange={(e) => setCreateForm(f => ({ ...f, gradeLevel: e.target.value }))}
-                        className="h-10"
-                      />
-                    </div>
+                  {/* Name */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="create-name">Name</Label>
+                    <Input
+                      id="create-name"
+                      placeholder="First Last"
+                      value={createForm.name}
+                      onChange={(e) => { setCreateForm(f => ({ ...f, name: e.target.value })); setCreateError(null); }}
+                      className="h-10"
+                    />
                   </div>
 
                   {/* Username */}
