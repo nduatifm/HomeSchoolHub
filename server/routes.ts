@@ -5626,10 +5626,11 @@ export function registerRoutes(app: Express) {
     const user = await storage.getUserById(userId);
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return null; }
     const enrollments = await storage.getEnrollments(classroom.id);
-    if (user.role === "student") {
+    if (user.role === "student" || user.roles?.includes("student")) {
       const student = await storage.getStudentByUserId(userId);
       if (student && enrollments.some((e: any) => e.studentId === student.id)) return classroom;
-    } else if (user.role === "parent") {
+    }
+    if (user.role === "parent" || user.roles?.includes("parent")) {
       const children = await storage.getStudentsByParent(userId);
       const enrolledIds = new Set(enrollments.map((e: any) => e.studentId));
       if (children.some((c: any) => enrolledIds.has(c.id))) return classroom;

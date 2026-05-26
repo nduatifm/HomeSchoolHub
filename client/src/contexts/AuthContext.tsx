@@ -44,6 +44,7 @@ interface AuthContextType {
   signupStudentGoogle: (code: string, credential: string) => Promise<void>;
   googleSignIn: (idToken: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -179,6 +180,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStudent(null);
   }
 
+  async function refreshUser() {
+    await fetchCurrentUser();
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -192,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signupStudentGoogle,
         googleSignIn,
         logout,
+        refreshUser,
         isLoading,
       }}
     >

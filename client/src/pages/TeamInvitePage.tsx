@@ -24,7 +24,7 @@ type InviteInfo = {
 export default function TeamInvitePage() {
   const { token } = useParams<{ token: string }>();
   const [, navigate] = useLocation();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, refreshUser, isLoading: authLoading } = useAuth();
   const [accepted, setAccepted] = useState(false);
 
   const {
@@ -39,7 +39,8 @@ export default function TeamInvitePage() {
 
   const acceptMutation = useMutation({
     mutationFn: () => apiRequest(`/api/team-invite/${token}/accept`, { method: "POST" }),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refreshUser();
       setAccepted(true);
       toast({ title: "Invitation accepted!", description: "You now have access to this child's account." });
     },
