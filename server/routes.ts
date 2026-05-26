@@ -196,7 +196,6 @@ async function maybeEmailNotification(
       const elapsed = Date.now() - new Date(user.lastNotificationEmailAt).getTime();
       if (elapsed < 30 * 60 * 1000) return;
     }
-    await storage.updateLastNotificationEmailAt(userId);
     await sendNotificationEmail(
       user.email,
       user.name,
@@ -204,6 +203,7 @@ async function maybeEmailNotification(
       notification.body,
       notification.link ?? "/dashboard"
     );
+    await storage.updateLastNotificationEmailAt(userId);
   } catch (err) {
     console.error("[notification-email] error:", err);
   }
@@ -2464,6 +2464,20 @@ export function registerRoutes(app: Express) {
             status: "pending",
             submittedAt: null,
           });
+          if (student.userId) {
+            storage.createNotification({
+              userId: student.userId,
+              type: "new_assignment",
+              title: "New Assignment",
+              body: `You have a new assignment: "${assignment.title}"`,
+              link: "/dashboard/classrooms",
+            }).catch(console.error);
+            maybeEmailNotification(student.userId, {
+              title: "New Assignment",
+              body: `You have a new assignment: "${assignment.title}"`,
+              link: "/dashboard/classrooms",
+            }).catch(() => {});
+          }
         }
 
         res.json(assignment);
@@ -3747,6 +3761,25 @@ export function registerRoutes(app: Express) {
       });
 
       const message = await storage.createMessage(data);
+
+      // Notify the recipient
+      const receiverId = data.receiverId;
+      if (receiverId && receiverId !== callerId) {
+        const senderName = caller?.name ?? "Someone";
+        storage.createNotification({
+          userId: receiverId,
+          type: "new_message",
+          title: "New Message",
+          body: `${senderName} sent you a message`,
+          link: "/dashboard#messages",
+        }).catch(console.error);
+        maybeEmailNotification(receiverId, {
+          title: "New Message",
+          body: `${senderName} sent you a message`,
+          link: "/dashboard#messages",
+        }).catch(() => {});
+      }
+
       res.json(message);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3808,6 +3841,24 @@ export function registerRoutes(app: Express) {
           }),
         ),
       );
+
+      // Notify all recipients
+      const threadSender = await storage.getUserById(requesterId);
+      const senderName = threadSender?.name ?? "Someone";
+      recipients.forEach((receiverId) => {
+        storage.createNotification({
+          userId: receiverId,
+          type: "new_message",
+          title: "New Message",
+          body: `${senderName} sent you a message`,
+          link: "/dashboard#messages",
+        }).catch(console.error);
+        maybeEmailNotification(receiverId, {
+          title: "New Message",
+          body: `${senderName} sent you a message`,
+          link: "/dashboard#messages",
+        }).catch(() => {});
+      });
 
       res.json(created);
     } catch (error: any) {
@@ -6065,6 +6116,28 @@ export function registerRoutes(app: Express) {
 
       const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...finalData }, materialIds);
 
+      // Notify enrolled students of new assignment (fire-and-forget)
+      prisma.classroomEnrollment.findMany({
+        where: { classroomId: classroom.id },
+        include: { student: { select: { id: true, userId: true } } },
+      }).then((enrollments) => {
+        enrollments.forEach(({ student }) => {
+          if (!student.userId) return;
+          storage.createNotification({
+            userId: student.userId,
+            type: "new_assignment",
+            title: "New Assignment",
+            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+          }).catch(console.error);
+          maybeEmailNotification(student.userId, {
+            title: "New Assignment",
+            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+          }).catch(() => {});
+        });
+      }).catch(console.error);
+
       res.status(201).json(assignment);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -6135,6 +6208,28 @@ export function registerRoutes(app: Express) {
         ...(formSchema !== undefined ? { formSchema } : {}),
         ...(answerKey !== undefined ? { answerKey } : {}),
       }, materialIds);
+
+      // Notify enrolled students of new assignment (fire-and-forget)
+      prisma.classroomEnrollment.findMany({
+        where: { classroomId: classroom.id },
+        include: { student: { select: { id: true, userId: true } } },
+      }).then((enrollments) => {
+        enrollments.forEach(({ student }) => {
+          if (!student.userId) return;
+          storage.createNotification({
+            userId: student.userId,
+            type: "new_assignment",
+            title: "New Assignment",
+            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+          }).catch(console.error);
+          maybeEmailNotification(student.userId, {
+            title: "New Assignment",
+            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+          }).catch(() => {});
+        });
+      }).catch(console.error);
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -6419,10 +6514,49 @@ export function registerRoutes(app: Express) {
       const submissionId = parseInt(req.params.submissionId);
       const sub = await prisma.classroomSubmission.findUnique({
         where: { id: submissionId },
-        include: { assignment: { select: { points: true, classroomId: true } } },
+        include: { assignment: { select: { points: true, classroomId: true, title: true, slug: true } } },
       });
       if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
       const updated = await storage.gradeClassroomSubmission(submissionId, grade, feedback ?? null, sub.assignment.points);
+
+      // Notify student their classroom submission was graded
+      const gradedStudent = await storage.getStudentById(sub.studentId);
+      if (gradedStudent?.userId) {
+        const assignmentTitle = sub.assignment.title;
+        const assignmentLink = `/classrooms/${classroom.slug ?? classroom.id}`;
+        const pct = sub.assignment.points > 0 ? Math.round((grade / sub.assignment.points) * 100) : grade;
+        const notifBody = `Your submission for "${assignmentTitle}" has been graded: ${pct}%`;
+        storage.createNotification({
+          userId: gradedStudent.userId,
+          type: "assignment_graded",
+          title: "Assignment Graded",
+          body: notifBody,
+          link: assignmentLink,
+        }).catch(console.error);
+        maybeEmailNotification(gradedStudent.userId, {
+          title: "Assignment Graded",
+          body: notifBody,
+          link: assignmentLink,
+        }).catch(() => {});
+        // Also notify team parents
+        storage.getTeamMemberUserIds(gradedStudent.id).then((parentIds) => {
+          parentIds.forEach((pid) => {
+            const parentBody = `${gradedStudent.name}'s submission for "${assignmentTitle}" has been graded: ${pct}%`;
+            storage.createNotification({
+              userId: pid,
+              type: "assignment_graded",
+              title: "Assignment Graded",
+              body: parentBody,
+              link: "/dashboard/children",
+            }).catch(console.error);
+            maybeEmailNotification(pid, {
+              title: "Assignment Graded",
+              body: parentBody,
+              link: "/dashboard/children",
+            }).catch(() => {});
+          });
+        }).catch(console.error);
+      }
 
       res.json(updated);
     } catch (error: any) {
