@@ -1186,17 +1186,14 @@ class PrismaStorage implements IStorage {
 
     if (role === "parent") {
       type TeacherRef = { id: number; name: string };
-      const [memberships, parentUser, tutorRequests] = await Promise.all([
-        prisma.childTeamMember.findMany({
-          where: { parentId: userId, status: "active" },
-          include: { child: { select: { id: true, name: true, userId: true } } },
-        }),
-        prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
-        prisma.tutorRequest.findMany({
-          where: { parentId: userId, status: "approved", studentId: { not: null } },
-          select: { studentId: true, teacher: { select: { id: true, name: true } } },
-        }),
-      ]);
+
+      // Fetch memberships first so we have student IDs for the tutor-request lookup.
+      // Filtering tutor requests by parentId breaks co-parents (team members) because
+      // TutorRequest.parentId is always the team owner's userId, not the co-parent's.
+      const memberships = await prisma.childTeamMember.findMany({
+        where: { parentId: userId, status: "active" },
+        include: { child: { select: { id: true, name: true, userId: true } } },
+      });
 
       const parentStudents = memberships.map((m) => m.child);
       if (parentStudents.length === 0) return fetchDirectSummaries();
@@ -1204,13 +1201,24 @@ class PrismaStorage implements IStorage {
       // Map childId → caller's role on that child's team (owner vs member)
       const callerRoleMap = new Map(memberships.map((m) => [m.child.id, m.role as string]));
 
+      const allStudentIds = parentStudents.map((s) => s.id);
+
+      // Fetch user data and tutor requests in parallel, keyed by studentId so both
+      // owners and co-parents (members) resolve the correct teacher assignment.
+      const [parentUser, tutorRequests] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+        prisma.tutorRequest.findMany({
+          where: { studentId: { in: allStudentIds }, status: "approved" },
+          select: { studentId: true, teacher: { select: { id: true, name: true } } },
+        }),
+      ]);
+
       const teacherMap = new Map<number, TeacherRef>();
       for (const r of tutorRequests) {
         if (r.studentId != null && !teacherMap.has(r.studentId)) teacherMap.set(r.studentId, r.teacher);
       }
 
       // For each student, get all team member user IDs for thread participant resolution
-      const allStudentIds = parentStudents.map((s) => s.id);
       const allMemberships = await prisma.childTeamMember.findMany({
         where: { childId: { in: allStudentIds }, status: "active" },
         select: { childId: true, parentId: true },
