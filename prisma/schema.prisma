@@ -40,6 +40,10 @@ model User {
   isManaged          Boolean   @default(false)
   slug               String?   @unique
 
+  // Notification preferences
+  emailNotifications         Boolean   @default(true)
+  lastNotificationEmailAt    DateTime?
+
   // Timestamps
   createdAt          DateTime  @default(now())
 

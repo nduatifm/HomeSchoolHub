@@ -179,3 +179,37 @@ export async function sendPasswordResetEmail(email: string, name: string, token:
     return { success: false, error: error.message };
   }
 }
+
+export async function sendNotificationEmail(
+  email: string,
+  name: string,
+  title: string,
+  body: string,
+  link: string
+): Promise<void> {
+  const baseUrl = getBaseUrl();
+  const ctaUrl = link.startsWith('http') ? link : `${baseUrl}${link.startsWith('/') ? link : '/' + link}`;
+  const profileUrl = `${baseUrl}/profile`;
+
+  const bodyHtml = `
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">${title}</h2>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4a5e50;">${body}</p>
+    ${primaryButton('Open Lyra Preparatory', ctaUrl)}
+    <p style="margin:32px 0 0;font-size:12px;color:#b8c8bb;line-height:1.6;">
+      You&rsquo;re receiving this because email notifications are enabled on your Lyra Preparatory account.
+      <a href="${profileUrl}" style="color:#1E8C64;text-decoration:underline;">Turn them off in your profile settings.</a>
+    </p>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: FROM,
+      to: email,
+      subject: title,
+      html: buildEmailHtml(bodyHtml, { preheader: body }),
+      text: `${body}\n\nOpen Lyra Preparatory: ${ctaUrl}\n\nTo turn off email notifications, visit your profile settings: ${profileUrl}\n\n© Lyra Preparatory`,
+    });
+  } catch (err: any) {
+    console.error('[notification-email] Failed to send:', err.message);
+  }
+}

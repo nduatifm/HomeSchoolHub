@@ -19,7 +19,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, X, Camera, ArrowLeftRight, Plus } from "lucide-react";
+import { Loader2, X, Camera, ArrowLeftRight, Plus, Bell } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import ModernSidebar from "@/components/ModernSidebar";
 
 /* ──────────────────────────────────────────────
@@ -774,6 +775,35 @@ export default function Profile() {
                 />
               </>
             )}
+          </Section>
+
+          {/* ══ Notifications ══ */}
+          <Section title="Notifications">
+            <div className="px-4 sm:px-6 py-4 sm:py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Bell className="w-4 h-4 text-gray-400" />
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Email Notifications</p>
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    Receive email alerts for new assignments, grades, progress reports, and tutor request decisions.
+                    We apply a 30-minute cooldown between emails so you're never flooded.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 pt-1">
+                  {updateDetailsMutation.isPending && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+                  <Switch
+                    data-testid="toggle-email-notifications"
+                    checked={user?.emailNotifications ?? true}
+                    disabled={updateDetailsMutation.isPending}
+                    onCheckedChange={(checked) =>
+                      updateDetailsMutation.mutate({ emailNotifications: checked })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
           </Section>
 
           {/* ══ Security ══ */}

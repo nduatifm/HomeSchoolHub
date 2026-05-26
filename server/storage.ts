@@ -329,6 +329,7 @@ export interface IStorage {
   getNotificationsForUser(userId: number, limit?: number): Promise<any[]>;
   markNotificationRead(id: number, userId: number): Promise<any>;
   markAllNotificationsRead(userId: number): Promise<void>;
+  updateLastNotificationEmailAt(userId: number): Promise<void>;
 
   getClassroomNotificationsForStudent(studentId: number, viewerUserId: number): Promise<Record<number, {
     pendingCount: number;
@@ -2478,6 +2479,13 @@ class PrismaStorage implements IStorage {
     await prisma.notification.updateMany({
       where: { userId, isRead: false },
       data: { isRead: true },
+    });
+  }
+
+  async updateLastNotificationEmailAt(userId: number): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastNotificationEmailAt: new Date() },
     });
   }
 

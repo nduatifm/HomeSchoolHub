@@ -38,6 +38,7 @@ import {
   sendStudentInviteEmail,
   sendTeamInviteEmail,
   sendPasswordResetEmail,
+  sendNotificationEmail,
 } from "./utils/emailService";
 import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
@@ -182,6 +183,32 @@ function generateTempPassword(): string {
 }
 
 // resetStudentAccount — shared core logic for parent + admin reset paths.
+// Fire-and-forget: sends a notification email if the user opted in and
+// hasn't received one in the last 30 minutes (per-user cooldown).
+async function maybeEmailNotification(
+  userId: number,
+  notification: { title: string; body: string; link?: string }
+) {
+  try {
+    const user = await storage.getUserById(userId);
+    if (!user || !user.emailNotifications || !user.email) return;
+    if (user.lastNotificationEmailAt) {
+      const elapsed = Date.now() - new Date(user.lastNotificationEmailAt).getTime();
+      if (elapsed < 30 * 60 * 1000) return;
+    }
+    await storage.updateLastNotificationEmailAt(userId);
+    await sendNotificationEmail(
+      user.email,
+      user.name,
+      notification.title,
+      notification.body,
+      notification.link ?? "/dashboard"
+    );
+  } catch (err) {
+    console.error("[notification-email] error:", err);
+  }
+}
+
 // Sets a new hashed temp password, force-verifies email, kills all sessions,
 // and fires an in-app notification to the student. Returns the plain-text temp password.
 async function resetStudentAccount(userId: number, callerDesc: string): Promise<string> {
@@ -831,6 +858,7 @@ export function registerRoutes(app: Express) {
           learningGoals: user.learningGoals,
           isAdmin: user.isAdmin ?? false,
           isSuperAdmin: user.isSuperAdmin ?? false,
+          emailNotifications: user.emailNotifications ?? true,
         },
         profile,
       });
@@ -1224,6 +1252,8 @@ export function registerRoutes(app: Express) {
         interests: z.array(z.string()).optional(),
         favoriteSubject: z.string().max(100).optional(),
         learningGoals: z.string().max(500).optional(),
+        // Notification preferences
+        emailNotifications: z.boolean().optional(),
       });
 
       const validation = updateDetailsSchema.safeParse(req.body);
@@ -1256,6 +1286,7 @@ export function registerRoutes(app: Express) {
           interests: user.interests,
           favoriteSubject: user.favoriteSubject,
           learningGoals: user.learningGoals,
+          emailNotifications: user.emailNotifications ?? true,
         },
       });
     } catch (error: any) {
@@ -2354,6 +2385,11 @@ export function registerRoutes(app: Express) {
             body: `You have a new assignment: "${assignment.title}"`,
             link: "/dashboard/classrooms",
           }).catch(console.error);
+          maybeEmailNotification(student.userId, {
+            title: "New Assignment",
+            body: `You have a new assignment: "${assignment.title}"`,
+            link: "/dashboard/classrooms",
+          }).catch(() => {});
         }
       }
 
@@ -2772,6 +2808,11 @@ export function registerRoutes(app: Express) {
             body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
             link: "/dashboard/classrooms",
           }).catch(console.error);
+          maybeEmailNotification(student.userId, {
+            title: "Assignment Graded",
+            body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
+            link: "/dashboard/classrooms",
+          }).catch(() => {});
         }
 
         // Also notify all team parents when a child's assignment is graded
@@ -2788,6 +2829,11 @@ export function registerRoutes(app: Express) {
                   body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
                   link: "/dashboard/children",
                 }).catch(console.error);
+                maybeEmailNotification(pid, {
+                  title: "Assignment Graded",
+                  body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
+                  link: "/dashboard/children",
+                }).catch(() => {});
               });
           }).catch(console.error);
         }
@@ -3648,6 +3694,11 @@ export function registerRoutes(app: Express) {
           body: `Your tutor request has been ${statusText} by ${user!.name}.`,
           link: "/dashboard#children",
         }).catch(console.error);
+        maybeEmailNotification(existingRequest.parentId, {
+          title: `Tutor Request ${status === "approved" ? "Approved" : "Declined"}`,
+          body: `Your tutor request has been ${statusText} by ${user!.name}.`,
+          link: "/dashboard#children",
+        }).catch(() => {});
       }
 
       res.json(request);
@@ -4076,6 +4127,11 @@ export function registerRoutes(app: Express) {
           body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
           link: "/dashboard#classrooms",
         }).catch(console.error);
+        maybeEmailNotification(reportStudent.userId, {
+          title: "New Progress Report",
+          body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+          link: "/dashboard#classrooms",
+        }).catch(() => {});
         storage.getTeamMemberUserIds(reportStudent.id).then((parentIds) => {
           parentIds.forEach((pid) => {
             storage.createNotification({
@@ -4085,6 +4141,11 @@ export function registerRoutes(app: Express) {
               body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
               link: "/dashboard/reports",
             }).catch(console.error);
+            maybeEmailNotification(pid, {
+              title: "New Progress Report",
+              body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+              link: "/dashboard/reports",
+            }).catch(() => {});
           });
         }).catch(console.error);
       }
