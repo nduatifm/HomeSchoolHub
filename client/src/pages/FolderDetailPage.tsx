@@ -57,7 +57,10 @@ export default function FolderDetailPage() {
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0") || null;
 
-  const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
+  // When ?studentId= is present the caller is acting as a parent regardless of
+  // any historical roles in their roles[] array (e.g. a teacher who was also
+  // invited as a co-parent still needs the parent folder-resolution path here).
+  const isTeacher = !parentStudentId && (user?.roles?.includes("teacher") || user?.role === "teacher");
   const isParent = user?.roles?.includes("parent") || user?.role === "parent";
   const isStudent = !isTeacher && !isParent;
   const goBack = useGoBack("/classrooms");
@@ -419,10 +422,17 @@ export default function FolderDetailPage() {
   const isSettled = !classroomsLoading && !classroomsFetching && !(isTeacher && foldersLoading);
 
   useEffect(() => {
+    // Bug 3 guard: a parent who lands here without ?studentId= (bookmark, back-button,
+    // share link, etc.) would see ownClassrooms=[] → folder=null → goBack() loop.
+    // Redirect to /classrooms immediately instead.
+    if (isParent && !parentStudentId) {
+      navigate("/classrooms");
+      return;
+    }
     if (isSettled && !folder) {
       goBack();
     }
-  }, [isSettled, folder, goBack, isTeacher]);
+  }, [isSettled, folder, goBack, isTeacher, isParent, parentStudentId, navigate]);
 
   if (!isSettled && !folder) return null;
 

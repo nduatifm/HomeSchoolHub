@@ -2043,7 +2043,9 @@ export function registerRoutes(app: Express) {
       const member = await storage.acceptTeamInvite(token, userId);
 
       // If the user doesn't have the parent role, add it
-      if (user.role !== "parent" && !user.roles.includes("parent")) {
+      // Use optional-chaining in case user.roles is null (legacy accounts created
+      // before the roles column existed — null-safe so the update still runs).
+      if (user.role !== "parent" && !user.roles?.includes("parent")) {
         await storage.updateUser(userId, { role: "parent", roles: { push: "parent" } });
       }
 
