@@ -201,15 +201,11 @@ export async function sendNotificationEmail(
     </p>
   `;
 
-  try {
-    await transporter.sendMail({
-      from: FROM,
-      to: email,
-      subject: title,
-      html: buildEmailHtml(bodyHtml, { preheader: body }),
-      text: `${body}\n\nOpen Lyra Preparatory: ${ctaUrl}\n\nTo turn off email notifications, visit your profile settings: ${profileUrl}\n\n© Lyra Preparatory`,
-    });
-  } catch (err: any) {
-    console.error('[notification-email] Failed to send:', err.message);
-  }
+  await transporter.sendMail({
+    from: FROM,
+    to: email,
+    subject: title,
+    html: buildEmailHtml(bodyHtml, { preheader: body }),
+    text: `${body}\n\nOpen Lyra Preparatory: ${ctaUrl}\n\nTo turn off email notifications, visit your profile settings: ${profileUrl}\n\n© Lyra Preparatory`,
+  });
 }

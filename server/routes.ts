@@ -191,11 +191,12 @@ async function maybeEmailNotification(
 ) {
   try {
     const user = await storage.getUserById(userId);
-    if (!user || !user.emailNotifications || !user.email) return;
-    if (user.lastNotificationEmailAt) {
-      const elapsed = Date.now() - new Date(user.lastNotificationEmailAt).getTime();
-      if (elapsed < 30 * 60 * 1000) return;
-    }
+    if (!user || !user.email) return;
+    // Atomic compare-and-set: claims the 30-min slot only if emailNotifications
+    // is true and the cooldown has elapsed. Returns false when another concurrent
+    // call already claimed the slot, preventing burst duplicates.
+    const claimed = await storage.tryClaimNotificationEmailSlot(userId);
+    if (!claimed) return;
     await sendNotificationEmail(
       user.email,
       user.name,
@@ -203,7 +204,6 @@ async function maybeEmailNotification(
       notification.body,
       notification.link ?? "/dashboard"
     );
-    await storage.updateLastNotificationEmailAt(userId);
   } catch (err) {
     console.error("[notification-email] error:", err);
   }

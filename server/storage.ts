@@ -329,7 +329,7 @@ export interface IStorage {
   getNotificationsForUser(userId: number, limit?: number): Promise<any[]>;
   markNotificationRead(id: number, userId: number): Promise<any>;
   markAllNotificationsRead(userId: number): Promise<void>;
-  updateLastNotificationEmailAt(userId: number): Promise<void>;
+  tryClaimNotificationEmailSlot(userId: number): Promise<boolean>;
 
   getClassroomNotificationsForStudent(studentId: number, viewerUserId: number): Promise<Record<number, {
     pendingCount: number;
@@ -2482,11 +2482,20 @@ class PrismaStorage implements IStorage {
     });
   }
 
-  async updateLastNotificationEmailAt(userId: number): Promise<void> {
-    await prisma.user.update({
-      where: { id: userId },
+  async tryClaimNotificationEmailSlot(userId: number): Promise<boolean> {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const result = await prisma.user.updateMany({
+      where: {
+        id: userId,
+        emailNotifications: true,
+        OR: [
+          { lastNotificationEmailAt: null },
+          { lastNotificationEmailAt: { lt: cutoff } },
+        ],
+      },
       data: { lastNotificationEmailAt: new Date() },
     });
+    return result.count === 1;
   }
 
   // ── Family team management ───────────────────────────────────────────────
