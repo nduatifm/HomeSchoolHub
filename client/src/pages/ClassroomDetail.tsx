@@ -175,9 +175,9 @@ export default function ClassroomDetail() {
     );
   }
 
-  const isTeacher = user?.role === "teacher" && classroom.teacherId === user.id;
-  const isStudent = user?.role === "student";
-  const isParent = user?.role === "parent";
+  const isTeacher = (user?.role === "teacher" || user?.roles?.includes("teacher")) && classroom.teacherId === user.id;
+  const isStudent = user?.role === "student" || user?.roles?.includes("student");
+  const isParent = user?.role === "parent" || user?.roles?.includes("parent");
   const isArchived = classroom.status === "archived";
   const theme = getSubjectTheme(classroom.subject || "");
 

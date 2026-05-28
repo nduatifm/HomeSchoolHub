@@ -403,8 +403,8 @@ export default function ClassroomsPage() {
   const [, navigate] = useLocation();
 
   const isTeacher = user?.roles?.includes("teacher") || user?.role === "teacher";
-  const isParent  = !isTeacher && user?.role === "parent";
-  const isStudent = !isTeacher && !isParent && user?.role === "student";
+  const isParent  = !isTeacher && (user?.role === "parent" || user?.roles?.includes("parent"));
+  const isStudent = !isTeacher && !isParent && (user?.role === "student" || user?.roles?.includes("student"));
 
   // ── Teacher / student queries ──
   const { data: classrooms = [], isLoading: classroomsLoading } = useQuery<Classroom[]>({

@@ -5857,11 +5857,13 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      if (user.role === "teacher") {
+      const isActorTeacher = user.role === "teacher" || user.roles?.includes("teacher");
+      const isActorStudent = !isActorTeacher && (user.role === "student" || user.roles?.includes("student"));
+      if (isActorTeacher) {
         const classrooms = await storage.getClassroomsByTeacher(user.id);
         return res.json(classrooms);
       }
-      if (user.role === "student") {
+      if (isActorStudent) {
         const student = await storage.getStudentByUserId(user.id);
         if (!student) return res.json([]);
         const classrooms = await storage.getClassroomsForStudent(student.id);

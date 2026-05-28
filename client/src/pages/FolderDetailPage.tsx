@@ -51,7 +51,7 @@ type TeacherStudent = { id: number; name: string; email: string; gradeLevel?: st
 export default function FolderDetailPage() {
   const { folderId: folderIdParam } = useParams<{ folderId: string }>();
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -60,9 +60,13 @@ export default function FolderDetailPage() {
   // When ?studentId= is present the caller is acting as a parent regardless of
   // any historical roles in their roles[] array (e.g. a teacher who was also
   // invited as a co-parent still needs the parent folder-resolution path here).
-  const isTeacher = !parentStudentId && (user?.roles?.includes("teacher") || user?.role === "teacher");
-  const isParent = user?.roles?.includes("parent") || user?.role === "parent";
-  const isStudent = !isTeacher && !isParent;
+  // Guard all role flags behind !authLoading && !!user so that a cached
+  // /api/classrooms response during auth initialisation cannot cause isSettled
+  // to become true before the user object is available (which would make
+  // isTeacher = false, folder = null, and fire goBack() prematurely).
+  const isTeacher = !authLoading && !!user && !parentStudentId && (user.roles?.includes("teacher") || user.role === "teacher");
+  const isParent = !authLoading && !!user && (user.roles?.includes("parent") || user.role === "parent");
+  const isStudent = !authLoading && !!user && !isTeacher && !isParent;
   const goBack = useGoBack("/classrooms");
 
   // Teachers and students use own classrooms; parents fetch the child's classrooms
@@ -420,10 +424,15 @@ export default function FolderDetailPage() {
   // goBack() before fresh classroom data arrives with the matching gradeFolderId.
   // For teachers we also wait for any active grade-folders refetch (foldersFetching) so that a
   // background refresh that temporarily clears the stale cache doesn't fire a spurious redirect.
-  const isLoading = classroomsLoading || (isTeacher && foldersLoading);
-  const isSettled = !classroomsLoading && !classroomsFetching && !(isTeacher && (foldersLoading || foldersFetching));
+  // authLoading must be false before we consider the state settled: if the user object hasn't
+  // loaded yet a cached /api/classrooms hit would make isSettled=true while isTeacher=false,
+  // producing folder=null and a premature goBack().
+  const isLoading = authLoading || classroomsLoading || (isTeacher && foldersLoading);
+  const isSettled = !authLoading && !classroomsLoading && !classroomsFetching && !(isTeacher && (foldersLoading || foldersFetching));
 
   useEffect(() => {
+    // Don't act while auth is still resolving.
+    if (authLoading) return;
     // Guard: a parent who lands here without ?studentId= (bookmark, back-button,
     // share link, etc.) would see ownClassrooms=[] → folder=null → goBack() loop.
     // Redirect to /classrooms immediately instead.
@@ -439,9 +448,9 @@ export default function FolderDetailPage() {
     if (isSettled && !folder) {
       goBack();
     }
-  }, [isSettled, folder, goBack, isTeacher, isParent, parentStudentId, navigate, foldersError]);
+  }, [authLoading, isSettled, folder, goBack, isTeacher, isParent, parentStudentId, navigate, foldersError]);
 
-  if (!isSettled && !folder) return null;
+  if (authLoading || (!isSettled && !folder)) return null;
 
   return (
     <div className="min-h-screen bg-background">
