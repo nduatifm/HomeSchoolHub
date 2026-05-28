@@ -57,15 +57,22 @@ export default function FolderDetailPage() {
   const searchParams = new URLSearchParams(window.location.search);
   const parentStudentId = parseInt(searchParams.get("studentId") ?? "0") || null;
 
-  // When ?studentId= is present the caller is acting as a parent regardless of
-  // any historical roles in their roles[] array (e.g. a teacher who was also
-  // invited as a co-parent still needs the parent folder-resolution path here).
-  // Guard all role flags behind !authLoading && !!user so that a cached
+  // Role derivation uses user.role (the active context set by the switch-role
+  // mechanism), NOT user.roles[] (historical entitlements). A teacher who was
+  // also added as a co-parent for a student would have "parent" in roles[], but
+  // their active role is still "teacher" — using roles[] here would make
+  // isParent=true and trigger the redirect at line 439, bouncing them out.
+  //
+  // Special case: when ?studentId= is present the caller is explicitly browsing
+  // a co-parented child's folder, so isParent is also true for that path
+  // regardless of active role (a teacher-co-parent uses !!parentStudentId).
+  //
+  // All flags are guarded behind !authLoading && !!user so that a cached
   // /api/classrooms response during auth initialisation cannot cause isSettled
   // to become true before the user object is available (which would make
-  // isTeacher = false, folder = null, and fire goBack() prematurely).
-  const isTeacher = !authLoading && !!user && !parentStudentId && (user.roles?.includes("teacher") || user.role === "teacher");
-  const isParent = !authLoading && !!user && (user.roles?.includes("parent") || user.role === "parent");
+  // isTeacher=false, folder=null, and fire goBack() prematurely).
+  const isTeacher = !authLoading && !!user && !parentStudentId && user.role === "teacher";
+  const isParent = !authLoading && !!user && (user.role === "parent" || !!parentStudentId);
   const isStudent = !authLoading && !!user && !isTeacher && !isParent;
   const goBack = useGoBack("/classrooms");
 
