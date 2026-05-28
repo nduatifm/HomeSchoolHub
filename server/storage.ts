@@ -2468,7 +2468,7 @@ class PrismaStorage implements IStorage {
     return prisma.notification.create({ data });
   }
 
-  async getNotificationsForUser(userId: number, limit = 20): Promise<any[]> {
+  async getNotificationsForUser(userId: number, limit = 50): Promise<any[]> {
     return prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },

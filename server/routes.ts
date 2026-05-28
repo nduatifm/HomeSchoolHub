@@ -6471,17 +6471,36 @@ export function registerRoutes(app: Express) {
 
       const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers, autoGrade);
 
-      // Notify the teacher when a returned submission is resubmitted
-      if (isResubmission) {
-        const teacherUser = await storage.getUserById(classroom.teacherId);
-        if (teacherUser) {
+      // Notify the teacher on every submission (first-time or resubmission)
+      const teacherUser = await storage.getUserById(classroom.teacherId);
+      if (teacherUser) {
+        if (isResubmission) {
           storage.createNotification({
             userId: teacherUser.id,
             type: "submission_resubmitted",
             title: "Submission Resubmitted",
             body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}/submissions/${submission.id}/review`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
           }).catch(console.error);
+          maybeEmailNotification(teacherUser.id, {
+            title: "Submission Resubmitted",
+            body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+          }).catch(() => {});
+        } else {
+          // First submission — teacher was previously never notified
+          storage.createNotification({
+            userId: teacherUser.id,
+            type: "new_submission",
+            title: "New Submission",
+            body: `${student.name} submitted "${assignment.title}".`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+          }).catch(console.error);
+          maybeEmailNotification(teacherUser.id, {
+            title: "New Submission",
+            body: `${student.name} submitted "${assignment.title}".`,
+            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+          }).catch(() => {});
         }
       }
 
