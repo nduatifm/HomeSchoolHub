@@ -81,7 +81,7 @@ export default function FolderDetailPage() {
   const classroomsLoading = isParent && parentStudentId ? parentClassroomsLoading : ownClassroomsLoading;
   const classroomsFetching = isParent && parentStudentId ? parentClassroomsFetching : ownClassroomsFetching;
 
-  const { data: folders = [], isLoading: foldersLoading } = useQuery<GradeFolder[]>({
+  const { data: folders = [], isLoading: foldersLoading, isFetching: foldersFetching, isError: foldersError } = useQuery<GradeFolder[]>({
     queryKey: ["/api/grade-folders"],
     enabled: isTeacher,
   });
@@ -418,21 +418,28 @@ export default function FolderDetailPage() {
   // isSettled gates the redirect decision: only redirect once both the initial load AND any
   // in-flight background refetch have completed, so stale-cache data never triggers a false
   // goBack() before fresh classroom data arrives with the matching gradeFolderId.
+  // For teachers we also wait for any active grade-folders refetch (foldersFetching) so that a
+  // background refresh that temporarily clears the stale cache doesn't fire a spurious redirect.
   const isLoading = classroomsLoading || (isTeacher && foldersLoading);
-  const isSettled = !classroomsLoading && !classroomsFetching && !(isTeacher && foldersLoading);
+  const isSettled = !classroomsLoading && !classroomsFetching && !(isTeacher && (foldersLoading || foldersFetching));
 
   useEffect(() => {
-    // Bug 3 guard: a parent who lands here without ?studentId= (bookmark, back-button,
+    // Guard: a parent who lands here without ?studentId= (bookmark, back-button,
     // share link, etc.) would see ownClassrooms=[] → folder=null → goBack() loop.
     // Redirect to /classrooms immediately instead.
     if (isParent && !parentStudentId) {
       navigate("/classrooms");
       return;
     }
+    // Guard: if the grade-folders API failed for a teacher (e.g. transient 500 or network
+    // error), don't silently redirect — stay on the page so the user can retry.
+    if (isTeacher && foldersError) {
+      return;
+    }
     if (isSettled && !folder) {
       goBack();
     }
-  }, [isSettled, folder, goBack, isTeacher, isParent, parentStudentId, navigate]);
+  }, [isSettled, folder, goBack, isTeacher, isParent, parentStudentId, navigate, foldersError]);
 
   if (!isSettled && !folder) return null;
 
