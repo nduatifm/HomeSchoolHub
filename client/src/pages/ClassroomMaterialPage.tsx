@@ -1275,8 +1275,8 @@ export default function ClassroomMaterialPage() {
     );
   }
 
-  const isTeacher = (user?.role === "teacher" || user?.roles?.includes("teacher")) && classroom.teacherId === user.id;
-  const isParent = user?.role === "parent" || user?.roles?.includes("parent");
+  const isTeacher = user?.role === "teacher" && classroom.teacherId === user.id;
+  const isParent = user?.role === "parent";
 
   if (isNew || isEdit) {
     if (!isTeacher) { navigate(`/classrooms/${classroomSlug}`); return null; }

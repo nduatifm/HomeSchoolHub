@@ -106,9 +106,9 @@ function DashboardRouter() {
   const { user, isLoading } = useAuth();
   if (isLoading) return <LoadingScreen />;
   if (!user) return <Redirect to="/login" />;
-  if (user.role === "teacher" || user.roles?.includes("teacher")) return <Redirect to="/classrooms" />;
-  if (user.role === "parent"  || user.roles?.includes("parent"))  return <Redirect to="/children" />;
-  if (user.role === "student" || user.roles?.includes("student")) return <Redirect to="/classrooms" />;
+  if (user.role === "teacher") return <Redirect to="/classrooms" />;
+  if (user.role === "parent")  return <Redirect to="/children" />;
+  if (user.role === "student") return <Redirect to="/classrooms" />;
   return <Redirect to="/login" />;
 }
 
@@ -116,8 +116,8 @@ function ClassroomsRouter() {
   const { user, isLoading } = useAuth();
   if (isLoading) return <LoadingScreen />;
   if (!user) return <Redirect to="/login" />;
-  if (user.role === "teacher" || user.roles?.includes("teacher")) return <ClassroomsPage />;
-  if (user.role === "parent"  || user.roles?.includes("parent"))  return <ParentClassroomsPage />;
+  if (user.role === "teacher") return <ClassroomsPage />;
+  if (user.role === "parent")  return <ParentClassroomsPage />;
   return <StudentClassroomsPage />;
 }
 
@@ -125,8 +125,8 @@ function FeedbackRouter() {
   const { user, isLoading } = useAuth();
   if (isLoading) return <LoadingScreen />;
   if (!user) return <Redirect to="/login" />;
-  if (user.role === "teacher" || user.roles?.includes("teacher")) return <TeacherFeedbackPage />;
-  if (user.role === "student" || user.roles?.includes("student")) return <StudentFeedbackPage />;
+  if (user.role === "teacher") return <TeacherFeedbackPage />;
+  if (user.role === "student") return <StudentFeedbackPage />;
   return <Redirect to="/children" />;
 }
 

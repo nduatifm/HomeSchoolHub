@@ -78,9 +78,7 @@ export default function MessagesPage() {
       ? selected
       : visibleConvs[0] ?? null;
 
-  const isTeacherUser = user?.role === "teacher" || user?.roles?.includes("teacher");
-  const isParentUser  = user?.role === "parent"  || user?.roles?.includes("parent");
-  const canUseDirect = isTeacherUser || isParentUser;
+  const canUseDirect = user?.role === "teacher" || user?.role === "parent";
   const { data: directContacts = [], isLoading: contactsLoading } = useQuery<DirectContact[]>({
     queryKey: ["/api/messages/direct-contacts"],
     enabled: newDirectOpen && canUseDirect,

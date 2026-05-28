@@ -66,21 +66,17 @@ export default function ModernSidebar() {
   });
   const unreadNotifCount = notifCount?.count ?? 0;
 
-  const isTeacherUser = user?.role === "teacher" || user?.roles?.includes("teacher");
-  const isParentUser  = user?.role === "parent"  || user?.roles?.includes("parent");
-  const isStudentUser = user?.role === "student" || user?.roles?.includes("student");
-
   const { data: classroomNotifData } = useQuery<{ total: number }>({
     queryKey: ["/api/classroom-notifications/total"],
     refetchInterval: 15000,
-    enabled: isTeacherUser || isParentUser || isStudentUser,
+    enabled: !!user,
   });
   const classroomBadge = classroomNotifData?.total ?? 0;
 
   const { data: pendingRequestData } = useQuery<{ count: number }>({
     queryKey: ["/api/tutor-requests/pending-count"],
     refetchInterval: 30000,
-    enabled: isTeacherUser,
+    enabled: user?.role === "teacher",
   });
   const pendingRequestCount = pendingRequestData?.count ?? 0;
 
@@ -132,8 +128,8 @@ export default function ModernSidebar() {
   ];
 
   const getItems = () => {
-    if (isTeacherUser) return teacherItems;
-    if (isParentUser)  return parentItems;
+    if (user?.role === "teacher") return teacherItems;
+    if (user?.role === "parent")  return parentItems;
     return studentItems;
   };
 

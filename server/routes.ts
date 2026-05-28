@@ -5857,8 +5857,8 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const isActorTeacher = user.role === "teacher" || user.roles?.includes("teacher");
-      const isActorStudent = !isActorTeacher && (user.role === "student" || user.roles?.includes("student"));
+      const isActorTeacher = user.role === "teacher";
+      const isActorStudent = user.role === "student";
       if (isActorTeacher) {
         const classrooms = await storage.getClassroomsByTeacher(user.id);
         return res.json(classrooms);
