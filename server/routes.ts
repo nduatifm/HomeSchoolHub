@@ -6471,21 +6471,24 @@ export function registerRoutes(app: Express) {
 
       const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers, autoGrade);
 
-      // Notify the teacher on every submission (first-time or resubmission)
+      // Notify the teacher on every submission (first-time or resubmission).
+      // Links point directly to the submission review page so the teacher can
+      // open the work in one click.
       const teacherUser = await storage.getUserById(classroom.teacherId);
       if (teacherUser) {
+        const reviewLink = `/classrooms/${classroom.slug ?? classroom.id}/submissions/${submission.id}/review`;
         if (isResubmission) {
           storage.createNotification({
             userId: teacherUser.id,
             type: "submission_resubmitted",
             title: "Submission Resubmitted",
             body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+            link: reviewLink,
           }).catch(console.error);
           maybeEmailNotification(teacherUser.id, {
             title: "Submission Resubmitted",
             body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+            link: reviewLink,
           }).catch(() => {});
         } else {
           // First submission — teacher was previously never notified
@@ -6494,12 +6497,12 @@ export function registerRoutes(app: Express) {
             type: "new_submission",
             title: "New Submission",
             body: `${student.name} submitted "${assignment.title}".`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+            link: reviewLink,
           }).catch(console.error);
           maybeEmailNotification(teacherUser.id, {
             title: "New Submission",
             body: `${student.name} submitted "${assignment.title}".`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
+            link: reviewLink,
           }).catch(() => {});
         }
       }
