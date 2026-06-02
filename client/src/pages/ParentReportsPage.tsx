@@ -8,22 +8,22 @@ import type { ProgressReport } from "@shared/schema";
 
 type ProgressReportEnriched = ProgressReport & { studentName?: string; teacherName?: string };
 
+function downloadReport(report: ProgressReportEnriched) {
+  const dataStr = JSON.stringify(report, null, 2);
+  const dataBlob = new Blob([dataStr], { type: "application/json" });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `progress-report-${report.id}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ParentReportsPage() {
   const [, navigate] = useLocation();
   const { data: progressReports = [] } = useQuery<ProgressReportEnriched[]>({
     queryKey: ["/api/progress-reports/parent"],
   });
-
-  const downloadReport = (report: ProgressReportEnriched) => {
-    const dataStr = JSON.stringify(report, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `progress-report-${report.id}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
 
   const semesterReports = progressReports.filter((r) => r.semesterData);
   const legacyReports = progressReports.filter((r) => !r.semesterData);
@@ -40,11 +40,13 @@ export default function ParentReportsPage() {
           {progressReports.length === 0 ? (
             <div className="text-center py-12 rounded-2xl border border-dashed border-border">
               <FileText className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">No progress reports yet. Reports written by teachers will appear here.</p>
+              <p className="text-sm text-muted-foreground">
+                No progress reports yet. Reports written by teachers will appear here.
+              </p>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Semester performance reports */}
+              {/* ── Semester performance reports ─────────────────── */}
               {semesterReports.length > 0 && (
                 <div className="space-y-3">
                   <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -61,15 +63,21 @@ export default function ParentReportsPage() {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <span className="font-medium text-sm">{report.studentName || "Student"}</span>
-                              <Badge variant="secondary" className="text-xs">Semester Report</Badge>
+                              <span className="font-medium text-sm">
+                                {report.studentName || "Student"}
+                              </span>
+                              <Badge variant="secondary" className="text-xs">
+                                Semester Report
+                              </Badge>
                               {sd?.overallGpa !== null && sd?.overallGpa !== undefined && (
                                 <Badge
                                   variant="outline"
                                   className={`text-xs font-semibold ${
-                                    sd.overallGpa >= 70 ? "text-green-600 border-green-200" :
-                                    sd.overallGpa >= 50 ? "text-amber-600 border-amber-200" :
-                                    "text-red-600 border-red-200"
+                                    sd.overallGpa >= 70
+                                      ? "text-green-600 border-green-200"
+                                      : sd.overallGpa >= 50
+                                        ? "text-amber-600 border-amber-200"
+                                        : "text-red-600 border-red-200"
                                   }`}
                                 >
                                   {sd.overallGpa}%
@@ -81,27 +89,43 @@ export default function ParentReportsPage() {
                             </p>
                             {sd && (
                               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                <span>{sd.completedAssignments}/{sd.totalAssignments} assignments completed</span>
+                                <span>
+                                  {sd.completedAssignments}/{sd.totalAssignments} assignments completed
+                                </span>
                                 <span>·</span>
-                                <span>{sd.classrooms?.length ?? 0} classroom{sd.classrooms?.length !== 1 ? "s" : ""}</span>
+                                <span>
+                                  {sd.classrooms?.length ?? 0} classroom
+                                  {sd.classrooms?.length !== 1 ? "s" : ""}
+                                </span>
                               </div>
                             )}
                             {report.content && (
-                              <p className="text-sm text-foreground line-clamp-1 mt-1.5 text-muted-foreground italic">
+                              <p className="text-sm text-muted-foreground italic line-clamp-1 mt-1.5">
                                 "{report.content}"
                               </p>
                             )}
                           </div>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => navigate(`/reports/${report.id}/view`)}
-                            className="shrink-0"
-                            data-testid={`button-view-${report.id}`}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                            View
-                          </Button>
+                          {/* Both view and download */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => downloadReport(report)}
+                              data-testid={`button-download-${report.id}`}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              <span className="sr-only">Download JSON</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => navigate(`/reports/${report.id}/view`)}
+                              data-testid={`button-view-${report.id}`}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                              View
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -109,7 +133,7 @@ export default function ParentReportsPage() {
                 </div>
               )}
 
-              {/* Legacy reports */}
+              {/* ── Legacy / narrative reports ───────────────────── */}
               {legacyReports.length > 0 && (
                 <div className="space-y-3">
                   {semesterReports.length > 0 && (
@@ -126,14 +150,21 @@ export default function ParentReportsPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm">{report.studentName || "Student"}</span>
-                            <span className="text-xs text-muted-foreground font-medium">{report.period}</span>
+                            <span className="font-medium text-sm">
+                              {report.studentName || "Student"}
+                            </span>
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {report.period}
+                            </span>
                             {(report.grades as any)?.Overall !== undefined && (
-                              <Badge variant="secondary">{(report.grades as any).Overall}%</Badge>
+                              <Badge variant="secondary">
+                                {(report.grades as any).Overall}%
+                              </Badge>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground mb-2">
-                            By {report.teacherName || "Teacher"} · {report.date ? new Date(report.date).toLocaleDateString() : ""}
+                            By {report.teacherName || "Teacher"} ·{" "}
+                            {report.date ? new Date(report.date).toLocaleDateString() : ""}
                           </p>
                           {report.content && (
                             <p className="text-sm text-foreground line-clamp-2">{report.content}</p>

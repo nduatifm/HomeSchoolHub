@@ -4301,20 +4301,30 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "studentId, from, and to are required" });
       }
 
-      // Fetch all classrooms the student is enrolled in
+      // Auth: teacher must own at least one classroom this student is enrolled in
+      const teacherClassroomIds = (await prisma.classroom.findMany({
+        where: { teacherId: userId },
+        select: { id: true },
+      })).map((c: any) => c.id);
+
+      const sharedEnrollment = await prisma.classroomEnrollment.findFirst({
+        where: { studentId, classroomId: { in: teacherClassroomIds } },
+      });
+      if (!sharedEnrollment && !user.isAdmin && !user.isSuperAdmin) {
+        return res.status(403).json({ error: "This student is not in any of your classrooms" });
+      }
+
+      // Fetch only the classrooms this teacher owns and the student is enrolled in
       const enrollments = await prisma.classroomEnrollment.findMany({
-        where: { studentId },
+        where: { studentId, classroomId: { in: teacherClassroomIds } },
         include: { classroom: true },
       });
 
-      // Attendance in range (global, not per-classroom)
+      // Global attendance in date range (attendance is not per-classroom in this data model)
       const allAttendance = await prisma.attendance.findMany({
-        where: {
-          studentId,
-          date: { gte: from, lte: to },
-        },
+        where: { studentId, date: { gte: from, lte: to } },
       });
-      const attendanceSummary = {
+      const attendance = {
         present: allAttendance.filter((a: any) => a.status === "present").length,
         absent: allAttendance.filter((a: any) => a.status === "absent").length,
         late: allAttendance.filter((a: any) => a.status === "late").length,
@@ -4327,17 +4337,16 @@ export function registerRoutes(app: Express) {
         enrollments.map(async (enrollment: any) => {
           const classroom = enrollment.classroom;
 
-          // Assignments due within range (or all if range is broad)
+          // Assignments due within the selected date range
           const assignments = await prisma.classroomAssignment.findMany({
-            where: { classroomId: classroom.id },
+            where: { classroomId: classroom.id, dueDate: { gte: from, lte: to } },
           });
 
-          const submissions = await prisma.classroomSubmission.findMany({
-            where: {
-              assignmentId: { in: assignments.map((a: any) => a.id) },
-              studentId,
-            },
-          });
+          const submissions = assignments.length > 0
+            ? await prisma.classroomSubmission.findMany({
+                where: { assignmentId: { in: assignments.map((a: any) => a.id) }, studentId },
+              })
+            : [];
 
           const policy = await prisma.gradingPolicy.findFirst({
             where: { classroomId: classroom.id },
@@ -4368,8 +4377,11 @@ export function registerRoutes(app: Express) {
               : null;
 
           const totalAssignments = assignments.length;
-          const completedAssignments = submissions.filter((s: any) => s.status === "submitted" || s.status === "graded").length;
-          const completionRate = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+          const completedAssignments = submissions.filter(
+            (s: any) => s.status === "submitted" || s.status === "graded"
+          ).length;
+          const completionRate =
+            totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
 
           return {
             id: classroom.id,
@@ -4379,13 +4391,11 @@ export function registerRoutes(app: Express) {
             completionRate,
             totalAssignments,
             completedAssignments,
-            attendance: attendanceSummary,
-            hasData: totalAssignments > 0 || allAttendance.length > 0,
+            hasData: totalAssignments > 0,
           };
         })
       );
 
-      // Overall stats
       const allAssignments = classroomRows.reduce((s, c) => s + c.totalAssignments, 0);
       const allCompleted = classroomRows.reduce((s, c) => s + c.completedAssignments, 0);
       const gradedClassrooms = classroomRows.filter((c) => c.weightedGrade !== null);
@@ -4394,17 +4404,29 @@ export function registerRoutes(app: Express) {
           ? Math.round(gradedClassrooms.reduce((s, c) => s + c.weightedGrade!, 0) / gradedClassrooms.length)
           : null;
 
-      const result = {
+      res.json({
         dateFrom: from,
         dateTo: to,
         overallGpa,
         totalAssignments: allAssignments,
         completedAssignments: allCompleted,
         completionRate: allAssignments > 0 ? Math.round((allCompleted / allAssignments) * 100) : 0,
+        attendance,
         classrooms: classroomRows,
-      };
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
-      res.json(result);
+  // GET /api/progress-reports/me — student self-scoped (their own reports)
+  app.get("/api/progress-reports/me", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId as number;
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) return res.status(403).json({ error: "Students only" });
+      const reports = await storage.getProgressReportsByStudent(student.id);
+      res.json(reports);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

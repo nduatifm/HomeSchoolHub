@@ -320,12 +320,6 @@ export const semesterClassroomDataSchema = z.object({
   completionRate: z.number(),
   totalAssignments: z.number(),
   completedAssignments: z.number(),
-  attendance: z.object({
-    present: z.number(),
-    absent: z.number(),
-    late: z.number(),
-    total: z.number(),
-  }),
   hasData: z.boolean(),
 });
 
@@ -336,6 +330,12 @@ export const semesterReportDataSchema = z.object({
   totalAssignments: z.number(),
   completedAssignments: z.number(),
   completionRate: z.number(),
+  attendance: z.object({
+    present: z.number(),
+    absent: z.number(),
+    late: z.number(),
+    total: z.number(),
+  }),
   classrooms: z.array(semesterClassroomDataSchema),
 });
 
