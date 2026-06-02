@@ -19,10 +19,12 @@ import type { SemesterReportData } from "@shared/schema";
 
 type StudentOption = { id: number; name: string };
 
-function StepIndicator({ current, total }: { current: number; total: number }) {
+const TOTAL_STEPS = 4;
+
+function StepIndicator({ current }: { current: number }) {
   return (
     <div className="flex items-center gap-1.5 mb-5">
-      {Array.from({ length: total }).map((_, i) => (
+      {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
         <div
           key={i}
           className={`h-1.5 rounded-full flex-1 transition-colors ${
@@ -156,20 +158,18 @@ export default function SemesterReportDialog({
       ? Math.round((previewData.attendance.present / previewData.attendance.total) * 100)
       : null;
 
+  const stepTitle = ["Select Student", "Date Range", "Preview Data", "Add Notes & Save"][step];
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent className="max-w-lg w-[calc(100vw-2rem)] rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold">
-            {step === 0 && "Select Student & Period"}
-            {step === 1 && "Select Date Range"}
-            {step === 2 && "Preview & Save"}
-          </DialogTitle>
+          <DialogTitle className="text-base font-semibold">{stepTitle}</DialogTitle>
         </DialogHeader>
 
-        <StepIndicator current={step} total={3} />
+        <StepIndicator current={step} />
 
-        {/* ── Step 0: Student + period label ─────────────────────────── */}
+        {/* ── Step 0: Student + optional period label ──────────────────── */}
         {step === 0 && (
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -212,21 +212,22 @@ export default function SemesterReportDialog({
           </div>
         )}
 
-        {/* ── Step 1: Date range ─────────────────────────────────────── */}
+        {/* ── Step 1: Date range ────────────────────────────────────────── */}
         {step === 1 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Only assignments with a due date inside this window will be included for{" "}
               <span className="font-medium text-foreground">{selectedStudent?.name}</span>.
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            {/* Stack on mobile, side-by-side on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-sm">From</Label>
                 <Input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-10"
+                  className="h-10 w-full"
                 />
               </div>
               <div className="space-y-1.5">
@@ -235,7 +236,7 @@ export default function SemesterReportDialog({
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="h-10"
+                  className="h-10 w-full"
                 />
               </div>
             </div>
@@ -261,14 +262,14 @@ export default function SemesterReportDialog({
           </div>
         )}
 
-        {/* ── Step 2: Preview + comment + save ──────────────────────── */}
+        {/* ── Step 2: Preview ───────────────────────────────────────────── */}
         {step === 2 && previewData && (
           <div className="space-y-4">
-            {/* Summary strip */}
-            <div className="rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 grid grid-cols-3 gap-3 text-center">
+            {/* Summary strip — single col on mobile, 3-col on sm+ */}
+            <div className="rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
-                  Grade
+                  Overall Grade
                 </p>
                 <p className={`text-lg font-bold ${gradeText(previewData.overallGpa)}`}>
                   {previewData.overallGpa !== null ? `${previewData.overallGpa}%` : "—"}
@@ -307,27 +308,28 @@ export default function SemesterReportDialog({
                     </span>
                   </div>
                   <GradeBar value={c.weightedGrade ?? 0} color={gradeColor(c.weightedGrade)} />
-                  <div className="flex gap-3 text-[11px] text-muted-foreground">
-                    <span>
-                      {c.completedAssignments}/{c.totalAssignments} assignments
-                    </span>
+                  <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                    <span>{c.completedAssignments}/{c.totalAssignments} assignments</span>
                     <span>·</span>
                     <span>{c.completionRate}% completion</span>
+                    {c.totalAssignments === 0 && (
+                      <span className="italic">No assignments in period</span>
+                    )}
                   </div>
                 </div>
               ))}
               {previewData.classrooms.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  No assignments in this classroom within the selected period.
+                  No classrooms found for this student in the selected period.
                 </p>
               )}
             </div>
 
-            {/* Global attendance */}
-            {previewData.attendance.total > 0 && (
-              <div className="rounded-xl border border-border px-3 py-2 flex items-center gap-3 text-xs text-muted-foreground">
+            {/* Global attendance note */}
+            {previewData.attendance.total > 0 ? (
+              <div className="rounded-xl border border-border px-3 py-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Users className="h-3.5 w-3.5 shrink-0" />
-                <span className="font-medium text-foreground">Attendance:</span>
+                <span className="font-medium text-foreground">Overall attendance:</span>
                 <span className="text-green-600 font-medium">
                   {previewData.attendance.present} present
                 </span>
@@ -344,22 +346,49 @@ export default function SemesterReportDialog({
                   </>
                 )}
               </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No attendance records in this period.</p>
             )}
 
-            {/* Teacher comments */}
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(1)}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
+              </Button>
+              <Button onClick={() => setStep(3)}>
+                Add Notes <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3: Notes + save ──────────────────────────────────────── */}
+        {step === 3 && previewData && (
+          <div className="space-y-4">
+            {/* Brief summary reminder */}
+            <div className="rounded-xl bg-muted/40 px-3 py-2.5 text-sm flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+              <span className="font-medium text-foreground">{selectedStudent?.name}</span>
+              <span>
+                Grade:{" "}
+                <span className={`font-semibold ${gradeText(previewData.overallGpa)}`}>
+                  {previewData.overallGpa !== null ? `${previewData.overallGpa}%` : "—"}
+                </span>
+              </span>
+              <span>· Completion: <span className="font-semibold text-foreground">{previewData.completionRate}%</span></span>
+            </div>
+
             <div className="space-y-1.5">
-              <Label className="text-sm">Comments (optional)</Label>
+              <Label className="text-sm">Teacher Comments <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Textarea
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                placeholder="Add overall notes, highlights, or recommendations…"
-                rows={3}
+                placeholder="Add overall notes, highlights, or recommendations for the student and family…"
+                rows={5}
                 className="resize-none text-sm"
               />
             </div>
 
             <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>
+              <Button variant="outline" onClick={() => setStep(2)}>
                 <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
               <Button onClick={handleSave} disabled={saveMutation.isPending}>
