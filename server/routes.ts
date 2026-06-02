@@ -2042,11 +2042,18 @@ export function registerRoutes(app: Express) {
 
       const member = await storage.acceptTeamInvite(token, userId);
 
-      // If the user doesn't have the parent role, add it
-      // Use optional-chaining in case user.roles is null (legacy accounts created
-      // before the roles column existed — null-safe so the update still runs).
-      if (user.role !== "parent" && !user.roles?.includes("parent")) {
-        await storage.updateUser(userId, { role: "parent", roles: { push: "parent" } });
+      // Add the "parent" capability if the user doesn't already have it.
+      // IMPORTANT: never overwrite a "teacher" primary role with "parent" — a teacher
+      // who accepts a co-parent invite should stay a teacher. We only flip the primary
+      // role to "parent" when the user has no meaningful role yet (e.g. plain signup).
+      if (!user.roles?.includes("parent")) {
+        const isTeacher = user.role === "teacher" || user.roles?.includes("teacher");
+        const existingRoles: string[] = user.roles ?? (user.role ? [user.role] : []);
+        const newRoles = Array.from(new Set([...existingRoles, "parent"]));
+        // Only promote the primary role to "parent" when the user isn't already a teacher.
+        // Teachers keep their primary role; "parent" is just appended to their roles array.
+        const primaryRole = isTeacher ? user.role : "parent";
+        await storage.updateUser(userId, { role: primaryRole, roles: newRoles });
       }
 
       // Notify all existing owners that someone accepted the invite
