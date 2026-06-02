@@ -175,16 +175,31 @@ export default function ReportViewPage() {
                             <p className="text-xs text-muted-foreground">{c.subject}</p>
                           )}
                         </div>
-                        <GradeLabel value={c.weightedGrade} />
+                        {c.totalAssignments > 0 ? (
+                          <GradeLabel value={c.weightedGrade} />
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">No data</span>
+                        )}
                       </div>
-                      {c.weightedGrade !== null && <GradeBar value={c.weightedGrade} />}
-                      <div className="flex gap-3 text-xs text-muted-foreground">
-                        <span>
-                          <CheckSquare className="inline h-3 w-3 mr-0.5 mb-px" />
-                          {c.completedAssignments}/{c.totalAssignments} assignments (
-                          {c.completionRate}%)
-                        </span>
-                      </div>
+                      {c.weightedGrade !== null && c.totalAssignments > 0 && (
+                        <GradeBar value={c.weightedGrade} />
+                      )}
+                      {c.totalAssignments === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">
+                          No assignments due in this period.
+                        </p>
+                      ) : (
+                        <div className="flex gap-3 text-xs text-muted-foreground">
+                          <span>
+                            <CheckSquare className="inline h-3 w-3 mr-0.5 mb-px" />
+                            {c.completedAssignments}/{c.totalAssignments} assignments (
+                            {c.completionRate}%)
+                          </span>
+                          {c.weightedGrade === null && c.totalAssignments > 0 && (
+                            <span className="text-amber-600">· No grades recorded yet</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {sd.classrooms.length === 0 && (

@@ -4314,9 +4314,9 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "This student is not in any of your classrooms" });
       }
 
-      // Fetch only the classrooms this teacher owns and the student is enrolled in
+      // Data scope: aggregate across ALL classrooms the student is enrolled in (not just this teacher's)
       const enrollments = await prisma.classroomEnrollment.findMany({
-        where: { studentId, classroomId: { in: teacherClassroomIds } },
+        where: { studentId },
         include: { classroom: true },
       });
 
