@@ -41,6 +41,7 @@ import ParentClassroomsPage from "./pages/ParentClassroomsPage";
 import ParentTutorsPage from "./pages/ParentTutorsPage";
 import ParentInvitesPage from "./pages/ParentInvitesPage";
 import ParentReportsPage from "./pages/ParentReportsPage";
+import ReportViewPage from "./pages/ReportViewPage";
 import TeamInvitePage from "./pages/TeamInvitePage";
 
 function RouteTracker() {
@@ -211,6 +212,9 @@ function AppRoutes() {
         </Route>
         <Route path="/reports">
           <ParentRoute component={ParentReportsPage} />
+        </Route>
+        <Route path="/reports/:id/view">
+          <ProtectedRoute component={ReportViewPage} />
         </Route>
 
         {/* Classroom sub-pages — most specific first */}

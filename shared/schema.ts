@@ -312,6 +312,36 @@ export type Message = z.infer<typeof messageSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
 // Progress Report schema
+export const semesterClassroomDataSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  subject: z.string(),
+  weightedGrade: z.number().nullable(),
+  completionRate: z.number(),
+  totalAssignments: z.number(),
+  completedAssignments: z.number(),
+  attendance: z.object({
+    present: z.number(),
+    absent: z.number(),
+    late: z.number(),
+    total: z.number(),
+  }),
+  hasData: z.boolean(),
+});
+
+export const semesterReportDataSchema = z.object({
+  dateFrom: z.string(),
+  dateTo: z.string(),
+  overallGpa: z.number().nullable(),
+  totalAssignments: z.number(),
+  completedAssignments: z.number(),
+  completionRate: z.number(),
+  classrooms: z.array(semesterClassroomDataSchema),
+});
+
+export type SemesterClassroomData = z.infer<typeof semesterClassroomDataSchema>;
+export type SemesterReportData = z.infer<typeof semesterReportDataSchema>;
+
 export const progressReportSchema = z.object({
   id: z.number(),
   studentId: z.number(),
@@ -320,6 +350,7 @@ export const progressReportSchema = z.object({
   content: z.string(),
   date: z.string(),
   grades: z.record(z.string(), z.number()),
+  semesterData: semesterReportDataSchema.nullable().optional(),
 });
 
 export const insertProgressReportSchema = progressReportSchema.omit({

@@ -4166,6 +4166,7 @@ export function registerRoutes(app: Express) {
         period: body.period || body.reportDate || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
         content: contentParts.join("\n\n"),
         grades,
+        semesterData: body.semesterData ?? null,
       });
 
       const report = await storage.createProgressReport(data);
@@ -4241,6 +4242,169 @@ export function registerRoutes(app: Express) {
         req.session.userId!,
       );
       res.json(reports);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/progress-reports/:id — single report (teacher author, student, or parent of student)
+  app.get("/api/progress-reports/:id", requireAuth, async (req, res) => {
+    try {
+      const reportId = parseInt(req.params.id, 10);
+      if (isNaN(reportId)) return res.status(400).json({ error: "Invalid report ID" });
+
+      const report = await storage.getProgressReportById(reportId);
+      if (!report) return res.status(404).json({ error: "Report not found" });
+
+      const userId = req.session.userId as number;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      // Teacher who created it
+      if (user.role === "teacher" && report.teacherId === userId) {
+        return res.json(report);
+      }
+      // Student whose report this is
+      if (user.role === "student") {
+        const student = await storage.getStudentByUserId(userId);
+        if (student && student.id === report.studentId) return res.json(report);
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      // Parent whose child's report this is
+      if (user.role === "parent") {
+        const children = await storage.getStudentsByParent(userId);
+        if (children.some((c: any) => c.id === report.studentId)) return res.json(report);
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      // Admin
+      if (user.isAdmin || user.isSuperAdmin) return res.json(report);
+
+      return res.status(403).json({ error: "Forbidden" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/semester-report/preview — compute semester data without saving (teacher only)
+  app.get("/api/semester-report/preview", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId as number;
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== "teacher") {
+        return res.status(403).json({ error: "Teachers only" });
+      }
+
+      const studentId = parseInt(req.query.studentId as string, 10);
+      const from = req.query.from as string;
+      const to = req.query.to as string;
+      if (isNaN(studentId) || !from || !to) {
+        return res.status(400).json({ error: "studentId, from, and to are required" });
+      }
+
+      // Fetch all classrooms the student is enrolled in
+      const enrollments = await prisma.classroomEnrollment.findMany({
+        where: { studentId },
+        include: { classroom: true },
+      });
+
+      // Attendance in range (global, not per-classroom)
+      const allAttendance = await prisma.attendance.findMany({
+        where: {
+          studentId,
+          date: { gte: from, lte: to },
+        },
+      });
+      const attendanceSummary = {
+        present: allAttendance.filter((a: any) => a.status === "present").length,
+        absent: allAttendance.filter((a: any) => a.status === "absent").length,
+        late: allAttendance.filter((a: any) => a.status === "late").length,
+        total: allAttendance.length,
+      };
+
+      const ALL_TYPES = ["assignment", "test", "quiz", "project"] as const;
+
+      const classroomRows = await Promise.all(
+        enrollments.map(async (enrollment: any) => {
+          const classroom = enrollment.classroom;
+
+          // Assignments due within range (or all if range is broad)
+          const assignments = await prisma.classroomAssignment.findMany({
+            where: { classroomId: classroom.id },
+          });
+
+          const submissions = await prisma.classroomSubmission.findMany({
+            where: {
+              assignmentId: { in: assignments.map((a: any) => a.id) },
+              studentId,
+            },
+          });
+
+          const policy = await prisma.gradingPolicy.findFirst({
+            where: { classroomId: classroom.id },
+            orderBy: { id: "desc" },
+          });
+
+          const weights = policy
+            ? { assignment: policy.assignmentWeight, test: policy.testWeight, quiz: policy.quizWeight, project: policy.projectWeight }
+            : { assignment: 25, test: 25, quiz: 25, project: 25 };
+
+          const subMap = Object.fromEntries(submissions.map((s: any) => [s.assignmentId, s]));
+
+          const breakdown = ALL_TYPES.map((type) => {
+            const typeAssignments = assignments.filter((a: any) => a.assignmentType === type);
+            const gradedSubs = typeAssignments.filter((a: any) => subMap[a.id]?.grade != null);
+            if (gradedSubs.length === 0) return { type, w: weights[type], avg: null as number | null };
+            const totalPossible = gradedSubs.reduce((s: number, a: any) => s + a.points, 0);
+            const totalEarned = gradedSubs.reduce((s: number, a: any) => s + (subMap[a.id].grade ?? 0), 0);
+            const avg = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+            return { type, w: weights[type], avg };
+          });
+
+          const gradedGroups = breakdown.filter((b) => b.avg !== null && b.w > 0);
+          const totalW = gradedGroups.reduce((s, b) => s + b.w, 0);
+          const weightedGrade =
+            gradedGroups.length > 0 && totalW > 0
+              ? Math.round(gradedGroups.reduce((s, b) => s + (b.avg! * b.w) / totalW, 0))
+              : null;
+
+          const totalAssignments = assignments.length;
+          const completedAssignments = submissions.filter((s: any) => s.status === "submitted" || s.status === "graded").length;
+          const completionRate = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+
+          return {
+            id: classroom.id,
+            name: classroom.name,
+            subject: classroom.subject || "",
+            weightedGrade,
+            completionRate,
+            totalAssignments,
+            completedAssignments,
+            attendance: attendanceSummary,
+            hasData: totalAssignments > 0 || allAttendance.length > 0,
+          };
+        })
+      );
+
+      // Overall stats
+      const allAssignments = classroomRows.reduce((s, c) => s + c.totalAssignments, 0);
+      const allCompleted = classroomRows.reduce((s, c) => s + c.completedAssignments, 0);
+      const gradedClassrooms = classroomRows.filter((c) => c.weightedGrade !== null);
+      const overallGpa =
+        gradedClassrooms.length > 0
+          ? Math.round(gradedClassrooms.reduce((s, c) => s + c.weightedGrade!, 0) / gradedClassrooms.length)
+          : null;
+
+      const result = {
+        dateFrom: from,
+        dateTo: to,
+        overallGpa,
+        totalAssignments: allAssignments,
+        completedAssignments: allCompleted,
+        completionRate: allAssignments > 0 ? Math.round((allCompleted / allAssignments) * 100) : 0,
+        classrooms: classroomRows,
+      };
+
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

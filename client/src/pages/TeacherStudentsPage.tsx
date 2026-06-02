@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -20,10 +19,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, Send, Loader2 } from "lucide-react";
+import { MessageSquare, Send, Loader2, FileBarChart } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ModernSidebar from "@/components/ModernSidebar";
 import ModernCombobox from "@/components/ModernCombobox";
+import SemesterReportDialog from "@/components/SemesterReportDialog";
 import type { Student, User } from "@shared/schema";
 
 type StudentWithParent = Student & {
@@ -125,16 +125,27 @@ export default function TeacherStudentsPage() {
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [sendMessageReceiverId, setSendMessageReceiverId] = useState(0);
   const [sendMessageReceiverName, setSendMessageReceiverName] = useState("");
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   const { data: students = [] } = useQuery<StudentWithParent[]>({ queryKey: ["/api/students/teacher"] });
   const { data: users = [] } = useQuery<PublicUser[]>({ queryKey: ["/api/users"] });
+
+  const studentOptions = (students as any[]).map((s: any) => ({ id: s.id, name: s.name }));
 
   return (
     <div className="min-h-screen bg-background">
       <ModernSidebar />
       <div className="md:ml-[228px]">
         <main className="p-4 sm:p-5 pt-18 md:pt-5 max-w-4xl mx-auto">
-          <h1 className="text-xl font-semibold text-foreground mb-5">Students</h1>
+          <div className="flex items-center justify-between mb-5">
+            <h1 className="text-xl font-semibold text-foreground">Students</h1>
+            {(students as any[]).length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setReportDialogOpen(true)}>
+                <FileBarChart className="h-3.5 w-3.5 mr-1.5" />
+                Generate Report
+              </Button>
+            )}
+          </div>
 
           {students.length === 0 ? (
             <p className="text-center text-muted-foreground py-8 text-sm rounded-2xl border border-dashed border-border">
@@ -225,6 +236,12 @@ export default function TeacherStudentsPage() {
         users={users}
         initialReceiverId={sendMessageReceiverId}
         initialReceiverName={sendMessageReceiverName}
+      />
+
+      <SemesterReportDialog
+        open={reportDialogOpen}
+        onClose={() => setReportDialogOpen(false)}
+        students={studentOptions}
       />
     </div>
   );

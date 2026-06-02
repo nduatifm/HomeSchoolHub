@@ -213,6 +213,7 @@ export interface IStorage {
   getDirectContacts(userId: number, role: string): Promise<{ id: number; name: string }[]>;
 
   createProgressReport(report: InsertProgressReport): Promise<ProgressReport>;
+  getProgressReportById(id: number): Promise<(ProgressReport & { studentName?: string; teacherName?: string }) | null>;
   getProgressReportsByStudent(studentId: number): Promise<ProgressReport[]>;
   getProgressReportsByTeacher(teacherId: number): Promise<ProgressReport[]>;
   getProgressReportsByParent(parentId: number): Promise<(ProgressReport & { studentName?: string; teacherName?: string })[]>;
@@ -1464,7 +1465,24 @@ class PrismaStorage implements IStorage {
   ): Promise<ProgressReport> {
     return (await prisma.progressReport.create({
       data: report,
-    })) as ProgressReport;
+    })) as unknown as ProgressReport;
+  }
+
+  async getProgressReportById(
+    id: number,
+  ): Promise<(ProgressReport & { studentName?: string; teacherName?: string }) | null> {
+    const report = await prisma.progressReport.findUnique({
+      where: { id },
+      include: { student: true, teacher: true },
+    });
+    if (!report) return null;
+    return {
+      ...(report as any),
+      studentName: (report as any).student?.name,
+      teacherName: (report as any).teacher?.name,
+      student: undefined,
+      teacher: undefined,
+    } as ProgressReport & { studentName?: string; teacherName?: string };
   }
 
   async getProgressReportsByStudent(
