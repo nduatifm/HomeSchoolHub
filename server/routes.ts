@@ -4247,6 +4247,19 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // GET /api/progress-reports/me — student self-scoped (their own reports)
+  app.get("/api/progress-reports/me", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId as number;
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) return res.status(403).json({ error: "Students only" });
+      const reports = await storage.getProgressReportsByStudent(student.id);
+      res.json(reports);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/progress-reports/:id — single report (teacher author, student, or parent of student)
   app.get("/api/progress-reports/:id", requireAuth, async (req, res) => {
     try {
@@ -4414,19 +4427,6 @@ export function registerRoutes(app: Express) {
         attendance,
         classrooms: classroomRows,
       });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // GET /api/progress-reports/me — student self-scoped (their own reports)
-  app.get("/api/progress-reports/me", requireAuth, async (req, res) => {
-    try {
-      const userId = req.session.userId as number;
-      const student = await storage.getStudentByUserId(userId);
-      if (!student) return res.status(403).json({ error: "Students only" });
-      const reports = await storage.getProgressReportsByStudent(student.id);
-      res.json(reports);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
