@@ -51,7 +51,7 @@ export default function TeacherAssignmentsTab({
   });
 
   // Build per-assignment stats: submitted (any non-pending) + graded counts
-  const statsMap: Record<number, { submitted: number; graded: number; toGrade: number }> = {};
+  const statsMap: Record<number, { submitted: number; graded: number; toGrade: number; returned: number }> = {};
   allSubResults.forEach((q, i) => {
     const id = assignments[i]?.id;
     if (!id) return;
@@ -59,7 +59,8 @@ export default function TeacherAssignmentsTab({
     const graded = subs.filter((s) => s.status === "graded").length;
     const submitted = subs.filter((s) => s.status !== "pending").length;
     const toGrade = subs.filter((s) => s.status === "submitted" || s.status === "late").length;
-    statsMap[id] = { submitted, graded, toGrade };
+    const returned = subs.filter((s) => s.status === "returned").length;
+    statsMap[id] = { submitted, graded, toGrade, returned };
   });
 
   const deleteMutation = useMutation({
@@ -107,14 +108,16 @@ export default function TeacherAssignmentsTab({
           const toGrade = stats?.toGrade ?? 0;
           const graded = stats?.graded ?? 0;
           const submitted = stats?.submitted ?? 0;
+          const returned = stats?.returned ?? 0;
           const hasStats = stats !== undefined;
+          const needsAttention = toGrade > 0 || returned > 0;
           const typeMeta = TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment;
 
           return (
             <div
               key={a.id}
               className={`rounded-2xl border bg-card overflow-hidden transition-colors ${
-                toGrade > 0
+                needsAttention
                   ? "border-amber-300 border-l-4 border-l-amber-400"
                   : "border-border"
               }`}
@@ -140,14 +143,19 @@ export default function TeacherAssignmentsTab({
                         {submitted} submitted / {graded} graded
                       </span>
                     )}
+                    {returned > 0 && (
+                      <span className="inline-flex items-center text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                        {returned} awaiting revision
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0 mt-0.5">
                   <Button
                     size="sm"
-                    className={`h-8 px-3 text-xs gap-1.5 ${toGrade > 0 ? "bg-amber-600 hover:bg-amber-700" : ""}`}
-                    variant={toGrade > 0 ? "default" : "ghost"}
+                    className={`h-8 px-3 text-xs gap-1.5 ${needsAttention ? "bg-amber-600 hover:bg-amber-700" : ""}`}
+                    variant={needsAttention ? "default" : "ghost"}
                     onClick={() => navigate(`/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`)}
                   >
                     Review

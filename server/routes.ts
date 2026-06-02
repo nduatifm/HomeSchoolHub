@@ -6795,6 +6795,45 @@ export function registerRoutes(app: Express) {
       const sub = await storage.getClassroomSubmissionById(submissionId);
       if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
       const updated = await storage.returnClassroomSubmission(submissionId, returnNote);
+
+      // Notify the student their submission was returned for revision
+      const returnedStudent = await storage.getStudentById(sub.studentId);
+      if (returnedStudent?.userId) {
+        const assignmentTitle = sub.assignment.title;
+        const classworkLink = `/classrooms/${classroom.slug ?? classroom.id}/classwork/${sub.assignment.slug ?? sub.assignment.id}`;
+        const studentBody = `Your submission for "${assignmentTitle}" has been returned — please review your teacher's note and resubmit.`;
+        storage.createNotification({
+          userId: returnedStudent.userId,
+          type: "submission_returned",
+          title: "Submission Returned for Revision",
+          body: studentBody,
+          link: classworkLink,
+        }).catch(console.error);
+        maybeEmailNotification(returnedStudent.userId, {
+          title: "Submission Returned for Revision",
+          body: studentBody,
+          link: classworkLink,
+        }).catch(() => {});
+        // Also notify every parent on the child's team
+        storage.getTeamMemberUserIds(returnedStudent.id).then((parentIds) => {
+          parentIds.forEach((pid) => {
+            const parentBody = `${returnedStudent.name}'s submission for "${assignmentTitle}" was returned for revision.`;
+            storage.createNotification({
+              userId: pid,
+              type: "submission_returned",
+              title: "Submission Returned for Revision",
+              body: parentBody,
+              link: "/dashboard/children",
+            }).catch(console.error);
+            maybeEmailNotification(pid, {
+              title: "Submission Returned for Revision",
+              body: parentBody,
+              link: "/dashboard/children",
+            }).catch(() => {});
+          });
+        }).catch(console.error);
+      }
+
       res.json(updated);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

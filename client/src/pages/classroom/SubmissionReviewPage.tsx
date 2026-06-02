@@ -212,10 +212,14 @@ export default function SubmissionReviewPage() {
             )}
           </div>
 
-          {/* Previously returned banner */}
-          {submission.status === "returned" && submission.returnNote && (
+          {/* Returned / previously-returned banner — shown whenever a returnNote exists,
+              regardless of whether the student has already resubmitted. This lets the
+              teacher see their own note even after status flips back to "submitted"/"late". */}
+          {submission.returnNote && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 space-y-1">
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Previously returned with note</p>
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+                {submission.status === "returned" ? "Returned for revision" : "Previously returned — student has resubmitted"}
+              </p>
               <p className="text-sm text-amber-800">"{submission.returnNote}"</p>
             </div>
           )}

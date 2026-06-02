@@ -2337,7 +2337,9 @@ class PrismaStorage implements IStorage {
       ...(fileUrl !== undefined ? { fileUrl } : {}),
       status,
       submittedAt: now.toISOString(),
-      returnNote: null,
+      // Intentionally do NOT clear returnNote here — preserving it lets the teacher see
+      // on the review page that this was previously returned. The student-facing banner
+      // already gates on status === "returned" so the note won't re-appear to them.
       ...(formAnswers !== undefined ? { formAnswers: JSON.parse(JSON.stringify(formAnswers)) as Prisma.InputJsonValue } : {}),
       ...(autoGrade !== undefined && autoGrade !== null ? { grade: autoGrade } : {}),
     } as const;
