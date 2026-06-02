@@ -1,0 +1,1 @@
+- [Dual-role teacher-parent auth gap](dual-role-auth.md) — primary `role` field alone is not enough; always check `roles` array too for teacher gates.

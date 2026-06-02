@@ -2346,7 +2346,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/assignments", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can create assignments" });
@@ -2408,7 +2408,7 @@ export function registerRoutes(app: Express) {
     async (req, res) => {
       try {
         const user = await storage.getUserById(req.session.userId!);
-        if (user?.role !== "teacher") {
+        if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
           return res
             .status(403)
             .json({ error: "Only teachers can create assignments" });
@@ -2589,7 +2589,7 @@ export function registerRoutes(app: Express) {
       }
 
       // Only teachers can view individual assignments, and only their own
-      if (user?.role !== "teacher" || assignment.teacherId !== user.id) {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher") || assignment.teacherId !== user.id) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -2602,7 +2602,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/assignments/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can update assignments" });
@@ -2637,7 +2637,7 @@ export function registerRoutes(app: Express) {
   app.delete("/api/assignments/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can delete assignments" });
@@ -2769,7 +2769,7 @@ export function registerRoutes(app: Express) {
     async (req, res) => {
       try {
         const user = await storage.getUserById(req.session.userId!);
-        if (user?.role !== "teacher") {
+        if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
           return res
             .status(403)
             .json({ error: "Only teachers can grade assignments" });
@@ -2890,7 +2890,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/student-submissions/teacher", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can view submissions" });
@@ -2929,7 +2929,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/materials", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can upload materials" });
@@ -2955,7 +2955,7 @@ export function registerRoutes(app: Express) {
     async (req, res) => {
       try {
         const user = await storage.getUserById(req.session.userId!);
-        if (user?.role !== "teacher") {
+        if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
           return res
             .status(403)
             .json({ error: "Only teachers can upload materials" });
@@ -3115,7 +3115,7 @@ export function registerRoutes(app: Express) {
       }
 
       // Only teachers can view individual materials, and only their own
-      if (user?.role !== "teacher" || material.teacherId !== user.id) {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher") || material.teacherId !== user.id) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -3128,7 +3128,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/materials/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can update materials" });
@@ -3163,7 +3163,7 @@ export function registerRoutes(app: Express) {
   app.delete("/api/materials/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can delete materials" });
@@ -3253,7 +3253,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/sessions", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can create sessions" });
@@ -3331,7 +3331,7 @@ export function registerRoutes(app: Express) {
 
       const user = await storage.getUserById(req.session.userId!);
       // Only teachers can view individual sessions, and only their own
-      if (user?.role !== "teacher" || session.teacherId !== user.id) {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher") || session.teacherId !== user.id) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -3344,7 +3344,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/sessions/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can update sessions" });
@@ -3379,7 +3379,7 @@ export function registerRoutes(app: Express) {
   app.delete("/api/sessions/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can delete sessions" });
@@ -3410,7 +3410,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/feedback", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can give feedback" });
@@ -3679,7 +3679,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/tutor-requests/:id", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can respond to requests" });
@@ -3968,7 +3968,7 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      if (user.role !== "teacher" && user.role !== "parent") {
+      if ((user.role !== "teacher" && !user.roles?.includes("teacher")) && (user.role !== "parent" && !user.roles?.includes("parent"))) {
         return res.status(403).json({ error: "Only teachers and parents can use direct messaging" });
       }
       const contacts = await storage.getDirectContacts(user.id, user.role);
@@ -3995,7 +3995,7 @@ export function registerRoutes(app: Express) {
       const myId = req.session.userId!;
       const caller = await storage.getUserById(myId);
       if (!caller) return res.status(401).json({ error: "Unauthorized" });
-      if (caller.role !== "teacher" && caller.role !== "parent") {
+      if ((caller.role !== "teacher" && !caller.roles?.includes("teacher")) && (caller.role !== "parent" && !caller.roles?.includes("parent"))) {
         return res.status(403).json({ error: "Only teachers and parents can send direct messages" });
       }
       const schema = z.object({
@@ -4140,7 +4140,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/progress-reports", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.session.userId!);
-      if (user?.role !== "teacher") {
+      if (user?.role !== "teacher" && !user?.roles?.includes("teacher")) {
         return res
           .status(403)
           .json({ error: "Only teachers can create reports" });
@@ -4303,7 +4303,7 @@ export function registerRoutes(app: Express) {
     try {
       const userId = req.session.userId as number;
       const user = await storage.getUserById(userId);
-      if (!user || user.role !== "teacher") {
+      if (!user || (user.role !== "teacher" && !user.roles?.includes("teacher"))) {
         return res.status(403).json({ error: "Teachers only" });
       }
 
@@ -6043,7 +6043,7 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const isActorTeacher = user.role === "teacher";
+      const isActorTeacher = user.role === "teacher" || !!user.roles?.includes("teacher");
       const isActorStudent = user.role === "student";
       if (isActorTeacher) {
         const classrooms = await storage.getClassroomsByTeacher(user.id);
