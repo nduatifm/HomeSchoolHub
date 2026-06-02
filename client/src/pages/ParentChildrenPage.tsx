@@ -389,11 +389,7 @@ export default function ParentChildrenPage() {
                               {child.gradeLevel ? `Grade ${child.gradeLevel}` : "Student"}
                             </p>
                           </div>
-                          {iAmMember ? (
-                            <Badge variant="secondary" className="flex items-center gap-0.5 text-[10px] px-1.5 h-5 shrink-0">
-                              <Eye className="w-2.5 h-2.5" /> View only
-                            </Badge>
-                          ) : iAmOwner ? (
+                          {iAmOwner || iAmMember ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button className="p-0.5 rounded hover:bg-muted transition-colors shrink-0">
@@ -401,26 +397,30 @@ export default function ParentChildrenPage() {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="text-sm">
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setEditChildId(child.id);
-                                    setEditForm({ name: child.name ?? "", gradeLevel: child.gradeLevel ?? "", email: child.email ?? "" });
-                                    setEditError(null);
-                                  }}
-                                >
-                                  <Pencil className="w-3.5 h-3.5 mr-2" />
-                                  Edit details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setResetChildId(child.id);
-                                    setResetTempPassword(null);
-                                    setCopiedPw(false);
-                                  }}
-                                >
-                                  <KeyRound className="w-3.5 h-3.5 mr-2" />
-                                  Reset login
-                                </DropdownMenuItem>
+                                {iAmOwner && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setEditChildId(child.id);
+                                        setEditForm({ name: child.name ?? "", gradeLevel: child.gradeLevel ?? "", email: child.email ?? "" });
+                                        setEditError(null);
+                                      }}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 mr-2" />
+                                      Edit details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setResetChildId(child.id);
+                                        setResetTempPassword(null);
+                                        setCopiedPw(false);
+                                      }}
+                                    >
+                                      <KeyRound className="w-3.5 h-3.5 mr-2" />
+                                      Reset login
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                                 <DropdownMenuItem
                                   disabled={becomeChildMutation.isPending}
                                   onClick={() => becomeChildMutation.mutate(child.id)}

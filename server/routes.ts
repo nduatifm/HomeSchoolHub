@@ -2277,9 +2277,9 @@ export function registerRoutes(app: Express) {
       const student = await storage.getStudentById(Number(studentId));
       if (!student) return res.status(404).json({ error: "Student not found" });
 
-      const isOwner = await storage.isTeamOwner(callerId, student.id);
-      if (!isOwner) {
-        return res.status(403).json({ error: "You are not an owner of this child's account" });
+      const isMember = await storage.isTeamMember(callerId, student.id);
+      if (!isMember) {
+        return res.status(403).json({ error: "You do not have access to this child's account" });
       }
 
       const sessionId = await createSession(student.userId);
