@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2, Info, AlertTriangle, RotateCcw } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2, Info, AlertTriangle, ChevronRight } from "lucide-react";
 import DOMPurify from "dompurify";
 import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
@@ -43,12 +43,7 @@ function relativeTime(ts: string): string {
 function TeacherPanel({ assignment, classroomId, classroomSlug }: {
   assignment: ClassroomAssignment; classroomId: number; classroomSlug: string | number;
 }) {
-  const [gradeInputs, setGradeInputs] = useState<Record<number, { grade: string; feedback: string }>>({});
-  const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
-  const [returnOpen, setReturnOpen] = useState<Record<number, boolean>>({});
-  const [returnNotes, setReturnNotes] = useState<Record<number, string>>({});
-  const toggleSub = (id: number) =>
-    setExpandedSubs((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const [, navigate] = useLocation();
 
   const { data: submissions = [], isLoading } = useQuery<SubmissionWithName[]>({
     queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"],
@@ -56,220 +51,65 @@ function TeacherPanel({ assignment, classroomId, classroomSlug }: {
     enabled: !!classroomId,
   });
 
-  const gradeMutation = useMutation({
-    mutationFn: ({ submissionId, grade, feedback }: { submissionId: number; grade: number; feedback: string }) =>
-      apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/grade`, {
-        method: "PATCH",
-        body: JSON.stringify({ grade, feedback }),
-      }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"] });
-      toast({ title: "Grade saved", type: "success" });
-      setExpandedSubs((prev) => { const n = new Set(prev); n.delete(variables.submissionId); return n; });
-    },
-    onError: () => toast({ title: "Couldn't save the grade — try again.", type: "error" }),
-  });
-
-  const returnMutation = useMutation({
-    mutationFn: ({ submissionId, returnNote }: { submissionId: number; returnNote: string }) =>
-      apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/return`, {
-        method: "PATCH",
-        body: JSON.stringify({ returnNote }),
-      }),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/classroom-notifications/total"] });
-      toast({ title: "Submission returned for revision", type: "success" });
-      setReturnOpen((prev) => ({ ...prev, [variables.submissionId]: false }));
-      setReturnNotes((prev) => ({ ...prev, [variables.submissionId]: "" }));
-      setExpandedSubs((prev) => { const n = new Set(prev); n.delete(variables.submissionId); return n; });
-    },
-    onError: () => toast({ title: "Couldn't return the submission — try again.", type: "error" }),
-  });
-
   if (isLoading) {
     return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>;
   }
 
-  return (
-    <div className="space-y-4">
-      <h2 className="text-base font-semibold text-gray-800">Student Submissions ({submissions.length})</h2>
-      {submissions.length === 0 ? (
-        <p className="text-sm text-gray-400 py-6 text-center">No submissions yet.</p>
-      ) : (
-        submissions.map((sub) => {
-          const inputs = gradeInputs[sub.id] ?? { grade: sub.grade?.toString() ?? "", feedback: sub.feedback ?? "" };
-          const setInput = (field: "grade" | "feedback", value: string) =>
-            setGradeInputs((prev) => ({ ...prev, [sub.id]: { ...inputs, [field]: value } }));
-          const isExpanded = expandedSubs.has(sub.id);
-          const canGrade = sub.status === "submitted" || sub.status === "graded" || sub.status === "late";
-          const canReturn = sub.status === "submitted" || sub.status === "late";
-          const isReturnOpen = returnOpen[sub.id] ?? false;
-          const returnNote = returnNotes[sub.id] ?? "";
+  const submitted = submissions.filter((s) => s.status === "submitted" || s.status === "late");
+  const others = submissions.filter((s) => s.status !== "submitted" && s.status !== "late");
+  const ordered = [...submitted, ...others];
 
-          return (
-            <Card key={sub.id} className="overflow-hidden">
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-gray-800">Student Submissions</h2>
+        <span className="text-xs text-muted-foreground">{submissions.length} total · {submitted.length} need review</span>
+      </div>
+
+      {ordered.length === 0 ? (
+        <p className="text-sm text-gray-400 py-8 text-center">No submissions yet.</p>
+      ) : (
+        <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+          {ordered.map((sub) => {
+            const needsAction = sub.status === "submitted" || sub.status === "late" || sub.status === "returned";
+            return (
               <button
+                key={sub.id}
                 type="button"
-                className="w-full text-left px-4 py-3.5 flex items-center justify-between gap-2 hover:bg-muted/30 transition-colors"
-                onClick={() => toggleSub(sub.id)}
+                className="w-full text-left px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-muted/40 transition-colors bg-white"
+                onClick={() => navigate(`/classrooms/${classroomSlug}/submissions/${sub.id}/review`)}
               >
-                <div>
-                  <p className="font-medium text-sm text-gray-900">{sub.studentName}</p>
-                  {sub.submittedAt && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Submitted {relativeTime(sub.submittedAt)}
-                    </p>
-                  )}
-                  {sub.returnNote && sub.status !== "returned" && (
-                    <p className="text-xs text-amber-600 mt-0.5">Previously returned for revision</p>
-                  )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm text-gray-900 truncate">{sub.studentName}</p>
+                    {needsAction && (
+                      <span className="shrink-0 inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    {sub.submittedAt ? (
+                      <span className="text-xs text-muted-foreground">Submitted {relativeTime(sub.submittedAt)}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not submitted</span>
+                    )}
+                    {sub.grade !== null && (
+                      <span className="text-xs text-green-700 font-medium">{sub.grade}/{assignment.points} pts</span>
+                    )}
+                    {sub.returnNote && (
+                      <span className="text-xs text-amber-600">
+                        {sub.status === "returned" ? "Awaiting revision" : "Previously returned"}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <StatusBadge status={sub.status} />
-                  <span className="text-xs text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
               </button>
-
-              {isExpanded && (
-                <CardContent className="px-4 pb-4 pt-0 space-y-3 border-t border-border">
-                  {/* Previously returned note */}
-                  {sub.returnNote && (
-                    <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 mt-3">
-                      <p className="text-xs font-semibold text-amber-700 mb-0.5">
-                        {sub.status === "returned" ? "Returned for revision" : "Previously returned — student has resubmitted"}
-                      </p>
-                      <p className="text-xs text-amber-700">"{sub.returnNote}"</p>
-                    </div>
-                  )}
-
-                  {assignment.formSchema && assignment.formSchema.length > 0 && sub.formAnswers ? (
-                    <div className="bg-gray-50 rounded p-3 mt-3">
-                      <FormResponse
-                        questions={assignment.formSchema}
-                        answers={sub.formAnswers as Record<string, string | string[]>}
-                        onChange={() => {}}
-                        disabled
-                      />
-                    </div>
-                  ) : sub.content ? (
-                    <div className="bg-gray-50 rounded p-3 mt-3 text-sm text-gray-700 whitespace-pre-wrap">
-                      {sub.content}
-                    </div>
-                  ) : null}
-                  {sub.fileUrl && (
-                    <a href={sub.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
-                      <FileText className="h-3.5 w-3.5" />View attached file
-                    </a>
-                  )}
-
-                  {canGrade && (
-                    <div className="border-t pt-3 space-y-3">
-                      {/* Grade row */}
-                      <div className="flex gap-2 items-end">
-                        <div className="w-24">
-                          <Label className="text-xs text-gray-500 mb-1 block">Grade / {assignment.points}</Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={assignment.points}
-                            value={inputs.grade}
-                            onChange={(e) => setInput("grade", e.target.value)}
-                            className="h-8 text-sm"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <Label className="text-xs text-gray-500 mb-1 block">Feedback</Label>
-                          <Input
-                            value={inputs.feedback}
-                            onChange={(e) => setInput("feedback", e.target.value)}
-                            placeholder="Optional feedback…"
-                            className="h-8 text-sm"
-                          />
-                        </div>
-                        <Button
-                          size="sm"
-                          className="h-8"
-                          disabled={
-                            gradeMutation.isPending ||
-                            returnMutation.isPending ||
-                            !inputs.grade ||
-                            isNaN(parseInt(inputs.grade, 10)) ||
-                            parseInt(inputs.grade, 10) < 0 ||
-                            parseInt(inputs.grade, 10) > assignment.points
-                          }
-                          onClick={() =>
-                            gradeMutation.mutate({
-                              submissionId: sub.id,
-                              grade: parseInt(inputs.grade, 10),
-                              feedback: inputs.feedback,
-                            })
-                          }
-                        >
-                          {gradeMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
-                        </Button>
-                      </div>
-                      {sub.grade !== null && (
-                        <p className="text-xs text-green-600 flex items-center gap-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Current grade: {sub.grade}/{assignment.points}
-                        </p>
-                      )}
-
-                      {/* Return for revision */}
-                      {canReturn && (
-                        <div className="border-t pt-2">
-                          {!isReturnOpen ? (
-                            <button
-                              type="button"
-                              className="flex items-center gap-1.5 text-xs text-amber-700 hover:text-amber-800 font-medium"
-                              onClick={() => setReturnOpen((prev) => ({ ...prev, [sub.id]: true }))}
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                              Return for revision instead
-                            </button>
-                          ) : (
-                            <div className="space-y-2">
-                              <Label className="text-xs text-amber-700 font-medium">Note for student (required)</Label>
-                              <Textarea
-                                placeholder="Explain what needs to be revised…"
-                                value={returnNote}
-                                onChange={(e) => setReturnNotes((prev) => ({ ...prev, [sub.id]: e.target.value }))}
-                                rows={2}
-                                className="text-sm resize-none border-amber-200 focus-visible:ring-amber-400"
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 gap-1"
-                                  disabled={!returnNote.trim() || returnMutation.isPending || gradeMutation.isPending}
-                                  onClick={() => returnMutation.mutate({ submissionId: sub.id, returnNote })}
-                                >
-                                  {returnMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
-                                  Return to student
-                                </Button>
-                                <button
-                                  type="button"
-                                  className="text-xs text-muted-foreground hover:text-foreground"
-                                  onClick={() => setReturnOpen((prev) => ({ ...prev, [sub.id]: false }))}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              )}
-            </Card>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </div>
   );
