@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2, Info, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, FileText, Upload, BookOpen, ExternalLink, ClipboardList, Link2, Info, AlertTriangle, RotateCcw } from "lucide-react";
 import DOMPurify from "dompurify";
 import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb, { buildClassroomCrumbs } from "@/components/Breadcrumb";
@@ -40,9 +40,13 @@ function relativeTime(ts: string): string {
   return `${days} days ago`;
 }
 
-function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssignment; classroomId: number }) {
+function TeacherPanel({ assignment, classroomId, classroomSlug }: {
+  assignment: ClassroomAssignment; classroomId: number; classroomSlug: string | number;
+}) {
   const [gradeInputs, setGradeInputs] = useState<Record<number, { grade: string; feedback: string }>>({});
   const [expandedSubs, setExpandedSubs] = useState<Set<number>>(new Set());
+  const [returnOpen, setReturnOpen] = useState<Record<number, boolean>>({});
+  const [returnNotes, setReturnNotes] = useState<Record<number, string>>({});
   const toggleSub = (id: number) =>
     setExpandedSubs((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -61,14 +65,27 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"] });
       toast({ title: "Grade saved", type: "success" });
-      // Collapse the graded card and expand next ungraded
-      setExpandedSubs((prev) => {
-        const next = new Set(prev);
-        next.delete(variables.submissionId);
-        return next;
-      });
+      setExpandedSubs((prev) => { const n = new Set(prev); n.delete(variables.submissionId); return n; });
     },
     onError: () => toast({ title: "Couldn't save the grade — try again.", type: "error" }),
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: ({ submissionId, returnNote }: { submissionId: number; returnNote: string }) =>
+      apiRequest(`/api/classrooms/${classroomId}/submissions/${submissionId}/return`, {
+        method: "PATCH",
+        body: JSON.stringify({ returnNote }),
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher/classroom-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classroom-notifications/total"] });
+      toast({ title: "Submission returned for revision", type: "success" });
+      setReturnOpen((prev) => ({ ...prev, [variables.submissionId]: false }));
+      setReturnNotes((prev) => ({ ...prev, [variables.submissionId]: "" }));
+      setExpandedSubs((prev) => { const n = new Set(prev); n.delete(variables.submissionId); return n; });
+    },
+    onError: () => toast({ title: "Couldn't return the submission — try again.", type: "error" }),
   });
 
   if (isLoading) {
@@ -87,6 +104,9 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
             setGradeInputs((prev) => ({ ...prev, [sub.id]: { ...inputs, [field]: value } }));
           const isExpanded = expandedSubs.has(sub.id);
           const canGrade = sub.status === "submitted" || sub.status === "graded" || sub.status === "late";
+          const canReturn = sub.status === "submitted" || sub.status === "late";
+          const isReturnOpen = returnOpen[sub.id] ?? false;
+          const returnNote = returnNotes[sub.id] ?? "";
 
           return (
             <Card key={sub.id} className="overflow-hidden">
@@ -102,6 +122,9 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                       Submitted {relativeTime(sub.submittedAt)}
                     </p>
                   )}
+                  {sub.returnNote && sub.status !== "returned" && (
+                    <p className="text-xs text-amber-600 mt-0.5">Previously returned for revision</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <StatusBadge status={sub.status} />
@@ -111,6 +134,16 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
 
               {isExpanded && (
                 <CardContent className="px-4 pb-4 pt-0 space-y-3 border-t border-border">
+                  {/* Previously returned note */}
+                  {sub.returnNote && (
+                    <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 mt-3">
+                      <p className="text-xs font-semibold text-amber-700 mb-0.5">
+                        {sub.status === "returned" ? "Returned for revision" : "Previously returned — student has resubmitted"}
+                      </p>
+                      <p className="text-xs text-amber-700">"{sub.returnNote}"</p>
+                    </div>
+                  )}
+
                   {assignment.formSchema && assignment.formSchema.length > 0 && sub.formAnswers ? (
                     <div className="bg-gray-50 rounded p-3 mt-3">
                       <FormResponse
@@ -130,8 +163,10 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                       <FileText className="h-3.5 w-3.5" />View attached file
                     </a>
                   )}
+
                   {canGrade && (
-                    <div className="border-t pt-3 space-y-2">
+                    <div className="border-t pt-3 space-y-3">
+                      {/* Grade row */}
                       <div className="flex gap-2 items-end">
                         <div className="w-24">
                           <Label className="text-xs text-gray-500 mb-1 block">Grade / {assignment.points}</Label>
@@ -159,6 +194,7 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                           className="h-8"
                           disabled={
                             gradeMutation.isPending ||
+                            returnMutation.isPending ||
                             !inputs.grade ||
                             isNaN(parseInt(inputs.grade, 10)) ||
                             parseInt(inputs.grade, 10) < 0 ||
@@ -180,6 +216,52 @@ function TeacherPanel({ assignment, classroomId }: { assignment: ClassroomAssign
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Current grade: {sub.grade}/{assignment.points}
                         </p>
+                      )}
+
+                      {/* Return for revision */}
+                      {canReturn && (
+                        <div className="border-t pt-2">
+                          {!isReturnOpen ? (
+                            <button
+                              type="button"
+                              className="flex items-center gap-1.5 text-xs text-amber-700 hover:text-amber-800 font-medium"
+                              onClick={() => setReturnOpen((prev) => ({ ...prev, [sub.id]: true }))}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Return for revision instead
+                            </button>
+                          ) : (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-amber-700 font-medium">Note for student (required)</Label>
+                              <Textarea
+                                placeholder="Explain what needs to be revised…"
+                                value={returnNote}
+                                onChange={(e) => setReturnNotes((prev) => ({ ...prev, [sub.id]: e.target.value }))}
+                                rows={2}
+                                className="text-sm resize-none border-amber-200 focus-visible:ring-amber-400"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50 gap-1"
+                                  disabled={!returnNote.trim() || returnMutation.isPending || gradeMutation.isPending}
+                                  onClick={() => returnMutation.mutate({ submissionId: sub.id, returnNote })}
+                                >
+                                  {returnMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                                  Return to student
+                                </Button>
+                                <button
+                                  type="button"
+                                  className="text-xs text-muted-foreground hover:text-foreground"
+                                  onClick={() => setReturnOpen((prev) => ({ ...prev, [sub.id]: false }))}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -936,7 +1018,7 @@ export default function ClassworkDetail() {
             {assignmentHeader}
             {assignmentInfoBlocks}
 
-            {isTeacher && <TeacherPanel assignment={assignment} classroomId={classroomId} />}
+            {isTeacher && <TeacherPanel assignment={assignment} classroomId={classroomId} classroomSlug={classroomSlug} />}
             {isParent && <ParentPanel assignment={assignment} classroomId={classroomId} studentId={parentStudentId} />}
           </div>
         )}
