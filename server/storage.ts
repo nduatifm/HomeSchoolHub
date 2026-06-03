@@ -2097,12 +2097,29 @@ class PrismaStorage implements IStorage {
   }
 
   async getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]> {
-    const rows = await prisma.classroomSubmission.findMany({
-      where: { assignmentId },
-      include: { student: { select: { name: true } } },
-      orderBy: { studentId: "asc" },
+    const assignment = await prisma.classroomAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { classroomId: true },
     });
-    return rows.map((r) => ({
+
+    const [rows, enrollments] = await Promise.all([
+      prisma.classroomSubmission.findMany({
+        where: { assignmentId },
+        include: { student: { select: { name: true } } },
+        orderBy: { studentId: "asc" },
+      }),
+      assignment
+        ? prisma.classroomEnrollment.findMany({
+            where: { classroomId: assignment.classroomId },
+            include: { student: { select: { id: true, name: true } } },
+            orderBy: { student: { name: "asc" } },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const submittedStudentIds = new Set(rows.map((r) => r.studentId));
+
+    const submissions: (ClassroomSubmission & { studentName: string })[] = rows.map((r) => ({
       id: r.id,
       assignmentId: r.assignmentId,
       studentId: r.studentId,
@@ -2116,6 +2133,27 @@ class PrismaStorage implements IStorage {
       returnNote: r.returnNote ?? null,
       studentName: r.student?.name ?? "Unknown",
     }));
+
+    for (const e of enrollments) {
+      if (!submittedStudentIds.has(e.student.id)) {
+        submissions.push({
+          id: -e.student.id,
+          assignmentId,
+          studentId: e.student.id,
+          content: null,
+          fileUrl: null,
+          formAnswers: null,
+          status: "not-submitted" as ClassroomSubmission["status"],
+          submittedAt: null,
+          grade: null,
+          feedback: null,
+          returnNote: null,
+          studentName: e.student.name,
+        });
+      }
+    }
+
+    return submissions;
   }
 
   async getClassroomSubmissionById(submissionId: number): Promise<(ClassroomSubmission & { studentName: string; assignment: ClassroomAssignment }) | null> {

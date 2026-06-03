@@ -55,33 +55,45 @@ function TeacherPanel({ assignment, classroomId, classroomSlug }: {
     return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-gray-400" /></div>;
   }
 
-  const submitted = submissions.filter((s) => s.status === "submitted" || s.status === "late");
-  const others = submissions.filter((s) => s.status !== "submitted" && s.status !== "late");
-  const ordered = [...submitted, ...others];
+  const needsReview  = submissions.filter((s) => s.status === "submitted" || s.status === "late" || s.status === "returned");
+  const graded       = submissions.filter((s) => s.status === "graded");
+  const notSubmitted = submissions.filter((s) => s.status === "not-submitted" || s.status === "pending");
+  const ordered      = [...needsReview, ...graded, ...notSubmitted];
+  const realTotal    = submissions.filter((s) => s.id > 0).length;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-gray-800">Student Submissions</h2>
-        <span className="text-xs text-muted-foreground">{submissions.length} total · {submitted.length} need review</span>
+        <div className="flex items-center gap-2 text-xs">
+          {needsReview.length > 0 && (
+            <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">{needsReview.length} need review</span>
+          )}
+          {graded.length > 0 && (
+            <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded font-medium">{graded.length} graded</span>
+          )}
+          {notSubmitted.length > 0 && (
+            <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-medium">{notSubmitted.length} not submitted</span>
+          )}
+        </div>
       </div>
 
       {ordered.length === 0 ? (
-        <p className="text-sm text-gray-400 py-8 text-center">No submissions yet.</p>
+        <p className="text-sm text-gray-400 py-8 text-center">No students enrolled yet.</p>
       ) : (
         <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
           {ordered.map((sub) => {
+            const isReal      = sub.id > 0;
             const needsAction = sub.status === "submitted" || sub.status === "late" || sub.status === "returned";
-            return (
-              <button
-                key={sub.id}
-                type="button"
-                className="w-full text-left px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-muted/40 transition-colors bg-white"
-                onClick={() => navigate(`/classrooms/${classroomSlug}/submissions/${sub.id}/review`)}
-              >
+            const isNotSub    = sub.status === "not-submitted" || sub.status === "pending";
+
+            const rowContent = (
+              <>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm text-gray-900 truncate">{sub.studentName}</p>
+                    <p className={`font-medium text-sm truncate ${isNotSub ? "text-gray-400" : "text-gray-900"}`}>
+                      {sub.studentName}
+                    </p>
                     {needsAction && (
                       <span className="shrink-0 inline-block w-1.5 h-1.5 rounded-full bg-primary" />
                     )}
@@ -90,7 +102,7 @@ function TeacherPanel({ assignment, classroomId, classroomSlug }: {
                     {sub.submittedAt ? (
                       <span className="text-xs text-muted-foreground">Submitted {relativeTime(sub.submittedAt)}</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Not submitted</span>
+                      <span className="text-xs text-muted-foreground">{isNotSub ? "Hasn't submitted yet" : "Not submitted"}</span>
                     )}
                     {sub.grade !== null && (
                       <span className="text-xs text-green-700 font-medium">{sub.grade}/{assignment.points} pts</span>
@@ -104,8 +116,30 @@ function TeacherPanel({ assignment, classroomId, classroomSlug }: {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <StatusBadge status={sub.status} />
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  {isReal && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                 </div>
+              </>
+            );
+
+            if (!isReal) {
+              return (
+                <div
+                  key={sub.id}
+                  className="px-4 py-3.5 flex items-center justify-between gap-3 bg-gray-50/60"
+                >
+                  {rowContent}
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={sub.id}
+                type="button"
+                className="w-full text-left px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-muted/40 transition-colors bg-white"
+                onClick={() => navigate(`/classrooms/${classroomSlug}/submissions/${sub.id}/review`)}
+              >
+                {rowContent}
               </button>
             );
           })}
