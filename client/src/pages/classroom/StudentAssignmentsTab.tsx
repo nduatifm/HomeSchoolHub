@@ -44,7 +44,12 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug }: {
         const overdue = isOverdue(a.dueDate);
         const needsAttention =
           (baseStatus === "not-submitted" || baseStatus === "pending") && overdue;
-        const effectiveStatus = baseStatus;
+        // Normalize pending/not-submitted overdue rows so the badge always reads
+        // "Not submitted" — "pending" is an auto-created DB record, not a meaningful label.
+        const effectiveStatus =
+          needsAttention && (baseStatus === "not-submitted" || baseStatus === "pending")
+            ? "not-submitted"
+            : baseStatus;
         const detailUrl = `/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`;
 
         return (
