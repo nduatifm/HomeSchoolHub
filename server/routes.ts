@@ -4154,6 +4154,23 @@ export function registerRoutes(app: Express) {
       }
 
       const body = req.body;
+
+      // Ownership check: teacher must teach this student (unless admin)
+      if (!user!.isAdmin && !user!.isSuperAdmin) {
+        const sid = parseInt(body.studentId, 10);
+        if (!isNaN(sid)) {
+          const tcIds = (await prisma.classroom.findMany({
+            where: { teacherId: user!.id },
+            select: { id: true },
+          })).map((c: any) => c.id);
+          const enrolled = await prisma.classroomEnrollment.findFirst({
+            where: { studentId: sid, classroomId: { in: tcIds } },
+          });
+          if (!enrolled) {
+            return res.status(403).json({ error: "This student is not in any of your classrooms" });
+          }
+        }
+      }
       // Map legacy form fields (reportDate/comments/overallGrade) to schema fields (date/content/grades)
       const overallNum = parseFloat(body.overallGrade);
       const grades = !isNaN(overallNum)
@@ -4222,9 +4239,33 @@ export function registerRoutes(app: Express) {
     requireAuth,
     async (req, res) => {
       try {
-        const reports = await storage.getProgressReportsByStudent(
-          parseInt(req.params.studentId),
-        );
+        const userId = req.session.userId as number;
+        const user = await storage.getUserById(userId);
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
+        const studentId = parseInt(req.params.studentId, 10);
+        if (isNaN(studentId)) return res.status(400).json({ error: "Invalid studentId" });
+
+        if (user.isAdmin || user.isSuperAdmin) {
+          // admins can access any student's reports
+        } else if (user.role === "teacher" || user.roles?.includes("teacher")) {
+          const tcIds = (await prisma.classroom.findMany({
+            where: { teacherId: userId },
+            select: { id: true },
+          })).map((c: any) => c.id);
+          const enrolled = await prisma.classroomEnrollment.findFirst({
+            where: { studentId, classroomId: { in: tcIds } },
+          });
+          if (!enrolled) return res.status(403).json({ error: "Forbidden" });
+        } else if (user.role === "parent" || user.roles?.includes("parent")) {
+          const children = await storage.getStudentsByParent(userId);
+          if (!children.some((c: any) => c.id === studentId)) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        } else {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+
+        const reports = await storage.getProgressReportsByStudent(studentId);
         res.json(reports);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -4320,6 +4361,9 @@ export function registerRoutes(app: Express) {
       if (isNaN(studentId) || !from || !to) {
         return res.status(400).json({ error: "studentId, from, and to are required" });
       }
+      if (from > to) {
+        return res.status(400).json({ error: "'From' date must be on or before 'To' date" });
+      }
 
       // Auth: teacher must own at least one classroom this student is enrolled in
       const teacherClassroomIds = (await prisma.classroom.findMany({
@@ -4398,7 +4442,7 @@ export function registerRoutes(app: Express) {
 
           const totalAssignments = assignments.length;
           const completedAssignments = submissions.filter(
-            (s: any) => s.status === "submitted" || s.status === "graded"
+            (s: any) => s.status === "submitted" || s.status === "graded" || s.status === "late"
           ).length;
           const completionRate =
             totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
@@ -4419,9 +4463,13 @@ export function registerRoutes(app: Express) {
       const allAssignments = classroomRows.reduce((s, c) => s + c.totalAssignments, 0);
       const allCompleted = classroomRows.reduce((s, c) => s + c.completedAssignments, 0);
       const gradedClassrooms = classroomRows.filter((c) => c.weightedGrade !== null);
+      const totalAssignmentsForGpa = gradedClassrooms.reduce((s, c) => s + c.totalAssignments, 0);
       const overallGpa =
-        gradedClassrooms.length > 0
-          ? Math.round(gradedClassrooms.reduce((s, c) => s + c.weightedGrade!, 0) / gradedClassrooms.length)
+        gradedClassrooms.length > 0 && totalAssignmentsForGpa > 0
+          ? Math.round(
+              gradedClassrooms.reduce((s, c) => s + c.weightedGrade! * c.totalAssignments, 0) /
+              totalAssignmentsForGpa
+            )
           : null;
 
       res.json({

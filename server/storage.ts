@@ -1488,23 +1488,39 @@ class PrismaStorage implements IStorage {
   async getProgressReportsByStudent(
     studentId: number,
   ): Promise<ProgressReport[]> {
-    return (await prisma.progressReport.findMany({
+    const reports = await prisma.progressReport.findMany({
       where: { studentId },
+      include: { teacher: true },
+      orderBy: { date: "desc" },
+    });
+    return reports.map((r: any) => ({
+      ...r,
+      teacherName: r.teacher?.name,
+      teacher: undefined,
     })) as ProgressReport[];
   }
 
   async getProgressReportsByTeacher(
     teacherId: number,
   ): Promise<ProgressReport[]> {
-    return (await prisma.progressReport.findMany({
+    const reports = await prisma.progressReport.findMany({
       where: { teacherId },
+      include: { student: true, teacher: true },
+      orderBy: { date: "desc" },
+    });
+    return reports.map((r: any) => ({
+      ...r,
+      studentName: r.student?.name,
+      teacherName: r.teacher?.name,
+      student: undefined,
+      teacher: undefined,
     })) as ProgressReport[];
   }
 
   async getProgressReportsByParent(
     parentId: number,
   ): Promise<(ProgressReport & { studentName?: string; teacherName?: string })[]> {
-    const memberships = await prisma.childTeamMember.findMany({ where: { parentId, status: "active" } });
+    const memberships = await prisma.childTeamMember.findMany({ where: { parentId } });
     const studentIds = memberships.map((m: any) => m.childId);
     if (studentIds.length === 0) return [];
     const reports = await prisma.progressReport.findMany({

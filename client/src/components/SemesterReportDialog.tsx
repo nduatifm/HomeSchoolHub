@@ -246,7 +246,7 @@ export default function SemesterReportDialog({
               </Button>
               <Button
                 onClick={handlePreview}
-                disabled={!dateFrom || !dateTo || previewQuery.isFetching}
+                disabled={!dateFrom || !dateTo || dateFrom > dateTo || previewQuery.isFetching}
               >
                 {previewQuery.isFetching ? (
                   <>
