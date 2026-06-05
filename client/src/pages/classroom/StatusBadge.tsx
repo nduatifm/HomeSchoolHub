@@ -21,6 +21,8 @@ export default function StatusBadge({
     label = "Not submitted";
   } else if (status === "graded" && grade !== null && grade !== undefined && points !== undefined) {
     label = `Graded — ${grade}/${points} pts`;
+  } else if (status === "late") {
+    label = "Submitted Late";
   } else {
     label = status.charAt(0).toUpperCase() + status.slice(1);
   }

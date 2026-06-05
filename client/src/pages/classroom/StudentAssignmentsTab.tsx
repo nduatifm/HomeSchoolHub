@@ -44,7 +44,7 @@ export default function StudentAssignmentsTab({ classroomId, classroomSlug }: {
         const overdue = isOverdue(a.dueDate);
         const needsAttention =
           (baseStatus === "not-submitted" || baseStatus === "pending") && overdue;
-        const effectiveStatus = needsAttention ? "late" : baseStatus;
+        const effectiveStatus = baseStatus;
         const detailUrl = `/classrooms/${classroomSlug}/classwork/${a.slug ?? a.id}`;
 
         return (
