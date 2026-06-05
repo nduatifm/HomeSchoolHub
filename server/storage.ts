@@ -1520,7 +1520,12 @@ class PrismaStorage implements IStorage {
   async getProgressReportsByParent(
     parentId: number,
   ): Promise<(ProgressReport & { studentName?: string; teacherName?: string })[]> {
-    const memberships = await prisma.childTeamMember.findMany({ where: { parentId } });
+    // Include both "active" and "revoked" so parents retain read access to
+    // historical reports even after being removed from a child's team.
+    // "pending" is excluded — those members have never been granted access.
+    const memberships = await prisma.childTeamMember.findMany({
+      where: { parentId, status: { in: ["active", "revoked"] } },
+    });
     const studentIds = memberships.map((m: any) => m.childId);
     if (studentIds.length === 0) return [];
     const reports = await prisma.progressReport.findMany({
