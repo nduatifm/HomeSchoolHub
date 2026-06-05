@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Info } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { GradeBreakdown } from "@shared/schema";
 
-const TYPE_META: Record<string, { color: string; bar: string; text: string }> = {
-  assignment: { color: "bg-blue-100 text-blue-700", bar: "bg-blue-500", text: "text-blue-700" },
-  test:       { color: "bg-orange-100 text-orange-700", bar: "bg-orange-500", text: "text-orange-700" },
-  quiz:       { color: "bg-purple-100 text-purple-700", bar: "bg-purple-500", text: "text-purple-700" },
-  project:    { color: "bg-teal-100 text-teal-700", bar: "bg-teal-500", text: "text-teal-700" },
+const TYPE_DOT: Record<string, string> = {
+  assignment: "bg-blue-500",
+  test:       "bg-orange-500",
+  quiz:       "bg-purple-500",
+  project:    "bg-teal-500",
 };
 
 export default function GradeBreakdownPanel({
@@ -35,7 +35,6 @@ export default function GradeBreakdownPanel({
 
   const { breakdown: items } = breakdown;
   const hasAnyGraded = items.some((b) => b.status === "graded");
-  // zero-weight items that have graded work must still be shown (not an empty state)
   const hasAnyZeroWeightGraded = items.some((b) => b.status === "zero-weight" && b.average !== null);
 
   if (!hasAnyGraded && !hasAnyZeroWeightGraded) {
@@ -47,76 +46,71 @@ export default function GradeBreakdownPanel({
     );
   }
 
+  const overallColor =
+    breakdown.overall === null ? "" :
+    breakdown.overall >= 70 ? "text-green-600" :
+    breakdown.overall >= 50 ? "text-amber-600" : "text-red-600";
+
+  const overallBarColor =
+    breakdown.overall === null ? "" :
+    breakdown.overall >= 70 ? "bg-green-500" :
+    breakdown.overall >= 50 ? "bg-amber-500" : "bg-red-500";
+
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-      {/* Overall */}
-      <div className="flex items-center justify-between">
+    <div className="rounded-2xl border border-border bg-card px-4 py-3 space-y-3">
+      {/* Overall grade — visual centrepiece */}
+      <div className="flex items-baseline justify-between">
         <span className="text-sm font-semibold text-foreground">Overall Grade</span>
         {breakdown.overall !== null ? (
-          <span className={`text-lg font-bold ${breakdown.overall >= 70 ? "text-green-600" : breakdown.overall >= 50 ? "text-amber-600" : "text-red-600"}`}>
+          <span className={`text-3xl font-bold tabular-nums ${overallColor}`}>
             {breakdown.overall}%
           </span>
         ) : (
-          <span className="text-sm text-muted-foreground">—</span>
+          <span className="text-xl text-muted-foreground">—</span>
         )}
       </div>
 
-      {/* Overall progress bar */}
       {breakdown.overall !== null && (
-        <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div className="h-2.5 rounded-full bg-muted overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${breakdown.overall >= 70 ? "bg-green-500" : breakdown.overall >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+            className={`h-full rounded-full transition-all ${overallBarColor}`}
             style={{ width: `${breakdown.overall}%` }}
           />
         </div>
       )}
 
-      {/* Per-type breakdown — all 4 types always shown */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+      {/* Per-type rows */}
+      <div className="divide-y divide-border/50">
         {items.map((item) => {
-          const meta = TYPE_META[item.type] ?? TYPE_META.assignment;
-          return (
-            <div key={item.type} className="flex items-center gap-2">
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${meta.color}`}>
-                {item.label}
-              </span>
+          const dot = TYPE_DOT[item.type] ?? TYPE_DOT.assignment;
+          const isPending = item.status === "pending";
+          const isZeroWeight = item.status === "zero-weight";
 
-              {item.status === "pending" && (
-                <span className="text-xs font-medium text-amber-600">
+          return (
+            <div key={item.type} className="flex items-center justify-between py-1.5 first:pt-0.5 last:pb-0">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${isPending || (isZeroWeight && item.average === null) ? "bg-muted-foreground/30" : dot}`} />
+                <span className={`text-sm ${isPending ? "text-muted-foreground" : "text-foreground"}`}>
+                  {item.label}
+                </span>
+              </div>
+
+              {isPending && (
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                   Pending
-                  {item.configuredWeight > 0 && (
-                    <span className="ml-1 font-normal text-muted-foreground">({item.configuredWeight}%)</span>
-                  )}
                 </span>
               )}
 
-              {item.status === "zero-weight" && (
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  {item.average !== null ? (
-                    <>
-                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className={`h-full rounded-full opacity-40 ${meta.bar}`} style={{ width: `${item.average}%` }} />
-                      </div>
-                      <span className="text-xs text-muted-foreground tabular-nums shrink-0">{item.average}%</span>
-                    </>
-                  ) : null}
-                  <span className="text-[10px] text-muted-foreground/70 shrink-0 italic">Not counted</span>
-                </div>
+              {isZeroWeight && item.average !== null && (
+                <span className="text-sm font-semibold tabular-nums text-muted-foreground">
+                  {item.average}%
+                </span>
               )}
 
               {item.status === "graded" && item.average !== null && (
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div className={`h-full rounded-full ${meta.bar}`} style={{ width: `${item.average}%` }} />
-                  </div>
-                  <span className={`text-xs font-semibold tabular-nums shrink-0 ${meta.text}`}>{item.average}%</span>
-                  <span
-                    className="text-[10px] text-muted-foreground shrink-0"
-                    title={`Configured: ${item.configuredWeight}%`}
-                  >
-                    ({item.effectiveWeight}% of grade)
-                  </span>
-                </div>
+                <span className="text-sm font-semibold tabular-nums text-foreground">
+                  {item.average}%
+                </span>
               )}
             </div>
           );
@@ -125,12 +119,9 @@ export default function GradeBreakdownPanel({
 
       {/* Partial-grade notice */}
       {breakdown.isPartial && breakdown.pendingTypes.length > 0 && (
-        <div className="flex items-start gap-1.5 pt-0.5">
-          <Info className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-600">
-            Based on graded items only — {breakdown.pendingTypes.join(", ")} pending.
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground pt-0.5">
+          Some categories are still pending.
+        </p>
       )}
     </div>
   );
