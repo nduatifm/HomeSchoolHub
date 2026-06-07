@@ -69,15 +69,35 @@ export default function MessagesPage() {
     (c) => c.type === "direct" || c.teacherUserId !== 0,
   );
 
+  // URL-based auto-selection — computed synchronously so it works
+  // whether conversations come from cache or a fresh fetch.
+  const search = useSearch();
+  const autoParams = new URLSearchParams(search);
+  const autoTeacherId = parseInt(autoParams.get("teacherId") ?? "0", 10);
+  const autoStudentId = parseInt(autoParams.get("studentId") ?? "0", 10);
+
+  const urlConv = autoTeacherId
+    ? visibleConvs.find(
+        (c) => c.teacherUserId === autoTeacherId && c.studentId === autoStudentId,
+      ) ?? null
+    : null;
+
+  // Open the thread panel on mobile when arriving via a URL-based link.
+  const urlConvKey = urlConv ? convKey(urlConv) : null;
+  useEffect(() => {
+    if (urlConvKey) setMobileView("thread");
+  }, [urlConvKey]);
+
   const selectedKey = selected ? convKey(selected) : null;
   const selectedStillExists = selectedKey
     ? visibleConvs.some((c) => convKey(c) === selectedKey)
     : false;
 
+  // Priority: explicit user selection → URL-matched conv → first conv in list
   const effectiveSelected: ConversationSummary | null =
     selected && (selectedStillExists || selected.type === "direct")
       ? selected
-      : visibleConvs[0] ?? null;
+      : urlConv ?? visibleConvs[0] ?? null;
 
   const canUseDirect = user?.role === "teacher" || user?.role === "parent";
   const { data: directContacts = [], isLoading: contactsLoading } = useQuery<DirectContact[]>({
@@ -94,23 +114,6 @@ export default function MessagesPage() {
     setSelected(conv);
     setMobileView("thread");
   };
-
-  const search = useSearch();
-  const autoParams = new URLSearchParams(search);
-  const autoTeacherId = parseInt(autoParams.get("teacherId") ?? "0", 10);
-  const autoStudentId = parseInt(autoParams.get("studentId") ?? "0", 10);
-  const hasAutoSelected = useRef(false);
-
-  useEffect(() => {
-    if (hasAutoSelected.current || !autoTeacherId || conversations.length === 0) return;
-    const match = conversations.find(
-      (c) => c.teacherUserId === autoTeacherId && c.studentId === autoStudentId,
-    );
-    if (match) {
-      hasAutoSelected.current = true;
-      selectConv(match);
-    }
-  }, [conversations, autoTeacherId, autoStudentId]);
 
   const startDirect = (contact: DirectContact) => {
     setNewDirectOpen(false);
