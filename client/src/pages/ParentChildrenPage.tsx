@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useQueries, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, ApiError } from "@/lib/queryClient";
@@ -54,6 +55,7 @@ type TeamMember = {
 
 export default function ParentChildrenPage() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -426,7 +428,7 @@ export default function ParentChildrenPage() {
                                   onClick={() => becomeChildMutation.mutate(child.id)}
                                 >
                                   <Eye className="w-3.5 h-3.5 mr-2" />
-                                  View as child
+                                  View as {child.name?.split(" ")[0] ?? "child"}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -452,10 +454,7 @@ export default function ParentChildrenPage() {
                           {/* Only owners can send messages — members are read-only */}
                           {assignedTeacher && iAmOwner && (
                             <button
-                              onClick={() => {
-                                setMessageForm({ receiverId: assignedTeacher.id, content: "", studentId: child.id });
-                                setSendMessageOpen(true);
-                              }}
+                              onClick={() => navigate(`/messages?teacherId=${assignedTeacher.id}&studentId=${child.id}`)}
                               className="text-xs text-primary hover:underline flex items-center gap-1"
                             >
                               <MessageSquare className="w-3 h-3" />

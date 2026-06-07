@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearch } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Send, MessageSquare, PenSquare, Search, X } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -93,6 +94,23 @@ export default function MessagesPage() {
     setSelected(conv);
     setMobileView("thread");
   };
+
+  const search = useSearch();
+  const autoParams = new URLSearchParams(search);
+  const autoTeacherId = parseInt(autoParams.get("teacherId") ?? "0", 10);
+  const autoStudentId = parseInt(autoParams.get("studentId") ?? "0", 10);
+  const hasAutoSelected = useRef(false);
+
+  useEffect(() => {
+    if (hasAutoSelected.current || !autoTeacherId || conversations.length === 0) return;
+    const match = conversations.find(
+      (c) => c.teacherUserId === autoTeacherId && c.studentId === autoStudentId,
+    );
+    if (match) {
+      hasAutoSelected.current = true;
+      selectConv(match);
+    }
+  }, [conversations, autoTeacherId, autoStudentId]);
 
   const startDirect = (contact: DirectContact) => {
     setNewDirectOpen(false);
