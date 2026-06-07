@@ -24,17 +24,17 @@ type ConversationSummary = {
 
 type DirectContact = { id: number; name: string };
 
-// Dark theme palette
+// Light theme palette (matches app design system)
 const D = {
-  bg:      "#0f0f0f",
-  panel:   "#111111",
-  border:  "#2a2a2a",
-  hover:   "#1c1c1c",
-  active:  "#222222",
-  text:    "#ffffff",
-  muted:   "#888888",
-  search:  "#1a1a1a",
-  accent:  "#2563eb",
+  bg:      "#ffffff",
+  panel:   "#ffffff",
+  border:  "hsl(var(--border) / 0.4)",
+  hover:   "hsl(var(--muted))",
+  active:  "hsl(var(--primary) / 0.08)",
+  text:    "hsl(var(--foreground))",
+  muted:   "hsl(var(--muted-foreground))",
+  search:  "hsl(var(--muted) / 0.5)",
+  accent:  "hsl(var(--primary))",
 };
 
 function formatDate(ts: string): string {
@@ -63,14 +63,14 @@ function convKey(conv: ConversationSummary) {
   return `${conv.teacherUserId}-${conv.studentId}`;
 }
 
-// Stable avatar colour from name string
+// Stable avatar colour from name string (light-mode friendly)
 const AVATAR_COLORS = [
-  ["#1e3a5f", "#4a9eff"],
-  ["#1e3d2f", "#4acf8f"],
-  ["#3d1e3a", "#cf4acf"],
-  ["#3d2e1e", "#cf8f4a"],
-  ["#1e2d3d", "#4a6fcf"],
-  ["#3d1e1e", "#cf4a4a"],
+  ["#dbeafe", "#1d4ed8"],
+  ["#dcfce7", "#15803d"],
+  ["#f3e8ff", "#7e22ce"],
+  ["#ffedd5", "#c2410c"],
+  ["#e0f2fe", "#0369a1"],
+  ["#fce7f3", "#be185d"],
 ];
 function avatarColors(name: string) {
   let h = 0;
@@ -277,7 +277,7 @@ export default function MessagesPage() {
                     className="text-xs font-medium px-3 py-1 rounded-full transition-colors"
                     style={
                       active
-                        ? { background: "#fff", color: "#000" }
+                        ? { background: "hsl(var(--foreground))", color: "hsl(var(--background))" }
                         : { color: D.muted }
                     }
                     onMouseEnter={(e) => {
@@ -492,22 +492,21 @@ export default function MessagesPage() {
         open={newDirectOpen}
         onOpenChange={(o) => { setNewDirectOpen(o); if (!o) setContactSearch(""); }}
       >
-        <DialogContent className="sm:max-w-sm" style={{ background: "#1a1a1a", borderColor: D.border }}>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base" style={{ color: D.text }}>New Direct Message</DialogTitle>
+            <DialogTitle className="text-base">New Direct Message</DialogTitle>
           </DialogHeader>
 
           <div
             className="flex items-center gap-2 rounded-lg border px-3 py-2"
-            style={{ borderColor: "#333", background: D.search }}
+            style={{ borderColor: "hsl(var(--border))" }}
           >
             <Search className="w-3.5 h-3.5 shrink-0" style={{ color: D.muted }} />
             <input
               value={contactSearch}
               onChange={(e) => setContactSearch(e.target.value)}
               placeholder={user?.role === "teacher" ? "Search parents…" : "Search teachers…"}
-              className="flex-1 text-sm outline-none bg-transparent"
-              style={{ color: D.text }}
+              className="flex-1 text-sm outline-none bg-transparent text-foreground"
               autoFocus
             />
             {contactSearch && (
@@ -522,8 +521,8 @@ export default function MessagesPage() {
               <div className="flex flex-col gap-2 px-1 py-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="flex items-center gap-3 py-1.5 px-2">
-                    <div className="w-8 h-8 rounded-full animate-pulse shrink-0" style={{ background: "#333" }} />
-                    <div className="h-3 w-32 rounded animate-pulse" style={{ background: "#333" }} />
+                    <div className="w-8 h-8 rounded-full bg-muted animate-pulse shrink-0" />
+                    <div className="h-3 w-32 bg-muted rounded animate-pulse" />
                   </div>
                 ))}
               </div>
