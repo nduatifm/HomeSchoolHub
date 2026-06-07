@@ -68,12 +68,18 @@ export default function MessagesPage() {
     (c) => c.type === "direct" || c.teacherUserId !== 0,
   );
 
-  // URL-based auto-selection: match by studentId alone (each student has at
-  // most one teacher, so studentId uniquely identifies the conversation).
-  const autoStudentId = parseInt(new URLSearchParams(window.location.search).get("studentId") ?? "0", 10);
+  // Session-based auto-selection: read the pending student ID set by the
+  // "Message" button on the children page. The useState initializer runs
+  // exactly once on mount — reads and clears sessionStorage atomically so
+  // it only fires for this navigation, never on back/forward or manual visits.
+  const [pendingStudentId] = useState<number>(() => {
+    const stored = sessionStorage.getItem("mp_openStudentId");
+    if (stored) sessionStorage.removeItem("mp_openStudentId");
+    return parseInt(stored ?? "0", 10) || 0;
+  });
 
-  const urlConv = autoStudentId
-    ? visibleConvs.find((c) => c.studentId === autoStudentId) ?? null
+  const urlConv = pendingStudentId
+    ? visibleConvs.find((c) => c.studentId === pendingStudentId) ?? null
     : null;
 
   // Open the thread panel on mobile when arriving via a URL-based link.

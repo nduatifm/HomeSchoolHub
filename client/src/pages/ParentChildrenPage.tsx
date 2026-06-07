@@ -454,7 +454,10 @@ export default function ParentChildrenPage() {
                           {/* Only owners can send messages — members are read-only */}
                           {assignedTeacher && iAmOwner && (
                             <button
-                              onClick={() => navigate(`/messages?studentId=${child.id}`)}
+                              onClick={() => {
+                                sessionStorage.setItem("mp_openStudentId", String(child.id));
+                                navigate("/messages");
+                              }}
                               className="text-xs text-primary hover:underline flex items-center gap-1"
                             >
                               <MessageSquare className="w-3 h-3" />
