@@ -68,15 +68,19 @@ export default function MessagesPage() {
     (c) => c.type === "direct" || c.teacherUserId !== 0,
   );
 
-  // Session-based auto-selection: read the pending student ID set by the
-  // "Message" button on the children page. The useState initializer runs
-  // exactly once on mount — reads and clears sessionStorage atomically so
-  // it only fires for this navigation, never on back/forward or manual visits.
+  // Session-based auto-selection: read the pending student ID written by the
+  // "Message" button on the children page. We READ in the useState initializer
+  // (stable, called before first render) but do NOT remove there — React 18
+  // Strict Mode double-invokes initializers in dev, so removing inside would
+  // wipe the value before the second call uses it. Instead we clear it once
+  // in a useEffect (runs after mount, not affected by the double-invoke issue).
   const [pendingStudentId] = useState<number>(() => {
     const stored = sessionStorage.getItem("mp_openStudentId");
-    if (stored) sessionStorage.removeItem("mp_openStudentId");
     return parseInt(stored ?? "0", 10) || 0;
   });
+  useEffect(() => {
+    sessionStorage.removeItem("mp_openStudentId");
+  }, []);
 
   const urlConv = pendingStudentId
     ? visibleConvs.find((c) => c.studentId === pendingStudentId) ?? null
