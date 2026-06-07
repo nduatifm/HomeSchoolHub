@@ -232,8 +232,7 @@ export default function MessagesPage() {
             {/* Search + compose */}
             <div className="flex items-center gap-2 p-3 shrink-0">
               <div
-                className="flex items-center gap-2 flex-1 rounded-lg px-3 py-2"
-                style={{ background: D.search, border: `1px solid #333` }}
+                className="flex items-center gap-2 flex-1 rounded-lg px-3 py-2 border border-border/50 bg-muted/20"
               >
                 <Search className="w-3.5 h-3.5 shrink-0" style={{ color: D.muted }} />
                 <input
@@ -277,11 +276,11 @@ export default function MessagesPage() {
                     className="text-xs font-medium px-3 py-1 rounded-full transition-colors"
                     style={
                       active
-                        ? { background: "hsl(var(--foreground))", color: "hsl(var(--background))" }
-                        : { color: D.muted }
+                        ? { background: "hsl(var(--primary))", color: "#fff" }
+                        : { color: "hsl(var(--muted-foreground))" }
                     }
                     onMouseEnter={(e) => {
-                      if (!active) e.currentTarget.style.background = D.hover;
+                      if (!active) e.currentTarget.style.background = "hsl(var(--muted))";
                     }}
                     onMouseLeave={(e) => {
                       if (!active) e.currentTarget.style.background = "transparent";
@@ -291,7 +290,7 @@ export default function MessagesPage() {
                     {tab.id === "unread" && visibleConvs.filter((c) => c.unreadCount > 0).length > 0 && (
                       <span
                         className="ml-1 text-[10px] font-bold rounded-full px-1"
-                        style={{ background: active ? "#333" : "#333", color: "#fff" }}
+                        style={{ background: active ? "rgba(255,255,255,0.25)" : "hsl(var(--primary))", color: "#fff" }}
                       >
                         {visibleConvs.filter((c) => c.unreadCount > 0).length}
                       </span>
