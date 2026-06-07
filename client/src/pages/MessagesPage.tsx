@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearch } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Send, MessageSquare, PenSquare, Search, X } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
@@ -69,17 +68,12 @@ export default function MessagesPage() {
     (c) => c.type === "direct" || c.teacherUserId !== 0,
   );
 
-  // URL-based auto-selection — computed synchronously so it works
-  // whether conversations come from cache or a fresh fetch.
-  const search = useSearch();
-  const autoParams = new URLSearchParams(search);
-  const autoTeacherId = parseInt(autoParams.get("teacherId") ?? "0", 10);
-  const autoStudentId = parseInt(autoParams.get("studentId") ?? "0", 10);
+  // URL-based auto-selection: match by studentId alone (each student has at
+  // most one teacher, so studentId uniquely identifies the conversation).
+  const autoStudentId = parseInt(new URLSearchParams(window.location.search).get("studentId") ?? "0", 10);
 
-  const urlConv = autoTeacherId
-    ? visibleConvs.find(
-        (c) => c.teacherUserId === autoTeacherId && c.studentId === autoStudentId,
-      ) ?? null
+  const urlConv = autoStudentId
+    ? visibleConvs.find((c) => c.studentId === autoStudentId) ?? null
     : null;
 
   // Open the thread panel on mobile when arriving via a URL-based link.
