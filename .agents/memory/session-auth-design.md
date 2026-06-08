@@ -1,19 +1,23 @@
 ---
-name: Session auth design
-description: How session tokens flow between client and server after the httpOnly cookie migration.
+name: Server-side impersonation design
+description: How auth sessions and impersonation work — cookie-only, no localStorage tokens.
 ---
 
 # Session Auth Design
 
 ## Rule
-Normal user sessions are carried by the `lyra_session` httpOnly cookie (set by server, never readable by JS). All fetch calls use `credentials: "include"`. The Authorization Bearer header is only used for impersonation overrides.
+All session auth uses a single `lyra_session` httpOnly cookie. No Authorization header, no localStorage token, ever.
 
-## Why
-Migrated from localStorage token storage (C1 finding in security audit) to eliminate XSS token-theft risk. httpOnly cookies cannot be read by JavaScript.
+**Why:** The previous design stored impersonation tokens in localStorage and sent them as `Authorization: Bearer`, making them XSS-stealable. Full server-side impersonation closes this gap.
 
 ## How to apply
-- `resolveSessionUserId` in `server/routes.ts`: reads `req.cookies.lyra_session` for normal auth. If an `Authorization: Bearer <token>` header is also present, it takes priority (impersonation override).
-- `setSessionCookie(res, token)` helper in `server/routes.ts` must be called on every login/signup route.
-- Client fetch calls must all include `credentials: "include"` (already set as default in `queryClient.ts`). Do NOT add Authorization headers for normal flows.
-- `adminSessionId` and `parentSessionId` in localStorage are set to the string `"1"` (truthy marker), not actual tokens. Only the impersonated user's real token is in localStorage as `"sessionId"`.
-- The `AuthContextType.sessionId` field is kept as `null` for interface compatibility but is never populated from localStorage.
+- `resolveSessionUserId` reads ONLY `req.cookies.lyra_session` — do not add Authorization header support back.
+- `AuthSession.impersonatingUserId Int?` — when set, requests run as that user; the original user is `realUserId`.
+- `req.session.userId` = effective identity (impersonated or real). `req.session.realUserId` = cookie holder. `req.session.sessionId` = raw session token.
+- `requireAdmin` / `requireSuperAdmin` check `realUserId` (not `userId`) so admin privileges survive impersonation.
+- `POST /api/admin/become` and `POST /api/parent/become-child` update `AuthSession.impersonatingUserId` in place — they do not create new sessions.
+- `POST /api/admin/stop-impersonating` and `POST /api/parent/stop-impersonating` set `impersonatingUserId = null`.
+- `GET /api/auth/me` returns `impersonatedBy: { id, name, role, isAdmin, isSuperAdmin } | null`. Client banners read this field, never localStorage.
+- `POST /api/dev/become` creates a new session AND calls `setSessionCookie()` — no sessionId in response body.
+- `POST /api/auth/logout` reads only the cookie (not Authorization header) to find and delete the session.
+- `change-password` uses `req.session.sessionId` (not Authorization header) to identify the current session to preserve.

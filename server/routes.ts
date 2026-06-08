@@ -1270,8 +1270,9 @@ export function registerRoutes(app: Express) {
       const hashedPassword = await hashPassword(newPassword);
       await storage.updateUser(user.id, { password: hashedPassword });
 
-      // Invalidate all OTHER active sessions for this user (keep the current one)
-      const currentSessionId = req.headers.authorization?.replace("Bearer ", "") ?? "";
+      // Invalidate all OTHER active sessions for this user (keep the current one).
+      // Session ID is now available from req.session.sessionId (set by resolveSessionUserId via cookie).
+      const currentSessionId = req.session.sessionId ?? "";
       await prisma.authSession.deleteMany({
         where: {
           userId: user.id,

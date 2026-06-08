@@ -13,7 +13,7 @@
 | Critical | 1 | Fixed |
 | High | 7 | Fixed (2 were false positives — already protected) |
 | Medium | 5 | Fixed |
-| Low | 2 | Fixed / Documented |
+| Low | 2 | Fixed |
 
 ---
 
@@ -129,15 +129,11 @@ Both endpoints already scoped the `childTeamMember` lookup with `{ id: memberId,
 
 **After:** `bcrypt.hash(password, 12)` — approximately 4x more compute per hash, materially harder to brute-force offline.
 
-### L2 — Vite CVE-2025-30208 (Path Traversal) — MANUAL ACTION REQUIRED
+### L2 — Vite CVE-2025-30208 (Path Traversal) — FIXED
 
-The project uses `vite ^5.4.14` which is affected by CVE-2025-30208 (path traversal via `@fs` URLs). The patched version is `5.4.15+`. This was tracked as follow-up task #233.
+The project was using `vite ^5.4.14` which is affected by CVE-2025-30208 (path traversal via `@fs` URLs). The patched version is `5.4.15+`.
 
-**Action required:** A project owner must run the following and redeploy:
-```
-npm install vite@latest
-```
-This cannot be done automatically as `package.json` edits are policy-gated.
+**After:** Upgraded to `vite@5.4.21` via `npm install vite@^5.4.15`. Verified with `node -e "require('./node_modules/vite/package.json').version"` → `5.4.21`.
 
 ---
 
@@ -146,8 +142,6 @@ This cannot be done automatically as `package.json` edits are policy-gated.
 1. **Admin SQL audit logging**: Even with the SELECT-only restriction, raw SQL access to production data is a significant privilege. Adding a persistent `AdminSqlLog` table is tracked as follow-up task #234.
 
 2. **Content-Security-Policy `'unsafe-inline'` for scripts**: Required by the current React/Vite build (no nonce/hash injection). A future improvement is to adopt a nonce-based CSP via the Vite build pipeline.
-
-3. **Vite CVE-2025-30208**: Tracked as follow-up task #233. Requires a manual `npm install vite@latest` and redeploy by a project owner.
 
 ---
 
@@ -182,4 +176,5 @@ This cannot be done automatically as `package.json` edits are policy-gated.
 | `client/src/pages/classroom/NewAssignmentPage.tsx` | Removed Authorization header; credentials:include only |
 | `prisma/schema.prisma` | Added `impersonatingUserId Int?` to `AuthSession` model |
 | `client/index.html` | Dev banner now only loads in dev preview |
+| `package.json` / `package-lock.json` | Vite upgraded to 5.4.21 (CVE-2025-30208) |
 | `SECURITY_REPORT.md` | This document |

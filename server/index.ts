@@ -39,16 +39,25 @@ app.use(helmet({
   xFrameOptions: { action: "deny" },
 }));
 
-// CORS — same-origin app; only allow known client origins
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  "http://localhost:5000",
-  process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : undefined,
-].filter(Boolean) as string[];
+// CORS — same-origin app; only allow an exact allowlist of trusted origins.
+// Wildcard suffix matching (.replit.app / .replit.dev) is intentionally removed
+// because credentials:true + broad suffix matching is equivalent to open CORS.
+const allowedOrigins = new Set<string>(
+  [
+    process.env.CLIENT_URL,
+    "http://localhost:5000",
+    "http://localhost:5001",
+    // Add the canonical Replit deployment domain if provided
+    process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
+      : undefined,
+  ].filter(Boolean) as string[]
+);
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.some(o => origin === o || origin.endsWith(".replit.app") || origin.endsWith(".replit.dev"))) {
+    // No origin = same-origin request (server-to-server or direct navigation) — always allow.
+    if (!origin || allowedOrigins.has(origin)) {
       cb(null, true);
     } else {
       cb(new Error("CORS: origin not allowed"));
@@ -80,6 +89,8 @@ const apiLimiter = rateLimit({
 app.use("/api/auth", authLimiter);
 // Also rate-limit invite acceptance (contains auth logic)
 app.use("/api/students", authLimiter);
+// Team invite acceptance contains token-based auth logic — must be rate-limited
+app.use("/api/team-invite", authLimiter);
 app.use("/api", apiLimiter);
 
 app.use(express.json());
