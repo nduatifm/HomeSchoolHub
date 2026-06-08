@@ -1,0 +1,108 @@
+Perform a comprehensive security audit of the entire LyraPrep platform and fix every vulnerability found. LyraPrep handles sensitive data including children's educational records, parent and guardian information, teacher credentials, grades, assignments, and private messages. The bar for security must reflect that. Do not add new features. Do not refactor working code. Only find, fix, and document security issues. Work through each section completely before moving to the next.
+
+Section 1 — Authentication and session security
+
+Verify that passwords are hashed using a strong modern algorithm (bcrypt, argon2, or scrypt) with an appropriate work factor. Plaintext or weakly hashed passwords must be fixed immediately
+Confirm that session tokens are cryptographically random, sufficiently long (minimum 128 bits of entropy), and not predictable or sequential
+Verify that session tokens are stored in httpOnly, secure, sameSite=strict cookies — not in local storage or session storage, which are accessible to JavaScript and vulnerable to XSS theft
+Confirm that sessions are fully invalidated server-side on logout — not just cleared client-side. A token that was valid before logout must be rejected by the server after logout
+Check for session fixation vulnerabilities — the session token must be rotated on login so a pre-login token cannot be reused post-login
+Verify that failed login attempts are rate-limited per IP and per account to prevent brute force attacks. After a defined number of failures (e.g. 10), the account should be temporarily locked or require a CAPTCHA
+Confirm that password reset flows use short-lived, single-use tokens sent to the registered email — not security questions or predictable reset URLs
+Verify that magic link invite tokens (used in the family team invite flow) are single-use, expire after 24 hours, and are invalidated immediately after acceptance
+Check that "remember me" or persistent session functionality, if present, uses a separate long-lived token stored securely and rotated on each use
+
+
+Section 2 — Authorization and access control
+This is the highest-risk area for LyraPrep given its multi-role, multi-child data model.
+
+Verify that every API endpoint enforces authorization server-side — not just on the client. A user must not be able to call any endpoint directly (via curl, Postman, or a manipulated browser request) and receive data or perform actions they are not permitted to
+Audit every endpoint that accepts an ID parameter (studentId, classroomId, assignmentId, submissionId, childId, etc.) and confirm that the server verifies the requesting user is actually permitted to access that specific record — not just that they are authenticated
+Check for insecure direct object reference (IDOR) vulnerabilities: a parent must not be able to increment a childId in the URL and access another family's child data. A student must not be able to change an assignmentId and access another student's submission. Test this explicitly for every ID-parameterized route
+Verify that Member-role parents cannot call Owner-only API endpoints (invite, role change, remove member) even if they construct the request manually
+Confirm that students cannot access classrooms, assignments, or materials for subjects they are not enrolled in — at the database query level, not just the UI level
+Verify that teachers can only access data for their own students and classrooms — not other teachers' students or classrooms
+Check that no endpoint returns more data than the requesting user is permitted to see — e.g. a student endpoint must not return other students' grades in the same response payload
+Audit any admin or internal endpoints and confirm they are not publicly accessible
+
+
+Section 3 — Input validation and injection
+
+Audit every form field, query parameter, route parameter, and API request body across the entire application for missing or insufficient input validation
+Verify that all database queries use parameterized queries or a safe ORM layer — no string interpolation of user input into SQL queries. Test for SQL injection on every input that touches the database
+Check every field that renders user-supplied content in the UI (assignment text, messages, study material content, teacher notes, classroom names, student names) for cross-site scripting (XSS) vulnerabilities. User input must be sanitized before storage and escaped before rendering
+Verify that the Tiptap rich text editor (used in the material editor and assignment editor) sanitizes HTML output before saving to the database — a user must not be able to inject malicious scripts through the editor
+Check for NoSQL injection if any part of the stack uses a NoSQL database
+Validate that all numeric inputs (grades, weight percentages, row/column counts) enforce minimum and maximum bounds server-side — not just in the UI
+Verify that file uploads (study materials, attachments) validate file type and size server-side — not just client-side. Reject executable file types. Store uploaded files outside the web root or in object storage, never in a publicly accessible directory with executable permissions
+Check that all API endpoints validate the Content-Type header and reject unexpected payload types
+
+
+Section 4 — Data exposure and sensitive data handling
+
+Audit every API response and confirm it does not return fields the requesting user does not need or is not permitted to see. Strip sensitive fields (password hashes, internal IDs, tokens, other users' email addresses) from all responses
+Verify that error messages returned to the client do not expose internal implementation details — no stack traces, no database error messages, no file paths, no table or column names in production error responses
+Confirm that all data in transit is encrypted — the application must enforce HTTPS and redirect all HTTP traffic to HTTPS. Check that no mixed content (HTTP resources loaded on an HTTPS page) exists
+Verify that sensitive data at rest is handled appropriately — particularly any stored tokens, invite links, or password reset codes which must be hashed in the database, not stored plaintext
+Check that API keys, database credentials, and any third-party service secrets are stored in environment variables — not hardcoded in the codebase, not committed to version control, not exposed in client-side code or API responses
+Audit the client-side JavaScript bundle and confirm no secrets, internal API keys, or sensitive configuration values are embedded in the frontend build
+Verify that children's data (grades, assignments, submissions, messages) is never returned in an API response to a user who is not an enrolled teacher, the child themselves, or a verified team member for that child
+
+
+Section 5 — Cross-site request forgery (CSRF)
+
+Verify that all state-changing API endpoints (POST, PUT, PATCH, DELETE) are protected against CSRF attacks
+Confirm that CSRF tokens are implemented for any form-based submission flow, or that the API uses a strict CORS policy combined with sameSite=strict cookies that together prevent cross-origin state-changing requests
+Verify that the CSRF protection cannot be bypassed by setting a custom Content-Type header or by using a cross-origin fetch
+
+
+Section 6 — CORS and API exposure
+
+Audit the CORS configuration and confirm that the Access-Control-Allow-Origin header is not set to * on any endpoint that handles authenticated requests or sensitive data
+Verify that CORS is restricted to the known origins of the LyraPrep frontend — no wildcard origins, no dynamically reflected origins without validation
+Confirm that the API does not expose endpoints that are not needed by the frontend — remove or disable any unused or debug endpoints
+Check that HTTP methods are restricted per endpoint — an endpoint that only needs GET must reject POST, PUT, and DELETE requests
+
+
+Section 7 — Rate limiting and abuse prevention
+
+Verify that rate limiting is applied to all authentication endpoints: login, password reset, magic link invite, and signup
+Confirm that rate limiting is applied to all API endpoints to prevent enumeration attacks, bulk data scraping, and denial of service
+Check that the invite flow cannot be abused to send unlimited emails to arbitrary addresses — limit the number of pending invites per child team and per time window
+Verify that grade submission, assignment submission, and message sending endpoints cannot be spammed with repeated identical requests
+Confirm that rate limit responses return HTTP 429 with a Retry-After header — not a generic 500 or silent failure
+
+
+Section 8 — Dependency and infrastructure security
+
+Run a dependency audit (npm audit or equivalent) and fix all critical and high severity vulnerabilities in third-party packages. Document any that cannot be resolved immediately and explain why
+Verify that the Node.js runtime, framework, and database versions are current and not running on end-of-life versions with known CVEs
+Check that the application does not use eval(), Function(), innerHTML with unsanitized input, or dangerouslySetInnerHTML with unvalidated content anywhere in the codebase
+Confirm that security-relevant HTTP response headers are set on all responses: Strict-Transport-Security, X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Content-Security-Policy, Referrer-Policy, and Permissions-Policy
+Verify that the Content-Security-Policy header is configured to prevent inline script execution and restrict resource loading to trusted origins — this is the primary defense against XSS in a React application
+Check that directory listing is disabled on the web server and that no sensitive files (.env, configuration files, internal documentation) are publicly accessible
+
+
+Section 9 — Logging and monitoring
+
+Verify that authentication events are logged: successful logins, failed logins, logouts, password resets, and magic link acceptances — with timestamp, user ID, and IP address
+Confirm that authorization failures are logged: every time a user attempts to access a resource they are not permitted to, log the event with the user ID, the attempted resource, and the timestamp
+Check that logs do not contain sensitive data — no passwords, no session tokens, no full credit card numbers, no children's personal data in plaintext log entries
+Verify that logs are written to a persistent store and not only to console output that disappears on server restart
+Confirm that there is a mechanism to detect and alert on repeated authorization failures from the same user or IP — a pattern that indicates an active attack or enumeration attempt
+
+
+Section 10 — Child data and COPPA compliance
+
+LyraPrep serves minors. Verify that no child's personal data (name, age, grade, academic records, messages) is exposed to any user who is not their enrolled teacher or a verified parent team member
+Confirm that children cannot self-register — account creation for students must go through a parent or teacher enrollment flow only
+Verify that student data is not used for any purpose beyond the educational service — no tracking pixels, no third-party analytics that receive student identifiers, no advertising SDKs
+Check that any third-party services integrated into LyraPrep (analytics, error monitoring, email delivery) are configured to not receive or store children's personal data beyond what is strictly necessary for the service to function
+
+
+After completing the full audit:
+
+Produce a written security report listing every vulnerability found, its severity (critical, high, medium, low), which section it was found in, the root cause, and how it was fixed
+Flag any vulnerability that could not be fully remediated in this session, explain why, and recommend the next step
+Confirm that no working functionality was broken as a side effect of any security fix
+Confirm that all critical and high severity issues are resolved before the report is marked complete
