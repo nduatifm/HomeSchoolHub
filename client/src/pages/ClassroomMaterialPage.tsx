@@ -103,13 +103,11 @@ function RichContent({ html }: { html: string }) {
 // ─── Upload helper ───────────────────────────────────────────────────────────
 
 async function uploadFileToCloudinary(file: File, folder = "classwork"): Promise<string> {
-  const impersonationToken = localStorage.getItem("sessionId");
   const fd = new FormData();
   fd.append("file", file);
   fd.append("folder", folder);
   const r = await fetch("/api/upload", {
     method: "POST",
-    headers: impersonationToken ? { Authorization: `Bearer ${impersonationToken}` } : {},
     credentials: "include",
     body: fd,
   });

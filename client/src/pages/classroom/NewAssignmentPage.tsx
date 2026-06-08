@@ -283,10 +283,9 @@ export default function NewAssignmentPage() {
       if (selectedMaterialIds.length > 0) {
         fd.append("materialIds", JSON.stringify(selectedMaterialIds));
       }
-      const token = localStorage.getItem("sessionId");
       return fetch(`/api/classrooms/${classroomId}/assignments/with-file`, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
         body: fd,
       }).then(async (r) => {
         const data = await r.json();

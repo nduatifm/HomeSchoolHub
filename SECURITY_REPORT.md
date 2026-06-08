@@ -26,12 +26,12 @@
 **After:**
 - Server sets a `lyra_session` **httpOnly cookie** after every successful login/signup. httpOnly cookies are never accessible to JavaScript.
 - **`sessionId` removed from all auth JSON responses** (login, student signup, Google student signup, Google auth). Session establishment is entirely cookie-based.
-- `client/src/lib/queryClient.ts` now uses `credentials: "include"` on all requests so the browser automatically attaches the cookie.
-- `client/src/contexts/AuthContext.tsx` no longer reads or writes `sessionId` to `localStorage`.
-- **Impersonation compatibility preserved:** Admin "become user" and parent "view as child" flows still store the *impersonated* session token in `localStorage` and send it as `Authorization: Bearer`. The server reads `Authorization` first, then falls back to the cookie — the base session remains in the secure cookie while the impersonated token is narrowly scoped to admin/parent-only surfaces.
-- `server/routes.ts`: `resolveSessionUserId` reads cookie for normal auth, Authorization header for impersonation override.
+- `client/src/lib/queryClient.ts` now uses `credentials: "include"` on all requests; **no Authorization header, no localStorage token reads whatsoever** — all three upload helpers (`apiRequest`, `apiUpload`, `apiUploadWithProgress`) were also cleaned.
+- `client/src/contexts/AuthContext.tsx` no longer reads or writes any session-related keys to `localStorage`.
+- **Impersonation fully server-side (final fix):** Admin "become user" and parent "view as child" no longer create a second session token. Instead, `POST /api/admin/become` and `POST /api/parent/become-child` update the caller's own `AuthSession` row (`impersonatingUserId Int?` column added). `resolveSessionUserId` returns `impersonatingUserId ?? userId` as the effective identity and exposes `realUserId` separately. New `POST /api/admin/stop-impersonating` and `POST /api/parent/stop-impersonating` clear the field. `POST /api/auth/me` returns `impersonatedBy: { id, name, role, isAdmin, isSuperAdmin }` so banners use live context data instead of localStorage. `requireAdmin`/`requireSuperAdmin` check `realUserId` so admin privileges are preserved during impersonation.
+- `server/routes.ts`: `resolveSessionUserId` reads **only** the httpOnly cookie — the Authorization header code path is gone entirely.
 
-**Files changed:** `server/routes.ts`, `server/index.ts`, `client/src/contexts/AuthContext.tsx`, `client/src/lib/queryClient.ts`, `client/src/components/AdminImpersonatorPanel.tsx`, `client/src/components/ImpersonationBanner.tsx`, `client/src/components/ManagedChildBanner.tsx`, `client/src/pages/ParentChildrenPage.tsx`, `client/src/pages/ClassroomMaterialPage.tsx`, `client/src/pages/Profile.tsx`
+**Files changed:** `server/routes.ts`, `server/index.ts`, `prisma/schema.prisma`, `client/src/contexts/AuthContext.tsx`, `client/src/lib/queryClient.ts`, `client/src/components/AdminImpersonatorPanel.tsx`, `client/src/components/ImpersonationBanner.tsx`, `client/src/components/ManagedChildBanner.tsx`, `client/src/pages/ParentChildrenPage.tsx`, `client/src/pages/ClassroomMaterialPage.tsx`, `client/src/pages/Profile.tsx`, `client/src/pages/classroom/NewAssignmentPage.tsx`, `client/src/components/DevRoleSwitcher.tsx`
 
 ---
 
@@ -42,8 +42,9 @@
 **Before:** No rate limiting. Brute-force attacks against `/api/auth/login` were unrestricted.
 
 **After:** `express-rate-limit` added in `server/index.ts`:
-- **Auth routes** (`/api/auth/*`) and invite routes (`/api/students/*`): 20 requests per 15 minutes per IP. Enforced in all environments (not just production).
-- **All API routes** (`/api/*`): 200 req/min in production, 1000 req/min in development.
+- **Auth routes** (`/api/auth/*`) and invite routes (`/api/students/*`): 10 requests per 15 minutes per IP. Enforced in all environments (not just production).
+- **All API routes** (`/api/*`): 100 req/min in production, 500 req/min in development.
+- `app.set("trust proxy", 1)` added so rate limiting correctly reads `X-Forwarded-For` in Replit's proxied environment.
 
 ### H2 — No Security Headers — FIXED
 
@@ -142,11 +143,11 @@ This cannot be done automatically as `package.json` edits are policy-gated.
 
 ## Residual Risk
 
-1. **Impersonation session tokens** (admin "become user", parent "view as child"): Short-lived impersonation tokens still pass through `localStorage`. These are accessible only to super-admins and parents respectively. A full mitigation would use server-side session chaining (tracked as follow-up task #235).
+1. **Admin SQL audit logging**: Even with the SELECT-only restriction, raw SQL access to production data is a significant privilege. Adding a persistent `AdminSqlLog` table is tracked as follow-up task #234.
 
-2. **Admin SQL audit logging**: Even with the SELECT-only restriction, raw SQL access to production data is a significant privilege. Adding a persistent `AdminSqlLog` table is tracked as follow-up task #234.
+2. **Content-Security-Policy `'unsafe-inline'` for scripts**: Required by the current React/Vite build (no nonce/hash injection). A future improvement is to adopt a nonce-based CSP via the Vite build pipeline.
 
-3. **Content-Security-Policy `'unsafe-inline'` for scripts**: Required by the current React/Vite build (no nonce/hash injection). A future improvement is to adopt a nonce-based CSP via the Vite build pipeline.
+3. **Vite CVE-2025-30208**: Tracked as follow-up task #233. Requires a manual `npm install vite@latest` and redeploy by a project owner.
 
 ---
 
@@ -169,13 +170,16 @@ This cannot be done automatically as `package.json` edits are policy-gated.
 | `server/routes.ts` | httpOnly cookie auth, sessionId removed from responses, IDOR checks, admin SQL auth, auth event logging |
 | `server/utils/authLogger.ts` | New — structured JSONL auth event logger |
 | `server/utils/emailService.ts` | escapeHtml applied to all email templates |
-| `client/src/lib/queryClient.ts` | credentials:include, Authorization header only for impersonation |
-| `client/src/contexts/AuthContext.tsx` | Removed localStorage session management |
-| `client/src/components/ImpersonationBanner.tsx` | Uses cookie-based session flow |
-| `client/src/components/ManagedChildBanner.tsx` | Uses cookie-based session flow |
-| `client/src/components/AdminImpersonatorPanel.tsx` | Saves marker flag not actual token |
-| `client/src/pages/ParentChildrenPage.tsx` | Saves marker flag not actual token |
-| `client/src/pages/ClassroomMaterialPage.tsx` | credentials:include |
-| `client/src/pages/Profile.tsx` | credentials:include |
+| `client/src/lib/queryClient.ts` | credentials:include only; all Authorization/localStorage token logic removed |
+| `client/src/contexts/AuthContext.tsx` | Added `impersonatedBy` type; removed all localStorage session management |
+| `client/src/components/ImpersonationBanner.tsx` | Reads `user.impersonatedBy` from context; calls `/api/admin/stop-impersonating` |
+| `client/src/components/ManagedChildBanner.tsx` | Reads `user.impersonatedBy` from context; calls `/api/parent/stop-impersonating` |
+| `client/src/components/AdminImpersonatorPanel.tsx` | Uses `user.impersonatedBy` guard; no localStorage writes |
+| `client/src/components/DevRoleSwitcher.tsx` | Removed localStorage sessionId write; cookie set server-side |
+| `client/src/pages/ParentChildrenPage.tsx` | Removed all localStorage token writes; server handles impersonation |
+| `client/src/pages/ClassroomMaterialPage.tsx` | Removed Authorization header; credentials:include only |
+| `client/src/pages/Profile.tsx` | Removed Authorization header; credentials:include only |
+| `client/src/pages/classroom/NewAssignmentPage.tsx` | Removed Authorization header; credentials:include only |
+| `prisma/schema.prisma` | Added `impersonatingUserId Int?` to `AuthSession` model |
 | `client/index.html` | Dev banner now only loads in dev preview |
 | `SECURITY_REPORT.md` | This document |

@@ -282,18 +282,10 @@ export default function ParentChildrenPage() {
 
   const becomeChildMutation = useMutation({
     mutationFn: (studentId: number) =>
-      apiRequest("/api/parent/become-child", { method: "POST", body: JSON.stringify({ studentId }) }) as Promise<{ sessionId: string; childName: string }>,
-    onSuccess: (data, studentId) => {
-      const child = childStats.find(c => c.id === studentId);
-      // Don't overwrite a parent session that's already stored (avoid double-nesting)
-      if (!localStorage.getItem("parentSessionId")) {
-        // Mark impersonation active (original parent session lives in httpOnly cookie)
-        localStorage.setItem("parentSessionId", "1");
-        localStorage.setItem("parentUserName", user?.name ?? "");
-      }
-      localStorage.setItem("parentChildName", child?.name ?? data.childName);
-      // Store the child's session token so apiRequest sends it as Authorization header
-      localStorage.setItem("sessionId", data.sessionId);
+      apiRequest("/api/parent/become-child", { method: "POST", body: JSON.stringify({ studentId }) }) as Promise<{ childName: string }>,
+    onSuccess: () => {
+      // Impersonation is now server-side — the parent's httpOnly cookie is unchanged.
+      // The server has updated the session to serve as the child.
       queryClient.clear();
       window.location.href = "/dashboard";
     },

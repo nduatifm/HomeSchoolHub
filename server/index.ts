@@ -14,6 +14,10 @@ try {
 
 const app = express();
 
+// Trust the first proxy hop — required for express-rate-limit to read X-Forwarded-For correctly
+// in Replit's environment (requests arrive via a reverse proxy).
+app.set("trust proxy", 1);
+
 const isProd = process.env.NODE_ENV === "production";
 
 // Security headers
@@ -59,7 +63,7 @@ app.use(cookieParser());
 // Rate limiting — auth routes always limited; API limiter loosened in dev
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
@@ -67,7 +71,7 @@ const authLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: isProd ? 200 : 1000,
+  max: isProd ? 100 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
@@ -97,7 +101,9 @@ declare global {
   namespace Express {
     interface Request {
       session: {
-        userId?: number;
+        userId?: number;      // effective identity (impersonated user, or real user when not impersonating)
+        realUserId?: number;  // actual cookie-holder (always the authenticated user)
+        sessionId?: string;   // raw session token (needed to update impersonatingUserId)
       };
     }
   }

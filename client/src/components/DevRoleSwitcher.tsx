@@ -41,11 +41,11 @@ export default function DevRoleSwitcher() {
     if (loading) return;
     setLoading(email);
     try {
-      const data = await apiRequest("/api/dev/become", {
+      // /api/dev/become now sets the httpOnly session cookie directly — no sessionId in response.
+      await apiRequest("/api/dev/become", {
         method: "POST",
         body: JSON.stringify({ email }),
       });
-      localStorage.setItem("sessionId", data.sessionId);
       localStorage.setItem("devPersonaEmail", email);
       setCurrentEmail(email);
       queryClient.clear();

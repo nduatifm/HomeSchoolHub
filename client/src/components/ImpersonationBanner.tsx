@@ -1,21 +1,22 @@
 import { Shield, X } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function ImpersonationBanner() {
-  const adminSessionId = localStorage.getItem("adminSessionId");
-  const impersonatedName = localStorage.getItem("impersonatedUserName") ?? "";
-  const impersonatedRole = localStorage.getItem("impersonatedUserRole") ?? "";
+  const { user, refreshUser } = useAuth();
+  const impersonatedBy = user?.impersonatedBy;
 
-  if (!adminSessionId) return null;
+  // Only show for admin/superAdmin impersonation (not parent child-view)
+  if (!impersonatedBy || (!impersonatedBy.isAdmin && !impersonatedBy.isSuperAdmin)) return null;
 
-  function handleReturn() {
-    // Clear the impersonation token — the original admin session is in the httpOnly cookie
-    localStorage.removeItem("sessionId");
-    localStorage.removeItem("adminSessionId");
-    localStorage.removeItem("adminUserName");
-    localStorage.removeItem("impersonatedUserName");
-    localStorage.removeItem("impersonatedUserRole");
+  async function handleReturn() {
+    try {
+      await apiRequest("/api/admin/stop-impersonating", { method: "POST" });
+    } catch {
+      // Best-effort — refresh regardless
+    }
     queryClient.clear();
+    await refreshUser();
     window.location.href = "/dashboard";
   }
 
@@ -23,9 +24,9 @@ export default function ImpersonationBanner() {
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg">
       <Shield className="w-3 h-3 shrink-0" />
       <span className="truncate max-w-[180px]">
-        {impersonatedName || "user"}
-        {impersonatedRole && (
-          <span className="ml-1 text-amber-100 capitalize">({impersonatedRole})</span>
+        {user?.name || "user"}
+        {user?.role && (
+          <span className="ml-1 text-amber-100 capitalize">({user.role})</span>
         )}
       </span>
       <button

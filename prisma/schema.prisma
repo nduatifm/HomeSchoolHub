@@ -446,9 +446,10 @@ model ThreadLabel {
 }
 
 model AuthSession {
-  id        String   @id
-  userId    Int
-  expiresAt DateTime
+  id                  String   @id
+  userId              Int
+  expiresAt           DateTime
+  impersonatingUserId Int?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

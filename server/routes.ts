@@ -61,14 +61,18 @@ async function createSession(userId: number): Promise<string> {
   return id;
 }
 
-async function getSessionUserId(sessionId: string): Promise<number | null> {
+async function getSession(sessionId: string): Promise<{ userId: number; realUserId: number; sessionId: string } | null> {
   const session = await prisma.authSession.findUnique({ where: { id: sessionId } });
   if (!session) return null;
   if (session.expiresAt < new Date()) {
     await prisma.authSession.deleteMany({ where: { id: sessionId } });
     return null;
   }
-  return session.userId;
+  return {
+    userId: session.impersonatingUserId ?? session.userId,
+    realUserId: session.userId,
+    sessionId: session.id,
+  };
 }
 
 async function deleteSession(sessionId: string): Promise<void> {
@@ -98,25 +102,22 @@ function setSessionCookie(res: Response, sessionId: string): void {
   });
 }
 
-// Shared session extraction helper — resolves session → userId and populates req.session.
-// Priority: Authorization header (impersonation flows) > httpOnly cookie (normal auth).
-// Returns the userId on success, or sends an error response and returns null.
+// Shared session extraction helper — resolves session from httpOnly cookie and populates req.session.
+// Impersonation is now server-side: the session's impersonatingUserId field overrides userId.
+// Returns the effective userId on success, or sends an error response and returns null.
 async function resolveSessionUserId(req: Request, res: Response): Promise<number | null> {
-  // Authorization header takes priority so impersonation flows can override the cookie
-  const authHeader = req.headers.authorization?.replace("Bearer ", "");
   const cookieSession = (req as any).cookies?.lyra_session;
-  const sessionId = authHeader || cookieSession;
-  if (!sessionId) {
+  if (!cookieSession) {
     res.status(401).json({ error: "Unauthorized" });
     return null;
   }
-  const userId = await getSessionUserId(sessionId);
-  if (!userId) {
+  const session = await getSession(cookieSession);
+  if (!session) {
     res.status(401).json({ error: "Unauthorized" });
     return null;
   }
-  req.session = { userId };
-  return userId;
+  req.session = { userId: session.userId, realUserId: session.realUserId, sessionId: session.sessionId };
+  return session.userId;
 }
 
 // Auth middleware
@@ -130,11 +131,11 @@ async function requireAuth(req: Request, res: Response, next: Function) {
   }
 }
 
-// Admin middleware — composes requireAuth then checks admin flag
+// Admin middleware — composes requireAuth then checks admin flag on the REAL user (not impersonated)
 async function requireAdmin(req: Request, res: Response, next: Function) {
   await requireAuth(req, res, async () => {
     try {
-      const user = await storage.getUserById(req.session.userId!);
+      const user = await storage.getUserById(req.session.realUserId ?? req.session.userId!);
       if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -145,11 +146,11 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
   });
 }
 
-// Super admin middleware — composes requireAuth then checks super-admin flag
+// Super admin middleware — composes requireAuth then checks super-admin flag on the REAL user
 async function requireSuperAdmin(req: Request, res: Response, next: Function) {
   await requireAuth(req, res, async () => {
     try {
-      const user = await storage.getUserById(req.session.userId!);
+      const user = await storage.getUserById(req.session.realUserId ?? req.session.userId!);
       if (!user || !user.isSuperAdmin) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -865,6 +866,25 @@ export function registerRoutes(app: Express) {
         });
       }
 
+      const realUserId = req.session.realUserId;
+      const effectiveUserId = req.session.userId;
+      const isImpersonating = realUserId !== undefined && realUserId !== effectiveUserId;
+
+      // When impersonating, return the real user's identity so the client can show the correct banner
+      let impersonatedBy: { id: number; name: string; role: string | null; isAdmin: boolean; isSuperAdmin: boolean } | null = null;
+      if (isImpersonating && realUserId) {
+        const realUser = await storage.getUserById(realUserId);
+        if (realUser) {
+          impersonatedBy = {
+            id: realUser.id,
+            name: realUser.name,
+            role: realUser.role,
+            isAdmin: realUser.isAdmin ?? false,
+            isSuperAdmin: realUser.isSuperAdmin ?? false,
+          };
+        }
+      }
+
       res.json({
         user: {
           id: user.id,
@@ -888,6 +908,7 @@ export function registerRoutes(app: Express) {
           isAdmin: user.isAdmin ?? false,
           isSuperAdmin: user.isSuperAdmin ?? false,
           emailNotifications: user.emailNotifications ?? true,
+          impersonatedBy,
         },
         profile,
       });
@@ -898,11 +919,11 @@ export function registerRoutes(app: Express) {
 
   // Logout
   app.post("/api/auth/logout", requireAuth, async (req, res) => {
-    const sessionId = req.headers.authorization?.replace("Bearer ", "") || (req as any).cookies?.lyra_session;
+    const sessionId = (req as any).cookies?.lyra_session;
     if (sessionId) {
       await deleteSession(sessionId);
     }
-    logAuthEvent({ event: "logout", userId: req.session.userId, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
+    logAuthEvent({ event: "logout", userId: req.session.realUserId ?? req.session.userId, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
     res.clearCookie("lyra_session", { path: "/" });
     res.json({ success: true });
   });
@@ -2301,10 +2322,10 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // POST /api/parent/become-child — parent switches into a child's student view
+  // POST /api/parent/become-child — parent switches into a child's student view (server-side)
   app.post("/api/parent/become-child", requireAuth, async (req, res) => {
     try {
-      const callerId = req.session.userId!;
+      const callerId = req.session.realUserId ?? req.session.userId!;
       const caller = await storage.getUserById(callerId);
       if (!caller || !caller.roles?.includes("parent")) {
         return res.status(403).json({ error: "Only parents can use this endpoint" });
@@ -2321,8 +2342,26 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "You do not have access to this child's account" });
       }
 
-      const sessionId = await createSession(student.userId);
-      res.json({ sessionId, childName: student.name });
+      // Server-side impersonation: update the parent's session instead of creating a child session.
+      // No new session token is created or returned — the parent's httpOnly cookie stays unchanged.
+      await prisma.authSession.update({
+        where: { id: req.session.sessionId! },
+        data: { impersonatingUserId: student.userId },
+      });
+      res.json({ childName: student.name });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/parent/stop-impersonating — parent ends child view and returns to own identity
+  app.post("/api/parent/stop-impersonating", requireAuth, async (req, res) => {
+    try {
+      await prisma.authSession.update({
+        where: { id: req.session.sessionId! },
+        data: { impersonatingUserId: null },
+      });
+      res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -5530,10 +5569,10 @@ export function registerRoutes(app: Express) {
         if (!targetUser) return res.status(404).json({ error: "Demo user not found" });
 
         const newSessionId = await createSession(targetUser.id);
+        setSessionCookie(res, newSessionId);
         const studentProfile = targetUser.role === "student" ? await storage.getStudentByUserId(targetUser.id) : null;
 
         return res.json({
-          sessionId: newSessionId,
           user: {
             id: targetUser.id,
             email: targetUser.email,
@@ -5790,9 +5829,14 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "Cannot impersonate yourself" });
       }
 
-      const sessionId = await createSession(targetUser.id);
+      // Server-side impersonation: update the admin's own session to serve as the target user.
+      // No new session token is created or returned — the admin's httpOnly cookie stays unchanged.
+      await prisma.authSession.update({
+        where: { id: req.session.sessionId! },
+        data: { impersonatingUserId: targetUser.id },
+      });
+      logAuthEvent({ event: "impersonation_start", userId: targetUser.id, email: targetUser.email ?? undefined, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown", detail: `admin ${callerUserId} → ${targetUser.id}` });
       res.json({
-        sessionId,
         user: {
           id: targetUser.id,
           email: targetUser.email,
@@ -5803,6 +5847,19 @@ export function registerRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("[admin-become] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/admin/stop-impersonating — super admin ends impersonation and returns to own identity
+  app.post("/api/admin/stop-impersonating", requireSuperAdmin, async (req, res) => {
+    try {
+      await prisma.authSession.update({
+        where: { id: req.session.sessionId! },
+        data: { impersonatingUserId: null },
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

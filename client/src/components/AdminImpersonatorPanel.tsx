@@ -37,7 +37,7 @@ interface SearchResult {
 }
 
 export default function AdminImpersonatorPanel() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -45,8 +45,6 @@ export default function AdminImpersonatorPanel() {
   const [searching, setSearching] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── All hooks must run unconditionally before any early return ────────────
 
   // Close panel on outside click (no-op when panel is closed)
   useEffect(() => {
@@ -83,15 +81,12 @@ export default function AdminImpersonatorPanel() {
     };
   }, [search]);
 
-  // ── Guards (after all hooks) ──────────────────────────────────────────────
-  const isImpersonating = !!localStorage.getItem("adminSessionId");
-
-  // Only visible for super admins who are NOT in an impersonated session
-  if (!user?.isSuperAdmin || isImpersonating) return null;
+  // Only visible for super admins who are NOT currently impersonating someone
+  if (!user?.isSuperAdmin || user?.impersonatedBy) return null;
 
   const isDevEnv = import.meta.env.DEV;
 
-  async function becomeUser(emailOrId: string | number, displayName: string, displayRole: string) {
+  async function becomeUser(emailOrId: string | number) {
     if (loading) return;
     const key = String(emailOrId);
     setLoading(key);
@@ -99,18 +94,14 @@ export default function AdminImpersonatorPanel() {
       const body = typeof emailOrId === "number"
         ? { userId: emailOrId }
         : { email: emailOrId };
-      const data = await apiRequest("/api/admin/become", {
+      await apiRequest("/api/admin/become", {
         method: "POST",
         body: JSON.stringify(body),
       });
-      // Mark impersonation active (original admin session lives in httpOnly cookie)
-      localStorage.setItem("adminSessionId", "1");
-      localStorage.setItem("adminUserName", user!.name ?? "Admin");
-      localStorage.setItem("impersonatedUserName", displayName);
-      localStorage.setItem("impersonatedUserRole", displayRole);
-      // Store the impersonated session token so apiRequest sends it as Authorization header
-      localStorage.setItem("sessionId", data.sessionId);
+      // Impersonation is now server-side — no localStorage or session token needed.
+      // Just refresh the user state from the server.
       queryClient.clear();
+      await refreshUser();
       window.location.href = "/dashboard";
     } catch (err: any) {
       console.error("[admin-become]", err?.message);
@@ -145,7 +136,7 @@ export default function AdminImpersonatorPanel() {
                 return (
                   <button
                     key={p.email}
-                    onClick={() => becomeUser(p.email, p.label, group.group.toLowerCase().replace(/s$/, ""))}
+                    onClick={() => becomeUser(p.email)}
                     disabled={!!loading}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-gray-800 cursor-pointer transition-colors disabled:opacity-50"
                   >
@@ -188,7 +179,7 @@ export default function AdminImpersonatorPanel() {
                 return (
                   <button
                     key={u.id}
-                    onClick={() => !blocked && becomeUser(u.id, u.name, u.role ?? "")}
+                    onClick={() => !blocked && becomeUser(u.id)}
                     disabled={!!loading || blocked}
                     title={blocked ? "Cannot impersonate super admins" : undefined}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${

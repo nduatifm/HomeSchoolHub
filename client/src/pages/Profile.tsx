@@ -336,10 +336,8 @@ export default function Profile() {
       formData.append("file", file);
       formData.append("folder", "profile-pictures");
 
-      const impersonationToken = localStorage.getItem("sessionId");
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
-        headers: impersonationToken ? { Authorization: `Bearer ${impersonationToken}` } : {},
         credentials: "include",
         body: formData,
       });
