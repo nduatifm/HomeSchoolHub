@@ -5865,8 +5865,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // GET /api/admin/users/search?email=... — lookup a single user by email (admin only)
-  app.get("/api/admin/users/search", async (req, res) => {
+  // GET /api/admin/users/search?email=... — lookup a single user by email (super admin only)
+  app.get("/api/admin/users/search", requireSuperAdmin, async (req, res) => {
     try {
       const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
       if (!email) {
@@ -5878,7 +5878,18 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      res.json(user);
+      // Return a minimal shape — never expose password hash or sensitive internal fields
+      res.json({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        roles: user.roles ?? [],
+        isAdmin: user.isAdmin ?? false,
+        isSuperAdmin: user.isSuperAdmin ?? false,
+        isEmailVerified: user.isEmailVerified,
+        profilePicture: user.profilePicture,
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -5892,10 +5903,17 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ error: "query is required in request body" });
       }
 
+      // Validate read-only intent: first keyword must be SELECT, WITH, or EXPLAIN …
       const statement = sql.split(/\s+/)[0].toUpperCase();
-      const ALLOWED_STATEMENTS = ["SELECT", "WITH", "EXPLAIN"];
-      if (!ALLOWED_STATEMENTS.includes(statement)) {
+      const ALLOWED_FIRST = ["SELECT", "WITH", "EXPLAIN"];
+      if (!ALLOWED_FIRST.includes(statement)) {
         return res.status(403).json({ error: "Only SELECT / WITH / EXPLAIN queries are permitted via this endpoint." });
+      }
+
+      // … AND no DML/DDL keywords are allowed anywhere in the query (guards against CTEs with side-effects)
+      const FORBIDDEN_TOKENS = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE|GRANT|REVOKE|EXECUTE|EXEC|CALL|DO|COPY|VACUUM|ANALYZE|REINDEX|CLUSTER|LOCK|SET|RESET)\b/i;
+      if (FORBIDDEN_TOKENS.test(sql)) {
+        return res.status(403).json({ error: "Query contains disallowed keywords. Only read-only SQL is permitted." });
       }
 
       const rows = await prisma.$queryRawUnsafe(sql);

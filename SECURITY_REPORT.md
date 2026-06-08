@@ -82,8 +82,18 @@ Both endpoints already scoped the `childTeamMember` lookup with `{ id: memberId,
 
 **After:**
 - Added `requireSuperAdmin` middleware (was entirely absent).
-- Restricted allowed SQL to `SELECT`, `WITH`, and `EXPLAIN` statements only — all DML/DDL is rejected with HTTP 403.
+- Dual-layer SQL validation:
+  1. First token must be `SELECT`, `WITH`, or `EXPLAIN`.
+  2. Full query is scanned for DML/DDL keywords (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `CREATE`, `ALTER`, `TRUNCATE`, `REPLACE`, `MERGE`, `GRANT`, `REVOKE`, `EXECUTE`, `EXEC`, `CALL`, `DO`, `COPY`, `LOCK`, `SET`, `RESET`, etc.) anywhere in the string — guards against DML inside CTEs.
 - Removed the `$executeRawUnsafe` code path entirely.
+
+### H7b — `/api/admin/users/search` Unauthenticated Data Exposure — FIXED
+
+**Before:** `GET /api/admin/users/search?email=...` had no authentication middleware and returned the full user record including all internal fields to any caller.
+
+**After:**
+- Added `requireSuperAdmin` middleware.
+- Response is now a minimal redacted shape: `{ id, email, name, role, roles, isAdmin, isSuperAdmin, isEmailVerified, profilePicture }` — password hash and other sensitive fields are never returned.
 
 ---
 
