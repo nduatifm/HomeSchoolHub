@@ -459,82 +459,83 @@ export default function MessagesPage() {
                   )}
                 </div>
 
-                {/* Contacts list box */}
-                <div className="p-4 overflow-y-auto flex-1">
-                  <div
-                    className="rounded-xl overflow-hidden"
-                    style={{ border: `1px solid ${D.border}`, maxWidth: 360 }}
-                  >
-                    {/* Loading skeletons */}
-                    {contactsLoading && (
-                      <div className="flex flex-col">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-3 px-4 py-3"
-                            style={{ borderBottom: i < 5 ? `1px solid ${D.border}` : "none" }}
-                          >
-                            <div className="w-10 h-10 rounded-full bg-muted animate-pulse shrink-0" />
-                            <div className="flex-1 space-y-1.5">
-                              <div className="h-3 w-28 bg-muted animate-pulse rounded" />
-                              <div className="h-2.5 w-16 bg-muted/60 animate-pulse rounded" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                {/* Contacts list box — only shown while typing */}
+                <div className="px-4 pt-3 pb-4 overflow-y-auto flex-1">
+                  {/* Prompt when field is empty */}
+                  {!contactSearch.trim() && (
+                    <p className="text-sm mt-1" style={{ color: D.muted }}>
+                      {user?.role === "teacher"
+                        ? "Type a parent's name to search…"
+                        : "Type a teacher's name to search…"}
+                    </p>
+                  )}
 
-                    {/* Empty state */}
-                    {!contactsLoading && filteredContacts.length === 0 && (
-                      <div className="px-4 py-8 text-center">
-                        <p className="text-sm" style={{ color: D.muted }}>
-                          {directContacts.length === 0
-                            ? user?.role === "teacher"
-                              ? "No parents connected to your students yet."
-                              : "No teachers assigned to your children yet."
-                            : "No contacts match your search."}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Contact rows */}
-                    {!contactsLoading && filteredContacts.map((contact, i) => {
-                      const [avatarBg, avatarFg] = avatarColors(contact.name);
-                      const isLast = i === filteredContacts.length - 1;
-                      return (
-                        <button
-                          key={contact.id}
-                          onClick={() => startDirect(contact)}
-                          className="w-full text-left flex items-center gap-3 px-4 py-3 transition-colors"
-                          style={{
-                            borderBottom: isLast ? "none" : `1px solid ${D.border}`,
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = D.hover)}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          {/* Avatar */}
-                          <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xs font-bold select-none"
-                            style={{ background: avatarBg, color: avatarFg }}
-                          >
-                            {getInitials(contact.name)}
-                          </div>
-                          {/* Name + role */}
-                          <div className="flex flex-col min-w-0">
-                            <span
-                              className="text-sm font-semibold truncate"
-                              style={{ color: D.text }}
+                  {/* Results box */}
+                  {contactSearch.trim() && (
+                    <div
+                      className="rounded-xl overflow-hidden"
+                      style={{ border: `1px solid ${D.border}`, maxWidth: 360 }}
+                    >
+                      {/* Loading skeletons */}
+                      {contactsLoading && (
+                        <div className="flex flex-col">
+                          {[1, 2, 3].map((i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-3 px-4 py-3"
+                              style={{ borderBottom: i < 3 ? `1px solid ${D.border}` : "none" }}
                             >
-                              {contact.name}
-                            </span>
-                            <span className="text-xs" style={{ color: D.muted }}>
-                              {contactRoleLabel}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                              <div className="w-10 h-10 rounded-full bg-muted animate-pulse shrink-0" />
+                              <div className="flex-1 space-y-1.5">
+                                <div className="h-3 w-28 bg-muted animate-pulse rounded" />
+                                <div className="h-2.5 w-16 bg-muted/60 animate-pulse rounded" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* No match */}
+                      {!contactsLoading && filteredContacts.length === 0 && (
+                        <div className="px-4 py-6 text-center">
+                          <p className="text-sm" style={{ color: D.muted }}>
+                            No contacts match &ldquo;{contactSearch}&rdquo;
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Contact rows */}
+                      {!contactsLoading && filteredContacts.map((contact, i) => {
+                        const [avatarBg, avatarFg] = avatarColors(contact.name);
+                        const isLast = i === filteredContacts.length - 1;
+                        return (
+                          <button
+                            key={contact.id}
+                            onClick={() => startDirect(contact)}
+                            className="w-full text-left flex items-center gap-3 px-4 py-3 transition-colors"
+                            style={{ borderBottom: isLast ? "none" : `1px solid ${D.border}` }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = D.hover)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xs font-bold select-none"
+                              style={{ background: avatarBg, color: avatarFg }}
+                            >
+                              {getInitials(contact.name)}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-semibold truncate" style={{ color: D.text }}>
+                                {contact.name}
+                              </span>
+                              <span className="text-xs" style={{ color: D.muted }}>
+                                {contactRoleLabel}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : effectiveSelected ? (
