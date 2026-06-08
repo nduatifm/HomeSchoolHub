@@ -85,10 +85,26 @@ function generateInviteCode(): string {
   return code;
 }
 
-// Shared session extraction helper — resolves Bearer token → userId and populates req.session.
+// Helper to set the session cookie on a response
+function setSessionCookie(res: Response, sessionId: string): void {
+  const isProd = process.env.NODE_ENV === "production";
+  res.cookie("lyra_session", sessionId, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "strict" : "lax",
+    maxAge: SESSION_TTL_MS,
+    path: "/",
+  });
+}
+
+// Shared session extraction helper — resolves session → userId and populates req.session.
+// Priority: Authorization header (impersonation flows) > httpOnly cookie (normal auth).
 // Returns the userId on success, or sends an error response and returns null.
 async function resolveSessionUserId(req: Request, res: Response): Promise<number | null> {
-  const sessionId = req.headers.authorization?.replace("Bearer ", "");
+  // Authorization header takes priority so impersonation flows can override the cookie
+  const authHeader = req.headers.authorization?.replace("Bearer ", "");
+  const cookieSession = (req as any).cookies?.lyra_session;
+  const sessionId = authHeader || cookieSession;
   if (!sessionId) {
     res.status(401).json({ error: "Unauthorized" });
     return null;
@@ -266,9 +282,9 @@ async function syncAdminFlags() {
   }
 }
 
-// Hash password with bcrypt
+// Hash password with bcrypt (12 rounds = ~250 ms on modern hardware)
 async function hashPassword(password: string): Promise<string> {
-  return await bcrypt.hash(password, 10);
+  return await bcrypt.hash(password, 12);
 }
 
 // Verify password with bcrypt
@@ -414,6 +430,7 @@ export function registerRoutes(app: Express) {
       }
 
       const sessionId = await createSession(user.id);
+      setSessionCookie(res, sessionId);
 
       // Include student profile so the frontend doesn't need a second /api/auth/me call.
       let studentProfile = null;
@@ -541,6 +558,7 @@ export function registerRoutes(app: Express) {
 
       // Create session immediately - student verified via invite code
       const sessionId = await createSession(user.id);
+      setSessionCookie(res, sessionId);
 
       res.json({
         user: {
@@ -673,6 +691,7 @@ export function registerRoutes(app: Express) {
 
       // Create session
       const sessionId = await createSession(user.id);
+      setSessionCookie(res, sessionId);
 
       res.json({
         user: {
@@ -775,6 +794,7 @@ export function registerRoutes(app: Express) {
 
       // Create session
       const sessionId = await createSession(user.id);
+      setSessionCookie(res, sessionId);
 
       // Include student profile for Google-auth students so the frontend
       // has it immediately without a second /api/auth/me call.
@@ -869,10 +889,11 @@ export function registerRoutes(app: Express) {
 
   // Logout
   app.post("/api/auth/logout", requireAuth, async (req, res) => {
-    const sessionId = req.headers.authorization?.replace("Bearer ", "");
+    const sessionId = req.headers.authorization?.replace("Bearer ", "") || (req as any).cookies?.lyra_session;
     if (sessionId) {
       await deleteSession(sessionId);
     }
+    res.clearCookie("lyra_session", { path: "/" });
     res.json({ success: true });
   });
 
@@ -2678,6 +2699,18 @@ export function registerRoutes(app: Express) {
     memoryUpload.single("file"),
     async (req: any, res) => {
       try {
+        const saId = parseInt(req.params.id);
+        if (isNaN(saId)) return res.status(400).json({ error: "Invalid assignment ID" });
+
+        // Ownership check: verify the caller is the student who owns this record
+        const existingSa = await storage.getStudentAssignmentById(saId);
+        if (!existingSa) return res.status(404).json({ error: "Assignment not found" });
+
+        const ownerStudent = await storage.getStudentById(existingSa.studentId);
+        if (!ownerStudent || ownerStudent.userId !== req.session.userId) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+
         const { submission, notes } = req.body;
         let fileUrl = null;
 
@@ -2691,16 +2724,13 @@ export function registerRoutes(app: Express) {
           }
         }
 
-        const sa = await storage.updateStudentAssignment(
-          parseInt(req.params.id),
-          {
-            submission,
-            fileUrl,
-            notes: notes || null,
-            status: "submitted",
-            submittedAt: new Date().toISOString(),
-          },
-        );
+        const sa = await storage.updateStudentAssignment(saId, {
+          submission,
+          fileUrl,
+          notes: notes || null,
+          status: "submitted",
+          submittedAt: new Date().toISOString(),
+        });
         res.json(sa);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -2717,6 +2747,13 @@ export function registerRoutes(app: Express) {
       try {
         const assignmentId = parseInt(req.params.assignmentId);
         const { studentId, submission, notes } = req.body;
+
+        // Ownership check: caller must be the student referenced in the request
+        const callerStudent = await storage.getStudentByUserId(req.session.userId!);
+        if (!callerStudent || callerStudent.id !== parseInt(studentId)) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+
         let fileUrl = null;
 
         if (req.file) {
@@ -5778,8 +5815,8 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // POST /api/admin/sql — execute raw SQL query (super admin only)
-  app.post("/api/admin/sql", async (req, res) => {
+  // POST /api/admin/sql — execute raw SQL query (super admin only; SELECT/WITH/EXPLAIN only)
+  app.post("/api/admin/sql", requireSuperAdmin, async (req, res) => {
     try {
       const sql = typeof req.body.query === "string" ? req.body.query.trim() : "";
       if (!sql) {
@@ -5787,13 +5824,13 @@ export function registerRoutes(app: Express) {
       }
 
       const statement = sql.split(/\s+/)[0].toUpperCase();
-      if (statement === "SELECT" || statement === "WITH") {
-        const rows = await prisma.$queryRawUnsafe(sql);
-        return res.json({ rows });
+      const ALLOWED_STATEMENTS = ["SELECT", "WITH", "EXPLAIN"];
+      if (!ALLOWED_STATEMENTS.includes(statement)) {
+        return res.status(403).json({ error: "Only SELECT / WITH / EXPLAIN queries are permitted via this endpoint." });
       }
 
-      const result = await prisma.$executeRawUnsafe(sql);
-      return res.json({ result });
+      const rows = await prisma.$queryRawUnsafe(sql);
+      return res.json({ rows });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -8,8 +8,8 @@ export default function ManagedChildBanner() {
   if (!parentSessionId) return null;
 
   function handleReturn() {
-    const orig = localStorage.getItem("parentSessionId")!;
-    localStorage.setItem("sessionId", orig);
+    // Clear the impersonation token — the original parent session is in the httpOnly cookie
+    localStorage.removeItem("sessionId");
     localStorage.removeItem("parentSessionId");
     localStorage.removeItem("parentUserName");
     localStorage.removeItem("parentChildName");

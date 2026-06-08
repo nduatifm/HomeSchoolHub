@@ -103,12 +103,12 @@ export default function AdminImpersonatorPanel() {
         method: "POST",
         body: JSON.stringify(body),
       });
-      // Store admin session so the banner can restore it
-      localStorage.setItem("adminSessionId", localStorage.getItem("sessionId") ?? "");
+      // Mark impersonation active (original admin session lives in httpOnly cookie)
+      localStorage.setItem("adminSessionId", "1");
       localStorage.setItem("adminUserName", user!.name ?? "Admin");
       localStorage.setItem("impersonatedUserName", displayName);
       localStorage.setItem("impersonatedUserRole", displayRole);
-      // Switch to target session
+      // Store the impersonated session token so apiRequest sends it as Authorization header
       localStorage.setItem("sessionId", data.sessionId);
       queryClient.clear();
       window.location.href = "/dashboard";

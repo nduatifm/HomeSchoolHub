@@ -21,19 +21,24 @@ export class ApiError extends Error {
 }
 
 export async function apiRequest(url: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("sessionId");
+  // Normal sessions use httpOnly cookies (set by the server) — never accessible to JS.
+  // Impersonation flows (admin become-user, parent view-as-child) temporarily store
+  // the impersonated session token in localStorage and send it via Authorization
+  // header so the server can distinguish it from the real cookie session.
+  const impersonationToken = localStorage.getItem("sessionId");
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...options.headers,
   };
-  
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+
+  if (impersonationToken) {
+    headers["Authorization"] = `Bearer ${impersonationToken}`;
   }
 
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -60,13 +65,13 @@ export async function apiRequest(url: string, options: RequestInit = {}) {
 }
 
 export async function apiUpload(url: string, formData: FormData, options: RequestInit = {}) {
-  const token = localStorage.getItem("sessionId");
+  const impersonationToken = localStorage.getItem("sessionId");
   const headers: HeadersInit = {
     ...options.headers,
   };
-  
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+
+  if (impersonationToken) {
+    headers["Authorization"] = `Bearer ${impersonationToken}`;
   }
 
   const response = await fetch(url, {
@@ -92,7 +97,7 @@ export function apiUploadWithProgress(
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    const token = localStorage.getItem("sessionId");
+    const impersonationToken = localStorage.getItem("sessionId");
 
     xhr.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
@@ -128,18 +133,17 @@ export function apiUploadWithProgress(
     });
 
     xhr.open("POST", url);
-    
-    if (token) {
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    if (impersonationToken) {
+      xhr.setRequestHeader("Authorization", `Bearer ${impersonationToken}`);
     }
-    
+
     xhr.withCredentials = true;
     xhr.send(formData);
   });
 }
 
 async function defaultQueryFn({ queryKey }: { queryKey: any[] }) {
-  // Build URL from queryKey segments - join path segments with /
   const url = queryKey
     .filter((segment) => segment !== undefined && segment !== null)
     .join('/');

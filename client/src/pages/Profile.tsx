@@ -336,9 +336,11 @@ export default function Profile() {
       formData.append("file", file);
       formData.append("folder", "profile-pictures");
 
+      const impersonationToken = localStorage.getItem("sessionId");
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("sessionId")}` },
+        headers: impersonationToken ? { Authorization: `Bearer ${impersonationToken}` } : {},
+        credentials: "include",
         body: formData,
       });
       if (!uploadRes.ok) throw new Error("Failed to upload image");

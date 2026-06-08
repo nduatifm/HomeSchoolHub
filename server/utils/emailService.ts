@@ -1,6 +1,16 @@
 import nodemailer from 'nodemailer';
 import { buildEmailHtml, primaryButton } from './emailTemplates';
 
+// Escape HTML special characters to prevent injection in email bodies
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || '587'),
@@ -34,7 +44,7 @@ export async function sendVerificationEmail(email: string, name: string, token: 
   const verificationUrl = `${baseUrl}/verify-email?token=${token}`;
 
   const bodyHtml = `
-    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">Welcome, ${name}!</h2>
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">Welcome, ${escapeHtml(name)}!</h2>
     <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#4a5e50;">
       Thanks for signing up. Please confirm your email address to activate your Lyra Preparatory account.
     </p>
@@ -43,7 +53,7 @@ export async function sendVerificationEmail(email: string, name: string, token: 
       This link expires in <strong>24 hours</strong>. If you didn&rsquo;t create an account, you can safely ignore this email.
     </p>
     <p style="margin:12px 0 0;font-size:12px;color:#b8c8bb;word-break:break-all;">
-      Or copy and paste: ${verificationUrl}
+      Or copy and paste: ${escapeHtml(verificationUrl)}
     </p>
   `;
 
@@ -72,14 +82,14 @@ export async function sendStudentInviteEmail(
   const signupUrl = `${baseUrl}/student-signup`;
 
   const bodyHtml = `
-    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">You&rsquo;ve been invited, ${studentName}!</h2>
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">You&rsquo;ve been invited, ${escapeHtml(studentName)}!</h2>
     <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4a5e50;">
-      <strong>${parentName}</strong> has invited you to join <strong>Lyra Preparatory</strong> as a student.
+      <strong>${escapeHtml(parentName)}</strong> has invited you to join <strong>Lyra Preparatory</strong> as a student.
       Use the invite code below to create your account.
     </p>
     <div style="background:#f0f9f5;border:2px solid #1E8C64;border-radius:10px;padding:20px 24px;text-align:center;margin:0 0 24px;">
       <p style="margin:0 0 6px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#1E8C64;">Your invite code</p>
-      <p style="margin:0;font-size:36px;font-weight:800;letter-spacing:6px;color:#1a2e23;font-family:monospace;">${inviteCode}</p>
+      <p style="margin:0;font-size:36px;font-weight:800;letter-spacing:6px;color:#1a2e23;font-family:monospace;">${escapeHtml(inviteCode)}</p>
     </div>
     ${primaryButton('Go to Sign-Up Page', signupUrl)}
     <p style="margin:24px 0 0;font-size:13px;color:#9bb09f;line-height:1.6;">
@@ -126,8 +136,8 @@ export async function sendTeamInviteEmail({
   const bodyHtml = `
     <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">You&rsquo;ve been invited to a family team!</h2>
     <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4a5e50;">
-      <strong>${inviterName}</strong> has invited you to co-manage <strong>${studentName}</strong>&rsquo;s
-      Lyra Preparatory account as a <strong>${roleLabel}</strong>.
+      <strong>${escapeHtml(inviterName)}</strong> has invited you to co-manage <strong>${escapeHtml(studentName)}</strong>&rsquo;s
+      Lyra Preparatory account as a <strong>${escapeHtml(roleLabel)}</strong>.
     </p>
     ${primaryButton('Accept Invitation', acceptUrl)}
     <p style="margin:24px 0 0;font-size:13px;color:#9bb09f;line-height:1.6;">
@@ -161,7 +171,7 @@ export async function sendPasswordResetEmail(email: string, name: string, token:
   const bodyHtml = `
     <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">Reset your password</h2>
     <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#4a5e50;">
-      Hi ${name}, we received a request to reset the password for your Lyra Preparatory account.
+      Hi ${escapeHtml(name)}, we received a request to reset the password for your Lyra Preparatory account.
       Click the button below to choose a new password.
     </p>
     ${primaryButton('Reset Password', resetUrl)}
@@ -200,8 +210,8 @@ export async function sendNotificationEmail(
   const profileUrl = `${baseUrl}/profile`;
 
   const bodyHtml = `
-    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">${title}</h2>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4a5e50;">${body}</p>
+    <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#1a2e23;">${escapeHtml(title)}</h2>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4a5e50;">${escapeHtml(body)}</p>
     ${primaryButton('Open Lyra Preparatory', ctaUrl)}
     <p style="margin:32px 0 0;font-size:12px;color:#b8c8bb;line-height:1.6;">
       You&rsquo;re receiving this because email notifications are enabled on your Lyra Preparatory account.

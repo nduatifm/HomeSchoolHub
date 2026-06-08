@@ -9,8 +9,8 @@ export default function ImpersonationBanner() {
   if (!adminSessionId) return null;
 
   function handleReturn() {
-    const orig = localStorage.getItem("adminSessionId")!;
-    localStorage.setItem("sessionId", orig);
+    // Clear the impersonation token — the original admin session is in the httpOnly cookie
+    localStorage.removeItem("sessionId");
     localStorage.removeItem("adminSessionId");
     localStorage.removeItem("adminUserName");
     localStorage.removeItem("impersonatedUserName");

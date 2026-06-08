@@ -287,10 +287,12 @@ export default function ParentChildrenPage() {
       const child = childStats.find(c => c.id === studentId);
       // Don't overwrite a parent session that's already stored (avoid double-nesting)
       if (!localStorage.getItem("parentSessionId")) {
-        localStorage.setItem("parentSessionId", localStorage.getItem("sessionId") ?? "");
+        // Mark impersonation active (original parent session lives in httpOnly cookie)
+        localStorage.setItem("parentSessionId", "1");
         localStorage.setItem("parentUserName", user?.name ?? "");
       }
       localStorage.setItem("parentChildName", child?.name ?? data.childName);
+      // Store the child's session token so apiRequest sends it as Authorization header
       localStorage.setItem("sessionId", data.sessionId);
       queryClient.clear();
       window.location.href = "/dashboard";
