@@ -56,30 +56,41 @@ app.use(cors({
 // Cookie parser (must be before routes)
 app.use(cookieParser());
 
-// Rate limiting
+// Rate limiting — auth routes always limited; API limiter loosened in dev
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many requests, please try again later." },
-  skip: () => !isProd,
+  message: { error: "Too many login attempts. Please try again in 15 minutes." },
 });
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 300,
+  max: isProd ? 200 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
-  skip: () => !isProd,
 });
 
 app.use("/api/auth", authLimiter);
+// Also rate-limit invite acceptance (contains auth logic)
+app.use("/api/students", authLimiter);
 app.use("/api", apiLimiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Enforce JSON content-type for mutating API requests (reject unexpected payloads)
+app.use("/api", (req: Request, res: Response, next: NextFunction) => {
+  if (["POST", "PUT", "PATCH"].includes(req.method)) {
+    const ct = req.headers["content-type"] ?? "";
+    if (!ct.includes("application/json") && !ct.includes("multipart/form-data")) {
+      return res.status(415).json({ error: "Content-Type must be application/json" });
+    }
+  }
+  next();
+});
 
 // Add user to request
 declare global {

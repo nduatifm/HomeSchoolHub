@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
+import { logAuthEvent } from "./utils/authLogger";
 import prisma from "./db";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -396,32 +397,40 @@ export function registerRoutes(app: Express) {
       const { email, password } = validation.data;
 
       // Try email first; fall back to username for managed child accounts
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown";
+      const ua = req.headers["user-agent"] ?? undefined;
+
       let user = await storage.getUserByEmail(email);
       if (!user) {
         user = await storage.getUserByUsername(email);
       }
       if (!user) {
+        logAuthEvent({ event: "login_failure", email, ip, userAgent: ua, detail: "user not found" });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Check if user password exists (Google-only account)
       if (!user.password && user.googleId) {
+        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "google-only account" });
         return res.status(401).json({
           error: "This account uses Google Sign-In. Please use the Google button to sign in.",
           requiresGoogle: true,
         });
       }
       if (!user.password) {
+        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "no password set" });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const isValid = await verifyPassword(password, user.password);
       if (!isValid) {
+        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "wrong password" });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Check if email is verified
       if (!user.isEmailVerified) {
+        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "email not verified" });
         return res.status(403).json({
           error: "Please verify your email before logging in",
           requiresVerification: true,
@@ -431,6 +440,7 @@ export function registerRoutes(app: Express) {
 
       const sessionId = await createSession(user.id);
       setSessionCookie(res, sessionId);
+      logAuthEvent({ event: "login_success", email, userId: user.id, ip, userAgent: ua });
 
       // Include student profile so the frontend doesn't need a second /api/auth/me call.
       let studentProfile = null;
@@ -460,7 +470,6 @@ export function registerRoutes(app: Express) {
           isEmailVerified: user.isEmailVerified,
         },
         student: studentProfile,
-        sessionId,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -559,6 +568,7 @@ export function registerRoutes(app: Express) {
       // Create session immediately - student verified via invite code
       const sessionId = await createSession(user.id);
       setSessionCookie(res, sessionId);
+      logAuthEvent({ event: "student_signup", email: user.email ?? undefined, userId: user.id, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown", detail: "password invite" });
 
       res.json({
         user: {
@@ -569,7 +579,6 @@ export function registerRoutes(app: Express) {
           isEmailVerified: user.isEmailVerified,
         },
         student,
-        sessionId,
         message: "Welcome! Your account has been created successfully.",
       });
     } catch (error: any) {
@@ -693,6 +702,7 @@ export function registerRoutes(app: Express) {
       const sessionId = await createSession(user.id);
       setSessionCookie(res, sessionId);
 
+      logAuthEvent({ event: "student_signup", email: user.email ?? undefined, userId: user.id, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown", detail: "google invite" });
       res.json({
         user: {
           id: user.id,
@@ -702,7 +712,6 @@ export function registerRoutes(app: Express) {
           isEmailVerified: user.isEmailVerified,
         },
         student,
-        sessionId,
         message: "Welcome! Your account has been created successfully.",
       });
     } catch (error: any) {
@@ -815,6 +824,7 @@ export function registerRoutes(app: Express) {
         await storage.updateUser(user.id, { roles: gRoles });
       }
 
+      logAuthEvent({ event: "google_auth", email: user.email ?? undefined, userId: user.id, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
       res.json({
         user: {
           id: user.id,
@@ -824,7 +834,6 @@ export function registerRoutes(app: Express) {
           roles: gRoles,
         },
         student: googleStudentProfile,
-        sessionId,
       });
     } catch (error: any) {
       console.error("[google-auth] Unexpected error:", error);
@@ -893,6 +902,7 @@ export function registerRoutes(app: Express) {
     if (sessionId) {
       await deleteSession(sessionId);
     }
+    logAuthEvent({ event: "logout", userId: req.session.userId, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
     res.clearCookie("lyra_session", { path: "/" });
     res.json({ success: true });
   });
@@ -1105,6 +1115,7 @@ export function registerRoutes(app: Express) {
       // Kill all active sessions so old sessions can't linger
       await prisma.authSession.deleteMany({ where: { userId: user.id } });
 
+      logAuthEvent({ event: "password_reset_success", userId: user.id, email: user.email ?? undefined, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
       res.json({ success: true, message: "Password reset successfully. You can now log in." });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
