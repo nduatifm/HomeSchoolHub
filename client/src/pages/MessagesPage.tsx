@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, PenSquare, X } from "lucide-react";
 import ModernSidebar from "@/components/ModernSidebar";
 import MessageThread from "@/components/MessageThread";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type ConversationSummary = {
   type?: "student" | "direct";
@@ -26,23 +25,21 @@ type DirectContact = { id: number; name: string };
 
 // Light theme palette (matches app design system)
 const D = {
-  bg:      "#ffffff",
-  panel:   "#ffffff",
-  border:  "hsl(var(--border) / 0.4)",
-  hover:   "hsl(var(--muted))",
-  active:  "hsl(var(--primary) / 0.08)",
-  text:    "hsl(var(--foreground))",
-  muted:   "hsl(var(--muted-foreground))",
-  search:  "hsl(var(--muted) / 0.5)",
-  accent:  "hsl(var(--primary))",
+  bg:     "#ffffff",
+  panel:  "#ffffff",
+  border: "hsl(var(--border) / 0.4)",
+  hover:  "hsl(var(--muted))",
+  active: "hsl(var(--primary) / 0.08)",
+  text:   "hsl(var(--foreground))",
+  muted:  "hsl(var(--muted-foreground))",
+  accent: "hsl(var(--primary))",
 };
 
 function formatDate(ts: string): string {
   const date = new Date(ts);
   const now  = new Date();
-  if (date.toDateString() === now.toDateString()) {
+  if (date.toDateString() === now.toDateString())
     return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  }
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
@@ -50,12 +47,7 @@ function formatDate(ts: string): string {
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0] ?? "")
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  return name.split(" ").map((n) => n[0] ?? "").join("").toUpperCase().slice(0, 2);
 }
 
 function convKey(conv: ConversationSummary) {
@@ -63,7 +55,6 @@ function convKey(conv: ConversationSummary) {
   return `${conv.teacherUserId}-${conv.studentId}`;
 }
 
-// Stable avatar colour from name string (light-mode friendly)
 const AVATAR_COLORS = [
   ["#dbeafe", "#1d4ed8"],
   ["#dcfce7", "#15803d"],
@@ -81,13 +72,14 @@ function avatarColors(name: string) {
 type ConvFilter = "all" | "direct" | "unread";
 
 export default function MessagesPage() {
-  const { user } = useAuth();
-  const [selected,      setSelected]      = useState<ConversationSummary | null>(null);
-  const [newDirectOpen, setNewDirectOpen] = useState(false);
-  const [contactSearch, setContactSearch] = useState("");
-  const [convSearch,    setConvSearch]    = useState("");
-  const [convFilter,    setConvFilter]    = useState<ConvFilter>("all");
-  const [mobileView,    setMobileView]    = useState<"list" | "thread">("list");
+  const { user }                               = useAuth();
+  const [selected,   setSelected]              = useState<ConversationSummary | null>(null);
+  const [composing,  setComposing]             = useState(false);
+  const [contactSearch, setContactSearch]      = useState("");
+  const [convSearch, setConvSearch]            = useState("");
+  const [convFilter, setConvFilter]            = useState<ConvFilter>("all");
+  const [mobileView, setMobileView]            = useState<"list" | "thread">("list");
+  const composeInputRef                        = useRef<HTMLInputElement>(null);
 
   const { data: conversations = [], isLoading } = useQuery<ConversationSummary[]>({
     queryKey: ["/api/messages/conversations"],
@@ -99,25 +91,21 @@ export default function MessagesPage() {
     (c) => c.type === "direct" || c.teacherUserId !== 0,
   );
 
-  // Session-based auto-selection (sessionStorage set by "Message" button on children page)
+  // Session-based auto-selection (set by "Message" button on children page)
   const [pendingStudentId] = useState<number>(() => {
     const stored = sessionStorage.getItem("mp_openStudentId");
     return parseInt(stored ?? "0", 10) || 0;
   });
-  useEffect(() => {
-    sessionStorage.removeItem("mp_openStudentId");
-  }, []);
+  useEffect(() => { sessionStorage.removeItem("mp_openStudentId"); }, []);
 
   const urlConv = pendingStudentId
     ? visibleConvs.find((c) => c.studentId === pendingStudentId) ?? null
     : null;
 
   const urlConvKey = urlConv ? convKey(urlConv) : null;
-  useEffect(() => {
-    if (urlConvKey) setMobileView("thread");
-  }, [urlConvKey]);
+  useEffect(() => { if (urlConvKey) setMobileView("thread"); }, [urlConvKey]);
 
-  const selectedKey = selected ? convKey(selected) : null;
+  const selectedKey         = selected ? convKey(selected) : null;
   const selectedStillExists = selectedKey
     ? visibleConvs.some((c) => convKey(c) === selectedKey)
     : false;
@@ -129,9 +117,10 @@ export default function MessagesPage() {
 
   const canUseDirect = user?.role === "teacher" || user?.role === "parent";
 
+  // Load contacts whenever the compose panel is open
   const { data: directContacts = [], isLoading: contactsLoading } = useQuery<DirectContact[]>({
     queryKey: ["/api/messages/direct-contacts"],
-    enabled: newDirectOpen && canUseDirect,
+    enabled: composing && canUseDirect,
     staleTime: 60000,
   });
 
@@ -139,7 +128,13 @@ export default function MessagesPage() {
     c.name.toLowerCase().includes(contactSearch.toLowerCase()),
   );
 
-  // Apply search + tab filter to conversation list
+  // Focus the compose search input whenever we enter compose mode
+  useEffect(() => {
+    if (composing) {
+      setTimeout(() => composeInputRef.current?.focus(), 50);
+    }
+  }, [composing]);
+
   const displayedConvs = visibleConvs.filter((c) => {
     if (convFilter === "direct" && c.type !== "direct") return false;
     if (convFilter === "unread" && c.unreadCount === 0) return false;
@@ -154,11 +149,11 @@ export default function MessagesPage() {
 
   const selectConv = (conv: ConversationSummary) => {
     setSelected(conv);
+    setComposing(false);
     setMobileView("thread");
   };
 
   const startDirect = (contact: DirectContact) => {
-    setNewDirectOpen(false);
     setContactSearch("");
     selectConv({
       type: "direct",
@@ -177,6 +172,13 @@ export default function MessagesPage() {
     });
   };
 
+  const openCompose = () => {
+    setSelected(null);
+    setComposing(true);
+    setContactSearch("");
+    setMobileView("thread");
+  };
+
   const getDisplayName = (conv: ConversationSummary): string => {
     if (conv.type === "direct") return conv.otherUserName ?? "Direct Message";
     if (conv.customName) return conv.customName;
@@ -192,13 +194,17 @@ export default function MessagesPage() {
     return null;
   };
 
-  const canRename = user?.role !== "student";
+  const canRename   = user?.role !== "student";
+  const showCompose = composing && canUseDirect;
 
   const TABS: { id: ConvFilter; label: string }[] = [
     { id: "all",    label: "All"    },
     { id: "direct", label: "Direct" },
     { id: "unread", label: "Unread" },
   ];
+
+  // Contact role label shown beneath the name in the compose panel
+  const contactRoleLabel = user?.role === "teacher" ? "Parent" : "Teacher";
 
   return (
     <div style={{ background: D.bg }}>
@@ -215,7 +221,7 @@ export default function MessagesPage() {
         >
           <span className="font-semibold text-sm flex-1" style={{ color: D.text }}>Messages</span>
           {canUseDirect && (
-            <button onClick={() => setNewDirectOpen(true)} style={{ color: D.muted }}>
+            <button onClick={openCompose} style={{ color: D.muted }}>
               <PenSquare className="w-4 h-4" />
             </button>
           )}
@@ -231,9 +237,7 @@ export default function MessagesPage() {
           >
             {/* Search + compose */}
             <div className="flex items-center gap-2 p-3 shrink-0">
-              <div
-                className="flex items-center gap-2 flex-1 rounded-lg px-3 py-2 border border-border/50 bg-muted/20"
-              >
+              <div className="flex items-center gap-2 flex-1 rounded-lg px-3 py-2 border border-border/50 bg-muted/20">
                 <Search className="w-3.5 h-3.5 shrink-0" style={{ color: D.muted }} />
                 <input
                   value={convSearch}
@@ -250,9 +254,9 @@ export default function MessagesPage() {
               </div>
               {canUseDirect && (
                 <button
-                  onClick={() => setNewDirectOpen(true)}
+                  onClick={openCompose}
                   className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors shrink-0"
-                  style={{ color: D.muted }}
+                  style={{ color: showCompose ? D.accent : D.muted }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = D.hover)}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   title="New direct message"
@@ -290,7 +294,10 @@ export default function MessagesPage() {
                     {tab.id === "unread" && visibleConvs.filter((c) => c.unreadCount > 0).length > 0 && (
                       <span
                         className="ml-1 text-[10px] font-bold rounded-full px-1"
-                        style={{ background: active ? "rgba(255,255,255,0.25)" : "hsl(var(--primary))", color: "#fff" }}
+                        style={{
+                          background: active ? "rgba(255,255,255,0.25)" : "hsl(var(--primary))",
+                          color: "#fff",
+                        }}
                       >
                         {visibleConvs.filter((c) => c.unreadCount > 0).length}
                       </span>
@@ -306,10 +313,10 @@ export default function MessagesPage() {
                 <div className="flex flex-col">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="flex items-center gap-3 px-4 py-3.5">
-                      <div className="w-11 h-11 rounded-full shrink-0 animate-pulse" style={{ background: "#222" }} />
+                      <div className="w-11 h-11 rounded-full bg-muted animate-pulse shrink-0" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-3 w-28 rounded animate-pulse" style={{ background: "#222" }} />
-                        <div className="h-2.5 w-40 rounded animate-pulse" style={{ background: "#1a1a1a" }} />
+                        <div className="h-3 w-28 bg-muted rounded animate-pulse" />
+                        <div className="h-2.5 w-40 bg-muted/60 rounded animate-pulse" />
                       </div>
                     </div>
                   ))}
@@ -333,7 +340,7 @@ export default function MessagesPage() {
                   </p>
                   {canUseDirect && convFilter !== "unread" && !convSearch && (
                     <button
-                      onClick={() => setNewDirectOpen(true)}
+                      onClick={openCompose}
                       className="text-xs font-medium hover:underline mt-1"
                       style={{ color: D.accent }}
                     >
@@ -344,9 +351,11 @@ export default function MessagesPage() {
               )}
 
               {!isLoading && displayedConvs.map((conv) => {
-                const isActive = effectiveSelected ? convKey(conv) === convKey(effectiveSelected) : false;
+                const isActive    = !showCompose && effectiveSelected
+                  ? convKey(conv) === convKey(effectiveSelected)
+                  : false;
                 const displayName = getDisplayName(conv);
-                const subtitle = getSubtitle(conv);
+                const subtitle    = getSubtitle(conv);
                 const [avatarBg, avatarFg] = avatarColors(displayName);
 
                 return (
@@ -363,23 +372,17 @@ export default function MessagesPage() {
                     }}
                   >
                     <div className="flex items-center gap-3 px-4 py-3">
-                      {/* Avatar */}
                       <div
                         className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 text-xs font-bold select-none"
                         style={{ background: avatarBg, color: avatarFg }}
                       >
                         {getInitials(displayName)}
                       </div>
-
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <span
                             className="text-sm truncate"
-                            style={{
-                              color: D.text,
-                              fontWeight: conv.unreadCount > 0 ? 700 : 600,
-                            }}
+                            style={{ color: D.text, fontWeight: conv.unreadCount > 0 ? 700 : 600 }}
                           >
                             {displayName}
                           </span>
@@ -405,13 +408,11 @@ export default function MessagesPage() {
                             )}
                           </div>
                         </div>
-
                         {subtitle && (
-                          <p className="text-[11px] truncate mb-0.5" style={{ color: "#666" }}>
+                          <p className="text-[11px] truncate mb-0.5" style={{ color: "#888" }}>
                             {subtitle}
                           </p>
                         )}
-
                         <p className="text-xs truncate" style={{ color: D.muted }}>
                           {conv.lastMessage
                             ? conv.lastMessage.length > 50
@@ -427,12 +428,116 @@ export default function MessagesPage() {
             </div>
           </div>
 
-          {/* ── Right: message thread ── */}
+          {/* ── Right: thread or compose ── */}
           <div
             className={`flex-1 min-w-0 flex flex-col min-h-[320px] md:min-h-0 ${mobileView === "list" ? "hidden md:flex" : "flex"}`}
             style={{ background: D.bg }}
           >
-            {effectiveSelected ? (
+            {showCompose ? (
+              /* ── Inline compose panel ── */
+              <div className="flex flex-col h-full">
+                {/* "To:" header with inline search */}
+                <div
+                  className="flex items-center gap-3 px-5 py-3.5 shrink-0"
+                  style={{ borderBottom: `1px solid ${D.border}` }}
+                >
+                  <span className="text-sm font-semibold shrink-0" style={{ color: D.muted }}>
+                    To:
+                  </span>
+                  <input
+                    ref={composeInputRef}
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    placeholder="Search people…"
+                    className="flex-1 text-sm bg-transparent outline-none"
+                    style={{ color: D.text }}
+                  />
+                  {contactSearch && (
+                    <button onClick={() => setContactSearch("")}>
+                      <X className="w-3.5 h-3.5" style={{ color: D.muted }} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Contacts list box */}
+                <div className="p-4 overflow-y-auto flex-1">
+                  <div
+                    className="rounded-xl overflow-hidden"
+                    style={{ border: `1px solid ${D.border}`, maxWidth: 360 }}
+                  >
+                    {/* Loading skeletons */}
+                    {contactsLoading && (
+                      <div className="flex flex-col">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3 px-4 py-3"
+                            style={{ borderBottom: i < 5 ? `1px solid ${D.border}` : "none" }}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-muted animate-pulse shrink-0" />
+                            <div className="flex-1 space-y-1.5">
+                              <div className="h-3 w-28 bg-muted animate-pulse rounded" />
+                              <div className="h-2.5 w-16 bg-muted/60 animate-pulse rounded" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Empty state */}
+                    {!contactsLoading && filteredContacts.length === 0 && (
+                      <div className="px-4 py-8 text-center">
+                        <p className="text-sm" style={{ color: D.muted }}>
+                          {directContacts.length === 0
+                            ? user?.role === "teacher"
+                              ? "No parents connected to your students yet."
+                              : "No teachers assigned to your children yet."
+                            : "No contacts match your search."}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Contact rows */}
+                    {!contactsLoading && filteredContacts.map((contact, i) => {
+                      const [avatarBg, avatarFg] = avatarColors(contact.name);
+                      const isLast = i === filteredContacts.length - 1;
+                      return (
+                        <button
+                          key={contact.id}
+                          onClick={() => startDirect(contact)}
+                          className="w-full text-left flex items-center gap-3 px-4 py-3 transition-colors"
+                          style={{
+                            borderBottom: isLast ? "none" : `1px solid ${D.border}`,
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = D.hover)}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          {/* Avatar */}
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xs font-bold select-none"
+                            style={{ background: avatarBg, color: avatarFg }}
+                          >
+                            {getInitials(contact.name)}
+                          </div>
+                          {/* Name + role */}
+                          <div className="flex flex-col min-w-0">
+                            <span
+                              className="text-sm font-semibold truncate"
+                              style={{ color: D.text }}
+                            >
+                              {contact.name}
+                            </span>
+                            <span className="text-xs" style={{ color: D.muted }}>
+                              {contactRoleLabel}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : effectiveSelected ? (
               effectiveSelected.type === "direct" ? (
                 <MessageThread
                   directMode={{ otherUserId: effectiveSelected.otherUserId! }}
@@ -455,111 +560,29 @@ export default function MessagesPage() {
                 />
               )
             ) : (
-              <div
-                className="flex flex-col h-full"
-                style={{ borderBottom: `1px solid ${D.border}` }}
-              >
-                {/* "To:" compose header */}
-                <div
-                  className="flex items-center gap-2 px-5 py-4 shrink-0"
-                  style={{ borderBottom: `1px solid ${D.border}` }}
-                >
-                  <span className="text-sm font-semibold" style={{ color: D.muted }}>To:</span>
-                  {canUseDirect ? (
-                    <button
-                      onClick={() => setNewDirectOpen(true)}
-                      className="text-sm flex-1 text-left hover:underline"
-                      style={{ color: D.muted }}
-                    >
-                      Search people…
-                    </button>
-                  ) : (
-                    <span className="text-sm" style={{ color: "#444" }}>
-                      {visibleConvs.length > 0 ? "Select a conversation" : "No conversations yet"}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1" />
+              /* Empty state — no conversation and not composing */
+              <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
+                <p className="text-sm" style={{ color: D.muted }}>
+                  {visibleConvs.length > 0
+                    ? "Select a conversation to start messaging"
+                    : canUseDirect
+                    ? "No conversations yet"
+                    : "No teacher assigned yet"}
+                </p>
+                {canUseDirect && (
+                  <button
+                    onClick={openCompose}
+                    className="text-xs font-medium hover:underline"
+                    style={{ color: D.accent }}
+                  >
+                    Start a direct message
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* ── New Direct Message Dialog ── */}
-      <Dialog
-        open={newDirectOpen}
-        onOpenChange={(o) => { setNewDirectOpen(o); if (!o) setContactSearch(""); }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base">New Direct Message</DialogTitle>
-          </DialogHeader>
-
-          <div
-            className="flex items-center gap-2 rounded-lg border px-3 py-2"
-            style={{ borderColor: "hsl(var(--border))" }}
-          >
-            <Search className="w-3.5 h-3.5 shrink-0" style={{ color: D.muted }} />
-            <input
-              value={contactSearch}
-              onChange={(e) => setContactSearch(e.target.value)}
-              placeholder={user?.role === "teacher" ? "Search parents…" : "Search teachers…"}
-              className="flex-1 text-sm outline-none bg-transparent text-foreground"
-              autoFocus
-            />
-            {contactSearch && (
-              <button onClick={() => setContactSearch("")}>
-                <X className="w-3.5 h-3.5" style={{ color: D.muted }} />
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto -mx-1">
-            {contactsLoading && (
-              <div className="flex flex-col gap-2 px-1 py-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3 py-1.5 px-2">
-                    <div className="w-8 h-8 rounded-full bg-muted animate-pulse shrink-0" />
-                    <div className="h-3 w-32 bg-muted rounded animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!contactsLoading && filteredContacts.length === 0 && (
-              <p className="text-sm text-center py-6 px-4" style={{ color: D.muted }}>
-                {directContacts.length === 0
-                  ? user?.role === "teacher"
-                    ? "No parents connected to your students yet."
-                    : "No teachers assigned to your children yet."
-                  : "No contacts match your search."}
-              </p>
-            )}
-
-            {!contactsLoading && filteredContacts.map((contact) => {
-              const [avatarBg, avatarFg] = avatarColors(contact.name);
-              return (
-                <button
-                  key={contact.id}
-                  onClick={() => startDirect(contact)}
-                  className="flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors mx-1"
-                  onMouseEnter={(e) => (e.currentTarget.style.background = D.hover)}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
-                    style={{ background: avatarBg, color: avatarFg }}
-                  >
-                    {getInitials(contact.name)}
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: D.text }}>{contact.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
