@@ -1,4 +1,5 @@
 #!/bin/bash
 set -e
 npm install
-npx prisma migrate dev --skip-generate
+npx prisma migrate deploy
+npx prisma generate
