@@ -42,17 +42,38 @@ app.use(helmet({
 // CORS — same-origin app; only allow an exact allowlist of trusted origins.
 // Wildcard suffix matching (.replit.app / .replit.dev) is intentionally removed
 // because credentials:true + broad suffix matching is equivalent to open CORS.
-const allowedOrigins = new Set<string>(
-  [
-    process.env.CLIENT_URL,
+function buildAllowedOrigins(): Set<string> {
+  const origins: (string | undefined)[] = [
     "http://localhost:5000",
     "http://localhost:5001",
     // Add the canonical Replit deployment domain if provided
     process.env.REPLIT_DOMAINS
       ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
       : undefined,
-  ].filter(Boolean) as string[]
-);
+  ];
+
+  // For each CLIENT_URL, also add the www ↔ non-www counterpart so both
+  // variants are always accepted (e.g. lyraprep.com and www.lyraprep.com).
+  if (process.env.CLIENT_URL) {
+    const url = process.env.CLIENT_URL.trim();
+    origins.push(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname.startsWith("www.")) {
+        parsed.hostname = parsed.hostname.slice(4);
+      } else {
+        parsed.hostname = `www.${parsed.hostname}`;
+      }
+      origins.push(parsed.origin);
+    } catch {
+      // malformed URL — skip the counterpart
+    }
+  }
+
+  return new Set<string>(origins.filter(Boolean) as string[]);
+}
+
+const allowedOrigins = buildAllowedOrigins();
 
 app.use(cors({
   origin: (origin, cb) => {
@@ -165,6 +186,18 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
   
+  // Global error handler — must be registered after all routes and static middleware.
+  // Catches any error passed via next(err) and returns a clean JSON response
+  // instead of Express's default HTML 500 page.
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status ?? err.statusCode ?? 500;
+    const message = err.message ?? "Internal server error";
+    console.error("[error]", err);
+    if (!res.headersSent) {
+      res.status(status).json({ error: message });
+    }
+  });
+
   const PORT = 5000;
   server.listen(PORT, "0.0.0.0", () => {
     log(`Server running on port ${PORT}`);
