@@ -842,6 +842,80 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Google Sign-In redirect-mode callback
+  // When the browser's origin is not in Google Cloud Console's Authorized JS Origins,
+  // GIS falls back from popup mode to redirect mode and POSTs the credential here
+  // as application/x-www-form-urlencoded (not JSON). This endpoint verifies the
+  // credential, sets the session cookie, and redirects back to the app.
+  // Requires https://<your-domain>/api/auth/google/callback in Authorized redirect URIs.
+  app.post("/api/auth/google/callback", async (req, res) => {
+    try {
+      const credential = req.body?.credential;
+      const csrfCookie = (req as any).cookies?.["g_csrf_token"];
+      const csrfBody = req.body?.["g_csrf_token"];
+
+      if (!credential) {
+        return res.redirect("/?google_error=no_credential");
+      }
+
+      // Validate CSRF token Google sends in redirect mode
+      if (csrfCookie && csrfBody && csrfCookie !== csrfBody) {
+        console.error("[google-callback] CSRF token mismatch");
+        return res.redirect("/?google_error=csrf");
+      }
+
+      let ticket;
+      try {
+        ticket = await googleClient.verifyIdToken({
+          idToken: credential,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+      } catch (verifyErr: any) {
+        console.error("[google-callback] Token verification failed:", verifyErr?.message);
+        return res.redirect("/?google_error=invalid_token");
+      }
+
+      const payload = ticket.getPayload();
+      if (!payload) return res.redirect("/?google_error=invalid_token");
+
+      const googleId = payload.sub;
+      const email = payload.email;
+      const name: string = payload.name || email || "Google User";
+      const profilePicture = payload.picture;
+
+      let user = await storage.getUserByGoogleId(googleId);
+      if (!user && email) {
+        user = await storage.getUserByEmail(email);
+        if (user) {
+          await storage.updateUser(user.id, { googleId, profilePicture, isEmailVerified: true });
+        }
+      }
+
+      // New user — redirect mode cannot show a role selector dialog.
+      // Send them to signup with a hint so they can complete registration.
+      if (!user) {
+        return res.redirect("/signup?google_error=no_account");
+      }
+
+      const sessionId = await createSession(user.id);
+      setSessionCookie(res, sessionId);
+
+      logAuthEvent({
+        event: "google_auth",
+        email: user.email ?? undefined,
+        userId: user.id,
+        ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown",
+        detail: "redirect-mode",
+      });
+
+      res.redirect("/");
+    } catch (error: any) {
+      console.error("[google-callback] Unexpected error:", error);
+      res.redirect("/?google_error=server_error");
+    }
+  });
+
+
   // Get current user
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     try {

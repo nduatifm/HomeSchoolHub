@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { GoogleLogin } from "@react-oauth/google";
@@ -42,6 +42,26 @@ export default function Login() {
       return p.startsWith("/") ? p : "/dashboard";
     } catch { return "/dashboard"; }
   })();
+
+  // Handle errors from Google's redirect-mode callback (server redirects back with ?google_error=...)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const googleError = params.get("google_error");
+      if (!googleError) return;
+      // Remove the query param so the user doesn't see it on refresh
+      const clean = window.location.pathname;
+      window.history.replaceState({}, "", clean);
+      const messages: Record<string, string> = {
+        no_credential: "Google Sign-In failed — no credential received. Please try again.",
+        invalid_token:  "Google Sign-In failed — could not verify your identity. Please try again.",
+        csrf:           "Google Sign-In failed — security check failed. Please try again.",
+        server_error:   "Google Sign-In failed — server error. Please try again.",
+        no_account:     "No account found for that Google address. Please sign up first.",
+      };
+      toast({ title: messages[googleError] ?? "Google Sign-In failed. Please try again.", type: "error", duration: 6000 });
+    } catch { /* ignore */ }
+  }, []);
 
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleCredential, setGoogleCredential] = useState<string | null>(null);
@@ -267,6 +287,7 @@ export default function Login() {
                   text="signin_with"
                   shape="rectangular"
                   logo_alignment="left"
+                  login_uri={`${window.location.origin}/api/auth/google/callback`}
                 />
               </div>
             </>

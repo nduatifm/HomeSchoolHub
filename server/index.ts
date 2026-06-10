@@ -177,6 +177,7 @@ app.post("/api/auth/signup", authLimiter);
 app.post("/api/auth/signup/student", authLimiter);
 app.post("/api/auth/signup/student/google", authLimiter);
 app.post("/api/auth/google", authLimiter);
+app.post("/api/auth/google/callback", authLimiter);
 app.post("/api/auth/forgot-password", authLimiter);
 app.post("/api/auth/reset-password", authLimiter);
 app.post("/api/auth/resend-verification", authLimiter);
@@ -189,8 +190,11 @@ app.use("/api", apiLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Enforce JSON content-type for mutating API requests (reject unexpected payloads)
+// Enforce JSON content-type for mutating API requests (reject unexpected payloads).
+// Exception: /api/auth/google/callback receives application/x-www-form-urlencoded
+// from Google's GIS redirect mode — that path must be allowed through.
 app.use("/api", (req: Request, res: Response, next: NextFunction) => {
+  if (req.path === "/auth/google/callback") return next();
   if (["POST", "PUT", "PATCH"].includes(req.method)) {
     const ct = req.headers["content-type"] ?? "";
     if (!ct.includes("application/json") && !ct.includes("multipart/form-data")) {
