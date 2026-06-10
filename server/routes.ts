@@ -96,7 +96,7 @@ function setSessionCookie(res: Response, sessionId: string): void {
   res.cookie("lyra_session", sessionId, {
     httpOnly: true,
     secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
+    sameSite: "lax",
     maxAge: SESSION_TTL_MS,
     path: "/",
   });

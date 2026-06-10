@@ -264,6 +264,9 @@ export default function Login() {
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
                   onError={() => toast({ title: "Google Sign In failed — try again.", type: "error" })}
+                  text="signin_with"
+                  shape="rectangular"
+                  logo_alignment="left"
                 />
               </div>
             </>

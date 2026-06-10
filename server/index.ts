@@ -168,7 +168,18 @@ const apiLimiter = rateLimit({
   message: { error: "Too many requests, please try again later." },
 });
 
-app.use("/api/auth", authLimiter);
+// Rate-limit only mutating auth endpoints. GET routes like /api/auth/me and
+// /api/auth/verify-email/:token are exempted — they are called on every page
+// load and would lock users out after just 10 navigations in 15 minutes.
+// Those GET routes are still covered by the broader apiLimiter below.
+app.post("/api/auth/login", authLimiter);
+app.post("/api/auth/signup", authLimiter);
+app.post("/api/auth/signup/student", authLimiter);
+app.post("/api/auth/signup/student/google", authLimiter);
+app.post("/api/auth/google", authLimiter);
+app.post("/api/auth/forgot-password", authLimiter);
+app.post("/api/auth/reset-password", authLimiter);
+app.post("/api/auth/resend-verification", authLimiter);
 // Also rate-limit invite acceptance (contains auth logic)
 app.use("/api/students", authLimiter);
 // Team invite acceptance contains token-based auth logic — must be rate-limited
