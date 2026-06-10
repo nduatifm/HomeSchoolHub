@@ -12,6 +12,65 @@ try {
   execSync("npx prisma generate --silent", { stdio: "pipe" });
 } catch {}
 
+// ---------------------------------------------------------------------------
+// Startup environment validation
+// Catch missing or misconfigured env vars before the server accepts traffic.
+// ---------------------------------------------------------------------------
+(function validateEnv() {
+  const isProdCheck = process.env.NODE_ENV === "production";
+
+  // Required in all environments — the app cannot function without these.
+  const required: string[] = [
+    "DATABASE_URL",
+  ];
+
+  // Required in production — silently broken behaviour in prod without these.
+  const requiredInProd: string[] = [
+    "CLIENT_URL",   // CORS allowlist; without it all cross-origin requests are rejected
+  ];
+
+  // Optional vars (features degrade gracefully when absent):
+  //   GOOGLE_CLIENT_ID          — Google Sign-In (disabled if missing)
+  //   CLOUDINARY_CLOUD_NAME     — file uploads (disabled if missing)
+  //   CLOUDINARY_API_KEY        — file uploads
+  //   CLOUDINARY_API_SECRET     — file uploads
+  //   SMTP_HOST                 — email delivery (disabled if missing)
+  //   SMTP_PORT                 — email delivery (defaults to 587)
+  //   SMTP_USER                 — email delivery
+  //   SMTP_PASS                 — email delivery
+  //   SUPER_ADMIN_EMAIL         — auto-promotes user to super-admin on startup
+  //   ADMIN_EMAIL               — auto-promotes user to admin on startup
+  //   REPLIT_DOMAINS            — added to CORS allowlist on Replit deployments
+
+  const missing: string[] = [];
+
+  for (const key of required) {
+    if (!process.env[key]) missing.push(key);
+  }
+
+  if (isProdCheck) {
+    for (const key of requiredInProd) {
+      if (!process.env[key]) missing.push(key);
+    }
+  } else {
+    // In development, warn but don't exit for prod-only vars.
+    for (const key of requiredInProd) {
+      if (!process.env[key]) {
+        console.warn(`[env] WARNING: ${key} is not set. This is required in production.`);
+      }
+    }
+  }
+
+  if (missing.length > 0) {
+    console.error(
+      `[env] FATAL: The following required environment variables are missing:\n` +
+      missing.map((k) => `  • ${k}`).join("\n") +
+      `\nSet them before starting the server.`
+    );
+    process.exit(1);
+  }
+})();
+
 const app = express();
 
 // Trust the first proxy hop — required for express-rate-limit to read X-Forwarded-For correctly
