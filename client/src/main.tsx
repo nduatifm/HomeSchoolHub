@@ -6,14 +6,19 @@ import "./index.css";
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
+// GoogleOAuthProvider must be outside StrictMode — StrictMode double-invokes
+// effects in development, causing google.accounts.id.initialize() to be called
+// twice, which corrupts GIS state and breaks the sign-in popup.
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    {googleClientId ? (
-      <GoogleOAuthProvider clientId={googleClientId}>
+  googleClientId ? (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <StrictMode>
         <App />
-      </GoogleOAuthProvider>
-    ) : (
+      </StrictMode>
+    </GoogleOAuthProvider>
+  ) : (
+    <StrictMode>
       <App />
-    )}
-  </StrictMode>
+    </StrictMode>
+  )
 );
