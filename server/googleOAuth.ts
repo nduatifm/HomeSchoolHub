@@ -30,10 +30,11 @@ export function getGoogleOAuth2Client(redirectUri: string): OAuth2Client {
 }
 
 export function getGoogleRedirectUri(req: Request): string {
-  const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-  const host =
-    (req.headers["x-forwarded-host"] as string) || req.headers.host || "localhost";
-  return `${proto}://${host}/api/auth/google/callback`;
+  // const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
+  // const host =
+  //   (req.headers["x-forwarded-host"] as string) || req.headers.host || "localhost";
+  // return `${proto}://${host}/api/auth/google/callback`;
+  return `${process.env.CLIENT_URL}/api/auth/google/callback`;
 }
 
 export interface OAuthStatePayload {
