@@ -34,7 +34,7 @@ export function getGoogleRedirectUri(req: Request): string {
   // const host =
   //   (req.headers["x-forwarded-host"] as string) || req.headers.host || "localhost";
   // return `${proto}://${host}/api/auth/google/callback`;
-  return `${process.env.CLIENT_URL}/api/auth/google/callback`;
+  return `https://www.lyraprep.com/api/auth/google/callback`;
 }
 
 export interface OAuthStatePayload {
