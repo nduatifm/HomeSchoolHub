@@ -996,6 +996,9 @@ export function registerRoutes(app: Express) {
         redirectUri
       });
 
+      res.json({
+        redirect: buildGoogleAuthUrl(state, redirectUri)
+      });
       res.redirect(buildGoogleAuthUrl(state, redirectUri));
     } catch (error) {
       console.error("[google-oauth] authorize error:", error);
