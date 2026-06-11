@@ -42,6 +42,7 @@ export interface OAuthStatePayload {
   inviteCode?: string;
   flow: "login" | "signup" | "student_signup";
   teamInvite?: string;
+  redirectUri?: string;
 }
 
 type SignedOAuthState = OAuthStatePayload & {

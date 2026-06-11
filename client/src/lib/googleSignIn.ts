@@ -18,7 +18,6 @@ export function getStudentGoogleSignupUrl(code: string): string {
 }
 
 export function handleGoogleSignIn(options: GoogleAuthOptions = {}): void {
-  console.log("getGoogleAuthUrl: ", getGoogleAuthUrl(options));
   window.location.href = getGoogleAuthUrl(options);
 }
 

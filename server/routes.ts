@@ -993,6 +993,7 @@ export function registerRoutes(app: Express) {
         next,
         teamInvite,
         role,
+        redirectUri
       });
 
       res.redirect(redirectUri);
@@ -1080,7 +1081,7 @@ export function registerRoutes(app: Express) {
         return redirectWithGoogleError(res, "server_error", errorBase);
       }
 
-      const redirectUri = getGoogleRedirectUri(req);
+      const redirectUri = state.redirectUri ?? getGoogleRedirectUri(req);
       const oauthClient = getGoogleOAuth2Client(redirectUri);
 
       let tokens;
