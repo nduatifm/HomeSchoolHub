@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
-import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,7 +19,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
-import { ApiError } from "@/lib/queryClient";
+import { ApiError, apiRequest } from "@/lib/queryClient";
+import { handleGoogleSignIn, isGoogleSignInAvailable } from "@/lib/googleSignIn";
 import { Link } from "wouter";
 import { AlertCircle, Mail, CheckCircle } from "lucide-react";
 
@@ -28,11 +28,9 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login, googleSignIn } = useAuth();
+  const { login, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  // const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-  const googleClientId = "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com";
 
   const teamInviteToken = (() => {
     try { return new URLSearchParams(window.location.search).get("teamInvite") || null; } catch { return null; }
@@ -44,31 +42,33 @@ export default function Login() {
     } catch { return "/dashboard"; }
   })();
 
-  // Handle errors from Google's redirect-mode callback (server redirects back with ?google_error=...)
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const googleError = params.get("google_error");
-      if (!googleError) return;
-      // Remove the query param so the user doesn't see it on refresh
-      const clean = window.location.pathname;
-      window.history.replaceState({}, "", clean);
-      const messages: Record<string, string> = {
-        no_credential: "Google Sign-In failed — no credential received. Please try again.",
-        invalid_token: "Google Sign-In failed — could not verify your identity. Please try again.",
-        csrf: "Google Sign-In failed — security check failed. Please try again.",
-        server_error: "Google Sign-In failed — server error. Please try again.",
-        no_account: "No account found for that Google address. Please sign up first.",
-      };
-      toast({ title: messages[googleError] ?? "Google Sign-In failed. Please try again.", type: "error", duration: 6000 });
+      const googleRoleRequired = params.get("google_role_required");
+      if (googleError) {
+        const clean = window.location.pathname;
+        window.history.replaceState({}, "", clean);
+        const messages: Record<string, string> = {
+          no_credential: "Google Sign-In failed — no credential received. Please try again.",
+          invalid_token: "Google Sign-In failed — could not verify your identity. Please try again.",
+          csrf: "Google Sign-In failed — security check failed. Please try again.",
+          server_error: "Google Sign-In failed — server error. Please try again.",
+          no_account: "No account found for that Google address. Please sign up first.",
+        };
+        toast({ title: messages[googleError] ?? "Google Sign-In failed. Please try again.", type: "error", duration: 6000 });
+      }
+      if (googleRoleRequired === "1") {
+        window.history.replaceState({}, "", window.location.pathname);
+        setShowRoleDialog(true);
+      }
     } catch { /* ignore */ }
-  }, []);
+  }, [toast]);
 
   const [showRoleDialog, setShowRoleDialog] = useState(false);
-  const [googleCredential, setGoogleCredential] = useState<string | null>(null);
   const [googleRole, setGoogleRole] = useState<"teacher" | "parent">("parent");
 
-  // Inline alert states — shown below the form instead of fleeting toasts
   const [verificationAlert, setVerificationAlert] = useState<{ email: string } | null>(null);
   const [googleOnlyAlert, setGoogleOnlyAlert] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
@@ -127,42 +127,31 @@ export default function Login() {
     }
   }
 
-  async function handleGoogleSuccess(credentialResponse: any) {
-    const credential = credentialResponse.credential;
-    setGoogleCredential(credential);
+  function handleGoogleClick() {
     clearAlerts();
-    setIsLoading(true);
-    try {
-      await googleSignIn(credential);
-      toast({ title: "Welcome back!", type: "success" });
-      if (teamInviteToken) {
-        setLocation(`/team-invite/${teamInviteToken}`);
-      } else {
-        const pending = localStorage.getItem("pendingTeamInvite");
-        if (pending) { localStorage.removeItem("pendingTeamInvite"); setLocation(`/team-invite/${pending}`); }
-        else setLocation(nextPath);
-      }
-    } catch (error: unknown) {
-      const apiError = error as ApiError;
-      if (apiError.requiresRole) {
-        setShowRoleDialog(true);
-      } else {
-        toast({ title: "Google Sign In failed — try again.", type: "error" });
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    handleGoogleSignIn({
+      flow: "login",
+      next: nextPath,
+      teamInvite: teamInviteToken || undefined,
+    });
   }
 
   async function handleGoogleLoginComplete() {
-    if (!googleCredential) return;
     setIsLoading(true);
     try {
-      await googleSignIn(googleCredential, googleRole);
+      const data = await apiRequest("/api/auth/google/complete", {
+        method: "POST",
+        body: JSON.stringify({ role: googleRole }),
+      });
+      await refreshUser();
       toast({ title: "Welcome back!", type: "success" });
-      setLocation(nextPath);
-    } catch (error: any) {
-      toast({ title: "Google Sign In failed — try again.", type: "error" });
+      setLocation(data.redirectTo || nextPath);
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      toast({
+        title: apiError.message || "Google Sign In failed — try again.",
+        type: "error",
+      });
     } finally {
       setIsLoading(false);
       setShowRoleDialog(false);
@@ -234,7 +223,6 @@ export default function Login() {
             </Button>
           </form>
 
-          {/* Inline: email not verified */}
           {verificationAlert && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3.5 space-y-2">
               <div className="flex items-start gap-2">
@@ -260,7 +248,6 @@ export default function Login() {
             </div>
           )}
 
-          {/* Inline: account uses Google Sign-In */}
           {googleOnlyAlert && (
             <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3.5 flex items-start gap-2">
               <Mail className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
@@ -270,8 +257,7 @@ export default function Login() {
             </div>
           )}
 
-          {/* Google sign-in section */}
-          {googleClientId ? (
+          {isGoogleSignInAvailable() && (
             <>
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">
@@ -281,21 +267,40 @@ export default function Login() {
                   <span className="bg-background px-3 text-muted-foreground">or continue with</span>
                 </div>
               </div>
-              <div className="flex justify-center" data-testid="google-login-container">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => toast({ title: "Google Sign In failed — try again.", type: "error" })}
-                  text="signin_with"
-                  shape="rectangular"
-                  logo_alignment="left"
-                  login_uri={`${window.location.origin}/api/auth/google/callback`}
-                />
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white border-2 border-gray-200 rounded-xl font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                onClick={handleGoogleClick}
+                disabled={isLoading}
+                data-testid="button-google-signin"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                >
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
+              </Button>
             </>
-          ) : (
-            <p className="mt-5 text-center text-xs text-muted-foreground">
-              Google Sign-In is not available in this environment.
-            </p>
           )}
 
           <div className="mt-6 space-y-2 text-center">
@@ -320,7 +325,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Role selection dialog — only shown for new Google accounts (teacher / parent) */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

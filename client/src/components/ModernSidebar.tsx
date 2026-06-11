@@ -238,18 +238,6 @@ export default function ModernSidebar() {
           </Link>
         )}
 
-        {/* Dev-only: Reset Database button */}
-        {import.meta.env.DEV && (
-          <button
-            onClick={() => setResetDbOpen(true)}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors duration-100"
-            data-testid="sidebar-reset-db"
-          >
-            <Trash2 className="w-4 h-4 shrink-0" />
-            <span className="truncate">Reset Database (Dev)</span>
-          </button>
-        )}
-
         {/* User pop-up trigger */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -389,24 +377,6 @@ export default function ModernSidebar() {
       >
         <SidebarContent />
       </aside>
-
-      <ConfirmDialog
-        open={resetDbOpen}
-        title="Reset the database?"
-        description="All users and data will be permanently deleted."
-        confirmLabel="Reset"
-        onConfirm={async () => {
-          setResetDbOpen(false);
-          try {
-            await apiRequest("/api/dev/reset-db", { method: "POST" });
-            toast({ title: "Database reset.", description: "All data cleared. Reloading…", type: "success" });
-            setTimeout(() => { window.location.href = "/"; }, 2000);
-          } catch {
-            toast({ title: "Reset failed — try again.", type: "error" });
-          }
-        }}
-        onCancel={() => setResetDbOpen(false)}
-      />
     </>
   );
 }

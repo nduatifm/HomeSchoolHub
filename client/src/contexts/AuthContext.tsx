@@ -50,8 +50,6 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, role: string) => Promise<any>;
   signupStudent: (code: string, password: string) => Promise<void>;
-  signupStudentGoogle: (code: string, credential: string) => Promise<void>;
-  googleSignIn: (idToken: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isLoading: boolean;
@@ -121,24 +119,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStudent(data.student);
   }
 
-  async function signupStudentGoogle(code: string, credential: string) {
-    const data = await apiRequest("/api/auth/signup/student/google", {
-      method: "POST",
-      body: JSON.stringify({ code, credential }),
-    });
-    setUser(data.user);
-    setStudent(data.student);
-  }
-
-  async function googleSignIn(idToken: string, role?: string) {
-    const data = await apiRequest("/api/auth/google", {
-      method: "POST",
-      body: JSON.stringify({ credential: idToken, role }),
-    });
-    setUser(data.user);
-    setStudent(data.student || null);
-  }
-
   async function logout() {
     try {
       await apiRequest("/api/auth/logout", { method: "POST" });
@@ -162,8 +142,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         signup,
         signupStudent,
-        signupStudentGoogle,
-        googleSignIn,
         logout,
         refreshUser,
         isLoading,

@@ -1,0 +1,6 @@
+{"event":"google_auth","email":"lkydv2001@gmail.com","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T07:39:34.170Z"}
+{"event":"logout","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T07:40:05.084Z"}
+{"event":"google_auth","email":"im.nydv@gmail.com","userId":2,"ip":"127.0.0.1","ts":"2026-06-11T07:40:31.935Z"}
+{"event":"logout","userId":2,"ip":"127.0.0.1","ts":"2026-06-11T07:40:36.366Z"}
+{"event":"google_auth","email":"lkydv2001@gmail.com","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T07:40:55.906Z"}
+{"event":"logout","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T07:48:18.324Z"}

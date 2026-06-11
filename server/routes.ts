@@ -44,12 +44,22 @@ import {
 import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
 import { uploadBufferToCloudinary } from "./utils/cloudinary";
+import {
+  buildGoogleAuthUrl,
+  clearPendingGoogleAuth,
+  createOAuthState,
+  getGoogleClientId,
+  getGoogleOAuth2Client,
+  getGoogleRedirectUri,
+  readPendingGoogleAuth,
+  redirectWithGoogleError,
+  sanitizeNextPath,
+  setPendingGoogleAuth,
+  verifyOAuthState,
+} from "./googleOAuth";
 
-// Google OAuth client
-// const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const googleClient = new OAuth2Client(
-  "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com",
-);
+// Google OAuth client (ID token verification for legacy POST endpoints)
+const googleClient = new OAuth2Client(getGoogleClientId());
 
 // Normalise any incoming email: trim whitespace and force lowercase
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
@@ -727,9 +737,7 @@ export function registerRoutes(app: Express) {
       // Verify the Google token
       const ticket = await googleClient.verifyIdToken({
         idToken: credential,
-        // audience: process.env.GOOGLE_CLIENT_ID,
-        audience:
-          "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com",
+        audience: getGoogleClientId(),
       });
 
       const payload = ticket.getPayload();
@@ -856,7 +864,432 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Google Sign In/Sign Up
+  async function completeStudentGoogleSignup(
+    res: Response,
+    code: string,
+    googleId: string,
+    googleEmail: string | undefined,
+    profilePicture: string | undefined,
+    emailVerified: boolean,
+    req: Request,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const invite = await storage.getStudentInviteByCode(code.toUpperCase());
+    if (!invite || invite.status === "accepted") {
+      return { ok: false, error: "invalid_invite" };
+    }
+    if (new Date(invite.expiresDate) < new Date()) {
+      return { ok: false, error: "expired_invite" };
+    }
+
+    if (
+      !googleEmail ||
+      googleEmail.toLowerCase() !== invite.email.toLowerCase()
+    ) {
+      return { ok: false, error: "email_mismatch" };
+    }
+
+    if (!emailVerified) {
+      return { ok: false, error: "email_not_verified" };
+    }
+
+    const existingUser = await storage.getUserByEmail(invite.email);
+    if (existingUser) {
+      return { ok: false, error: "email_already_registered" };
+    }
+
+    const user = await storage.createUser({
+      email: normalizeEmail(invite.email),
+      password: null,
+      name: invite.studentName,
+      role: "student",
+      roles: ["student"],
+      isEmailVerified: true,
+      emailVerifyToken: null,
+      emailVerifyExpires: null,
+      googleId,
+      profilePicture: profilePicture || null,
+    });
+
+    const student = await storage.createStudent({
+      userId: user.id,
+      name: invite.studentName,
+      gradeLevel: invite.gradeLevel,
+      badges: [],
+      points: 0,
+    });
+
+    await storage.createChildTeamMember({
+      childId: student.id,
+      parentId: invite.parentId,
+      role: "owner",
+      status: "active",
+      acceptedAt: new Date(),
+    });
+
+    const tutorRequestModeSetting =
+      await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+    const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
+
+    if (!isTutorRequestMode) {
+      const teacherId = await storage.findFirstAvailableTeacherId(student.id);
+      if (teacherId !== null) {
+        const today = new Date().toISOString().split("T")[0];
+        await storage.createTutorRequest({
+          parentId: invite.parentId,
+          teacherId,
+          studentId: student.id,
+          status: "approved",
+          message: "Auto-assigned on student signup",
+          requestDate: today,
+          responseDate: today,
+        });
+      }
+    }
+
+    await storage.updateStudentInvite(invite.id, { status: "accepted" });
+
+    const sessionId = await createSession(user.id);
+    setSessionCookie(res, sessionId);
+
+    logAuthEvent({
+      event: "student_signup",
+      email: user.email ?? undefined,
+      userId: user.id,
+      ip:
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+        req.socket.remoteAddress ??
+        "unknown",
+      detail: "google invite redirect",
+    });
+
+    return { ok: true };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Google OAuth 2.0 redirect flow (authorization code)
+  // ---------------------------------------------------------------------------
+
+  app.get("/api/auth/google/authorize", async (req, res) => {
+    try {
+      if (!process.env.GOOGLE_CLIENT_SECRET) {
+        return redirectWithGoogleError(res, "server_error");
+      }
+
+      const flow =
+        req.query.flow === "signup" ? "signup" : ("login" as const);
+      const next = sanitizeNextPath(req.query.next);
+      const teamInvite =
+        typeof req.query.teamInvite === "string"
+          ? req.query.teamInvite
+          : undefined;
+      const role =
+        req.query.role === "teacher" || req.query.role === "parent"
+          ? req.query.role
+          : undefined;
+
+      const redirectUri = getGoogleRedirectUri(req);
+      const state = createOAuthState({
+        flow,
+        next,
+        teamInvite,
+        role,
+      });
+
+      res.redirect(buildGoogleAuthUrl(state, redirectUri));
+    } catch (error) {
+      console.error("[google-oauth] authorize error:", error);
+      redirectWithGoogleError(res, "server_error");
+    }
+  });
+
+  app.get("/api/auth/signup/student/authorize", async (req, res) => {
+    try {
+      if (!process.env.GOOGLE_CLIENT_SECRET) {
+        return redirectWithGoogleError(
+          res,
+          "server_error",
+          "/student-signup",
+        );
+      }
+
+      const code =
+        typeof req.query.code === "string" ? req.query.code.toUpperCase() : "";
+      if (!code) {
+        return redirectWithGoogleError(
+          res,
+          "invalid_invite",
+          "/student-signup",
+        );
+      }
+
+      const invite = await storage.getStudentInviteByCode(code);
+      if (!invite || invite.status === "accepted") {
+        return redirectWithGoogleError(
+          res,
+          "invalid_invite",
+          "/student-signup",
+        );
+      }
+      if (new Date(invite.expiresDate) < new Date()) {
+        return redirectWithGoogleError(res, "expired_invite", "/student-signup");
+      }
+
+      const redirectUri = getGoogleRedirectUri(req);
+      const state = createOAuthState({
+        flow: "student_signup",
+        inviteCode: code,
+        next: "/dashboard",
+      });
+
+      res.redirect(buildGoogleAuthUrl(state, redirectUri));
+    } catch (error) {
+      console.error("[google-oauth] student authorize error:", error);
+      redirectWithGoogleError(res, "server_error", "/student-signup");
+    }
+  });
+
+  app.get("/api/auth/google/callback", async (req, res) => {
+    const errorBase =
+      typeof req.query.state === "string"
+        ? (() => {
+            const s = verifyOAuthState(req.query.state);
+            return s?.flow === "student_signup" ? "/student-signup" : "/login";
+          })()
+        : "/login";
+
+    try {
+      if (req.query.error) {
+        return redirectWithGoogleError(res, "no_credential", errorBase);
+      }
+
+      const code = typeof req.query.code === "string" ? req.query.code : null;
+      const stateParam =
+        typeof req.query.state === "string" ? req.query.state : null;
+
+      if (!code || !stateParam) {
+        return redirectWithGoogleError(res, "no_credential", errorBase);
+      }
+
+      const state = verifyOAuthState(stateParam);
+      if (!state) {
+        return redirectWithGoogleError(res, "csrf", errorBase);
+      }
+
+      if (!process.env.GOOGLE_CLIENT_SECRET) {
+        return redirectWithGoogleError(res, "server_error", errorBase);
+      }
+
+      const redirectUri = getGoogleRedirectUri(req);
+      const oauthClient = getGoogleOAuth2Client(redirectUri);
+
+      let tokens;
+      try {
+        const tokenResponse = await oauthClient.getToken(code);
+        tokens = tokenResponse.tokens;
+      } catch (verifyErr: unknown) {
+        console.error(
+          "[google-oauth] Token exchange failed:",
+          verifyErr instanceof Error ? verifyErr.message : verifyErr,
+        );
+        return redirectWithGoogleError(res, "invalid_token", errorBase);
+      }
+
+      const idToken = tokens.id_token;
+      if (!idToken) {
+        return redirectWithGoogleError(res, "invalid_token", errorBase);
+      }
+
+      const ticket = await oauthClient.verifyIdToken({
+        idToken,
+        audience: getGoogleClientId(),
+      });
+      const payload = ticket.getPayload();
+      if (!payload?.sub) {
+        return redirectWithGoogleError(res, "invalid_token", errorBase);
+      }
+
+      const googleId = payload.sub;
+      const email = payload.email;
+      const name: string = payload.name || email || "Google User";
+      const profilePicture = payload.picture;
+
+      if (state.flow === "student_signup") {
+        if (!state.inviteCode) {
+          return redirectWithGoogleError(res, "invalid_invite", "/student-signup");
+        }
+
+        try {
+          const result = await completeStudentGoogleSignup(
+            res,
+            state.inviteCode,
+            googleId,
+            email,
+            profilePicture,
+            payload.email_verified === true,
+            req,
+          );
+          if (!result.ok) {
+            return redirectWithGoogleError(
+              res,
+              result.error,
+              "/student-signup",
+            );
+          }
+          return res.redirect(sanitizeNextPath(state.next));
+        } catch (err) {
+          console.error("[google-oauth] student callback error:", err);
+          return redirectWithGoogleError(res, "server_error", "/student-signup");
+        }
+      }
+
+      let user = await storage.getUserByGoogleId(googleId);
+
+      if (!user && email) {
+        user = await storage.getUserByEmail(email);
+        if (user) {
+          await storage.updateUser(user.id, {
+            googleId,
+            profilePicture,
+            isEmailVerified: true,
+          });
+        }
+      }
+
+      if (!user) {
+        if (state.role && ["teacher", "parent"].includes(state.role)) {
+          user = await storage.createUser({
+            email: email
+              ? normalizeEmail(email)
+              : `google_${googleId}@placeholder.com`,
+            password: null,
+            name,
+            role: state.role,
+            roles: [state.role],
+            isEmailVerified: true,
+            emailVerifyToken: null,
+            emailVerifyExpires: null,
+            googleId,
+            profilePicture,
+          });
+        } else {
+          setPendingGoogleAuth(res, {
+            googleId,
+            email,
+            name,
+            profilePicture,
+            next: state.next,
+            teamInvite: state.teamInvite,
+          });
+          const rolePath =
+            state.flow === "signup" ? "/signup" : "/login";
+          return res.redirect(
+            `${rolePath}?google_role_required=1`,
+          );
+        }
+      }
+
+      const sessionId = await createSession(user.id);
+      setSessionCookie(res, sessionId);
+
+      logAuthEvent({
+        event: "google_auth",
+        email: user.email ?? undefined,
+        userId: user.id,
+        ip:
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+          req.socket.remoteAddress ??
+          "unknown",
+      });
+
+      let redirectTo = sanitizeNextPath(state.next);
+      if (state.teamInvite) {
+        redirectTo = `/team-invite/${state.teamInvite}`;
+      }
+      res.redirect(redirectTo);
+    } catch (error) {
+      console.error("[google-oauth] callback error:", error);
+      redirectWithGoogleError(res, "server_error", errorBase);
+    }
+  });
+
+  app.post("/api/auth/google/complete", async (req, res) => {
+    try {
+      const { role } = req.body;
+      if (!role || !["teacher", "parent"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role for Google sign up" });
+      }
+
+      const pending = readPendingGoogleAuth(req);
+      if (!pending) {
+        return res.status(401).json({
+          error: "Google sign-in session expired. Please try again.",
+        });
+      }
+
+      let user = await storage.getUserByGoogleId(pending.googleId);
+      if (!user && pending.email) {
+        user = await storage.getUserByEmail(pending.email);
+        if (user) {
+          await storage.updateUser(user.id, {
+            googleId: pending.googleId,
+            profilePicture: pending.profilePicture,
+            isEmailVerified: true,
+          });
+        }
+      }
+
+      if (!user) {
+        user = await storage.createUser({
+          email: pending.email
+            ? normalizeEmail(pending.email)
+            : `google_${pending.googleId}@placeholder.com`,
+          password: null,
+          name: pending.name,
+          role,
+          roles: [role],
+          isEmailVerified: true,
+          emailVerifyToken: null,
+          emailVerifyExpires: null,
+          googleId: pending.googleId,
+          profilePicture: pending.profilePicture,
+        });
+      }
+
+      clearPendingGoogleAuth(res);
+
+      const sessionId = await createSession(user.id);
+      setSessionCookie(res, sessionId);
+
+      logAuthEvent({
+        event: "google_auth",
+        email: user.email ?? undefined,
+        userId: user.id,
+        ip:
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+          req.socket.remoteAddress ??
+          "unknown",
+      });
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          roles: user.roles ?? [role],
+        },
+        student: null,
+        redirectTo: pending.teamInvite
+          ? `/team-invite/${pending.teamInvite}`
+          : sanitizeNextPath(pending.next),
+      });
+    } catch (error) {
+      console.error("[google-oauth] complete error:", error);
+      res.status(500).json({ error: "Failed to complete Google sign up" });
+    }
+  });
+
+  // Google Sign In/Sign Up (legacy POST — ID token from GIS popup)
   app.post("/api/auth/google", async (req, res) => {
     try {
       const { credential, role } = req.body;
@@ -877,9 +1310,7 @@ export function registerRoutes(app: Express) {
       try {
         ticket = await googleClient.verifyIdToken({
           idToken: credential,
-          // audience: process.env.GOOGLE_CLIENT_ID,
-          audience:
-            "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com",
+          audience: getGoogleClientId(),
         });
       } catch (verifyErr: any) {
         console.error(
@@ -6520,48 +6951,6 @@ export function registerRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error("Dev become error:", error);
-        res.status(500).json({ error: error.message });
-      }
-    });
-
-    // POST /api/dev/reset-db — wipe all user data and reset seed flag for fresh testing
-    app.post("/api/dev/reset-db", async (_req, res) => {
-      try {
-        // Delete in FK-safe order (children before parents)
-        await prisma.$transaction([
-          prisma.classroomSubmission.deleteMany(),
-          prisma.classroomMaterial.deleteMany(),
-          prisma.classroomAssignment.deleteMany(),
-          prisma.classroomPost.deleteMany(),
-          prisma.classroomEnrollment.deleteMany(),
-          prisma.classroom.deleteMany(),
-          prisma.tutorRating.deleteMany(),
-          prisma.payment.deleteMany(),
-          prisma.earnings.deleteMany(),
-          prisma.attendance.deleteMany(),
-          prisma.session.deleteMany(),
-          prisma.feedback.deleteMany(),
-          prisma.schedule.deleteMany(),
-          prisma.clarification.deleteMany(),
-          prisma.studentAssignment.deleteMany(),
-          prisma.assignment.deleteMany(),
-          prisma.material.deleteMany(),
-          prisma.progressReport.deleteMany(),
-          prisma.parentalControl.deleteMany(),
-          prisma.teacherStudentAssignment.deleteMany(),
-          prisma.tutorRequest.deleteMany(),
-          prisma.studentInvite.deleteMany(),
-          prisma.threadLabel.deleteMany(),
-          prisma.message.deleteMany(),
-          prisma.authSession.deleteMany(),
-          prisma.student.deleteMany(),
-          prisma.user.deleteMany(),
-          prisma.systemSettings.deleteMany(),
-        ]);
-        console.log("[dev] Database reset complete — all data wiped");
-        res.json({ cleared: true });
-      } catch (error: any) {
-        console.error("[dev] reset-db error:", error);
         res.status(500).json({ error: error.message });
       }
     });
