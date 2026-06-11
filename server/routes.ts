@@ -996,9 +996,6 @@ export function registerRoutes(app: Express) {
         redirectUri
       });
 
-      res.json({
-        redirect: buildGoogleAuthUrl(state, redirectUri)
-      });
       res.redirect(buildGoogleAuthUrl(state, redirectUri));
     } catch (error) {
       console.error("[google-oauth] authorize error:", error);
@@ -1053,6 +1050,11 @@ export function registerRoutes(app: Express) {
   });
 
   app.get("/api/auth/google/callback", async (req, res) => {
+    res.json({
+      query: req.query,
+      header: req.headers.host
+    });
+
     const errorBase =
       typeof req.query.state === "string"
         ? (() => {
