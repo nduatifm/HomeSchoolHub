@@ -3,7 +3,9 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
+import passport from "passport";
 import { registerRoutes } from "./routes";
+import { setupGooglePassport } from "./googleOAuth";
 import { setupVite, serveStatic, log } from "./vite";
 import { createServer } from "http";
 import { execSync } from "child_process";
@@ -151,6 +153,9 @@ app.use(cors({
 // Cookie parser (must be before routes)
 app.use(cookieParser());
 
+setupGooglePassport();
+app.use(passport.initialize());
+
 // Rate limiting — auth routes always limited; API limiter loosened in dev
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -176,9 +181,8 @@ app.post("/api/auth/login", authLimiter);
 app.post("/api/auth/signup", authLimiter);
 app.post("/api/auth/signup/student", authLimiter);
 app.post("/api/auth/signup/student/google", authLimiter);
-// app.post("/api/auth/google", authLimiter);
-// app.get("/api/auth/google/authorize", authLimiter);
-// app.get("/api/auth/google/callback", authLimiter);
+app.get("/api/auth/google/authorize", authLimiter);
+app.get("/api/auth/google/callback", authLimiter);
 app.get("/api/auth/signup/student/authorize", authLimiter);
 app.post("/api/auth/google/complete", authLimiter);
 app.post("/api/auth/forgot-password", authLimiter);

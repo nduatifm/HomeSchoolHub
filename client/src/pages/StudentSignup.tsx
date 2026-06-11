@@ -9,7 +9,7 @@ import { Logo } from "@/components/Logo";
 import { Link } from "wouter";
 import { ToastAction } from "@/components/ui/toast";
 import { CheckCircle, GraduationCap, LogIn } from "lucide-react";
-import { handleStudentGoogleSignup, isGoogleSignInAvailable } from "@/lib/googleSignIn";
+import { handleStudentGoogleSignup, loadGoogleSignInAvailability } from "@/lib/googleSignIn";
 
 export default function StudentSignup() {
   const [code, setCode] = useState("");
@@ -19,9 +19,14 @@ export default function StudentSignup() {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingCode, setIsCheckingCode] = useState(false);
+  const [googleAvailable, setGoogleAvailable] = useState(false);
   const { signupStudent } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadGoogleSignInAvailability().then(setGoogleAvailable);
+  }, []);
 
   useEffect(() => {
     try {
@@ -198,7 +203,7 @@ export default function StudentSignup() {
 
                 <p className="text-sm font-medium text-foreground text-center">Choose how to create your account</p>
 
-                {isGoogleSignInAvailable() && (
+                {googleAvailable && (
                   <Button
                     type="button"
                     variant="outline"

@@ -20,7 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
 import { ApiError, apiRequest } from "@/lib/queryClient";
-import { handleGoogleSignIn, isGoogleSignInAvailable } from "@/lib/googleSignIn";
+import { handleGoogleSignIn, loadGoogleSignInAvailability } from "@/lib/googleSignIn";
 import { Mail, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 
@@ -46,10 +46,15 @@ export default function Signup() {
 
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [googleRole, setGoogleRole] = useState<"teacher" | "parent" | "">("");
+  const [googleAvailable, setGoogleAvailable] = useState(false);
 
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [isResending, setIsResending] = useState(false);
+
+  useEffect(() => {
+    loadGoogleSignInAvailability().then(setGoogleAvailable);
+  }, []);
 
   useEffect(() => {
     try {
@@ -217,7 +222,7 @@ export default function Signup() {
             </Button>
           </form>
 
-          {isGoogleSignInAvailable() && (
+          {googleAvailable && (
             <>
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">

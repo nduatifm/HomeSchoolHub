@@ -45,12 +45,13 @@ import { OAuth2Client } from "google-auth-library";
 import { memoryUpload } from "./utils/multer";
 import { uploadBufferToCloudinary } from "./utils/cloudinary";
 import {
-  buildGoogleAuthUrl,
+  authenticateGoogle,
   clearPendingGoogleAuth,
   createOAuthState,
   getGoogleClientId,
-  getGoogleOAuth2Client,
   getGoogleRedirectUri,
+  googleErrorBaseFromState,
+  isGoogleOAuthConfigured,
   readPendingGoogleAuth,
   redirectWithGoogleError,
   sanitizeNextPath,
@@ -966,18 +967,22 @@ export function registerRoutes(app: Express) {
   }
 
   // ---------------------------------------------------------------------------
-  // Google OAuth 2.0 redirect flow (authorization code)
+  // Google OAuth 2.0 redirect flow (Passport + passport-google-oauth20)
   // ---------------------------------------------------------------------------
 
-  app.get("/api/auth/google/authorize", async (req, res) => {
+  app.get("/api/auth/google/available", (_req, res) => {
+    res.json({ available: isGoogleOAuthConfigured() });
+  });
+
+  app.get("/api/auth/google/authorize", (req, res, next) => {
     try {
-      if (!process.env.GOOGLE_CLIENT_SECRET) {
+      if (!isGoogleOAuthConfigured()) {
         return redirectWithGoogleError(res, "server_error");
       }
 
       const flow =
         req.query.flow === "signup" ? "signup" : ("login" as const);
-      const next = sanitizeNextPath(req.query.next);
+      const nextPath = sanitizeNextPath(req.query.next);
       const teamInvite =
         typeof req.query.teamInvite === "string"
           ? req.query.teamInvite
@@ -990,22 +995,22 @@ export function registerRoutes(app: Express) {
       const redirectUri = getGoogleRedirectUri(req);
       const state = createOAuthState({
         flow,
-        next,
+        next: nextPath,
         teamInvite,
         role,
-        redirectUri
+        redirectUri,
       });
 
-      res.redirect(buildGoogleAuthUrl(state, redirectUri));
+      authenticateGoogle({ state, callbackURL: redirectUri })(req, res, next);
     } catch (error) {
       console.error("[google-oauth] authorize error:", error);
       redirectWithGoogleError(res, "server_error");
     }
   });
 
-  app.get("/api/auth/signup/student/authorize", async (req, res) => {
+  app.get("/api/auth/signup/student/authorize", async (req, res, next) => {
     try {
-      if (!process.env.GOOGLE_CLIENT_SECRET) {
+      if (!isGoogleOAuthConfigured()) {
         return redirectWithGoogleError(
           res,
           "server_error",
@@ -1040,182 +1045,158 @@ export function registerRoutes(app: Express) {
         flow: "student_signup",
         inviteCode: code,
         next: "/dashboard",
+        redirectUri,
       });
 
-      res.redirect(buildGoogleAuthUrl(state, redirectUri));
+      authenticateGoogle({ state, callbackURL: redirectUri })(req, res, next);
     } catch (error) {
       console.error("[google-oauth] student authorize error:", error);
       redirectWithGoogleError(res, "server_error", "/student-signup");
     }
   });
 
-  app.get("/api/auth/google/callback", async (req, res) => {
-    res.json({
-      query: req.query,
-      header: req.headers.host
-    });
+  app.get("/api/auth/google/callback", (req, res, next) => {
+    const errorBase = googleErrorBaseFromState(req.query.state);
 
-    const errorBase =
-      typeof req.query.state === "string"
-        ? (() => {
-            const s = verifyOAuthState(req.query.state);
-            return s?.flow === "student_signup" ? "/student-signup" : "/login";
-          })()
-        : "/login";
-
-    try {
-      if (req.query.error) {
-        return redirectWithGoogleError(res, "no_credential", errorBase);
-      }
-
-      const code = typeof req.query.code === "string" ? req.query.code : null;
-      const stateParam =
-        typeof req.query.state === "string" ? req.query.state : null;
-
-      if (!code || !stateParam) {
-        return redirectWithGoogleError(res, "no_credential", errorBase);
-      }
-
-      const state = verifyOAuthState(stateParam);
-      if (!state) {
-        return redirectWithGoogleError(res, "csrf", errorBase);
-      }
-
-      if (!process.env.GOOGLE_CLIENT_SECRET) {
-        return redirectWithGoogleError(res, "server_error", errorBase);
-      }
-
-      const redirectUri = state.redirectUri ?? getGoogleRedirectUri(req);
-      const oauthClient = getGoogleOAuth2Client(redirectUri);
-
-      let tokens;
-      try {
-        const tokenResponse = await oauthClient.getToken(code);
-        tokens = tokenResponse.tokens;
-      } catch (verifyErr: unknown) {
-        console.error(
-          "[google-oauth] Token exchange failed:",
-          verifyErr instanceof Error ? verifyErr.message : verifyErr,
-        );
-        return redirectWithGoogleError(res, "invalid_token", errorBase);
-      }
-
-      const idToken = tokens.id_token;
-      if (!idToken) {
-        return redirectWithGoogleError(res, "invalid_token", errorBase);
-      }
-
-      const ticket = await oauthClient.verifyIdToken({
-        idToken,
-        audience: getGoogleClientId(),
-      });
-      const payload = ticket.getPayload();
-      if (!payload?.sub) {
-        return redirectWithGoogleError(res, "invalid_token", errorBase);
-      }
-
-      const googleId = payload.sub;
-      const email = payload.email;
-      const name: string = payload.name || email || "Google User";
-      const profilePicture = payload.picture;
-
-      if (state.flow === "student_signup") {
-        if (!state.inviteCode) {
-          return redirectWithGoogleError(res, "invalid_invite", "/student-signup");
-        }
-
-        try {
-          const result = await completeStudentGoogleSignup(
-            res,
-            state.inviteCode,
-            googleId,
-            email,
-            profilePicture,
-            payload.email_verified === true,
-            req,
-          );
-          if (!result.ok) {
-            return redirectWithGoogleError(
-              res,
-              result.error,
-              "/student-signup",
-            );
-          }
-          return res.redirect(sanitizeNextPath(state.next));
-        } catch (err) {
-          console.error("[google-oauth] student callback error:", err);
-          return redirectWithGoogleError(res, "server_error", "/student-signup");
-        }
-      }
-
-      let user = await storage.getUserByGoogleId(googleId);
-
-      if (!user && email) {
-        user = await storage.getUserByEmail(email);
-        if (user) {
-          await storage.updateUser(user.id, {
-            googleId,
-            profilePicture,
-            isEmailVerified: true,
-          });
-        }
-      }
-
-      if (!user) {
-        if (state.role && ["teacher", "parent"].includes(state.role)) {
-          user = await storage.createUser({
-            email: email
-              ? normalizeEmail(email)
-              : `google_${googleId}@placeholder.com`,
-            password: null,
-            name,
-            role: state.role,
-            roles: [state.role],
-            isEmailVerified: true,
-            emailVerifyToken: null,
-            emailVerifyExpires: null,
-            googleId,
-            profilePicture,
-          });
-        } else {
-          setPendingGoogleAuth(res, {
-            googleId,
-            email,
-            name,
-            profilePicture,
-            next: state.next,
-            teamInvite: state.teamInvite,
-          });
-          const rolePath =
-            state.flow === "signup" ? "/signup" : "/login";
-          return res.redirect(
-            `${rolePath}?google_role_required=1`,
-          );
-        }
-      }
-
-      const sessionId = await createSession(user.id);
-      setSessionCookie(res, sessionId);
-
-      logAuthEvent({
-        event: "google_auth",
-        email: user.email ?? undefined,
-        userId: user.id,
-        ip:
-          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
-          req.socket.remoteAddress ??
-          "unknown",
-      });
-
-      let redirectTo = sanitizeNextPath(state.next);
-      if (state.teamInvite) {
-        redirectTo = `/team-invite/${state.teamInvite}`;
-      }
-      res.redirect(redirectTo);
-    } catch (error) {
-      console.error("[google-oauth] callback error:", error);
-      redirectWithGoogleError(res, "server_error", errorBase);
+    if (req.query.error) {
+      return redirectWithGoogleError(res, "no_credential", errorBase);
     }
+
+    if (!isGoogleOAuthConfigured()) {
+      return redirectWithGoogleError(res, "server_error", errorBase);
+    }
+
+    const stateParam =
+      typeof req.query.state === "string" ? req.query.state : null;
+    if (!stateParam) {
+      return redirectWithGoogleError(res, "no_credential", errorBase);
+    }
+
+    const state = verifyOAuthState(stateParam);
+    if (!state) {
+      return redirectWithGoogleError(res, "csrf", errorBase);
+    }
+
+    const redirectUri = state.redirectUri ?? getGoogleRedirectUri(req);
+
+    authenticateGoogle({ callbackURL: redirectUri }, async (err, profile, info) => {
+        try {
+          if (err) {
+            console.error("[google-oauth] callback error:", err);
+            return redirectWithGoogleError(res, "server_error", errorBase);
+          }
+
+          if (!profile) {
+            const errorCode =
+              info?.message === "csrf" ? "csrf" : "invalid_token";
+            return redirectWithGoogleError(res, errorCode, errorBase);
+          }
+
+          const {
+            googleId,
+            email,
+            name,
+            profilePicture,
+            emailVerified,
+            state: oauthState,
+          } = profile;
+
+          if (oauthState.flow === "student_signup") {
+            if (!oauthState.inviteCode) {
+              return redirectWithGoogleError(res, "invalid_invite", "/student-signup");
+            }
+
+            try {
+              const result = await completeStudentGoogleSignup(
+                res,
+                oauthState.inviteCode,
+                googleId,
+                email,
+                profilePicture,
+                emailVerified,
+                req,
+              );
+              if (!result.ok) {
+                return redirectWithGoogleError(
+                  res,
+                  result.error,
+                  "/student-signup",
+                );
+              }
+              return res.redirect(sanitizeNextPath(oauthState.next));
+            } catch (studentErr) {
+              console.error("[google-oauth] student callback error:", studentErr);
+              return redirectWithGoogleError(res, "server_error", "/student-signup");
+            }
+          }
+
+          let user = await storage.getUserByGoogleId(googleId);
+
+          if (!user && email) {
+            user = await storage.getUserByEmail(email);
+            if (user) {
+              await storage.updateUser(user.id, {
+                googleId,
+                profilePicture,
+                isEmailVerified: true,
+              });
+            }
+          }
+
+          if (!user) {
+            if (oauthState.role && ["teacher", "parent"].includes(oauthState.role)) {
+              user = await storage.createUser({
+                email: email
+                  ? normalizeEmail(email)
+                  : `google_${googleId}@placeholder.com`,
+                password: null,
+                name,
+                role: oauthState.role,
+                roles: [oauthState.role],
+                isEmailVerified: true,
+                emailVerifyToken: null,
+                emailVerifyExpires: null,
+                googleId,
+                profilePicture,
+              });
+            } else {
+              setPendingGoogleAuth(res, {
+                googleId,
+                email,
+                name,
+                profilePicture,
+                next: oauthState.next,
+                teamInvite: oauthState.teamInvite,
+              });
+              const rolePath =
+                oauthState.flow === "signup" ? "/signup" : "/login";
+              return res.redirect(`${rolePath}?google_role_required=1`);
+            }
+          }
+
+          const sessionId = await createSession(user.id);
+          setSessionCookie(res, sessionId);
+
+          logAuthEvent({
+            event: "google_auth",
+            email: user.email ?? undefined,
+            userId: user.id,
+            ip:
+              (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+              req.socket.remoteAddress ??
+              "unknown",
+          });
+
+          let redirectTo = sanitizeNextPath(oauthState.next);
+          if (oauthState.teamInvite) {
+            redirectTo = `/team-invite/${oauthState.teamInvite}`;
+          }
+          return res.redirect(redirectTo);
+        } catch (callbackErr) {
+          console.error("[google-oauth] callback error:", callbackErr);
+          return redirectWithGoogleError(res, "server_error", errorBase);
+        }
+    })(req, res, next);
   });
 
   app.post("/api/auth/google/complete", async (req, res) => {

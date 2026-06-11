@@ -1,10 +1,15 @@
 import crypto from "crypto";
 import type { Request, Response } from "express";
+import passport from "passport";
+import type { AuthenticateOptions } from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { OAuth2Client } from "google-auth-library";
 
 const STATE_TTL_MS = 5 * 60 * 1000;
 const PENDING_COOKIE = "google_oauth_pending";
 const PENDING_TTL_MS = 5 * 60 * 1000;
+
+export const GOOGLE_STRATEGY = "google";
 
 const FALLBACK_CLIENT_ID =
   "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com";
@@ -19,6 +24,10 @@ function getSecret(): string {
 
 export function getGoogleClientId(): string {
   return process.env.GOOGLE_CLIENT_ID || FALLBACK_CLIENT_ID;
+}
+
+export function isGoogleOAuthConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLIENT_SECRET);
 }
 
 export function getGoogleOAuth2Client(redirectUri: string): OAuth2Client {
@@ -45,10 +54,19 @@ export interface OAuthStatePayload {
   redirectUri?: string;
 }
 
-type SignedOAuthState = OAuthStatePayload & {
+export type SignedOAuthState = OAuthStatePayload & {
   nonce: string;
   exp: number;
 };
+
+export interface GoogleAuthProfile {
+  googleId: string;
+  email?: string;
+  name: string;
+  profilePicture?: string;
+  emailVerified: boolean;
+  state: SignedOAuthState;
+}
 
 function signPayload(payload: object): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -149,22 +167,102 @@ export function redirectWithGoogleError(
   res.redirect(`${basePath}?google_error=${encodeURIComponent(error)}`);
 }
 
-export function buildGoogleAuthUrl(state: string, redirectUri: string): string {
-  const params = new URLSearchParams({
-    client_id: getGoogleClientId(),
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: "openid email profile",
-    state,
-    access_type: "online",
-    prompt: "select_account",
-  });
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-}
-
 export function sanitizeNextPath(next: unknown): string {
   if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//")) {
     return "/dashboard";
   }
   return next;
+}
+
+export function googleErrorBaseFromState(stateParam: unknown): string {
+  if (typeof stateParam !== "string") return "/login";
+  const state = verifyOAuthState(stateParam);
+  return state?.flow === "student_signup" ? "/student-signup" : "/login";
+}
+
+/** Passport OAuth2 accepts callbackURL at runtime; types omit it on AuthenticateOptions. */
+export function buildGoogleAuthenticateOptions(options: {
+  state?: string;
+  callbackURL: string;
+}): AuthenticateOptions {
+  return {
+    session: false,
+    scope: ["profile", "email"],
+    state: options.state,
+    callbackURL: options.callbackURL,
+  } as AuthenticateOptions;
+}
+
+type GoogleAuthCallback = (
+  err: unknown,
+  profile: GoogleAuthProfile | false,
+  info?: { message?: string },
+) => void;
+
+export function authenticateGoogle(
+  options: { state?: string; callbackURL: string },
+  callback?: GoogleAuthCallback,
+) {
+  const authOptions = buildGoogleAuthenticateOptions(options);
+  if (callback) {
+    return passport.authenticate(
+      GOOGLE_STRATEGY as string,
+      authOptions,
+      callback,
+    );
+  }
+  return passport.authenticate(GOOGLE_STRATEGY as string, authOptions);
+}
+
+export function setupGooglePassport(): void {
+  if (!isGoogleOAuthConfigured()) return;
+
+  passport.use(
+    GOOGLE_STRATEGY,
+    new GoogleStrategy(
+      {
+        clientID: getGoogleClientId(),
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        callbackURL: "/api/auth/google/callback",
+        passReqToCallback: true,
+        scope: ["profile", "email"],
+      },
+      (req, _accessToken, _refreshToken, profile, done) => {
+        try {
+          const stateParam =
+            typeof req.query.state === "string" ? req.query.state : null;
+          if (!stateParam) {
+            return done(null, false, { message: "csrf" });
+          }
+
+          const state = verifyOAuthState(stateParam);
+          if (!state) {
+            return done(null, false, { message: "csrf" });
+          }
+
+          const googleId = profile.id;
+          const email = profile.emails?.[0]?.value;
+          const emailVerified = profile.emails?.[0]?.verified === true;
+          const name =
+            profile.displayName ||
+            profile.name?.givenName ||
+            email ||
+            "Google User";
+          const profilePicture = profile.photos?.[0]?.value;
+
+          const result: GoogleAuthProfile = {
+            googleId,
+            email,
+            name,
+            profilePicture,
+            emailVerified,
+            state,
+          };
+          return done(null, result);
+        } catch (err) {
+          return done(err);
+        }
+      },
+    ),
+  );
 }

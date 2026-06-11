@@ -20,7 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/Logo";
 import { ApiError, apiRequest } from "@/lib/queryClient";
-import { handleGoogleSignIn, isGoogleSignInAvailable } from "@/lib/googleSignIn";
+import { handleGoogleSignIn, loadGoogleSignInAvailability } from "@/lib/googleSignIn";
 import { Link } from "wouter";
 import { AlertCircle, Mail, CheckCircle } from "lucide-react";
 
@@ -41,6 +41,12 @@ export default function Login() {
       return p.startsWith("/") ? p : "/dashboard";
     } catch { return "/dashboard"; }
   })();
+
+  const [googleAvailable, setGoogleAvailable] = useState(false);
+
+  useEffect(() => {
+    loadGoogleSignInAvailability().then(setGoogleAvailable);
+  }, []);
 
   useEffect(() => {
     try {
@@ -257,7 +263,7 @@ export default function Login() {
             </div>
           )}
 
-          {isGoogleSignInAvailable() && (
+          {googleAvailable && (
             <>
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">

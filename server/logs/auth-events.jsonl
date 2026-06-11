@@ -4,3 +4,5 @@
 {"event":"logout","userId":2,"ip":"127.0.0.1","ts":"2026-06-11T07:40:36.366Z"}
 {"event":"google_auth","email":"lkydv2001@gmail.com","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T07:40:55.906Z"}
 {"event":"logout","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T07:48:18.324Z"}
+{"event":"google_auth","email":"lkydv2001@gmail.com","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T10:20:50.105Z"}
+{"event":"logout","userId":1,"ip":"127.0.0.1","ts":"2026-06-11T10:20:54.615Z"}
