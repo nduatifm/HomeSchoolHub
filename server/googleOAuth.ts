@@ -23,7 +23,8 @@ function getSecret(): string {
 }
 
 export function getGoogleClientId(): string {
-  return process.env.GOOGLE_CLIENT_ID || FALLBACK_CLIENT_ID;
+  // return process.env.GOOGLE_CLIENT_ID || FALLBACK_CLIENT_ID;
+  return FALLBACK_CLIENT_ID;
 }
 
 export function isGoogleOAuthConfigured(): boolean {
