@@ -46,7 +46,10 @@ import { memoryUpload } from "./utils/multer";
 import { uploadBufferToCloudinary } from "./utils/cloudinary";
 
 // Google OAuth client
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client(
+  "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com",
+);
 
 // Normalise any incoming email: trim whitespace and force lowercase
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
@@ -61,8 +64,12 @@ async function createSession(userId: number): Promise<string> {
   return id;
 }
 
-async function getSession(sessionId: string): Promise<{ userId: number; realUserId: number; sessionId: string } | null> {
-  const session = await prisma.authSession.findUnique({ where: { id: sessionId } });
+async function getSession(
+  sessionId: string,
+): Promise<{ userId: number; realUserId: number; sessionId: string } | null> {
+  const session = await prisma.authSession.findUnique({
+    where: { id: sessionId },
+  });
   if (!session) return null;
   if (session.expiresAt < new Date()) {
     await prisma.authSession.deleteMany({ where: { id: sessionId } });
@@ -96,7 +103,7 @@ function setSessionCookie(res: Response, sessionId: string): void {
   res.cookie("lyra_session", sessionId, {
     httpOnly: true,
     secure: isProd,
-    sameSite: "lax",
+    sameSite: isProd ? "strict" : "lax",
     maxAge: SESSION_TTL_MS,
     path: "/",
   });
@@ -105,7 +112,10 @@ function setSessionCookie(res: Response, sessionId: string): void {
 // Shared session extraction helper — resolves session from httpOnly cookie and populates req.session.
 // Impersonation is now server-side: the session's impersonatingUserId field overrides userId.
 // Returns the effective userId on success, or sends an error response and returns null.
-async function resolveSessionUserId(req: Request, res: Response): Promise<number | null> {
+async function resolveSessionUserId(
+  req: Request,
+  res: Response,
+): Promise<number | null> {
   const cookieSession = (req as any).cookies?.lyra_session;
   if (!cookieSession) {
     res.status(401).json({ error: "Unauthorized" });
@@ -116,7 +126,11 @@ async function resolveSessionUserId(req: Request, res: Response): Promise<number
     res.status(401).json({ error: "Unauthorized" });
     return null;
   }
-  req.session = { userId: session.userId, realUserId: session.realUserId, sessionId: session.sessionId };
+  req.session = {
+    userId: session.userId,
+    realUserId: session.realUserId,
+    sessionId: session.sessionId,
+  };
   return session.userId;
 }
 
@@ -135,7 +149,9 @@ async function requireAuth(req: Request, res: Response, next: Function) {
 async function requireAdmin(req: Request, res: Response, next: Function) {
   await requireAuth(req, res, async () => {
     try {
-      const user = await storage.getUserById(req.session.realUserId ?? req.session.userId!);
+      const user = await storage.getUserById(
+        req.session.realUserId ?? req.session.userId!,
+      );
       if (!user || (!user.isAdmin && !user.isSuperAdmin)) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -150,7 +166,9 @@ async function requireAdmin(req: Request, res: Response, next: Function) {
 async function requireSuperAdmin(req: Request, res: Response, next: Function) {
   await requireAuth(req, res, async () => {
     try {
-      const user = await storage.getUserById(req.session.realUserId ?? req.session.userId!);
+      const user = await storage.getUserById(
+        req.session.realUserId ?? req.session.userId!,
+      );
       if (!user || !user.isSuperAdmin) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -163,7 +181,11 @@ async function requireSuperAdmin(req: Request, res: Response, next: Function) {
 
 // requireTeamOwner — validates that the authenticated caller is an owner of the given child's team.
 // Returns true and responds with 403 if not; returns false to signal the route handler should continue.
-async function assertTeamOwner(callerId: number, studentId: number, res: Response): Promise<boolean> {
+async function assertTeamOwner(
+  callerId: number,
+  studentId: number,
+  res: Response,
+): Promise<boolean> {
   const isOwner = await storage.isTeamOwner(callerId, studentId);
   if (!isOwner) {
     res.status(403).json({ error: "Only owners can perform this action" });
@@ -174,12 +196,14 @@ async function assertTeamOwner(callerId: number, studentId: number, res: Respons
 
 // generateUniqueUsername — slugify a name into a username, append suffix if taken.
 async function generateUniqueUsername(name: string): Promise<string> {
-  const base = name.trim().toLowerCase()
-    .replace(/\s+/g, ".")
-    .replace(/[^a-z0-9.]/g, "")
-    .replace(/\.+/g, ".")
-    .replace(/^\.|\.$/g, "")
-    || "student";
+  const base =
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ".")
+      .replace(/[^a-z0-9.]/g, "")
+      .replace(/\.+/g, ".")
+      .replace(/^\.|\.$/g, "") || "student";
 
   const existing = await storage.getUserByUsername(base);
   if (!existing) return base;
@@ -197,7 +221,9 @@ async function generateUniqueUsername(name: string): Promise<string> {
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const bytes = crypto.randomBytes(10);
-  return Array.from(bytes as Uint8Array).map((b) => chars[b % chars.length]).join("");
+  return Array.from(bytes as Uint8Array)
+    .map((b) => chars[b % chars.length])
+    .join("");
 }
 
 // resetStudentAccount — shared core logic for parent + admin reset paths.
@@ -205,7 +231,7 @@ function generateTempPassword(): string {
 // hasn't received one in the last 30 minutes (per-user cooldown).
 async function maybeEmailNotification(
   userId: number,
-  notification: { title: string; body: string; link?: string }
+  notification: { title: string; body: string; link?: string },
 ) {
   try {
     const user = await storage.getUserById(userId);
@@ -220,7 +246,7 @@ async function maybeEmailNotification(
       user.name,
       notification.title,
       notification.body,
-      notification.link ?? "/dashboard"
+      notification.link ?? "/dashboard",
     );
   } catch (err) {
     console.error("[notification-email] error:", err);
@@ -229,11 +255,17 @@ async function maybeEmailNotification(
 
 // Sets a new hashed temp password, force-verifies email, kills all sessions,
 // and fires an in-app notification to the student. Returns the plain-text temp password.
-async function resetStudentAccount(userId: number, callerDesc: string): Promise<string> {
+async function resetStudentAccount(
+  userId: number,
+  callerDesc: string,
+): Promise<string> {
   const user = await storage.getUserById(userId);
   if (!user) throw Object.assign(new Error("User not found"), { status: 404 });
   if (user.role !== "student") {
-    throw Object.assign(new Error("Account reset is only available for student accounts"), { status: 400 });
+    throw Object.assign(
+      new Error("Account reset is only available for student accounts"),
+      { status: 400 },
+    );
   }
   const tempPassword = generateTempPassword();
   const hashed = await hashPassword(tempPassword);
@@ -244,13 +276,15 @@ async function resetStudentAccount(userId: number, callerDesc: string): Promise<
     emailVerifyExpires: null,
   });
   await prisma.authSession.deleteMany({ where: { userId } });
-  storage.createNotification({
-    userId,
-    type: "account_reset",
-    title: "Your login credentials were reset",
-    body: "Your login credentials were reset. Please change your password in your profile settings.",
-    link: "/profile",
-  }).catch(() => {});
+  storage
+    .createNotification({
+      userId,
+      type: "account_reset",
+      title: "Your login credentials were reset",
+      body: "Your login credentials were reset. Please change your password in your profile settings.",
+      link: "/profile",
+    })
+    .catch(() => {});
   console.log(`[account-reset] ${callerDesc} reset login for userId=${userId}`);
   return tempPassword;
 }
@@ -265,18 +299,27 @@ async function syncAdminFlags() {
     const allUsers = await storage.getAllUsers();
 
     for (const u of allUsers) {
-      const shouldBeSuperAdmin = !!superAdminEmail && u.email.toLowerCase() === superAdminEmail.toLowerCase();
-      const shouldBeAdmin = shouldBeSuperAdmin || (!!adminEmail && u.email.toLowerCase() === adminEmail.toLowerCase());
+      const shouldBeSuperAdmin =
+        !!superAdminEmail &&
+        u.email.toLowerCase() === superAdminEmail.toLowerCase();
+      const shouldBeAdmin =
+        shouldBeSuperAdmin ||
+        (!!adminEmail && u.email.toLowerCase() === adminEmail.toLowerCase());
 
       const currentIsAdmin = u.isAdmin ?? false;
       const currentIsSuperAdmin = u.isSuperAdmin ?? false;
 
-      if (currentIsAdmin !== shouldBeAdmin || currentIsSuperAdmin !== shouldBeSuperAdmin) {
+      if (
+        currentIsAdmin !== shouldBeAdmin ||
+        currentIsSuperAdmin !== shouldBeSuperAdmin
+      ) {
         await storage.updateUser(u.id, {
           isAdmin: shouldBeAdmin,
           isSuperAdmin: shouldBeSuperAdmin,
         } as Prisma.UserUpdateInput);
-        console.log(`[admin] Synced ${u.email}: isAdmin=${shouldBeAdmin}, isSuperAdmin=${shouldBeSuperAdmin}`);
+        console.log(
+          `[admin] Synced ${u.email}: isAdmin=${shouldBeAdmin}, isSuperAdmin=${shouldBeSuperAdmin}`,
+        );
       }
     }
   } catch (err) {
@@ -302,17 +345,32 @@ export function registerRoutes(app: Express) {
   syncAdminFlags();
 
   // Delete expired sessions on startup
-  prisma.authSession.deleteMany({ where: { expiresAt: { lt: new Date() } } })
-    .then((r) => { if (r.count > 0) console.log(`[sessions] Deleted ${r.count} expired sessions`); })
-    .catch((err) => console.error("[sessions] Failed to clean expired sessions:", err));
+  prisma.authSession
+    .deleteMany({ where: { expiresAt: { lt: new Date() } } })
+    .then((r) => {
+      if (r.count > 0)
+        console.log(`[sessions] Deleted ${r.count} expired sessions`);
+    })
+    .catch((err) =>
+      console.error("[sessions] Failed to clean expired sessions:", err),
+    );
 
   // Ensure TUTOR_REQUEST_MODE is ON by default (requests require teacher approval)
-  storage.getSystemSetting("TUTOR_REQUEST_MODE").then(async (s) => {
-    if (!s) {
-      await storage.setSystemSetting("TUTOR_REQUEST_MODE", "true", "Requires teacher to approve/reject parent tutor requests (set false to auto-approve)");
-      console.log("[settings] TUTOR_REQUEST_MODE defaulted to true");
-    }
-  }).catch((err) => console.error("[settings] Failed to init TUTOR_REQUEST_MODE:", err));
+  storage
+    .getSystemSetting("TUTOR_REQUEST_MODE")
+    .then(async (s) => {
+      if (!s) {
+        await storage.setSystemSetting(
+          "TUTOR_REQUEST_MODE",
+          "true",
+          "Requires teacher to approve/reject parent tutor requests (set false to auto-approve)",
+        );
+        console.log("[settings] TUTOR_REQUEST_MODE defaulted to true");
+      }
+    })
+    .catch((err) =>
+      console.error("[settings] Failed to init TUTOR_REQUEST_MODE:", err),
+    );
 
   // ========== AUTH ROUTES ==========
 
@@ -333,10 +391,10 @@ export function registerRoutes(app: Express) {
       const existing = await storage.getUserByEmail(email);
       if (existing) {
         if (!existing.isEmailVerified) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: "Email already registered but not verified",
             requiresVerification: true,
-            email: existing.email
+            email: existing.email,
           });
         }
         return res.status(400).json({ error: "Email already registered" });
@@ -398,7 +456,10 @@ export function registerRoutes(app: Express) {
       const { email, password } = validation.data;
 
       // Try email first; fall back to username for managed child accounts
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown";
+      const ip =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+        req.socket.remoteAddress ??
+        "unknown";
       const ua = req.headers["user-agent"] ?? undefined;
 
       let user = await storage.getUserByEmail(email);
@@ -406,32 +467,67 @@ export function registerRoutes(app: Express) {
         user = await storage.getUserByUsername(email);
       }
       if (!user) {
-        logAuthEvent({ event: "login_failure", email, ip, userAgent: ua, detail: "user not found" });
+        logAuthEvent({
+          event: "login_failure",
+          email,
+          ip,
+          userAgent: ua,
+          detail: "user not found",
+        });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Check if user password exists (Google-only account)
       if (!user.password && user.googleId) {
-        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "google-only account" });
+        logAuthEvent({
+          event: "login_failure",
+          email,
+          userId: user.id,
+          ip,
+          userAgent: ua,
+          detail: "google-only account",
+        });
         return res.status(401).json({
-          error: "This account uses Google Sign-In. Please use the Google button to sign in.",
+          error:
+            "This account uses Google Sign-In. Please use the Google button to sign in.",
           requiresGoogle: true,
         });
       }
       if (!user.password) {
-        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "no password set" });
+        logAuthEvent({
+          event: "login_failure",
+          email,
+          userId: user.id,
+          ip,
+          userAgent: ua,
+          detail: "no password set",
+        });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       const isValid = await verifyPassword(password, user.password);
       if (!isValid) {
-        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "wrong password" });
+        logAuthEvent({
+          event: "login_failure",
+          email,
+          userId: user.id,
+          ip,
+          userAgent: ua,
+          detail: "wrong password",
+        });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
       // Check if email is verified
       if (!user.isEmailVerified) {
-        logAuthEvent({ event: "login_failure", email, userId: user.id, ip, userAgent: ua, detail: "email not verified" });
+        logAuthEvent({
+          event: "login_failure",
+          email,
+          userId: user.id,
+          ip,
+          userAgent: ua,
+          detail: "email not verified",
+        });
         return res.status(403).json({
           error: "Please verify your email before logging in",
           requiresVerification: true,
@@ -441,7 +537,13 @@ export function registerRoutes(app: Express) {
 
       const sessionId = await createSession(user.id);
       setSessionCookie(res, sessionId);
-      logAuthEvent({ event: "login_success", email, userId: user.id, ip, userAgent: ua });
+      logAuthEvent({
+        event: "login_success",
+        email,
+        userId: user.id,
+        ip,
+        userAgent: ua,
+      });
 
       // Include student profile so the frontend doesn't need a second /api/auth/me call.
       let studentProfile = null;
@@ -449,7 +551,8 @@ export function registerRoutes(app: Express) {
         studentProfile = await storage.getStudentByUserId(user.id);
         if (!studentProfile) {
           return res.status(500).json({
-            error: "Your account isn't fully set up. Please contact your parent or an administrator.",
+            error:
+              "Your account isn't fully set up. Please contact your parent or an administrator.",
           });
         }
       }
@@ -492,7 +595,9 @@ export function registerRoutes(app: Express) {
 
       const invite = await storage.getStudentInviteByCode(code.toUpperCase());
       if (!invite || invite.status === "accepted") {
-        return res.status(400).json({ error: "Invalid or expired invite code" });
+        return res
+          .status(400)
+          .json({ error: "Invalid or expired invite code" });
       }
 
       // Check if invite is expired
@@ -569,7 +674,16 @@ export function registerRoutes(app: Express) {
       // Create session immediately - student verified via invite code
       const sessionId = await createSession(user.id);
       setSessionCookie(res, sessionId);
-      logAuthEvent({ event: "student_signup", email: user.email ?? undefined, userId: user.id, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown", detail: "password invite" });
+      logAuthEvent({
+        event: "student_signup",
+        email: user.email ?? undefined,
+        userId: user.id,
+        ip:
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+          req.socket.remoteAddress ??
+          "unknown",
+        detail: "password invite",
+      });
 
       res.json({
         user: {
@@ -601,7 +715,9 @@ export function registerRoutes(app: Express) {
 
       const invite = await storage.getStudentInviteByCode(code.toUpperCase());
       if (!invite || invite.status === "accepted") {
-        return res.status(400).json({ error: "Invalid or expired invite code" });
+        return res
+          .status(400)
+          .json({ error: "Invalid or expired invite code" });
       }
 
       if (new Date(invite.expiresDate) < new Date()) {
@@ -611,7 +727,9 @@ export function registerRoutes(app: Express) {
       // Verify the Google token
       const ticket = await googleClient.verifyIdToken({
         idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        // audience: process.env.GOOGLE_CLIENT_ID,
+        audience:
+          "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com",
       });
 
       const payload = ticket.getPayload();
@@ -624,15 +742,23 @@ export function registerRoutes(app: Express) {
       const profilePicture = payload.picture;
 
       // Require the Google account email to match the invited student's email
-      if (!googleEmail || googleEmail.toLowerCase() !== invite.email.toLowerCase()) {
+      if (
+        !googleEmail ||
+        googleEmail.toLowerCase() !== invite.email.toLowerCase()
+      ) {
         return res.status(400).json({
-          error: "The Google account email must match the invited student email (" + invite.email + ")",
+          error:
+            "The Google account email must match the invited student email (" +
+            invite.email +
+            ")",
         });
       }
 
       // Require the Google account email to be verified by Google
       if (!payload.email_verified) {
-        return res.status(400).json({ error: "Google account email is not verified" });
+        return res
+          .status(400)
+          .json({ error: "Google account email is not verified" });
       }
 
       // Check if email is already registered
@@ -703,7 +829,16 @@ export function registerRoutes(app: Express) {
       const sessionId = await createSession(user.id);
       setSessionCookie(res, sessionId);
 
-      logAuthEvent({ event: "student_signup", email: user.email ?? undefined, userId: user.id, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown", detail: "google invite" });
+      logAuthEvent({
+        event: "student_signup",
+        email: user.email ?? undefined,
+        userId: user.id,
+        ip:
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+          req.socket.remoteAddress ??
+          "unknown",
+        detail: "google invite",
+      });
       res.json({
         user: {
           id: user.id,
@@ -742,14 +877,21 @@ export function registerRoutes(app: Express) {
       try {
         ticket = await googleClient.verifyIdToken({
           idToken: credential,
-          audience: process.env.GOOGLE_CLIENT_ID,
+          // audience: process.env.GOOGLE_CLIENT_ID,
+          audience:
+            "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com",
         });
       } catch (verifyErr: any) {
-        console.error("[google-auth] Token verification failed:", verifyErr?.message);
-        if (!process.env.GOOGLE_CLIENT_ID) {
-          console.error("[google-auth] GOOGLE_CLIENT_ID env var is not set — Google Sign-In is misconfigured.");
-        }
-        return res.status(401).json({ error: "Invalid Google token. Please try again." });
+        console.error(
+          "[google-auth] Token verification failed:",
+          verifyErr?.message,
+        );
+        // if (!process.env.GOOGLE_CLIENT_ID) {
+        //   console.error("[google-auth] GOOGLE_CLIENT_ID env var is not set — Google Sign-In is misconfigured.");
+        // }
+        return res
+          .status(401)
+          .json({ error: "Invalid Google token. Please try again." });
       }
 
       const payload = ticket.getPayload();
@@ -789,7 +931,9 @@ export function registerRoutes(app: Express) {
         }
 
         user = await storage.createUser({
-          email: email ? normalizeEmail(email) : `google_${googleId}@placeholder.com`,
+          email: email
+            ? normalizeEmail(email)
+            : `google_${googleId}@placeholder.com`,
           password: null, // No password for Google users
           name,
           role,
@@ -813,7 +957,8 @@ export function registerRoutes(app: Express) {
         googleStudentProfile = await storage.getStudentByUserId(user.id);
         if (!googleStudentProfile) {
           return res.status(500).json({
-            error: "Your account isn't fully set up. Please contact your parent or an administrator.",
+            error:
+              "Your account isn't fully set up. Please contact your parent or an administrator.",
           });
         }
       }
@@ -825,7 +970,15 @@ export function registerRoutes(app: Express) {
         await storage.updateUser(user.id, { roles: gRoles });
       }
 
-      logAuthEvent({ event: "google_auth", email: user.email ?? undefined, userId: user.id, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
+      logAuthEvent({
+        event: "google_auth",
+        email: user.email ?? undefined,
+        userId: user.id,
+        ip:
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+          req.socket.remoteAddress ??
+          "unknown",
+      });
       res.json({
         user: {
           id: user.id,
@@ -841,80 +994,6 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ error: "Failed to authenticate with Google" });
     }
   });
-
-  // Google Sign-In redirect-mode callback
-  // When the browser's origin is not in Google Cloud Console's Authorized JS Origins,
-  // GIS falls back from popup mode to redirect mode and POSTs the credential here
-  // as application/x-www-form-urlencoded (not JSON). This endpoint verifies the
-  // credential, sets the session cookie, and redirects back to the app.
-  // Requires https://<your-domain>/api/auth/google/callback in Authorized redirect URIs.
-  app.post("/api/auth/google/callback", async (req, res) => {
-    try {
-      const credential = req.body?.credential;
-      const csrfCookie = (req as any).cookies?.["g_csrf_token"];
-      const csrfBody = req.body?.["g_csrf_token"];
-
-      if (!credential) {
-        return res.redirect("/?google_error=no_credential");
-      }
-
-      // Validate CSRF token Google sends in redirect mode
-      if (csrfCookie && csrfBody && csrfCookie !== csrfBody) {
-        console.error("[google-callback] CSRF token mismatch");
-        return res.redirect("/?google_error=csrf");
-      }
-
-      let ticket;
-      try {
-        ticket = await googleClient.verifyIdToken({
-          idToken: credential,
-          audience: process.env.GOOGLE_CLIENT_ID,
-        });
-      } catch (verifyErr: any) {
-        console.error("[google-callback] Token verification failed:", verifyErr?.message);
-        return res.redirect("/?google_error=invalid_token");
-      }
-
-      const payload = ticket.getPayload();
-      if (!payload) return res.redirect("/?google_error=invalid_token");
-
-      const googleId = payload.sub;
-      const email = payload.email;
-      const name: string = payload.name || email || "Google User";
-      const profilePicture = payload.picture;
-
-      let user = await storage.getUserByGoogleId(googleId);
-      if (!user && email) {
-        user = await storage.getUserByEmail(email);
-        if (user) {
-          await storage.updateUser(user.id, { googleId, profilePicture, isEmailVerified: true });
-        }
-      }
-
-      // New user — redirect mode cannot show a role selector dialog.
-      // Send them to signup with a hint so they can complete registration.
-      if (!user) {
-        return res.redirect("/signup?google_error=no_account");
-      }
-
-      const sessionId = await createSession(user.id);
-      setSessionCookie(res, sessionId);
-
-      logAuthEvent({
-        event: "google_auth",
-        email: user.email ?? undefined,
-        userId: user.id,
-        ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown",
-        detail: "redirect-mode",
-      });
-
-      res.redirect("/");
-    } catch (error: any) {
-      console.error("[google-callback] Unexpected error:", error);
-      res.redirect("/?google_error=server_error");
-    }
-  });
-
 
   // Get current user
   app.get("/api/auth/me", requireAuth, async (req, res) => {
@@ -942,10 +1021,17 @@ export function registerRoutes(app: Express) {
 
       const realUserId = req.session.realUserId;
       const effectiveUserId = req.session.userId;
-      const isImpersonating = realUserId !== undefined && realUserId !== effectiveUserId;
+      const isImpersonating =
+        realUserId !== undefined && realUserId !== effectiveUserId;
 
       // When impersonating, return the real user's identity so the client can show the correct banner
-      let impersonatedBy: { id: number; name: string; role: string | null; isAdmin: boolean; isSuperAdmin: boolean } | null = null;
+      let impersonatedBy: {
+        id: number;
+        name: string;
+        role: string | null;
+        isAdmin: boolean;
+        isSuperAdmin: boolean;
+      } | null = null;
       if (isImpersonating && realUserId) {
         const realUser = await storage.getUserById(realUserId);
         if (realUser) {
@@ -997,7 +1083,14 @@ export function registerRoutes(app: Express) {
     if (sessionId) {
       await deleteSession(sessionId);
     }
-    logAuthEvent({ event: "logout", userId: req.session.realUserId ?? req.session.userId, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
+    logAuthEvent({
+      event: "logout",
+      userId: req.session.realUserId ?? req.session.userId,
+      ip:
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+        req.socket.remoteAddress ??
+        "unknown",
+    });
     res.clearCookie("lyra_session", { path: "/" });
     res.json({ success: true });
   });
@@ -1131,17 +1224,24 @@ export function registerRoutes(app: Express) {
   // POST /api/auth/forgot-password — send a password reset link
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
-      const schema = z.object({ email: z.string().email("Invalid email address") });
+      const schema = z.object({
+        email: z.string().email("Invalid email address"),
+      });
       const validation = schema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error.errors[0].message });
+        return res
+          .status(400)
+          .json({ error: validation.error.errors[0].message });
       }
       const { email } = validation.data;
       const user = await storage.getUserByEmail(email);
 
       // Always return success to prevent email enumeration
       if (!user) {
-        return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
+        return res.json({
+          success: true,
+          message: "If that email is registered, a reset link has been sent.",
+        });
       }
 
       // Students cannot self-reset — their parent/admin must do it
@@ -1168,7 +1268,10 @@ export function registerRoutes(app: Express) {
         console.error("Failed to send password reset email:", err),
       );
 
-      res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
+      res.json({
+        success: true,
+        message: "If that email is registered, a reset link has been sent.",
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1179,20 +1282,30 @@ export function registerRoutes(app: Express) {
     try {
       const schema = z.object({
         token: z.string().min(1, "Reset token is required"),
-        newPassword: z.string().min(8, "Password must be at least 8 characters").max(100, "Password too long"),
+        newPassword: z
+          .string()
+          .min(8, "Password must be at least 8 characters")
+          .max(100, "Password too long"),
       });
       const validation = schema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error.errors[0].message });
+        return res
+          .status(400)
+          .json({ error: validation.error.errors[0].message });
       }
       const { token, newPassword } = validation.data;
 
       const user = await storage.getUserByPasswordResetToken(token);
       if (!user) {
-        return res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+        return res.status(400).json({
+          error: "Invalid or expired reset link. Please request a new one.",
+        });
       }
 
-      if (!user.passwordResetExpires || new Date(user.passwordResetExpires) < new Date()) {
+      if (
+        !user.passwordResetExpires ||
+        new Date(user.passwordResetExpires) < new Date()
+      ) {
         return res.status(400).json({
           error: "This reset link has expired. Please request a new one.",
           expired: true,
@@ -1210,8 +1323,19 @@ export function registerRoutes(app: Express) {
       // Kill all active sessions so old sessions can't linger
       await prisma.authSession.deleteMany({ where: { userId: user.id } });
 
-      logAuthEvent({ event: "password_reset_success", userId: user.id, email: user.email ?? undefined, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown" });
-      res.json({ success: true, message: "Password reset successfully. You can now log in." });
+      logAuthEvent({
+        event: "password_reset_success",
+        userId: user.id,
+        email: user.email ?? undefined,
+        ip:
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+          req.socket.remoteAddress ??
+          "unknown",
+      });
+      res.json({
+        success: true,
+        message: "Password reset successfully. You can now log in.",
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1238,7 +1362,10 @@ export function registerRoutes(app: Express) {
 
       // Atomically update User.name and Student.name (if a student record exists)
       const [user] = await prisma.$transaction(async (tx) => {
-        const updatedUser = await tx.user.update({ where: { id: userId }, data: { name } });
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: { name },
+        });
         await tx.student.updateMany({ where: { userId }, data: { name } });
         return [updatedUser];
       });
@@ -1425,18 +1552,24 @@ export function registerRoutes(app: Express) {
   // Add a new role to the user's capabilities (e.g. parent adding teacher role)
   app.post("/api/user/add-role", requireAuth, async (req, res) => {
     try {
-      const { role: newRole } = z.object({ role: z.enum(["teacher"]) }).parse(req.body);
+      const { role: newRole } = z
+        .object({ role: z.enum(["teacher"]) })
+        .parse(req.body);
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
       // Only parents can add the teacher role
       const currentRoles: string[] = user.roles ?? [];
       if (!currentRoles.includes("parent")) {
-        return res.status(403).json({ error: "Only parents can add the teacher role" });
+        return res
+          .status(403)
+          .json({ error: "Only parents can add the teacher role" });
       }
 
       if (currentRoles.includes(newRole)) {
-        return res.status(400).json({ error: `You already have the ${newRole} role` });
+        return res
+          .status(400)
+          .json({ error: `You already have the ${newRole} role` });
       }
 
       // Append new role to roles[] and switch active context to new role
@@ -1471,7 +1604,8 @@ export function registerRoutes(app: Express) {
         },
       });
     } catch (error: any) {
-      if (error.name === "ZodError") return res.status(400).json({ error: error.errors[0].message });
+      if (error.name === "ZodError")
+        return res.status(400).json({ error: error.errors[0].message });
       res.status(500).json({ error: error.message });
     }
   });
@@ -1479,7 +1613,9 @@ export function registerRoutes(app: Express) {
   // Switch active role context (for dual-role users)
   app.post("/api/user/switch-active-role", requireAuth, async (req, res) => {
     try {
-      const { role: targetRole } = z.object({ role: z.string().min(1) }).parse(req.body);
+      const { role: targetRole } = z
+        .object({ role: z.string().min(1) })
+        .parse(req.body);
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -1489,7 +1625,9 @@ export function registerRoutes(app: Express) {
       }
       // Nobody can switch into the student role via this endpoint
       if (targetRole === "student") {
-        return res.status(403).json({ error: "Cannot switch to the student role" });
+        return res
+          .status(403)
+          .json({ error: "Cannot switch to the student role" });
       }
 
       let currentRoles: string[] = user.roles ?? [];
@@ -1499,7 +1637,9 @@ export function registerRoutes(app: Express) {
       }
 
       if (!currentRoles.includes(targetRole)) {
-        return res.status(400).json({ error: `You do not have the ${targetRole} role` });
+        return res
+          .status(400)
+          .json({ error: `You do not have the ${targetRole} role` });
       }
 
       const updatedUser = await prisma.user.update({
@@ -1532,7 +1672,8 @@ export function registerRoutes(app: Express) {
         },
       });
     } catch (error: any) {
-      if (error.name === "ZodError") return res.status(400).json({ error: error.errors[0].message });
+      if (error.name === "ZodError")
+        return res.status(400).json({ error: error.errors[0].message });
       res.status(500).json({ error: error.message });
     }
   });
@@ -1597,11 +1738,13 @@ export function registerRoutes(app: Express) {
       }
 
       // Guard: refuse if a pending invite already exists for this email
-      const existingPendingInvite = await storage.getPendingStudentInviteByEmail(data.email);
+      const existingPendingInvite =
+        await storage.getPendingStudentInviteByEmail(data.email);
       if (existingPendingInvite) {
         return res.status(409).json({
           error: "pending_invite_exists",
-          message: "A pending invite was already sent to this email — check your invite list or resend the existing one.",
+          message:
+            "A pending invite was already sent to this email — check your invite list or resend the existing one.",
         });
       }
 
@@ -1661,9 +1804,13 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/invites/student/code/:code", async (req, res) => {
     try {
-      const invite = await storage.getStudentInviteByCode(req.params.code.toUpperCase());
+      const invite = await storage.getStudentInviteByCode(
+        req.params.code.toUpperCase(),
+      );
       if (!invite) {
-        return res.status(404).json({ error: "Invite not found or already used" });
+        return res
+          .status(404)
+          .json({ error: "Invite not found or already used" });
       }
       if (invite.status === "accepted") {
         // Check if the student already has an account so the frontend can redirect them to login
@@ -1671,7 +1818,9 @@ export function registerRoutes(app: Express) {
         if (existingUser) {
           return res.status(409).json({ error: "already_registered" });
         }
-        return res.status(404).json({ error: "Invite not found or already used" });
+        return res
+          .status(404)
+          .json({ error: "Invite not found or already used" });
       }
       if (new Date(invite.expiresDate) < new Date()) {
         return res.status(400).json({ error: "Invite has expired" });
@@ -1691,7 +1840,9 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (user?.role !== "parent") {
-        return res.status(403).json({ error: "Only parents can revoke invites" });
+        return res
+          .status(403)
+          .json({ error: "Only parents can revoke invites" });
       }
       const inviteId = parseInt(req.params.id, 10);
       if (isNaN(inviteId)) {
@@ -1737,9 +1888,17 @@ export function registerRoutes(app: Express) {
       // Augment each student with the classrooms they are enrolled in (for this teacher)
       const teacherClassrooms = await prisma.classroom.findMany({
         where: { teacherId: req.session.userId!, deletedAt: null },
-        select: { id: true, name: true, slug: true, enrollments: { select: { studentId: true } } },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          enrollments: { select: { studentId: true } },
+        },
       });
-      const studentClassroomsMap = new Map<number, { id: number; name: string; slug: string | null }[]>();
+      const studentClassroomsMap = new Map<
+        number,
+        { id: number; name: string; slug: string | null }[]
+      >();
       for (const c of teacherClassrooms) {
         for (const e of c.enrollments) {
           const list = studentClassroomsMap.get(e.studentId) ?? [];
@@ -1747,7 +1906,10 @@ export function registerRoutes(app: Express) {
           studentClassroomsMap.set(e.studentId, list);
         }
       }
-      const augmented = students.map((s) => ({ ...s, classrooms: studentClassroomsMap.get(s.id) ?? [] }));
+      const augmented = students.map((s) => ({
+        ...s,
+        classrooms: studentClassroomsMap.get(s.id) ?? [],
+      }));
 
       res.json(augmented);
     } catch (error: any) {
@@ -1761,7 +1923,8 @@ export function registerRoutes(app: Express) {
       // Only teachers (and admins) may access this endpoint.
       // Check both role (active context) and roles array for compatibility with all account types.
       const caller = await storage.getUserById(req.session.userId!);
-      const isTeacher = caller?.role === "teacher" || caller?.roles?.includes("teacher");
+      const isTeacher =
+        caller?.role === "teacher" || caller?.roles?.includes("teacher");
       if (!caller || (!isTeacher && !caller.isAdmin && !caller.isSuperAdmin)) {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -1785,7 +1948,14 @@ export function registerRoutes(app: Express) {
         take: 30,
         orderBy: { name: "asc" },
       });
-      res.json(students.map((s) => ({ id: s.id, name: s.name, gradeLevel: s.gradeLevel, email: s.user.email })));
+      res.json(
+        students.map((s) => ({
+          id: s.id,
+          name: s.name,
+          gradeLevel: s.gradeLevel,
+          email: s.user.email,
+        })),
+      );
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1796,81 +1966,114 @@ export function registerRoutes(app: Express) {
   app.get("/api/students/me", requireAuth, async (req, res) => {
     try {
       const student = await storage.getStudentByUserId(req.session.userId!);
-      if (!student) return res.status(404).json({ error: "No student profile for this user" });
+      if (!student)
+        return res
+          .status(404)
+          .json({ error: "No student profile for this user" });
       res.json({ id: student.id, name: student.name, userId: student.userId });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/students/:studentId/classroom-notifications", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+  app.get(
+    "/api/students/:studentId/classroom-notifications",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        if (isNaN(studentId))
+          return res.status(400).json({ error: "Invalid student ID" });
 
-      const student = await storage.getStudentById(studentId);
-      if (!student) return res.status(404).json({ error: "Student not found" });
+        const student = await storage.getStudentById(studentId);
+        if (!student)
+          return res.status(404).json({ error: "Student not found" });
 
-      const callerId = req.session.userId!;
-      const isOwner = student.userId === callerId;
-      const isParent = await storage.isTeamMember(callerId, student.id);
-      const relation = await prisma.teacherStudentAssignment.findFirst({
-        where: { teacherId: callerId, studentId: student.id },
-      });
-      const isTeacher = !!relation;
-      const caller = await storage.getUserById(callerId);
-      const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
+        const callerId = req.session.userId!;
+        const isOwner = student.userId === callerId;
+        const isParent = await storage.isTeamMember(callerId, student.id);
+        const relation = await prisma.teacherStudentAssignment.findFirst({
+          where: { teacherId: callerId, studentId: student.id },
+        });
+        const isTeacher = !!relation;
+        const caller = await storage.getUserById(callerId);
+        const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 
-      if (!isOwner && !isParent && !isTeacher && !isAdmin) {
-        return res.status(403).json({ error: "Forbidden" });
+        if (!isOwner && !isParent && !isTeacher && !isAdmin) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+
+        const notifications = await storage.getClassroomNotificationsForStudent(
+          studentId,
+          callerId,
+        );
+        res.json(notifications);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      const notifications = await storage.getClassroomNotificationsForStudent(studentId, callerId);
-      res.json(notifications);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // GET /api/classroom-notifications/total — aggregate pending count for the sidebar badge
-  app.get("/api/classroom-notifications/total", requireAuth, async (req, res) => {
-    try {
-      const userId = req.session.userId!;
-      const user = await storage.getUserById(userId);
-      if (!user) return res.status(401).json({ error: "Unauthorized" });
+  app.get(
+    "/api/classroom-notifications/total",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = req.session.userId!;
+        const user = await storage.getUserById(userId);
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-      if (user.role === "student") {
-        const student = await storage.getStudentByUserId(userId);
-        if (!student) return res.json({ total: 0 });
-        const notifications = await storage.getClassroomNotificationsForStudent(student.id, userId);
-        const total = Object.values(notifications).reduce((sum, n) => sum + n.pendingCount, 0);
-        return res.json({ total });
+        if (user.role === "student") {
+          const student = await storage.getStudentByUserId(userId);
+          if (!student) return res.json({ total: 0 });
+          const notifications =
+            await storage.getClassroomNotificationsForStudent(
+              student.id,
+              userId,
+            );
+          const total = Object.values(notifications).reduce(
+            (sum, n) => sum + n.pendingCount,
+            0,
+          );
+          return res.json({ total });
+        }
+
+        if (user.role === "parent") {
+          const children = await storage.getStudentsByParent(userId);
+          if (!children.length) return res.json({ total: 0 });
+          const allNotifications = await Promise.all(
+            children.map((child) =>
+              storage.getClassroomNotificationsForStudent(child.id, userId),
+            ),
+          );
+          const total = allNotifications.reduce(
+            (sum, notifMap) =>
+              sum +
+              Object.values(notifMap).reduce((s, n) => s + n.pendingCount, 0),
+            0,
+          );
+          return res.json({ total });
+        }
+
+        if (
+          user.role === "teacher" ||
+          (user.roles && user.roles.includes("teacher"))
+        ) {
+          const stats = await storage.getTeacherClassroomStats(userId);
+          const total = Object.values(stats).reduce(
+            (sum, s) => sum + s.toGradeCount,
+            0,
+          );
+          return res.json({ total });
+        }
+
+        res.json({ total: 0 });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      if (user.role === "parent") {
-        const children = await storage.getStudentsByParent(userId);
-        if (!children.length) return res.json({ total: 0 });
-        const allNotifications = await Promise.all(
-          children.map((child) => storage.getClassroomNotificationsForStudent(child.id, userId))
-        );
-        const total = allNotifications.reduce(
-          (sum, notifMap) => sum + Object.values(notifMap).reduce((s, n) => s + n.pendingCount, 0),
-          0
-        );
-        return res.json({ total });
-      }
-
-      if (user.role === "teacher" || (user.roles && user.roles.includes("teacher"))) {
-        const stats = await storage.getTeacherClassroomStats(userId);
-        const total = Object.values(stats).reduce((sum, s) => sum + s.toGradeCount, 0);
-        return res.json({ total });
-      }
-
-      res.json({ total: 0 });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   app.get("/api/teacher/classroom-stats", requireAuth, async (req, res) => {
     try {
@@ -1885,8 +2088,11 @@ export function registerRoutes(app: Express) {
   // GET /api/students/check-username?username=X — check if a username is available
   app.get("/api/students/check-username", requireAuth, async (req, res) => {
     try {
-      const username = String(req.query.username ?? "").trim().toLowerCase();
-      if (!username) return res.status(400).json({ error: "username is required" });
+      const username = String(req.query.username ?? "")
+        .trim()
+        .toLowerCase();
+      if (!username)
+        return res.status(400).json({ error: "username is required" });
       const existing = await storage.getUserByUsername(username);
       res.json({ available: !existing });
     } catch (error: any) {
@@ -1909,7 +2115,8 @@ export function registerRoutes(app: Express) {
   app.get("/api/students/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid student ID" });
+      if (isNaN(id))
+        return res.status(400).json({ error: "Invalid student ID" });
       const student = await storage.getStudentById(id);
       if (!student) return res.status(404).json({ error: "Student not found" });
 
@@ -1937,7 +2144,8 @@ export function registerRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       const existing = await storage.getStudentById(id);
-      if (!existing) return res.status(404).json({ error: "Student not found" });
+      if (!existing)
+        return res.status(404).json({ error: "Student not found" });
 
       const callerId = req.session.userId!;
       const isParent = await storage.isTeamMember(callerId, existing.id);
@@ -1966,7 +2174,8 @@ export function registerRoutes(app: Express) {
   app.get("/api/students/:studentId/team", requireAuth, async (req, res) => {
     try {
       const studentId = parseInt(req.params.studentId);
-      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+      if (isNaN(studentId))
+        return res.status(400).json({ error: "Invalid student ID" });
       const student = await storage.getStudentById(studentId);
       if (!student) return res.status(404).json({ error: "Student not found" });
 
@@ -1974,7 +2183,8 @@ export function registerRoutes(app: Express) {
       const caller = await storage.getUserById(callerId);
       const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
       const isTeamMember = await storage.isTeamMember(callerId, studentId);
-      if (!isTeamMember && !isAdmin) return res.status(403).json({ error: "Forbidden" });
+      if (!isTeamMember && !isAdmin)
+        return res.status(403).json({ error: "Forbidden" });
 
       const team = await storage.getChildTeam(studentId);
       res.json(team);
@@ -1984,73 +2194,93 @@ export function registerRoutes(app: Express) {
   });
 
   // POST /api/students/:studentId/team/invite — invite a co-parent (owner only)
-  app.post("/api/students/:studentId/team/invite", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
-      const student = await storage.getStudentById(studentId);
-      if (!student) return res.status(404).json({ error: "Student not found" });
-
-      const callerId = req.session.userId!;
-      if (!await assertTeamOwner(callerId, studentId, res)) return;
-
-      const schema = z.object({
-        email: z.string().email("Valid email required"),
-        role: z.enum(["owner", "member"]).default("member"),
-      });
-      const parse = schema.safeParse(req.body);
-      if (!parse.success) return res.status(400).json({ error: parse.error.errors[0].message });
-      const { email: rawInviteEmail, role } = parse.data;
-      const email = normalizeEmail(rawInviteEmail);
-
-      // Check if the email is already a team member
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        const already = await storage.isTeamMember(existingUser.id, studentId);
-        if (already) return res.status(409).json({ error: "This person is already on the team" });
-      }
-
-      // Check no duplicate pending invite for this email + child
-      const dupeInvite = await prisma.childTeamMember.findFirst({
-        where: { childId: studentId, inviteEmail: { equals: email, mode: "insensitive" }, status: "pending" },
-      });
-      if (dupeInvite) return res.status(409).json({ error: "An invite has already been sent to this email" });
-
-      const token = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-      const inviter = await storage.getUserById(callerId);
-      const member = await storage.createChildTeamMember({
-        childId: studentId,
-        // parentId stays null until the invitee accepts; if they already have an account we set it now
-        parentId: existingUser?.id ?? null,
-        role,
-        status: "pending",
-        invitedBy: callerId,
-        inviteToken: token,
-        inviteEmail: email,
-        inviteExpiresAt: expiresAt,
-      });
-
-      // Send invite email
+  app.post(
+    "/api/students/:studentId/team/invite",
+    requireAuth,
+    async (req, res) => {
       try {
-        await sendTeamInviteEmail({
-          toEmail: email,
-          inviterName: inviter?.name ?? "Someone",
-          studentName: student.name,
-          role,
-          token,
-          expiresAt,
-        });
-      } catch (emailErr) {
-        console.error("Failed to send team invite email:", emailErr);
-      }
+        const studentId = parseInt(req.params.studentId);
+        if (isNaN(studentId))
+          return res.status(400).json({ error: "Invalid student ID" });
+        const student = await storage.getStudentById(studentId);
+        if (!student)
+          return res.status(404).json({ error: "Student not found" });
 
-      res.json({ ok: true, member });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+        const callerId = req.session.userId!;
+        if (!(await assertTeamOwner(callerId, studentId, res))) return;
+
+        const schema = z.object({
+          email: z.string().email("Valid email required"),
+          role: z.enum(["owner", "member"]).default("member"),
+        });
+        const parse = schema.safeParse(req.body);
+        if (!parse.success)
+          return res.status(400).json({ error: parse.error.errors[0].message });
+        const { email: rawInviteEmail, role } = parse.data;
+        const email = normalizeEmail(rawInviteEmail);
+
+        // Check if the email is already a team member
+        const existingUser = await storage.getUserByEmail(email);
+        if (existingUser) {
+          const already = await storage.isTeamMember(
+            existingUser.id,
+            studentId,
+          );
+          if (already)
+            return res
+              .status(409)
+              .json({ error: "This person is already on the team" });
+        }
+
+        // Check no duplicate pending invite for this email + child
+        const dupeInvite = await prisma.childTeamMember.findFirst({
+          where: {
+            childId: studentId,
+            inviteEmail: { equals: email, mode: "insensitive" },
+            status: "pending",
+          },
+        });
+        if (dupeInvite)
+          return res
+            .status(409)
+            .json({ error: "An invite has already been sent to this email" });
+
+        const token = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        const inviter = await storage.getUserById(callerId);
+        const member = await storage.createChildTeamMember({
+          childId: studentId,
+          // parentId stays null until the invitee accepts; if they already have an account we set it now
+          parentId: existingUser?.id ?? null,
+          role,
+          status: "pending",
+          invitedBy: callerId,
+          inviteToken: token,
+          inviteEmail: email,
+          inviteExpiresAt: expiresAt,
+        });
+
+        // Send invite email
+        try {
+          await sendTeamInviteEmail({
+            toEmail: email,
+            inviterName: inviter?.name ?? "Someone",
+            studentName: student.name,
+            role,
+            token,
+            expiresAt,
+          });
+        } catch (emailErr) {
+          console.error("Failed to send team invite email:", emailErr);
+        }
+
+        res.json({ ok: true, member });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/team-invite/:token — get invite info (unauthenticated, for invite acceptance page)
   // Always returns 200 with a status field so the UI can handle all states without HTTP error codes.
@@ -2061,11 +2291,18 @@ export function registerRoutes(app: Express) {
         return res.json({
           status: "not_found",
           isExpired: false,
-          childId: null, childName: null, childGradeLevel: null,
-          inviterName: null, role: null, inviteEmail: null, expiresAt: null,
+          childId: null,
+          childName: null,
+          childGradeLevel: null,
+          inviterName: null,
+          role: null,
+          inviteEmail: null,
+          expiresAt: null,
         });
       }
-      const isExpired = !!(invite.inviteExpiresAt && new Date(invite.inviteExpiresAt) < new Date());
+      const isExpired = !!(
+        invite.inviteExpiresAt && new Date(invite.inviteExpiresAt) < new Date()
+      );
       res.json({
         status: isExpired ? "expired" : "pending",
         isExpired,
@@ -2083,65 +2320,79 @@ export function registerRoutes(app: Express) {
   });
 
   // POST /api/students/:studentId/team/invite/:token/resend — resend invite email (owner only)
-  app.post("/api/students/:studentId/team/invite/:token/resend", requireAuth, async (req, res) => {
-    try {
-      const callerId = req.session.userId!;
-      const { token } = req.params;
-      const studentId = parseInt(req.params.studentId);
+  app.post(
+    "/api/students/:studentId/team/invite/:token/resend",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const callerId = req.session.userId!;
+        const { token } = req.params;
+        const studentId = parseInt(req.params.studentId);
 
-      const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, childId: studentId, status: "pending" } });
-      if (!membership) return res.status(404).json({ error: "Pending invite not found" });
+        const membership = await prisma.childTeamMember.findFirst({
+          where: { inviteToken: token, childId: studentId, status: "pending" },
+        });
+        if (!membership)
+          return res.status(404).json({ error: "Pending invite not found" });
 
-      if (!await assertTeamOwner(callerId, studentId, res)) return;
+        if (!(await assertTeamOwner(callerId, studentId, res))) return;
 
-      const newToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await prisma.childTeamMember.update({
-        where: { id: membership.id },
-        data: { inviteToken: newToken, inviteExpiresAt: expiresAt },
-      });
+        const newToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await prisma.childTeamMember.update({
+          where: { id: membership.id },
+          data: { inviteToken: newToken, inviteExpiresAt: expiresAt },
+        });
 
-      const student = await storage.getStudentById(membership.childId);
-      const inviter = await storage.getUserById(callerId);
-      if (membership.inviteEmail && student) {
-        try {
-          await sendTeamInviteEmail({
-            toEmail: membership.inviteEmail,
-            inviterName: inviter?.name ?? "Someone",
-            studentName: student.name,
-            role: membership.role as "owner" | "member",
-            token: newToken,
-            expiresAt,
-          });
-        } catch (emailErr) {
-          console.error("Failed to resend team invite email:", emailErr);
+        const student = await storage.getStudentById(membership.childId);
+        const inviter = await storage.getUserById(callerId);
+        if (membership.inviteEmail && student) {
+          try {
+            await sendTeamInviteEmail({
+              toEmail: membership.inviteEmail,
+              inviterName: inviter?.name ?? "Someone",
+              studentName: student.name,
+              role: membership.role as "owner" | "member",
+              token: newToken,
+              expiresAt,
+            });
+          } catch (emailErr) {
+            console.error("Failed to resend team invite email:", emailErr);
+          }
         }
-      }
 
-      res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+        res.json({ ok: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // DELETE /api/students/:studentId/team/invite/:token — cancel a pending invite (owner only)
-  app.delete("/api/students/:studentId/team/invite/:token", requireAuth, async (req, res) => {
-    try {
-      const callerId = req.session.userId!;
-      const { token } = req.params;
-      const studentId = parseInt(req.params.studentId);
+  app.delete(
+    "/api/students/:studentId/team/invite/:token",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const callerId = req.session.userId!;
+        const { token } = req.params;
+        const studentId = parseInt(req.params.studentId);
 
-      const membership = await prisma.childTeamMember.findFirst({ where: { inviteToken: token, childId: studentId, status: "pending" } });
-      if (!membership) return res.status(404).json({ error: "Pending invite not found" });
+        const membership = await prisma.childTeamMember.findFirst({
+          where: { inviteToken: token, childId: studentId, status: "pending" },
+        });
+        if (!membership)
+          return res.status(404).json({ error: "Pending invite not found" });
 
-      if (!await assertTeamOwner(callerId, studentId, res)) return;
+        if (!(await assertTeamOwner(callerId, studentId, res))) return;
 
-      await storage.removeTeamMember(membership.id);
-      res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+        await storage.removeTeamMember(membership.id);
+        res.json({ ok: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/team-invite/:token/accept — accept a team invite (authenticated)
   app.post("/api/team-invite/:token/accept", requireAuth, async (req, res) => {
@@ -2150,23 +2401,37 @@ export function registerRoutes(app: Express) {
       const userId = req.session.userId!;
 
       const invite = await storage.getTeamInviteByToken(token);
-      if (!invite) return res.status(404).json({ error: "Invite not found or already accepted" });
-      if (invite.inviteExpiresAt && new Date(invite.inviteExpiresAt) < new Date()) {
+      if (!invite)
+        return res
+          .status(404)
+          .json({ error: "Invite not found or already accepted" });
+      if (
+        invite.inviteExpiresAt &&
+        new Date(invite.inviteExpiresAt) < new Date()
+      ) {
         return res.status(410).json({ error: "Invite has expired" });
       }
 
       // Verify the user's email matches the invite email
       const user = await storage.getUserById(userId);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      if (invite.inviteEmail && (user.email ?? "").toLowerCase() !== invite.inviteEmail.toLowerCase()) {
-        return res.status(403).json({ error: "This invite was sent to a different email address" });
+      if (
+        invite.inviteEmail &&
+        (user.email ?? "").toLowerCase() !== invite.inviteEmail.toLowerCase()
+      ) {
+        return res
+          .status(403)
+          .json({ error: "This invite was sent to a different email address" });
       }
 
       // Check for duplicate (user already on team)
       const existing = await prisma.childTeamMember.findFirst({
         where: { childId: invite.childId, parentId: userId, status: "active" },
       });
-      if (existing) return res.status(409).json({ error: "You are already on this child's team" });
+      if (existing)
+        return res
+          .status(409)
+          .json({ error: "You are already on this child's team" });
 
       const member = await storage.acceptTeamInvite(token, userId);
 
@@ -2175,13 +2440,18 @@ export function registerRoutes(app: Express) {
       // who accepts a co-parent invite should stay a teacher. We only flip the primary
       // role to "parent" when the user has no meaningful role yet (e.g. plain signup).
       if (!user.roles?.includes("parent")) {
-        const isTeacher = user.role === "teacher" || user.roles?.includes("teacher");
-        const existingRoles: string[] = user.roles ?? (user.role ? [user.role] : []);
+        const isTeacher =
+          user.role === "teacher" || user.roles?.includes("teacher");
+        const existingRoles: string[] =
+          user.roles ?? (user.role ? [user.role] : []);
         const newRoles = Array.from(new Set([...existingRoles, "parent"]));
         // Only promote the primary role to "parent" when the user isn't already a teacher.
         // Teachers keep their primary role; "parent" is just appended to their roles array.
         const primaryRole = isTeacher ? user.role : "parent";
-        await storage.updateUser(userId, { role: primaryRole, roles: newRoles });
+        await storage.updateUser(userId, {
+          role: primaryRole,
+          roles: newRoles,
+        });
       }
 
       // Notify all existing owners that someone accepted the invite
@@ -2191,13 +2461,15 @@ export function registerRoutes(app: Express) {
         ownerIds
           .filter((oid) => oid !== userId)
           .forEach((oid) => {
-            storage.createNotification({
-              userId: oid,
-              type: "team_invite_accepted",
-              title: "Family team invitation accepted",
-              body: `${user.name} has joined ${childStudent.name}'s family team as ${member.role}.`,
-              link: "/children",
-            }).catch(console.error);
+            storage
+              .createNotification({
+                userId: oid,
+                type: "team_invite_accepted",
+                title: "Family team invitation accepted",
+                body: `${user.name} has joined ${childStudent.name}'s family team as ${member.role}.`,
+                link: "/children",
+              })
+              .catch(console.error);
           });
       }
 
@@ -2208,90 +2480,129 @@ export function registerRoutes(app: Express) {
   });
 
   // PATCH /api/students/:studentId/team/:memberId — change role (owner only)
-  app.patch("/api/students/:studentId/team/:memberId", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      const memberId = parseInt(req.params.memberId);
-      const callerId = req.session.userId!;
+  app.patch(
+    "/api/students/:studentId/team/:memberId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        const memberId = parseInt(req.params.memberId);
+        const callerId = req.session.userId!;
 
-      if (!await assertTeamOwner(callerId, studentId, res)) return;
+        if (!(await assertTeamOwner(callerId, studentId, res))) return;
 
-      // Validate the membership record belongs to this child (prevent cross-child tampering)
-      const membership = await prisma.childTeamMember.findFirst({ where: { id: memberId, childId: studentId } });
-      if (!membership) return res.status(404).json({ error: "Team member not found" });
+        // Validate the membership record belongs to this child (prevent cross-child tampering)
+        const membership = await prisma.childTeamMember.findFirst({
+          where: { id: memberId, childId: studentId },
+        });
+        if (!membership)
+          return res.status(404).json({ error: "Team member not found" });
 
-      const schema = z.object({ role: z.enum(["owner", "member"]) });
-      const parse = schema.safeParse(req.body);
-      if (!parse.success) return res.status(400).json({ error: "role must be 'owner' or 'member'" });
+        const schema = z.object({ role: z.enum(["owner", "member"]) });
+        const parse = schema.safeParse(req.body);
+        if (!parse.success)
+          return res
+            .status(400)
+            .json({ error: "role must be 'owner' or 'member'" });
 
-      // Prevent demoting the last owner
-      if (parse.data.role === "member") {
-        const ownerCount = await storage.countTeamOwners(studentId);
-        if (ownerCount <= 1) return res.status(400).json({ error: "At least one Owner is required — promote another member to Owner before demoting this one." });
+        // Prevent demoting the last owner
+        if (parse.data.role === "member") {
+          const ownerCount = await storage.countTeamOwners(studentId);
+          if (ownerCount <= 1)
+            return res.status(400).json({
+              error:
+                "At least one Owner is required — promote another member to Owner before demoting this one.",
+            });
+        }
+
+        const member = await storage.updateTeamMemberRole(
+          memberId,
+          parse.data.role,
+        );
+        res.json(member);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      const member = await storage.updateTeamMemberRole(memberId, parse.data.role);
-      res.json(member);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // DELETE /api/students/:studentId/team/:memberId — remove member (owner only)
-  app.delete("/api/students/:studentId/team/:memberId", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      const memberId = parseInt(req.params.memberId);
-      const callerId = req.session.userId!;
+  app.delete(
+    "/api/students/:studentId/team/:memberId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        const memberId = parseInt(req.params.memberId);
+        const callerId = req.session.userId!;
 
-      // Only team owners can remove members (including themselves)
-      if (!await assertTeamOwner(callerId, studentId, res)) return;
+        // Only team owners can remove members (including themselves)
+        if (!(await assertTeamOwner(callerId, studentId, res))) return;
 
-      // Find the membership record
-      const membership = await prisma.childTeamMember.findFirst({
-        where: { id: memberId, childId: studentId },
-      });
-      if (!membership) return res.status(404).json({ error: "Team member not found" });
+        // Find the membership record
+        const membership = await prisma.childTeamMember.findFirst({
+          where: { id: memberId, childId: studentId },
+        });
+        if (!membership)
+          return res.status(404).json({ error: "Team member not found" });
 
-      // Prevent removing the last owner
-      if (membership.role === "owner" || membership.status === "active") {
-        const ownerCount = await storage.countTeamOwners(studentId);
-        if (ownerCount <= 1 && membership.role === "owner") {
-          return res.status(400).json({ error: "At least one Owner is required — promote another member to Owner before removing this one." });
+        // Prevent removing the last owner
+        if (membership.role === "owner" || membership.status === "active") {
+          const ownerCount = await storage.countTeamOwners(studentId);
+          if (ownerCount <= 1 && membership.role === "owner") {
+            return res.status(400).json({
+              error:
+                "At least one Owner is required — promote another member to Owner before removing this one.",
+            });
+          }
         }
-      }
 
-      await storage.removeTeamMember(memberId);
-      res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+        await storage.removeTeamMember(memberId);
+        res.json({ ok: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // resend and cancel are now token-based: POST /api/team-invite/:token/resend and DELETE /api/team-invite/:token
 
   // POST /api/students/:studentId/reset-login — reset a student's login credentials (team owner only)
-  app.post("/api/students/:studentId/reset-login", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+  app.post(
+    "/api/students/:studentId/reset-login",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        if (isNaN(studentId))
+          return res.status(400).json({ error: "Invalid student ID" });
 
-      const callerId = req.session.userId!;
-      const student = await storage.getStudentById(studentId);
-      if (!student) {
-        return res.status(404).json({ error: "Student account not found — they may not have completed signup yet." });
+        const callerId = req.session.userId!;
+        const student = await storage.getStudentById(studentId);
+        if (!student) {
+          return res.status(404).json({
+            error:
+              "Student account not found — they may not have completed signup yet.",
+          });
+        }
+
+        const isOwner = await storage.isTeamOwner(callerId, studentId);
+        if (!isOwner)
+          return res
+            .status(403)
+            .json({ error: "Only owners can reset login credentials" });
+
+        const caller = await storage.getUserById(callerId);
+        const tempPassword = await resetStudentAccount(
+          student.userId,
+          `parent(${caller?.name ?? callerId})`,
+        );
+        res.json({ tempPassword });
+      } catch (error: any) {
+        res.status(error.status ?? 500).json({ error: error.message });
       }
-
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-      if (!isOwner) return res.status(403).json({ error: "Only owners can reset login credentials" });
-
-      const caller = await storage.getUserById(callerId);
-      const tempPassword = await resetStudentAccount(student.userId, `parent(${caller?.name ?? callerId})`);
-      res.json({ tempPassword });
-    } catch (error: any) {
-      res.status(error.status ?? 500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // POST /api/students/create-direct — parent creates a managed student account (username login, no email needed)
   app.post("/api/students/create-direct", requireAuth, async (req, res) => {
@@ -2299,22 +2610,36 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const caller = await storage.getUserById(callerId);
       if (!caller || !caller.roles?.includes("parent")) {
-        return res.status(403).json({ error: "Only parents can create student accounts directly" });
+        return res
+          .status(403)
+          .json({ error: "Only parents can create student accounts directly" });
       }
 
-      const { name, gradeLevel, password, username: requestedUsername } = req.body;
+      const {
+        name,
+        gradeLevel,
+        password,
+        username: requestedUsername,
+      } = req.body;
       if (!name?.trim() || !password) {
-        return res.status(400).json({ error: "Name and password are required" });
+        return res
+          .status(400)
+          .json({ error: "Name and password are required" });
       }
       if (password.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters" });
+        return res
+          .status(400)
+          .json({ error: "Password must be at least 6 characters" });
       }
 
       let username: string;
       if (requestedUsername?.trim()) {
         const cleaned = requestedUsername.trim().toLowerCase();
         if (!/^[a-z0-9][a-z0-9.]{1,18}[a-z0-9]$/.test(cleaned)) {
-          return res.status(400).json({ error: "Username must be 3–20 characters, letters/numbers/dots only, and cannot start or end with a dot." });
+          return res.status(400).json({
+            error:
+              "Username must be 3–20 characters, letters/numbers/dots only, and cannot start or end with a dot.",
+          });
         }
         const taken = await storage.getUserByUsername(cleaned);
         if (taken) {
@@ -2372,7 +2697,8 @@ export function registerRoutes(app: Express) {
         throw err;
       }
 
-      const tutorRequestModeSetting = await storage.getSystemSetting("TUTOR_REQUEST_MODE");
+      const tutorRequestModeSetting =
+        await storage.getSystemSetting("TUTOR_REQUEST_MODE");
       const isTutorRequestMode = tutorRequestModeSetting?.value === "true";
 
       if (!isTutorRequestMode) {
@@ -2403,18 +2729,23 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.realUserId ?? req.session.userId!;
       const caller = await storage.getUserById(callerId);
       if (!caller || !caller.roles?.includes("parent")) {
-        return res.status(403).json({ error: "Only parents can use this endpoint" });
+        return res
+          .status(403)
+          .json({ error: "Only parents can use this endpoint" });
       }
 
       const { studentId } = req.body as { studentId?: number };
-      if (!studentId) return res.status(400).json({ error: "studentId is required" });
+      if (!studentId)
+        return res.status(400).json({ error: "studentId is required" });
 
       const student = await storage.getStudentById(Number(studentId));
       if (!student) return res.status(404).json({ error: "Student not found" });
 
       const isMember = await storage.isTeamMember(callerId, student.id);
       if (!isMember) {
-        return res.status(403).json({ error: "You do not have access to this child's account" });
+        return res
+          .status(403)
+          .json({ error: "You do not have access to this child's account" });
       }
 
       // Server-side impersonation: update the parent's session instead of creating a child session.
@@ -2443,56 +2774,74 @@ export function registerRoutes(app: Express) {
   });
 
   // PATCH /api/students/:studentId/edit-profile — owner edits student name, grade level, email
-  app.patch("/api/students/:studentId/edit-profile", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      if (isNaN(studentId)) return res.status(400).json({ error: "Invalid student ID" });
+  app.patch(
+    "/api/students/:studentId/edit-profile",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        if (isNaN(studentId))
+          return res.status(400).json({ error: "Invalid student ID" });
 
-      const callerId = req.session.userId!;
-      const student = await storage.getStudentById(studentId);
-      if (!student) return res.status(404).json({ error: "Student not found" });
+        const callerId = req.session.userId!;
+        const student = await storage.getStudentById(studentId);
+        if (!student)
+          return res.status(404).json({ error: "Student not found" });
 
-      const isOwner = await storage.isTeamOwner(callerId, studentId);
-      if (!isOwner) return res.status(403).json({ error: "Only owners can edit student details" });
+        const isOwner = await storage.isTeamOwner(callerId, studentId);
+        if (!isOwner)
+          return res
+            .status(403)
+            .json({ error: "Only owners can edit student details" });
 
-      const { name, gradeLevel, email } = req.body;
+        const { name, gradeLevel, email } = req.body;
 
-      const userUpdates: Record<string, any> = {};
-      if (name?.trim()) userUpdates.name = name.trim();
-      if (email?.trim()) {
-        const trimmedEmail = email.trim().toLowerCase();
-        const existing = await storage.getUserByEmail(trimmedEmail);
-        if (existing && existing.id !== student.userId) {
-          return res.status(409).json({ error: "An account with this email already exists" });
+        const userUpdates: Record<string, any> = {};
+        if (name?.trim()) userUpdates.name = name.trim();
+        if (email?.trim()) {
+          const trimmedEmail = email.trim().toLowerCase();
+          const existing = await storage.getUserByEmail(trimmedEmail);
+          if (existing && existing.id !== student.userId) {
+            return res
+              .status(409)
+              .json({ error: "An account with this email already exists" });
+          }
+          userUpdates.email = trimmedEmail;
         }
-        userUpdates.email = trimmedEmail;
+
+        const studentUpdates: Record<string, any> = {};
+        if (name?.trim()) studentUpdates.name = name.trim();
+        if (gradeLevel !== undefined)
+          studentUpdates.gradeLevel = gradeLevel?.trim() || "";
+
+        const hasUserUpdates = Object.keys(userUpdates).length > 0;
+        const hasStudentUpdates = Object.keys(studentUpdates).length > 0;
+
+        let updatedStudent = student;
+        if (hasUserUpdates || hasStudentUpdates) {
+          [, updatedStudent] = (await prisma.$transaction([
+            hasUserUpdates
+              ? prisma.user.update({
+                  where: { id: student.userId },
+                  data: userUpdates,
+                })
+              : prisma.user.findUnique({ where: { id: student.userId } }),
+            hasStudentUpdates
+              ? prisma.student.update({
+                  where: { id: studentId },
+                  data: studentUpdates,
+                })
+              : prisma.student.findUnique({ where: { id: studentId } }),
+          ])) as [any, any];
+          updatedStudent = updatedStudent ?? student;
+        }
+
+        res.json({ student: updatedStudent });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      const studentUpdates: Record<string, any> = {};
-      if (name?.trim()) studentUpdates.name = name.trim();
-      if (gradeLevel !== undefined) studentUpdates.gradeLevel = gradeLevel?.trim() || "";
-
-      const hasUserUpdates = Object.keys(userUpdates).length > 0;
-      const hasStudentUpdates = Object.keys(studentUpdates).length > 0;
-
-      let updatedStudent = student;
-      if (hasUserUpdates || hasStudentUpdates) {
-        [, updatedStudent] = await prisma.$transaction([
-          hasUserUpdates
-            ? prisma.user.update({ where: { id: student.userId }, data: userUpdates })
-            : prisma.user.findUnique({ where: { id: student.userId } }),
-          hasStudentUpdates
-            ? prisma.student.update({ where: { id: studentId }, data: studentUpdates })
-            : prisma.student.findUnique({ where: { id: studentId } }),
-        ]) as [any, any];
-        updatedStudent = updatedStudent ?? student;
-      }
-
-      res.json({ student: updatedStudent });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // ========== ASSIGNMENT ROUTES ==========
 
@@ -2533,13 +2882,15 @@ export function registerRoutes(app: Express) {
         });
         // Notify the student
         if (student.userId) {
-          storage.createNotification({
-            userId: student.userId,
-            type: "new_assignment",
-            title: "New Assignment",
-            body: `You have a new assignment: "${assignment.title}"`,
-            link: "/dashboard/classrooms",
-          }).catch(console.error);
+          storage
+            .createNotification({
+              userId: student.userId,
+              type: "new_assignment",
+              title: "New Assignment",
+              body: `You have a new assignment: "${assignment.title}"`,
+              link: "/dashboard/classrooms",
+            })
+            .catch(console.error);
           maybeEmailNotification(student.userId, {
             title: "New Assignment",
             body: `You have a new assignment: "${assignment.title}"`,
@@ -2620,13 +2971,15 @@ export function registerRoutes(app: Express) {
             submittedAt: null,
           });
           if (student.userId) {
-            storage.createNotification({
-              userId: student.userId,
-              type: "new_assignment",
-              title: "New Assignment",
-              body: `You have a new assignment: "${assignment.title}"`,
-              link: "/dashboard/classrooms",
-            }).catch(console.error);
+            storage
+              .createNotification({
+                userId: student.userId,
+                type: "new_assignment",
+                title: "New Assignment",
+                body: `You have a new assignment: "${assignment.title}"`,
+                link: "/dashboard/classrooms",
+              })
+              .catch(console.error);
             maybeEmailNotification(student.userId, {
               title: "New Assignment",
               body: `You have a new assignment: "${assignment.title}"`,
@@ -2671,11 +3024,13 @@ export function registerRoutes(app: Express) {
               const assignment = await storage.getAssignmentById(
                 sa.assignmentId,
               );
-              const teacher = await storage.getUserById(assignment?.teacherId || 0);
-              return { 
-                ...assignment, 
+              const teacher = await storage.getUserById(
+                assignment?.teacherId || 0,
+              );
+              return {
+                ...assignment,
                 studentAssignment: sa,
-                teacherName: teacher?.name || null
+                teacherName: teacher?.name || null,
               };
             }),
           );
@@ -2691,7 +3046,9 @@ export function registerRoutes(app: Express) {
             where: { studentId, status: "approved" },
             select: { teacherId: true },
           });
-          const assignedTeacherIds = new Set(approvedRequests.map((r) => r.teacherId));
+          const assignedTeacherIds = new Set(
+            approvedRequests.map((r) => r.teacherId),
+          );
 
           // Get any existing student assignments to show submission status
           const studentAssignments =
@@ -2717,9 +3074,9 @@ export function registerRoutes(app: Express) {
                   ...assignment,
                   studentAssignment:
                     studentAssignmentMap.get(assignment.id) || null,
-                  teacherName: teacher?.name || null
+                  teacherName: teacher?.name || null,
                 };
-              })
+              }),
           );
 
           res.json(assignmentsWithTeachers);
@@ -2742,7 +3099,10 @@ export function registerRoutes(app: Express) {
       }
 
       // Only teachers can view individual assignments, and only their own
-      if (user?.role !== "teacher" && !user?.roles?.includes("teacher") || assignment.teacherId !== user.id) {
+      if (
+        (user?.role !== "teacher" && !user?.roles?.includes("teacher")) ||
+        assignment.teacherId !== user.id
+      ) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -2825,11 +3185,13 @@ export function registerRoutes(app: Express) {
     async (req: any, res) => {
       try {
         const saId = parseInt(req.params.id);
-        if (isNaN(saId)) return res.status(400).json({ error: "Invalid assignment ID" });
+        if (isNaN(saId))
+          return res.status(400).json({ error: "Invalid assignment ID" });
 
         // Ownership check: verify the caller is the student who owns this record
         const existingSa = await storage.getStudentAssignmentById(saId);
-        if (!existingSa) return res.status(404).json({ error: "Assignment not found" });
+        if (!existingSa)
+          return res.status(404).json({ error: "Assignment not found" });
 
         const ownerStudent = await storage.getStudentById(existingSa.studentId);
         if (!ownerStudent || ownerStudent.userId !== req.session.userId) {
@@ -2874,7 +3236,9 @@ export function registerRoutes(app: Express) {
         const { studentId, submission, notes } = req.body;
 
         // Ownership check: caller must be the student referenced in the request
-        const callerStudent = await storage.getStudentByUserId(req.session.userId!);
+        const callerStudent = await storage.getStudentByUserId(
+          req.session.userId!,
+        );
         if (!callerStudent || callerStudent.id !== parseInt(studentId)) {
           return res.status(403).json({ error: "Forbidden" });
         }
@@ -2986,13 +3350,15 @@ export function registerRoutes(app: Express) {
         // so there is no explicit classroom association to deep-link to. Dashboard links are
         // the correct fallback here — classroom grading uses /classrooms/{id} instead.
         if (student?.userId) {
-          storage.createNotification({
-            userId: student.userId,
-            type: "assignment_graded",
-            title: "Assignment Graded",
-            body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
-            link: "/dashboard/classrooms",
-          }).catch(console.error);
+          storage
+            .createNotification({
+              userId: student.userId,
+              type: "assignment_graded",
+              title: "Assignment Graded",
+              body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
+              link: "/dashboard/classrooms",
+            })
+            .catch(console.error);
           maybeEmailNotification(student.userId, {
             title: "Assignment Graded",
             body: `Your assignment "${assignment?.title ?? "submission"}" has been graded: ${grade}%`,
@@ -3002,25 +3368,30 @@ export function registerRoutes(app: Express) {
 
         // Also notify all team parents when a child's assignment is graded
         if (student) {
-          storage.getTeamMemberUserIds(student.id).then((parentIds) => {
-            const teacherId = req.session.userId!;
-            parentIds
-              .filter((pid) => pid !== teacherId)
-              .forEach((pid) => {
-                storage.createNotification({
-                  userId: pid,
-                  type: "assignment_graded",
-                  title: "Assignment Graded",
-                  body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
-                  link: "/dashboard/children",
-                }).catch(console.error);
-                maybeEmailNotification(pid, {
-                  title: "Assignment Graded",
-                  body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
-                  link: "/dashboard/children",
-                }).catch(() => {});
-              });
-          }).catch(console.error);
+          storage
+            .getTeamMemberUserIds(student.id)
+            .then((parentIds) => {
+              const teacherId = req.session.userId!;
+              parentIds
+                .filter((pid) => pid !== teacherId)
+                .forEach((pid) => {
+                  storage
+                    .createNotification({
+                      userId: pid,
+                      type: "assignment_graded",
+                      title: "Assignment Graded",
+                      body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
+                      link: "/dashboard/children",
+                    })
+                    .catch(console.error);
+                  maybeEmailNotification(pid, {
+                    title: "Assignment Graded",
+                    body: `${student.name}'s assignment "${assignment?.title ?? "submission"}" was graded: ${grade}%`,
+                    link: "/dashboard/children",
+                  }).catch(() => {});
+                });
+            })
+            .catch(console.error);
         }
 
         res.json(sa);
@@ -3210,9 +3581,9 @@ export function registerRoutes(app: Express) {
             const teacher = await storage.getUserById(material.teacherId);
             return {
               ...material,
-              teacherName: teacher?.name || null
+              teacherName: teacher?.name || null,
             };
-          })
+          }),
         );
 
         res.json(materialsWithTeacher);
@@ -3232,10 +3603,15 @@ export function registerRoutes(app: Express) {
 
       // Authorization: the student themselves, the student's parent, or an assigned/approved teacher
       const requestingUser = await storage.getUserById(req.session.userId!);
-      if (!requestingUser) return res.status(401).json({ error: "Unauthorized" });
+      if (!requestingUser)
+        return res.status(401).json({ error: "Unauthorized" });
 
-      const isOwnStudent = requestingUser.role === "student" && student.userId === requestingUser.id;
-      const isParent = requestingUser.role === "parent" && await storage.isTeamMember(requestingUser.id, student.id);
+      const isOwnStudent =
+        requestingUser.role === "student" &&
+        student.userId === requestingUser.id;
+      const isParent =
+        requestingUser.role === "parent" &&
+        (await storage.isTeamMember(requestingUser.id, student.id));
 
       const isTutorMode = await isTutorRequestModeEnabled();
 
@@ -3247,7 +3623,11 @@ export function registerRoutes(app: Express) {
         } else {
           // In tutor-request mode, approved TutorRequest is the single source of truth
           const approvedRequest = await prisma.tutorRequest.findFirst({
-            where: { teacherId: requestingUser.id, status: "approved", studentId },
+            where: {
+              teacherId: requestingUser.id,
+              status: "approved",
+              studentId,
+            },
           });
           isAssignedTeacher = !!approvedRequest;
         }
@@ -3268,7 +3648,11 @@ export function registerRoutes(app: Express) {
         return res.json(null);
       }
       const teacher = await storage.getUserById(allRequests[0].teacherId);
-      return res.json(teacher ? { id: teacher.id, name: teacher.name, email: teacher.email } : null);
+      return res.json(
+        teacher
+          ? { id: teacher.id, name: teacher.name, email: teacher.email }
+          : null,
+      );
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -3284,7 +3668,10 @@ export function registerRoutes(app: Express) {
       }
 
       // Only teachers can view individual materials, and only their own
-      if (user?.role !== "teacher" && !user?.roles?.includes("teacher") || material.teacherId !== user.id) {
+      if (
+        (user?.role !== "teacher" && !user?.roles?.includes("teacher")) ||
+        material.teacherId !== user.id
+      ) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -3479,9 +3866,9 @@ export function registerRoutes(app: Express) {
           const teacher = await storage.getUserById(session.teacherId);
           return {
             ...session,
-            teacherName: teacher?.name || null
+            teacherName: teacher?.name || null,
           };
-        })
+        }),
       );
 
       res.json(sessionsWithTeacher);
@@ -3500,7 +3887,10 @@ export function registerRoutes(app: Express) {
 
       const user = await storage.getUserById(req.session.userId!);
       // Only teachers can view individual sessions, and only their own
-      if (user?.role !== "teacher" && !user?.roles?.includes("teacher") || session.teacherId !== user.id) {
+      if (
+        (user?.role !== "teacher" && !user?.roles?.includes("teacher")) ||
+        session.teacherId !== user.id
+      ) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -3747,15 +4137,19 @@ export function registerRoutes(app: Express) {
       if (isSelfRequest) {
         // Only allowed if the user actually has the teacher role in their roles array
         if (!user.roles?.includes("teacher")) {
-          return res.status(400).json({ error: "You cannot request yourself as a tutor" });
+          return res
+            .status(400)
+            .json({ error: "You cannot request yourself as a tutor" });
         }
       }
 
       // Validate that studentId (if provided) belongs to this parent
       if (data.studentId) {
         const student = await storage.getStudentById(data.studentId);
-        if (!student || !await storage.isTeamOwner(user.id, student.id)) {
-          return res.status(403).json({ error: "Student does not belong to you" });
+        if (!student || !(await storage.isTeamOwner(user.id, student.id))) {
+          return res
+            .status(403)
+            .json({ error: "Student does not belong to you" });
         }
       }
 
@@ -3769,10 +4163,13 @@ export function registerRoutes(app: Express) {
           },
         });
         if (existingRequest) {
-          const label = existingRequest.status === "approved"
-            ? "already connected to this teacher"
-            : "already has a pending request for this teacher";
-          return res.status(409).json({ error: `This student is ${label}. Please wait for a response before sending another.` });
+          const label =
+            existingRequest.status === "approved"
+              ? "already connected to this teacher"
+              : "already has a pending request for this teacher";
+          return res.status(409).json({
+            error: `This student is ${label}. Please wait for a response before sending another.`,
+          });
         }
       }
 
@@ -3795,13 +4192,15 @@ export function registerRoutes(app: Express) {
           });
         } else {
           // Notify the teacher of a new pending tutor request (skip if teacher === parent)
-          storage.createNotification({
-            userId: data.teacherId as number,
-            type: "new_tutor_request",
-            title: "New Tutor Request",
-            body: `${user!.name} has sent you a tutor request.`,
-            link: "/dashboard/requests",
-          }).catch(console.error);
+          storage
+            .createNotification({
+              userId: data.teacherId as number,
+              type: "new_tutor_request",
+              title: "New Tutor Request",
+              body: `${user!.name} has sent you a tutor request.`,
+              link: "/dashboard/requests",
+            })
+            .catch(console.error);
         }
       }
 
@@ -3834,16 +4233,20 @@ export function registerRoutes(app: Express) {
   });
 
   // GET /api/tutor-requests/pending-count — count of pending requests for the logged-in teacher
-  app.get("/api/tutor-requests/pending-count", requireAuth, async (req, res) => {
-    try {
-      const count = await prisma.tutorRequest.count({
-        where: { teacherId: req.session.userId!, status: "pending" },
-      });
-      res.json({ count });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/tutor-requests/pending-count",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const count = await prisma.tutorRequest.count({
+          where: { teacherId: req.session.userId!, status: "pending" },
+        });
+        res.json({ count });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.patch("/api/tutor-requests/:id", requireAuth, async (req, res) => {
     try {
@@ -3860,7 +4263,9 @@ export function registerRoutes(app: Express) {
       // Guard: dual-role user cannot approve their own tutor request
       const existingRequest = await storage.getTutorRequestById(requestId);
       if (existingRequest && existingRequest.parentId === user.id) {
-        return res.status(400).json({ error: "You cannot approve your own tutor request" });
+        return res
+          .status(400)
+          .json({ error: "You cannot approve your own tutor request" });
       }
 
       const request = await storage.updateTutorRequest(requestId, {
@@ -3870,15 +4275,21 @@ export function registerRoutes(app: Express) {
 
       // Notify the parent of approval or rejection
       // Skip if the teacher and parent are the same person (homeschool dual-role)
-      if (existingRequest && (status === "approved" || status === "rejected") && existingRequest.parentId !== user!.id) {
+      if (
+        existingRequest &&
+        (status === "approved" || status === "rejected") &&
+        existingRequest.parentId !== user!.id
+      ) {
         const statusText = status === "approved" ? "approved" : "declined";
-        storage.createNotification({
-          userId: existingRequest.parentId,
-          type: "tutor_request_update",
-          title: `Tutor Request ${status === "approved" ? "Approved" : "Declined"}`,
-          body: `Your tutor request has been ${statusText} by ${user!.name}.`,
-          link: "/dashboard#children",
-        }).catch(console.error);
+        storage
+          .createNotification({
+            userId: existingRequest.parentId,
+            type: "tutor_request_update",
+            title: `Tutor Request ${status === "approved" ? "Approved" : "Declined"}`,
+            body: `Your tutor request has been ${statusText} by ${user!.name}.`,
+            link: "/dashboard#children",
+          })
+          .catch(console.error);
         maybeEmailNotification(existingRequest.parentId, {
           title: `Tutor Request ${status === "approved" ? "Approved" : "Declined"}`,
           body: `Your tutor request has been ${statusText} by ${user!.name}.`,
@@ -3910,7 +4321,9 @@ export function registerRoutes(app: Express) {
             const student = await storage.getStudentById(sid);
             const isStudent = student?.userId === callerId;
             if (!isStudent) {
-              return res.status(403).json({ error: "Members cannot send messages — only owners can" });
+              return res.status(403).json({
+                error: "Members cannot send messages — only owners can",
+              });
             }
           }
         } else {
@@ -3919,7 +4332,9 @@ export function registerRoutes(app: Express) {
             where: { parentId: callerId, role: "owner", status: "active" },
           });
           if (!ownerMembership) {
-            return res.status(403).json({ error: "Members cannot send messages — only owners can" });
+            return res.status(403).json({
+              error: "Members cannot send messages — only owners can",
+            });
           }
         }
       }
@@ -3937,13 +4352,15 @@ export function registerRoutes(app: Express) {
       const receiverId = data.receiverId;
       if (receiverId && receiverId !== callerId) {
         const senderName = caller?.name ?? "Someone";
-        storage.createNotification({
-          userId: receiverId,
-          type: "new_message",
-          title: "New Message",
-          body: `${senderName} sent you a message`,
-          link: "/dashboard#messages",
-        }).catch(console.error);
+        storage
+          .createNotification({
+            userId: receiverId,
+            type: "new_message",
+            title: "New Message",
+            body: `${senderName} sent you a message`,
+            link: "/dashboard#messages",
+          })
+          .catch(console.error);
         maybeEmailNotification(receiverId, {
           title: "New Message",
           body: `${senderName} sent you a message`,
@@ -3964,7 +4381,9 @@ export function registerRoutes(app: Express) {
       const messageText = req.body.message as string;
 
       if (!teacherUserId || !studentId || !messageText?.trim()) {
-        return res.status(400).json({ error: "teacherUserId, studentId, and message are required" });
+        return res.status(400).json({
+          error: "teacherUserId, studentId, and message are required",
+        });
       }
 
       const student = await storage.getStudentById(studentId);
@@ -3988,15 +4407,17 @@ export function registerRoutes(app: Express) {
           where: { studentId, teacherId: teacherUserId, status: "approved" },
         });
         if (!approvedRequest) {
-          return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
+          return res
+            .status(403)
+            .json({ error: "Forbidden: teacher not assigned to this student" });
         }
       }
 
       // Only owners participate in the thread (not read-only members)
       const ownerUserIds = await storage.getTeamOwnerUserIds(student.id);
-      const allParticipants = Array.from(new Set(
-        [teacherUserId, student.userId, ...ownerUserIds],
-      ));
+      const allParticipants = Array.from(
+        new Set([teacherUserId, student.userId, ...ownerUserIds]),
+      );
       const recipients = allParticipants.filter((id) => id !== requesterId);
 
       const timestamp = new Date().toISOString();
@@ -4017,13 +4438,15 @@ export function registerRoutes(app: Express) {
       const threadSender = await storage.getUserById(requesterId);
       const senderName = threadSender?.name ?? "Someone";
       recipients.forEach((receiverId) => {
-        storage.createNotification({
-          userId: receiverId,
-          type: "new_message",
-          title: "New Message",
-          body: `${senderName} sent you a message`,
-          link: "/dashboard#messages",
-        }).catch(console.error);
+        storage
+          .createNotification({
+            userId: receiverId,
+            type: "new_message",
+            title: "New Message",
+            body: `${senderName} sent you a message`,
+            link: "/dashboard#messages",
+          })
+          .catch(console.error);
         maybeEmailNotification(receiverId, {
           title: "New Message",
           body: `${senderName} sent you a message`,
@@ -4052,7 +4475,10 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const summaries = await storage.getConversationSummaries(user.id, user.role ?? "");
+      const summaries = await storage.getConversationSummaries(
+        user.id,
+        user.role ?? "",
+      );
       res.json(summaries);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4067,7 +4493,8 @@ export function registerRoutes(app: Express) {
         name: z.string().max(60),
       });
       const parse = schema.safeParse(req.body);
-      if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+      if (!parse.success)
+        return res.status(400).json({ error: parse.error.flatten() });
 
       const { teacherUserId, studentId, name } = parse.data;
       const callerId = req.session.userId!;
@@ -4075,15 +4502,21 @@ export function registerRoutes(app: Express) {
       const student = await storage.getStudentById(studentId);
       if (!student) return res.status(404).json({ error: "Student not found" });
 
-      const isTeacher  = callerId === teacherUserId;
-      const isStudent  = callerId === student.userId;
-      const isParent   = await storage.isTeamMember(callerId, student.id);
+      const isTeacher = callerId === teacherUserId;
+      const isStudent = callerId === student.userId;
+      const isParent = await storage.isTeamMember(callerId, student.id);
       if (!isTeacher && !isStudent && !isParent) {
-        return res.status(403).json({ error: "Not a participant of this thread" });
+        return res
+          .status(403)
+          .json({ error: "Not a participant of this thread" });
       }
 
       const trimmed = name.trim();
-      await storage.setThreadLabel(teacherUserId, studentId, trimmed === "" ? null : trimmed);
+      await storage.setThreadLabel(
+        teacherUserId,
+        studentId,
+        trimmed === "" ? null : trimmed,
+      );
       res.json({ ok: true, name: trimmed === "" ? null : trimmed });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4095,7 +4528,9 @@ export function registerRoutes(app: Express) {
       const teacherId = parseInt(req.query.teacherId as string);
       const studentId = parseInt(req.query.studentId as string);
       if (!teacherId || !studentId) {
-        return res.status(400).json({ error: "teacherId and studentId are required" });
+        return res
+          .status(400)
+          .json({ error: "teacherId and studentId are required" });
       }
 
       // Authorization: requester must be the teacher, the student, or the student's parent
@@ -4119,7 +4554,9 @@ export function registerRoutes(app: Express) {
           where: { studentId, teacherId, status: "approved" },
         });
         if (!approvedRequest) {
-          return res.status(403).json({ error: "Forbidden: teacher not assigned to this student" });
+          return res
+            .status(403)
+            .json({ error: "Forbidden: teacher not assigned to this student" });
         }
       }
 
@@ -4137,8 +4574,15 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      if ((user.role !== "teacher" && !user.roles?.includes("teacher")) && (user.role !== "parent" && !user.roles?.includes("parent"))) {
-        return res.status(403).json({ error: "Only teachers and parents can use direct messaging" });
+      if (
+        user.role !== "teacher" &&
+        !user.roles?.includes("teacher") &&
+        user.role !== "parent" &&
+        !user.roles?.includes("parent")
+      ) {
+        return res.status(403).json({
+          error: "Only teachers and parents can use direct messaging",
+        });
       }
       const contacts = await storage.getDirectContacts(user.id, user.role);
       res.json(contacts);
@@ -4147,64 +4591,89 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/messages/direct/:otherUserId", requireAuth, async (req, res) => {
-    try {
-      const myId = req.session.userId!;
-      const otherId = parseInt(req.params.otherUserId);
-      if (!otherId) return res.status(400).json({ error: "Invalid otherUserId" });
-      const messages = await storage.getDirectMessages(myId, otherId);
-      res.json(messages);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/messages/direct/:otherUserId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const myId = req.session.userId!;
+        const otherId = parseInt(req.params.otherUserId);
+        if (!otherId)
+          return res.status(400).json({ error: "Invalid otherUserId" });
+        const messages = await storage.getDirectMessages(myId, otherId);
+        res.json(messages);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.post("/api/messages/direct", requireAuth, async (req, res) => {
     try {
       const myId = req.session.userId!;
       const caller = await storage.getUserById(myId);
       if (!caller) return res.status(401).json({ error: "Unauthorized" });
-      if ((caller.role !== "teacher" && !caller.roles?.includes("teacher")) && (caller.role !== "parent" && !caller.roles?.includes("parent"))) {
-        return res.status(403).json({ error: "Only teachers and parents can send direct messages" });
+      if (
+        caller.role !== "teacher" &&
+        !caller.roles?.includes("teacher") &&
+        caller.role !== "parent" &&
+        !caller.roles?.includes("parent")
+      ) {
+        return res.status(403).json({
+          error: "Only teachers and parents can send direct messages",
+        });
       }
       const schema = z.object({
         receiverId: z.number().int().positive(),
         message: z.string().min(1).max(5000),
       });
       const parse = schema.safeParse(req.body);
-      if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+      if (!parse.success)
+        return res.status(400).json({ error: parse.error.flatten() });
       const { receiverId, message } = parse.data;
       const contacts = await storage.getDirectContacts(myId, caller.role);
       const isValidContact = contacts.some((c) => c.id === receiverId);
       if (!isValidContact) {
-        return res.status(403).json({ error: "You can only send direct messages to connected teachers or parents" });
+        return res.status(403).json({
+          error:
+            "You can only send direct messages to connected teachers or parents",
+        });
       }
-      const created = await storage.createDirectMessage(myId, receiverId, message);
+      const created = await storage.createDirectMessage(
+        myId,
+        receiverId,
+        message,
+      );
       res.json(created);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.patch("/api/messages/direct-read/:otherUserId", requireAuth, async (req, res) => {
-    try {
-      const myId = req.session.userId!;
-      const otherId = parseInt(req.params.otherUserId);
-      if (!otherId) return res.status(400).json({ error: "Invalid otherUserId" });
-      await prisma.message.updateMany({
-        where: {
-          conversationType: "direct",
-          senderId: otherId,
-          receiverId: myId,
-          isRead: false,
-        },
-        data: { isRead: true },
-      });
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.patch(
+    "/api/messages/direct-read/:otherUserId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const myId = req.session.userId!;
+        const otherId = parseInt(req.params.otherUserId);
+        if (!otherId)
+          return res.status(400).json({ error: "Invalid otherUserId" });
+        await prisma.message.updateMany({
+          where: {
+            conversationType: "direct",
+            senderId: otherId,
+            receiverId: myId,
+            isRead: false,
+          },
+          data: { isRead: true },
+        });
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   app.get("/api/messages/:userId", requireAuth, async (req, res) => {
     try {
@@ -4254,14 +4723,20 @@ export function registerRoutes(app: Express) {
       const teacherId = parseInt(req.query.teacherId as string);
       const studentId = parseInt(req.query.studentId as string);
       if (!teacherId || !studentId) {
-        return res.status(400).json({ error: "teacherId and studentId are required" });
+        return res
+          .status(400)
+          .json({ error: "teacherId and studentId are required" });
       }
 
-      const student = await prisma.student.findUnique({ where: { id: studentId } });
+      const student = await prisma.student.findUnique({
+        where: { id: studentId },
+      });
       if (!student) return res.status(404).json({ error: "Student not found" });
 
       const teamUserIds = await storage.getTeamMemberUserIds(studentId);
-      const participantIds = Array.from(new Set([teacherId, student.userId, ...teamUserIds]));
+      const participantIds = Array.from(
+        new Set([teacherId, student.userId, ...teamUserIds]),
+      );
       const viewerId = req.session.userId!;
 
       // Mark tagged rows (new messages) and legacy rows (old messages without studentId) as read.
@@ -4321,15 +4796,19 @@ export function registerRoutes(app: Express) {
       if (!user!.isAdmin && !user!.isSuperAdmin) {
         const sid = parseInt(body.studentId, 10);
         if (!isNaN(sid)) {
-          const tcIds = (await prisma.classroom.findMany({
-            where: { teacherId: user!.id },
-            select: { id: true },
-          })).map((c: any) => c.id);
+          const tcIds = (
+            await prisma.classroom.findMany({
+              where: { teacherId: user!.id },
+              select: { id: true },
+            })
+          ).map((c: any) => c.id);
           const enrolled = await prisma.classroomEnrollment.findFirst({
             where: { studentId: sid, classroomId: { in: tcIds } },
           });
           if (!enrolled) {
-            return res.status(403).json({ error: "This student is not in any of your classrooms" });
+            return res
+              .status(403)
+              .json({ error: "This student is not in any of your classrooms" });
           }
         }
       }
@@ -4348,8 +4827,17 @@ export function registerRoutes(app: Express) {
       const data = insertProgressReportSchema.parse({
         studentId: body.studentId,
         teacherId: user.id,
-        date: body.date || body.reportDate || new Date().toISOString().split("T")[0],
-        period: body.period || body.reportDate || new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+        date:
+          body.date ||
+          body.reportDate ||
+          new Date().toISOString().split("T")[0],
+        period:
+          body.period ||
+          body.reportDate ||
+          new Date().toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          }),
         content: contentParts.join("\n\n"),
         grades,
         semesterData: body.semesterData ?? null,
@@ -4358,36 +4846,45 @@ export function registerRoutes(app: Express) {
       const report = await storage.createProgressReport(data);
 
       // Notify student and all team parents about the new progress report
-      const reportStudent = await storage.getStudentById(data.studentId as number);
+      const reportStudent = await storage.getStudentById(
+        data.studentId as number,
+      );
       if (reportStudent) {
-        storage.createNotification({
-          userId: reportStudent.userId,
-          type: "progress_report",
-          title: "New Progress Report",
-          body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
-          link: "/dashboard#classrooms",
-        }).catch(console.error);
+        storage
+          .createNotification({
+            userId: reportStudent.userId,
+            type: "progress_report",
+            title: "New Progress Report",
+            body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+            link: "/dashboard#classrooms",
+          })
+          .catch(console.error);
         maybeEmailNotification(reportStudent.userId, {
           title: "New Progress Report",
           body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
           link: "/dashboard#classrooms",
         }).catch(() => {});
-        storage.getTeamMemberUserIds(reportStudent.id).then((parentIds) => {
-          parentIds.forEach((pid) => {
-            storage.createNotification({
-              userId: pid,
-              type: "progress_report",
-              title: "New Progress Report",
-              body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
-              link: "/dashboard/reports",
-            }).catch(console.error);
-            maybeEmailNotification(pid, {
-              title: "New Progress Report",
-              body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
-              link: "/dashboard/reports",
-            }).catch(() => {});
-          });
-        }).catch(console.error);
+        storage
+          .getTeamMemberUserIds(reportStudent.id)
+          .then((parentIds) => {
+            parentIds.forEach((pid) => {
+              storage
+                .createNotification({
+                  userId: pid,
+                  type: "progress_report",
+                  title: "New Progress Report",
+                  body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+                  link: "/dashboard/reports",
+                })
+                .catch(console.error);
+              maybeEmailNotification(pid, {
+                title: "New Progress Report",
+                body: `A new progress report has been submitted by ${user!.name} for ${reportStudent.name}.`,
+                link: "/dashboard/reports",
+              }).catch(() => {});
+            });
+          })
+          .catch(console.error);
       }
 
       res.json(report);
@@ -4405,15 +4902,18 @@ export function registerRoutes(app: Express) {
         const user = await storage.getUserById(userId);
         if (!user) return res.status(401).json({ error: "Unauthorized" });
         const studentId = parseInt(req.params.studentId, 10);
-        if (isNaN(studentId)) return res.status(400).json({ error: "Invalid studentId" });
+        if (isNaN(studentId))
+          return res.status(400).json({ error: "Invalid studentId" });
 
         if (user.isAdmin || user.isSuperAdmin) {
           // admins can access any student's reports
         } else if (user.role === "teacher" || user.roles?.includes("teacher")) {
-          const tcIds = (await prisma.classroom.findMany({
-            where: { teacherId: userId },
-            select: { id: true },
-          })).map((c: any) => c.id);
+          const tcIds = (
+            await prisma.classroom.findMany({
+              where: { teacherId: userId },
+              select: { id: true },
+            })
+          ).map((c: any) => c.id);
           const enrolled = await prisma.classroomEnrollment.findFirst({
             where: { studentId, classroomId: { in: tcIds } },
           });
@@ -4474,7 +4974,8 @@ export function registerRoutes(app: Express) {
   app.get("/api/progress-reports/:id", requireAuth, async (req, res) => {
     try {
       const reportId = parseInt(req.params.id, 10);
-      if (isNaN(reportId)) return res.status(400).json({ error: "Invalid report ID" });
+      if (isNaN(reportId))
+        return res.status(400).json({ error: "Invalid report ID" });
 
       const report = await storage.getProgressReportById(reportId);
       if (!report) return res.status(404).json({ error: "Report not found" });
@@ -4496,7 +4997,8 @@ export function registerRoutes(app: Express) {
       // Parent whose child's report this is
       if (user.role === "parent") {
         const children = await storage.getStudentsByParent(userId);
-        if (children.some((c: any) => c.id === report.studentId)) return res.json(report);
+        if (children.some((c: any) => c.id === report.studentId))
+          return res.json(report);
         return res.status(403).json({ error: "Forbidden" });
       }
       // Admin
@@ -4513,7 +5015,10 @@ export function registerRoutes(app: Express) {
     try {
       const userId = req.session.userId as number;
       const user = await storage.getUserById(userId);
-      if (!user || (user.role !== "teacher" && !user.roles?.includes("teacher"))) {
+      if (
+        !user ||
+        (user.role !== "teacher" && !user.roles?.includes("teacher"))
+      ) {
         return res.status(403).json({ error: "Teachers only" });
       }
 
@@ -4521,23 +5026,31 @@ export function registerRoutes(app: Express) {
       const from = req.query.from as string;
       const to = req.query.to as string;
       if (isNaN(studentId) || !from || !to) {
-        return res.status(400).json({ error: "studentId, from, and to are required" });
+        return res
+          .status(400)
+          .json({ error: "studentId, from, and to are required" });
       }
       if (from > to) {
-        return res.status(400).json({ error: "'From' date must be on or before 'To' date" });
+        return res
+          .status(400)
+          .json({ error: "'From' date must be on or before 'To' date" });
       }
 
       // Auth: teacher must own at least one classroom this student is enrolled in
-      const teacherClassroomIds = (await prisma.classroom.findMany({
-        where: { teacherId: userId },
-        select: { id: true },
-      })).map((c: any) => c.id);
+      const teacherClassroomIds = (
+        await prisma.classroom.findMany({
+          where: { teacherId: userId },
+          select: { id: true },
+        })
+      ).map((c: any) => c.id);
 
       const sharedEnrollment = await prisma.classroomEnrollment.findFirst({
         where: { studentId, classroomId: { in: teacherClassroomIds } },
       });
       if (!sharedEnrollment && !user.isAdmin && !user.isSuperAdmin) {
-        return res.status(403).json({ error: "This student is not in any of your classrooms" });
+        return res
+          .status(403)
+          .json({ error: "This student is not in any of your classrooms" });
       }
 
       // Data scope: aggregate across ALL classrooms the student is enrolled in (not just this teacher's)
@@ -4551,7 +5064,8 @@ export function registerRoutes(app: Express) {
         where: { studentId, date: { gte: from, lte: to } },
       });
       const attendance = {
-        present: allAttendance.filter((a: any) => a.status === "present").length,
+        present: allAttendance.filter((a: any) => a.status === "present")
+          .length,
         absent: allAttendance.filter((a: any) => a.status === "absent").length,
         late: allAttendance.filter((a: any) => a.status === "late").length,
         total: allAttendance.length,
@@ -4565,14 +5079,21 @@ export function registerRoutes(app: Express) {
 
           // Assignments due within the selected date range
           const assignments = await prisma.classroomAssignment.findMany({
-            where: { classroomId: classroom.id, dueDate: { gte: from, lte: to } },
+            where: {
+              classroomId: classroom.id,
+              dueDate: { gte: from, lte: to },
+            },
           });
 
-          const submissions = assignments.length > 0
-            ? await prisma.classroomSubmission.findMany({
-                where: { assignmentId: { in: assignments.map((a: any) => a.id) }, studentId },
-              })
-            : [];
+          const submissions =
+            assignments.length > 0
+              ? await prisma.classroomSubmission.findMany({
+                  where: {
+                    assignmentId: { in: assignments.map((a: any) => a.id) },
+                    studentId,
+                  },
+                })
+              : [];
 
           const policy = await prisma.gradingPolicy.findFirst({
             where: { classroomId: classroom.id },
@@ -4580,34 +5101,64 @@ export function registerRoutes(app: Express) {
           });
 
           const weights = policy
-            ? { assignment: policy.assignmentWeight, test: policy.testWeight, quiz: policy.quizWeight, project: policy.projectWeight }
+            ? {
+                assignment: policy.assignmentWeight,
+                test: policy.testWeight,
+                quiz: policy.quizWeight,
+                project: policy.projectWeight,
+              }
             : { assignment: 25, test: 25, quiz: 25, project: 25 };
 
-          const subMap = Object.fromEntries(submissions.map((s: any) => [s.assignmentId, s]));
+          const subMap = Object.fromEntries(
+            submissions.map((s: any) => [s.assignmentId, s]),
+          );
 
           const breakdown = ALL_TYPES.map((type) => {
-            const typeAssignments = assignments.filter((a: any) => a.assignmentType === type);
-            const gradedSubs = typeAssignments.filter((a: any) => subMap[a.id]?.grade != null);
-            if (gradedSubs.length === 0) return { type, w: weights[type], avg: null as number | null };
-            const totalPossible = gradedSubs.reduce((s: number, a: any) => s + a.points, 0);
-            const totalEarned = gradedSubs.reduce((s: number, a: any) => s + (subMap[a.id].grade ?? 0), 0);
-            const avg = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+            const typeAssignments = assignments.filter(
+              (a: any) => a.assignmentType === type,
+            );
+            const gradedSubs = typeAssignments.filter(
+              (a: any) => subMap[a.id]?.grade != null,
+            );
+            if (gradedSubs.length === 0)
+              return { type, w: weights[type], avg: null as number | null };
+            const totalPossible = gradedSubs.reduce(
+              (s: number, a: any) => s + a.points,
+              0,
+            );
+            const totalEarned = gradedSubs.reduce(
+              (s: number, a: any) => s + (subMap[a.id].grade ?? 0),
+              0,
+            );
+            const avg =
+              totalPossible > 0
+                ? Math.round((totalEarned / totalPossible) * 100)
+                : 0;
             return { type, w: weights[type], avg };
           });
 
-          const gradedGroups = breakdown.filter((b) => b.avg !== null && b.w > 0);
+          const gradedGroups = breakdown.filter(
+            (b) => b.avg !== null && b.w > 0,
+          );
           const totalW = gradedGroups.reduce((s, b) => s + b.w, 0);
           const weightedGrade =
             gradedGroups.length > 0 && totalW > 0
-              ? Math.round(gradedGroups.reduce((s, b) => s + (b.avg! * b.w) / totalW, 0))
+              ? Math.round(
+                  gradedGroups.reduce((s, b) => s + (b.avg! * b.w) / totalW, 0),
+                )
               : null;
 
           const totalAssignments = assignments.length;
           const completedAssignments = submissions.filter(
-            (s: any) => s.status === "submitted" || s.status === "graded" || s.status === "late"
+            (s: any) =>
+              s.status === "submitted" ||
+              s.status === "graded" ||
+              s.status === "late",
           ).length;
           const completionRate =
-            totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+            totalAssignments > 0
+              ? Math.round((completedAssignments / totalAssignments) * 100)
+              : 0;
 
           return {
             id: classroom.id,
@@ -4619,18 +5170,31 @@ export function registerRoutes(app: Express) {
             completedAssignments,
             hasData: totalAssignments > 0,
           };
-        })
+        }),
       );
 
-      const allAssignments = classroomRows.reduce((s, c) => s + c.totalAssignments, 0);
-      const allCompleted = classroomRows.reduce((s, c) => s + c.completedAssignments, 0);
-      const gradedClassrooms = classroomRows.filter((c) => c.weightedGrade !== null);
-      const totalAssignmentsForGpa = gradedClassrooms.reduce((s, c) => s + c.totalAssignments, 0);
+      const allAssignments = classroomRows.reduce(
+        (s, c) => s + c.totalAssignments,
+        0,
+      );
+      const allCompleted = classroomRows.reduce(
+        (s, c) => s + c.completedAssignments,
+        0,
+      );
+      const gradedClassrooms = classroomRows.filter(
+        (c) => c.weightedGrade !== null,
+      );
+      const totalAssignmentsForGpa = gradedClassrooms.reduce(
+        (s, c) => s + c.totalAssignments,
+        0,
+      );
       const overallGpa =
         gradedClassrooms.length > 0 && totalAssignmentsForGpa > 0
           ? Math.round(
-              gradedClassrooms.reduce((s, c) => s + c.weightedGrade! * c.totalAssignments, 0) /
-              totalAssignmentsForGpa
+              gradedClassrooms.reduce(
+                (s, c) => s + c.weightedGrade! * c.totalAssignments,
+                0,
+              ) / totalAssignmentsForGpa,
             )
           : null;
 
@@ -4640,7 +5204,10 @@ export function registerRoutes(app: Express) {
         overallGpa,
         totalAssignments: allAssignments,
         completedAssignments: allCompleted,
-        completionRate: allAssignments > 0 ? Math.round((allCompleted / allAssignments) * 100) : 0,
+        completionRate:
+          allAssignments > 0
+            ? Math.round((allCompleted / allAssignments) * 100)
+            : 0,
         attendance,
         classrooms: classroomRows,
       });
@@ -4674,15 +5241,19 @@ export function registerRoutes(app: Express) {
 
       // Notify the assignment's teacher about the clarification question
       if (data.assignmentId) {
-        const clarificationAssignment = await storage.getAssignmentById(data.assignmentId as number);
+        const clarificationAssignment = await storage.getAssignmentById(
+          data.assignmentId as number,
+        );
         if (clarificationAssignment?.teacherId) {
-          storage.createNotification({
-            userId: clarificationAssignment.teacherId,
-            type: "new_clarification",
-            title: "New Clarification Question",
-            body: `${student.name} asked a clarification question on assignment "${clarificationAssignment.title}".`,
-            link: "/dashboard/students",
-          }).catch(console.error);
+          storage
+            .createNotification({
+              userId: clarificationAssignment.teacherId,
+              type: "new_clarification",
+              title: "New Clarification Question",
+              body: `${student.name} asked a clarification question on assignment "${clarificationAssignment.title}".`,
+              link: "/dashboard/students",
+            })
+            .catch(console.error);
         }
       }
 
@@ -4910,7 +5481,10 @@ export function registerRoutes(app: Express) {
     app.post("/api/dev/become", async (req, res) => {
       try {
         // Accept either { email } for a specific persona or legacy { role } for primary persona
-        const { email: targetEmail, role: legacyRole } = req.body as { email?: string; role?: string };
+        const { email: targetEmail, role: legacyRole } = req.body as {
+          email?: string;
+          role?: string;
+        };
 
         const today = new Date().toISOString().split("T")[0];
         const hash = await hashPassword("Demo1234!");
@@ -4933,7 +5507,9 @@ export function registerRoutes(app: Express) {
           });
         }
 
-        let teacher2 = await storage.getUserByEmail("demo.teacher2@lyraprep.dev");
+        let teacher2 = await storage.getUserByEmail(
+          "demo.teacher2@lyraprep.dev",
+        );
         if (!teacher2) {
           teacher2 = await storage.createUser({
             email: "demo.teacher2@lyraprep.dev",
@@ -4950,7 +5526,9 @@ export function registerRoutes(app: Express) {
           });
         }
 
-        let teacher3 = await storage.getUserByEmail("demo.teacher3@lyraprep.dev");
+        let teacher3 = await storage.getUserByEmail(
+          "demo.teacher3@lyraprep.dev",
+        );
         if (!teacher3) {
           teacher3 = await storage.createUser({
             email: "demo.teacher3@lyraprep.dev",
@@ -4984,7 +5562,9 @@ export function registerRoutes(app: Express) {
 
         // ── Ensure demo students (all under James Wilson) ──
         // Student 1: Emily Wilson, Grade 10 — Sarah Chen's student
-        let studentUser = await storage.getUserByEmail("demo.student@lyraprep.dev");
+        let studentUser = await storage.getUserByEmail(
+          "demo.student@lyraprep.dev",
+        );
         if (!studentUser) {
           studentUser = await storage.createUser({
             email: "demo.student@lyraprep.dev",
@@ -4994,7 +5574,8 @@ export function registerRoutes(app: Express) {
             roles: ["student"],
             isEmailVerified: true,
             favoriteSubject: "Mathematics",
-            learningGoals: "Improve SAT score, master calculus, get into a top university",
+            learningGoals:
+              "Improve SAT score, master calculus, get into a top university",
             interests: ["Math Competitions", "Chess", "Piano"],
           });
         }
@@ -5007,11 +5588,19 @@ export function registerRoutes(app: Express) {
             badges: ["First Assignment", "Perfect Score", "5-Day Streak"],
             points: 840,
           });
-          await storage.createChildTeamMember({ childId: studentRecord.id, parentId: parent.id, role: "owner", status: "active", acceptedAt: new Date() });
+          await storage.createChildTeamMember({
+            childId: studentRecord.id,
+            parentId: parent.id,
+            role: "owner",
+            status: "active",
+            acceptedAt: new Date(),
+          });
         }
 
         // Student 2: Liam Wilson, Grade 7 — Marcus Johnson's student
-        let studentUser2 = await storage.getUserByEmail("demo.student2@lyraprep.dev");
+        let studentUser2 = await storage.getUserByEmail(
+          "demo.student2@lyraprep.dev",
+        );
         if (!studentUser2) {
           studentUser2 = await storage.createUser({
             email: "demo.student2@lyraprep.dev",
@@ -5021,7 +5610,8 @@ export function registerRoutes(app: Express) {
             roles: ["student"],
             isEmailVerified: true,
             favoriteSubject: "History",
-            learningGoals: "Improve reading comprehension, write stronger essays, learn more about world history",
+            learningGoals:
+              "Improve reading comprehension, write stronger essays, learn more about world history",
             interests: ["Football", "Video Games", "Reading"],
           });
         }
@@ -5034,11 +5624,19 @@ export function registerRoutes(app: Express) {
             badges: ["First Assignment", "Bookworm"],
             points: 430,
           });
-          await storage.createChildTeamMember({ childId: studentRecord2.id, parentId: parent.id, role: "owner", status: "active", acceptedAt: new Date() });
+          await storage.createChildTeamMember({
+            childId: studentRecord2.id,
+            parentId: parent.id,
+            role: "owner",
+            status: "active",
+            acceptedAt: new Date(),
+          });
         }
 
         // Student 3: Sophie Wilson, Grade 12 — Aisha Patel's student
-        let studentUser3 = await storage.getUserByEmail("demo.student3@lyraprep.dev");
+        let studentUser3 = await storage.getUserByEmail(
+          "demo.student3@lyraprep.dev",
+        );
         if (!studentUser3) {
           studentUser3 = await storage.createUser({
             email: "demo.student3@lyraprep.dev",
@@ -5048,7 +5646,8 @@ export function registerRoutes(app: Express) {
             roles: ["student"],
             isEmailVerified: true,
             favoriteSubject: "Biology",
-            learningGoals: "Score 5 on AP Biology and AP Chemistry, apply to pre-med programs",
+            learningGoals:
+              "Score 5 on AP Biology and AP Chemistry, apply to pre-med programs",
             interests: ["Science Olympiad", "Volunteering", "Running"],
           });
         }
@@ -5058,10 +5657,21 @@ export function registerRoutes(app: Express) {
             userId: studentUser3.id,
             name: "Sophie Wilson",
             gradeLevel: "Grade 12",
-            badges: ["First Assignment", "Perfect Score", "Top Performer", "Science Star"],
+            badges: [
+              "First Assignment",
+              "Perfect Score",
+              "Top Performer",
+              "Science Star",
+            ],
             points: 1250,
           });
-          await storage.createChildTeamMember({ childId: studentRecord3.id, parentId: parent.id, role: "owner", status: "active", acceptedAt: new Date() });
+          await storage.createChildTeamMember({
+            childId: studentRecord3.id,
+            parentId: parent.id,
+            role: "owner",
+            status: "active",
+            acceptedAt: new Date(),
+          });
         }
 
         // ── Grade Folder + Classroom + Enrollments (idempotent) ──
@@ -5071,19 +5681,28 @@ export function registerRoutes(app: Express) {
         });
         if (!demoFolder) {
           demoFolder = await prisma.gradeFolder.create({
-            data: { name: "Grade 5", teacherId: teacher.id, slug: "grade-5-demo" },
+            data: {
+              name: "Grade 5",
+              teacherId: teacher.id,
+              slug: "grade-5-demo",
+            },
           });
         }
 
         let demoClassroom = await prisma.classroom.findFirst({
-          where: { teacherId: teacher.id, name: "Grade 5 English", deletedAt: null },
+          where: {
+            teacherId: teacher.id,
+            name: "Grade 5 English",
+            deletedAt: null,
+          },
         });
         if (!demoClassroom) {
           demoClassroom = await prisma.classroom.create({
             data: {
               name: "Grade 5 English",
               subject: "English",
-              description: "A comprehensive English classroom covering grammar, literature, and writing.",
+              description:
+                "A comprehensive English classroom covering grammar, literature, and writing.",
               teacherId: teacher.id,
               status: "active",
               slug: "grade-5-english-demo",
@@ -5102,7 +5721,12 @@ export function registerRoutes(app: Express) {
         // Enroll all three demo students
         for (const sr of [studentRecord, studentRecord2, studentRecord3]) {
           const alreadyEnrolled = await prisma.classroomEnrollment.findUnique({
-            where: { classroomId_studentId: { classroomId: demoClassroom.id, studentId: sr.id } },
+            where: {
+              classroomId_studentId: {
+                classroomId: demoClassroom.id,
+                studentId: sr.id,
+              },
+            },
           });
           if (!alreadyEnrolled) {
             await prisma.classroomEnrollment.create({
@@ -5117,9 +5741,12 @@ export function registerRoutes(app: Express) {
           // Assignments
           const a1 = await storage.createAssignment({
             title: "Quadratic Functions & Parabolas",
-            description: "Complete exercises 3.1–3.8 on quadratic functions. Show all working. Include a graph for each function.",
+            description:
+              "Complete exercises 3.1–3.8 on quadratic functions. Show all working. Include a graph for each function.",
             subject: "Mathematics",
-            dueDate: new Date(Date.now() + 5 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() + 5 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher.id,
             gradeLevel: "Grade 10",
             points: 100,
@@ -5127,9 +5754,12 @@ export function registerRoutes(app: Express) {
           });
           const a2 = await storage.createAssignment({
             title: "Newton's Laws Problem Set",
-            description: "Solve the 12 problems in the attached worksheet. Pay attention to units and significant figures.",
+            description:
+              "Solve the 12 problems in the attached worksheet. Pay attention to units and significant figures.",
             subject: "Physics",
-            dueDate: new Date(Date.now() + 8 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() + 8 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher.id,
             gradeLevel: "Grade 10",
             points: 120,
@@ -5137,9 +5767,12 @@ export function registerRoutes(app: Express) {
           });
           const a3 = await storage.createAssignment({
             title: "SAT Math Practice Test — Module 1",
-            description: "Complete the full timed module (35 min). Submit your answer sheet and a reflection on which question types were hardest.",
+            description:
+              "Complete the full timed module (35 min). Submit your answer sheet and a reflection on which question types were hardest.",
             subject: "SAT Prep",
-            dueDate: new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() + 3 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher.id,
             gradeLevel: "Grade 10",
             points: 80,
@@ -5147,9 +5780,12 @@ export function registerRoutes(app: Express) {
           });
           const a4 = await storage.createAssignment({
             title: "Trigonometry Ratios Quiz",
-            description: "Short quiz covering sin, cos, tan, and their inverses. 20 questions, 30 minutes.",
+            description:
+              "Short quiz covering sin, cos, tan, and their inverses. 20 questions, 30 minutes.",
             subject: "Mathematics",
-            dueDate: new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() - 3 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher.id,
             gradeLevel: "Grade 10",
             points: 50,
@@ -5172,7 +5808,8 @@ export function registerRoutes(app: Express) {
             assignmentId: a2.id,
             studentId: studentRecord.id,
             status: "submitted",
-            submission: "I completed all 12 problems. Problem 7 required using Newton's 3rd law in a non-obvious way.",
+            submission:
+              "I completed all 12 problems. Problem 7 required using Newton's 3rd law in a non-obvious way.",
             fileUrl: null,
             notes: "Submitted a bit late — please review",
             grade: null,
@@ -5187,7 +5824,8 @@ export function registerRoutes(app: Express) {
             fileUrl: null,
             notes: null,
             grade: 72,
-            feedback: "Good effort on the algebra section. Focus on word problems — you lost 6 points there. We will practice those next session.",
+            feedback:
+              "Good effort on the algebra section. Focus on word problems — you lost 6 points there. We will practice those next session.",
             submittedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
           });
           await storage.createStudentAssignment({
@@ -5198,36 +5836,46 @@ export function registerRoutes(app: Express) {
             fileUrl: null,
             notes: null,
             grade: 92,
-            feedback: "Excellent work! Strong grasp of inverse trig. Keep it up.",
+            feedback:
+              "Excellent work! Strong grasp of inverse trig. Keep it up.",
             submittedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
           });
 
           // Materials
           await storage.createMaterial({
             title: "Quadratic Formula Cheat Sheet",
-            description: "A concise reference card covering the quadratic formula, discriminant analysis, vertex form, and factoring strategies.",
+            description:
+              "A concise reference card covering the quadratic formula, discriminant analysis, vertex form, and factoring strategies.",
             fileUrl: "https://example.com/materials/quadratic-cheatsheet.pdf",
             subject: "Mathematics",
             teacherId: teacher.id,
-            uploadDate: new Date(Date.now() - 10 * 86400000).toISOString().split("T")[0],
+            uploadDate: new Date(Date.now() - 10 * 86400000)
+              .toISOString()
+              .split("T")[0],
             gradeLevel: "Grade 10",
           });
           await storage.createMaterial({
             title: "SAT Math Formulas & Strategies",
-            description: "Official SAT formula sheet plus high-yield strategies for the math sections — includes annotated examples for each formula type.",
+            description:
+              "Official SAT formula sheet plus high-yield strategies for the math sections — includes annotated examples for each formula type.",
             fileUrl: "https://example.com/materials/sat-math-strategies.pdf",
             subject: "SAT Prep",
             teacherId: teacher.id,
-            uploadDate: new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0],
+            uploadDate: new Date(Date.now() - 6 * 86400000)
+              .toISOString()
+              .split("T")[0],
             gradeLevel: "Grade 10",
           });
           await storage.createMaterial({
             title: "Newton's Laws — Illustrated Guide",
-            description: "Visual walkthrough of all three Newtonian laws with real-world examples and practice problems at the end.",
+            description:
+              "Visual walkthrough of all three Newtonian laws with real-world examples and practice problems at the end.",
             fileUrl: "https://example.com/materials/newtons-laws-guide.pdf",
             subject: "Physics",
             teacherId: teacher.id,
-            uploadDate: new Date(Date.now() - 14 * 86400000).toISOString().split("T")[0],
+            uploadDate: new Date(Date.now() - 14 * 86400000)
+              .toISOString()
+              .split("T")[0],
             gradeLevel: "Grade 10",
           });
 
@@ -5236,24 +5884,31 @@ export function registerRoutes(app: Express) {
             teacher: { connect: { id: teacher.id } },
             studentIds: [studentRecord.id],
             subject: "Mathematics",
-            sessionDate: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0],
+            sessionDate: new Date(Date.now() - 7 * 86400000)
+              .toISOString()
+              .split("T")[0],
             startTime: "14:00",
             endTime: "15:00",
             title: "Quadratic Equations — Deep Dive",
-            description: "Reviewed completing the square and graphing parabolas. Emily showed great progress on vertex form.",
+            description:
+              "Reviewed completing the square and graphing parabolas. Emily showed great progress on vertex form.",
             meetingUrl: "https://meet.google.com/abc-demo-xyz",
-            notes: "Emily needs more practice on word problems involving projectile motion.",
+            notes:
+              "Emily needs more practice on word problems involving projectile motion.",
             status: "completed",
           });
           await storage.createSession({
             teacher: { connect: { id: teacher.id } },
             studentIds: [studentRecord.id],
             subject: "SAT Prep",
-            sessionDate: new Date(Date.now() + 4 * 86400000).toISOString().split("T")[0],
+            sessionDate: new Date(Date.now() + 4 * 86400000)
+              .toISOString()
+              .split("T")[0],
             startTime: "15:00",
             endTime: "16:30",
             title: "SAT Math — Word Problems Workshop",
-            description: "We will drill the word problem types Emily found hardest in the practice module.",
+            description:
+              "We will drill the word problem types Emily found hardest in the practice module.",
             meetingUrl: "https://meet.google.com/abc-demo-xyz",
             notes: null,
             status: "scheduled",
@@ -5269,9 +5924,14 @@ export function registerRoutes(app: Express) {
               teacherId: teacher.id,
               studentId: studentRecord.id,
               status: "approved",
-              message: "We are looking for a dedicated tutor to help Emily with Mathematics and SAT preparation. She is aiming for a 1500+ score.",
-              requestDate: new Date(Date.now() - 20 * 86400000).toISOString().split("T")[0],
-              responseDate: new Date(Date.now() - 18 * 86400000).toISOString().split("T")[0],
+              message:
+                "We are looking for a dedicated tutor to help Emily with Mathematics and SAT preparation. She is aiming for a 1500+ score.",
+              requestDate: new Date(Date.now() - 20 * 86400000)
+                .toISOString()
+                .split("T")[0],
+              responseDate: new Date(Date.now() - 18 * 86400000)
+                .toISOString()
+                .split("T")[0],
             });
           }
 
@@ -5282,7 +5942,8 @@ export function registerRoutes(app: Express) {
             studentId: studentRecord.id,
             teacherId: teacher.id,
             period: "March 2026",
-            content: "Emily has shown consistent improvement across all subjects this month. Her mathematical reasoning is noticeably sharper, and she is tackling multi-step problems with more confidence. SAT prep is going well — her practice scores have risen from 1280 to 1360 over the past four weeks. Areas to watch: word problems and time management under exam conditions.",
+            content:
+              "Emily has shown consistent improvement across all subjects this month. Her mathematical reasoning is noticeably sharper, and she is tackling multi-step problems with more confidence. SAT prep is going well — her practice scores have risen from 1280 to 1360 over the past four weeks. Areas to watch: word problems and time management under exam conditions.",
             date: today,
             grades: { Mathematics: 88, Physics: 81, "SAT Prep": 85 },
           });
@@ -5290,7 +5951,8 @@ export function registerRoutes(app: Express) {
             studentId: studentRecord.id,
             teacherId: teacher.id,
             period: "February 2026",
-            content: "A solid month overall. Emily completed all assignments on time and actively participated in sessions. Mathematics remains her strongest subject. Physics requires more attention — she struggles with vector-based problems. Recommended additional practice problems from the resource pack.",
+            content:
+              "A solid month overall. Emily completed all assignments on time and actively participated in sessions. Mathematics remains her strongest subject. Physics requires more attention — she struggles with vector-based problems. Recommended additional practice problems from the resource pack.",
             date: "2026-02-28",
             grades: { Mathematics: 85, Physics: 74, "SAT Prep": 78 },
           });
@@ -5299,15 +5961,21 @@ export function registerRoutes(app: Express) {
           await storage.createFeedback({
             teacherId: teacher.id,
             studentId: studentRecord.id,
-            message: "Fantastic work on today's quiz — you nailed the inverse trig section! Keep building on this momentum.",
-            date: new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0],
+            message:
+              "Fantastic work on today's quiz — you nailed the inverse trig section! Keep building on this momentum.",
+            date: new Date(Date.now() - 3 * 86400000)
+              .toISOString()
+              .split("T")[0],
             type: "positive",
           });
           await storage.createFeedback({
             teacherId: teacher.id,
             studentId: studentRecord.id,
-            message: "Word problems are your weakest area right now. Make sure to spend at least 20 minutes daily on the SAT word problem drills I sent — this will make a big difference before the exam.",
-            date: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0],
+            message:
+              "Word problems are your weakest area right now. Make sure to spend at least 20 minutes daily on the SAT word problem drills I sent — this will make a big difference before the exam.",
+            date: new Date(Date.now() - 5 * 86400000)
+              .toISOString()
+              .split("T")[0],
             type: "constructive",
           });
 
@@ -5315,7 +5983,9 @@ export function registerRoutes(app: Express) {
           await storage.createAttendance({
             studentId: studentRecord.id,
             sessionId: pastSession.id,
-            date: new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0],
+            date: new Date(Date.now() - 7 * 86400000)
+              .toISOString()
+              .split("T")[0],
             status: "present",
             notes: null,
           });
@@ -5323,9 +5993,12 @@ export function registerRoutes(app: Express) {
           // ── Teacher 2 (Marcus Johnson) — Liam Wilson, Grade 7 ──
           const b1 = await storage.createAssignment({
             title: "The Diary of a Young Girl — Chapter Analysis",
-            description: "Read chapters 1–5 of Anne Frank's diary. Write a 300-word analysis of how Anne's voice changes across these chapters.",
+            description:
+              "Read chapters 1–5 of Anne Frank's diary. Write a 300-word analysis of how Anne's voice changes across these chapters.",
             subject: "English",
-            dueDate: new Date(Date.now() + 6 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() + 6 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher2.id,
             gradeLevel: "Grade 7",
             points: 80,
@@ -5333,9 +6006,12 @@ export function registerRoutes(app: Express) {
           });
           const b2 = await storage.createAssignment({
             title: "World War II Timeline",
-            description: "Create an illustrated timeline of key WW2 events from 1939–1945. Include at least 15 events with a 2-sentence explanation each.",
+            description:
+              "Create an illustrated timeline of key WW2 events from 1939–1945. Include at least 15 events with a 2-sentence explanation each.",
             subject: "History",
-            dueDate: new Date(Date.now() + 10 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() + 10 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher2.id,
             gradeLevel: "Grade 7",
             points: 100,
@@ -5343,9 +6019,12 @@ export function registerRoutes(app: Express) {
           });
           const b3 = await storage.createAssignment({
             title: "Persuasive Essay — Homework Debate",
-            description: "Write a 400-word persuasive essay arguing for OR against homework. Use at least 3 supporting points with evidence.",
+            description:
+              "Write a 400-word persuasive essay arguing for OR against homework. Use at least 3 supporting points with evidence.",
             subject: "Essay Writing",
-            dueDate: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() - 2 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher2.id,
             gradeLevel: "Grade 7",
             points: 90,
@@ -5353,42 +6032,64 @@ export function registerRoutes(app: Express) {
           });
 
           await storage.createStudentAssignment({
-            assignmentId: b1.id, studentId: studentRecord2.id,
-            status: "pending", submission: null, fileUrl: null, notes: null, grade: null, feedback: null, submittedAt: null,
+            assignmentId: b1.id,
+            studentId: studentRecord2.id,
+            status: "pending",
+            submission: null,
+            fileUrl: null,
+            notes: null,
+            grade: null,
+            feedback: null,
+            submittedAt: null,
           });
           await storage.createStudentAssignment({
-            assignmentId: b2.id, studentId: studentRecord2.id,
+            assignmentId: b2.id,
+            studentId: studentRecord2.id,
             status: "submitted",
-            submission: "I created a 16-event timeline covering from the German invasion of Poland through the dropping of the atomic bombs.",
-            fileUrl: null, notes: null, grade: null, feedback: null,
+            submission:
+              "I created a 16-event timeline covering from the German invasion of Poland through the dropping of the atomic bombs.",
+            fileUrl: null,
+            notes: null,
+            grade: null,
+            feedback: null,
             submittedAt: new Date(Date.now() - 86400000).toISOString(),
           });
           await storage.createStudentAssignment({
-            assignmentId: b3.id, studentId: studentRecord2.id,
+            assignmentId: b3.id,
+            studentId: studentRecord2.id,
             status: "graded",
-            submission: "I argued against homework using three main points: stress, lack of play time, and diminishing returns after school hours.",
-            fileUrl: null, notes: null,
+            submission:
+              "I argued against homework using three main points: stress, lack of play time, and diminishing returns after school hours.",
+            fileUrl: null,
+            notes: null,
             grade: 78,
-            feedback: "Good argument structure, Liam! Your second point about play time was the strongest. Work on citing evidence more specifically next time.",
+            feedback:
+              "Good argument structure, Liam! Your second point about play time was the strongest. Work on citing evidence more specifically next time.",
             submittedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
           });
 
           await storage.createMaterial({
             title: "Essay Writing Framework",
-            description: "A step-by-step guide to structuring persuasive and analytical essays — includes topic sentence, evidence, and conclusion templates.",
+            description:
+              "A step-by-step guide to structuring persuasive and analytical essays — includes topic sentence, evidence, and conclusion templates.",
             fileUrl: "https://example.com/materials/essay-framework.pdf",
             subject: "Essay Writing",
             teacherId: teacher2.id,
-            uploadDate: new Date(Date.now() - 8 * 86400000).toISOString().split("T")[0],
+            uploadDate: new Date(Date.now() - 8 * 86400000)
+              .toISOString()
+              .split("T")[0],
             gradeLevel: "Grade 7",
           });
           await storage.createMaterial({
             title: "WW2 Key Figures Reference Sheet",
-            description: "Quick-reference cards for major figures of WWII — leaders, generals, and civilians who shaped the war's outcome.",
+            description:
+              "Quick-reference cards for major figures of WWII — leaders, generals, and civilians who shaped the war's outcome.",
             fileUrl: "https://example.com/materials/ww2-figures.pdf",
             subject: "History",
             teacherId: teacher2.id,
-            uploadDate: new Date(Date.now() - 12 * 86400000).toISOString().split("T")[0],
+            uploadDate: new Date(Date.now() - 12 * 86400000)
+              .toISOString()
+              .split("T")[0],
             gradeLevel: "Grade 7",
           });
 
@@ -5396,63 +6097,115 @@ export function registerRoutes(app: Express) {
             teacher: { connect: { id: teacher2.id } },
             studentIds: [studentRecord2.id],
             subject: "English",
-            sessionDate: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0],
-            startTime: "16:00", endTime: "17:00",
+            sessionDate: new Date(Date.now() - 5 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            startTime: "16:00",
+            endTime: "17:00",
             title: "Reading Comprehension Strategies",
-            description: "Worked through active reading techniques — annotation, summarising, and identifying author's intent.",
+            description:
+              "Worked through active reading techniques — annotation, summarising, and identifying author's intent.",
             meetingUrl: "https://meet.google.com/def-demo-lmn",
-            notes: "Liam is engaged but needs to slow down when annotating. Recommend re-reading each paragraph before moving on.",
+            notes:
+              "Liam is engaged but needs to slow down when annotating. Recommend re-reading each paragraph before moving on.",
             status: "completed",
           });
           await storage.createSession({
             teacher: { connect: { id: teacher2.id } },
             studentIds: [studentRecord2.id],
             subject: "History",
-            sessionDate: new Date(Date.now() + 6 * 86400000).toISOString().split("T")[0],
-            startTime: "16:00", endTime: "17:00",
+            sessionDate: new Date(Date.now() + 6 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            startTime: "16:00",
+            endTime: "17:00",
             title: "WW2 Causes — Interactive Discussion",
-            description: "Deep dive into the political and economic causes of WWII ahead of the timeline assignment.",
+            description:
+              "Deep dive into the political and economic causes of WWII ahead of the timeline assignment.",
             meetingUrl: "https://meet.google.com/def-demo-lmn",
-            notes: null, status: "scheduled",
+            notes: null,
+            status: "scheduled",
           });
 
-          const existingReq2 = await prisma.tutorRequest.findFirst({ where: { parentId: parent.id, teacherId: teacher2.id } });
+          const existingReq2 = await prisma.tutorRequest.findFirst({
+            where: { parentId: parent.id, teacherId: teacher2.id },
+          });
           if (!existingReq2) {
             await storage.createTutorRequest({
-              parentId: parent.id, teacherId: teacher2.id, studentId: studentRecord2.id,
+              parentId: parent.id,
+              teacherId: teacher2.id,
+              studentId: studentRecord2.id,
               status: "approved",
-              message: "Liam struggles with writing and needs help with comprehension. He loves history so we hope that helps as an entry point.",
-              requestDate: new Date(Date.now() - 25 * 86400000).toISOString().split("T")[0],
-              responseDate: new Date(Date.now() - 23 * 86400000).toISOString().split("T")[0],
+              message:
+                "Liam struggles with writing and needs help with comprehension. He loves history so we hope that helps as an entry point.",
+              requestDate: new Date(Date.now() - 25 * 86400000)
+                .toISOString()
+                .split("T")[0],
+              responseDate: new Date(Date.now() - 23 * 86400000)
+                .toISOString()
+                .split("T")[0],
             });
           }
           // TutorRequest is the single source of truth — no TSA write needed in seed
 
           await storage.createProgressReport({
-            studentId: studentRecord2.id, teacherId: teacher2.id,
+            studentId: studentRecord2.id,
+            teacherId: teacher2.id,
             period: "March 2026",
-            content: "Liam is showing real enthusiasm for History — his timeline work is detailed and thoughtful. Writing remains the primary growth area: sentence variety and evidence citation need work. We are making steady progress with the essay framework. He consistently attends sessions and asks good questions.",
+            content:
+              "Liam is showing real enthusiasm for History — his timeline work is detailed and thoughtful. Writing remains the primary growth area: sentence variety and evidence citation need work. We are making steady progress with the essay framework. He consistently attends sessions and asks good questions.",
             date: today,
             grades: { English: 74, History: 82, "Essay Writing": 71 },
           });
           await storage.createProgressReport({
-            studentId: studentRecord2.id, teacherId: teacher2.id,
+            studentId: studentRecord2.id,
+            teacherId: teacher2.id,
             period: "February 2026",
-            content: "A promising start. Liam is confident in History but tentative with written work. Introduced the essay framework; early signs are positive. Recommended daily reading of at least 20 minutes to build vocabulary and comprehension.",
+            content:
+              "A promising start. Liam is confident in History but tentative with written work. Introduced the essay framework; early signs are positive. Recommended daily reading of at least 20 minutes to build vocabulary and comprehension.",
             date: "2026-02-28",
             grades: { English: 68, History: 79, "Essay Writing": 65 },
           });
 
-          await storage.createFeedback({ teacherId: teacher2.id, studentId: studentRecord2.id, message: "Your WW2 submission was thorough and well-organised — I was impressed with the level of detail!", date: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0], type: "positive" });
-          await storage.createFeedback({ teacherId: teacher2.id, studentId: studentRecord2.id, message: "For your next essay, try to include a quote or statistic for each point — it will make your arguments much more convincing.", date: new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0], type: "constructive" });
-          await storage.createAttendance({ studentId: studentRecord2.id, sessionId: pastSession2.id, date: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0], status: "present", notes: null });
+          await storage.createFeedback({
+            teacherId: teacher2.id,
+            studentId: studentRecord2.id,
+            message:
+              "Your WW2 submission was thorough and well-organised — I was impressed with the level of detail!",
+            date: new Date(Date.now() - 2 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            type: "positive",
+          });
+          await storage.createFeedback({
+            teacherId: teacher2.id,
+            studentId: studentRecord2.id,
+            message:
+              "For your next essay, try to include a quote or statistic for each point — it will make your arguments much more convincing.",
+            date: new Date(Date.now() - 4 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            type: "constructive",
+          });
+          await storage.createAttendance({
+            studentId: studentRecord2.id,
+            sessionId: pastSession2.id,
+            date: new Date(Date.now() - 5 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            status: "present",
+            notes: null,
+          });
 
           // ── Teacher 3 (Aisha Patel) — Sophie Wilson, Grade 12 ──
           const c1 = await storage.createAssignment({
             title: "AP Biology — Cellular Respiration Lab Report",
-            description: "Write a full lab report for the fermentation experiment we ran in our last session. Include hypothesis, method, data, analysis, and conclusion (800–1000 words).",
+            description:
+              "Write a full lab report for the fermentation experiment we ran in our last session. Include hypothesis, method, data, analysis, and conclusion (800–1000 words).",
             subject: "Biology",
-            dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() + 7 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher3.id,
             gradeLevel: "Grade 12",
             points: 150,
@@ -5460,9 +6213,12 @@ export function registerRoutes(app: Express) {
           });
           const c2 = await storage.createAssignment({
             title: "AP Chemistry — Equilibrium Problem Set",
-            description: "Complete all 20 equilibrium problems. Show equilibrium expressions, ICE tables where applicable, and calculations. Due at start of our next session.",
+            description:
+              "Complete all 20 equilibrium problems. Show equilibrium expressions, ICE tables where applicable, and calculations. Due at start of our next session.",
             subject: "Chemistry",
-            dueDate: new Date(Date.now() + 2 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() + 2 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher3.id,
             gradeLevel: "Grade 12",
             points: 120,
@@ -5470,9 +6226,12 @@ export function registerRoutes(app: Express) {
           });
           const c3 = await storage.createAssignment({
             title: "AP Biology Practice MCQ — Genetics Unit",
-            description: "Complete the 40-question genetics MCQ under timed conditions (50 min). Justify your answers for any you were unsure about.",
+            description:
+              "Complete the 40-question genetics MCQ under timed conditions (50 min). Justify your answers for any you were unsure about.",
             subject: "AP Science",
-            dueDate: new Date(Date.now() - 1 * 86400000).toISOString().split("T")[0],
+            dueDate: new Date(Date.now() - 1 * 86400000)
+              .toISOString()
+              .split("T")[0],
             teacherId: teacher3.id,
             gradeLevel: "Grade 12",
             points: 100,
@@ -5480,42 +6239,64 @@ export function registerRoutes(app: Express) {
           });
 
           await storage.createStudentAssignment({
-            assignmentId: c1.id, studentId: studentRecord3.id,
+            assignmentId: c1.id,
+            studentId: studentRecord3.id,
             status: "submitted",
-            submission: "Lab report attached. The yeast showed higher respiration rates at 37°C than at 25°C or 15°C, consistent with enzyme optimal temperature theory.",
-            fileUrl: null, notes: "Happy to revise if needed!", grade: null, feedback: null,
+            submission:
+              "Lab report attached. The yeast showed higher respiration rates at 37°C than at 25°C or 15°C, consistent with enzyme optimal temperature theory.",
+            fileUrl: null,
+            notes: "Happy to revise if needed!",
+            grade: null,
+            feedback: null,
             submittedAt: new Date(Date.now() - 86400000).toISOString(),
           });
           await storage.createStudentAssignment({
-            assignmentId: c2.id, studentId: studentRecord3.id,
-            status: "pending", submission: null, fileUrl: null, notes: null, grade: null, feedback: null, submittedAt: null,
+            assignmentId: c2.id,
+            studentId: studentRecord3.id,
+            status: "pending",
+            submission: null,
+            fileUrl: null,
+            notes: null,
+            grade: null,
+            feedback: null,
+            submittedAt: null,
           });
           await storage.createStudentAssignment({
-            assignmentId: c3.id, studentId: studentRecord3.id,
+            assignmentId: c3.id,
+            studentId: studentRecord3.id,
             status: "graded",
-            submission: "Completed all 40 questions under 50 minutes. Was unsure about Mendel's law questions at the end.",
-            fileUrl: null, notes: null,
+            submission:
+              "Completed all 40 questions under 50 minutes. Was unsure about Mendel's law questions at the end.",
+            fileUrl: null,
+            notes: null,
             grade: 93,
-            feedback: "Outstanding, Sophie — 37/40 is a 5-level score! Review questions 28 and 35 on linked genes. You are well on track for the AP exam.",
+            feedback:
+              "Outstanding, Sophie — 37/40 is a 5-level score! Review questions 28 and 35 on linked genes. You are well on track for the AP exam.",
             submittedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
           });
 
           await storage.createMaterial({
             title: "AP Biology — Genetics Quick Reference",
-            description: "Covers Mendelian genetics, linked genes, codominance, and non-disjunction with worked examples and AP-style questions.",
+            description:
+              "Covers Mendelian genetics, linked genes, codominance, and non-disjunction with worked examples and AP-style questions.",
             fileUrl: "https://example.com/materials/ap-bio-genetics.pdf",
             subject: "Biology",
             teacherId: teacher3.id,
-            uploadDate: new Date(Date.now() - 9 * 86400000).toISOString().split("T")[0],
+            uploadDate: new Date(Date.now() - 9 * 86400000)
+              .toISOString()
+              .split("T")[0],
             gradeLevel: "Grade 12",
           });
           await storage.createMaterial({
             title: "AP Chemistry — Equilibrium & Ksp Master Sheet",
-            description: "Complete coverage of chemical equilibrium, Le Chatelier's principle, Ksp calculations, and common exam question patterns.",
+            description:
+              "Complete coverage of chemical equilibrium, Le Chatelier's principle, Ksp calculations, and common exam question patterns.",
             fileUrl: "https://example.com/materials/ap-chem-equilibrium.pdf",
             subject: "Chemistry",
             teacherId: teacher3.id,
-            uploadDate: new Date(Date.now() - 11 * 86400000).toISOString().split("T")[0],
+            uploadDate: new Date(Date.now() - 11 * 86400000)
+              .toISOString()
+              .split("T")[0],
             gradeLevel: "Grade 12",
           });
 
@@ -5523,10 +6304,14 @@ export function registerRoutes(app: Express) {
             teacher: { connect: { id: teacher3.id } },
             studentIds: [studentRecord3.id],
             subject: "Biology",
-            sessionDate: new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0],
-            startTime: "17:00", endTime: "18:30",
+            sessionDate: new Date(Date.now() - 4 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            startTime: "17:00",
+            endTime: "18:30",
             title: "Genetics Unit — Linked Genes Deep Dive",
-            description: "Worked through complex linked-gene problems and non-disjunction scenarios. Sophie grasped the concept quickly once we drew chromosome diagrams.",
+            description:
+              "Worked through complex linked-gene problems and non-disjunction scenarios. Sophie grasped the concept quickly once we drew chromosome diagrams.",
             meetingUrl: "https://meet.google.com/ghi-demo-opq",
             notes: "Review questions 28 and 35 from the MCQ for next session.",
             status: "completed",
@@ -5535,44 +6320,88 @@ export function registerRoutes(app: Express) {
             teacher: { connect: { id: teacher3.id } },
             studentIds: [studentRecord3.id],
             subject: "Chemistry",
-            sessionDate: new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0],
-            startTime: "17:00", endTime: "18:30",
+            sessionDate: new Date(Date.now() + 3 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            startTime: "17:00",
+            endTime: "18:30",
             title: "Equilibrium Problem Workshop",
-            description: "Go through the problem set together, focusing on multi-step ICE table problems which are high-frequency on the AP exam.",
+            description:
+              "Go through the problem set together, focusing on multi-step ICE table problems which are high-frequency on the AP exam.",
             meetingUrl: "https://meet.google.com/ghi-demo-opq",
-            notes: null, status: "scheduled",
+            notes: null,
+            status: "scheduled",
           });
 
-          const existingReq3 = await prisma.tutorRequest.findFirst({ where: { parentId: parent.id, teacherId: teacher3.id } });
+          const existingReq3 = await prisma.tutorRequest.findFirst({
+            where: { parentId: parent.id, teacherId: teacher3.id },
+          });
           if (!existingReq3) {
             await storage.createTutorRequest({
-              parentId: parent.id, teacherId: teacher3.id, studentId: studentRecord3.id,
+              parentId: parent.id,
+              teacherId: teacher3.id,
+              studentId: studentRecord3.id,
               status: "approved",
-              message: "Sophie is targeting top AP scores in Biology and Chemistry and needs a specialist tutor. She is very motivated and self-directed.",
-              requestDate: new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0],
-              responseDate: new Date(Date.now() - 28 * 86400000).toISOString().split("T")[0],
+              message:
+                "Sophie is targeting top AP scores in Biology and Chemistry and needs a specialist tutor. She is very motivated and self-directed.",
+              requestDate: new Date(Date.now() - 30 * 86400000)
+                .toISOString()
+                .split("T")[0],
+              responseDate: new Date(Date.now() - 28 * 86400000)
+                .toISOString()
+                .split("T")[0],
             });
           }
           // TutorRequest is the single source of truth — no TSA write needed in seed
 
           await storage.createProgressReport({
-            studentId: studentRecord3.id, teacherId: teacher3.id,
+            studentId: studentRecord3.id,
+            teacherId: teacher3.id,
             period: "March 2026",
-            content: "Sophie is performing at an exceptional level. Her genetics MCQ score of 93% puts her firmly in AP 5 territory. Lab reports are thorough and well-written. The remaining gap is equilibrium chemistry — she sometimes skips ICE table steps under time pressure. Addressing this in our next session.",
+            content:
+              "Sophie is performing at an exceptional level. Her genetics MCQ score of 93% puts her firmly in AP 5 territory. Lab reports are thorough and well-written. The remaining gap is equilibrium chemistry — she sometimes skips ICE table steps under time pressure. Addressing this in our next session.",
             date: today,
             grades: { Biology: 95, Chemistry: 88, "AP Science": 93 },
           });
           await storage.createProgressReport({
-            studentId: studentRecord3.id, teacherId: teacher3.id,
+            studentId: studentRecord3.id,
+            teacherId: teacher3.id,
             period: "February 2026",
-            content: "An outstanding student who comes prepared and asks precise questions. February scores show strong growth in both subjects. Identified chemical equilibrium as the only area requiring more attention. Sophie took on extra practice problems without being asked — excellent attitude.",
+            content:
+              "An outstanding student who comes prepared and asks precise questions. February scores show strong growth in both subjects. Identified chemical equilibrium as the only area requiring more attention. Sophie took on extra practice problems without being asked — excellent attitude.",
             date: "2026-02-28",
             grades: { Biology: 91, Chemistry: 82, "AP Science": 88 },
           });
 
-          await storage.createFeedback({ teacherId: teacher3.id, studentId: studentRecord3.id, message: "37/40 on the genetics MCQ is exceptional work — you are absolutely ready for AP exam level questions.", date: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0], type: "positive" });
-          await storage.createFeedback({ teacherId: teacher3.id, studentId: studentRecord3.id, message: "Always show your ICE table working even when it feels obvious — AP graders award method marks and you don't want to lose them.", date: new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0], type: "constructive" });
-          await storage.createAttendance({ studentId: studentRecord3.id, sessionId: pastSession3.id, date: new Date(Date.now() - 4 * 86400000).toISOString().split("T")[0], status: "present", notes: null });
+          await storage.createFeedback({
+            teacherId: teacher3.id,
+            studentId: studentRecord3.id,
+            message:
+              "37/40 on the genetics MCQ is exceptional work — you are absolutely ready for AP exam level questions.",
+            date: new Date(Date.now() - 2 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            type: "positive",
+          });
+          await storage.createFeedback({
+            teacherId: teacher3.id,
+            studentId: studentRecord3.id,
+            message:
+              "Always show your ICE table working even when it feels obvious — AP graders award method marks and you don't want to lose them.",
+            date: new Date(Date.now() - 6 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            type: "constructive",
+          });
+          await storage.createAttendance({
+            studentId: studentRecord3.id,
+            sessionId: pastSession3.id,
+            date: new Date(Date.now() - 4 * 86400000)
+              .toISOString()
+              .split("T")[0],
+            status: "present",
+            notes: null,
+          });
 
           // ── Classroom seed content ──
           // Welcome post from teacher
@@ -5580,7 +6409,8 @@ export function registerRoutes(app: Express) {
             data: {
               classroomId: demoClassroom.id,
               authorId: teacher.id,
-              content: "Welcome to Grade 5 English! This classroom is where we'll share announcements, materials, and assignments. Looking forward to a great term with all of you.",
+              content:
+                "Welcome to Grade 5 English! This classroom is where we'll share announcements, materials, and assignments. Looking forward to a great term with all of you.",
             },
           });
 
@@ -5589,8 +6419,11 @@ export function registerRoutes(app: Express) {
             data: {
               classroomId: demoClassroom.id,
               title: "Reading Comprehension — Chapter 1",
-              description: "Read Chapter 1 of 'Charlotte's Web' and answer the 5 comprehension questions on the worksheet. Write in full sentences.",
-              dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+              description:
+                "Read Chapter 1 of 'Charlotte's Web' and answer the 5 comprehension questions on the worksheet. Write in full sentences.",
+              dueDate: new Date(Date.now() + 7 * 86400000)
+                .toISOString()
+                .split("T")[0],
               points: 50,
               assignmentType: "assignment",
               slug: "reading-comprehension-ch1",
@@ -5601,8 +6434,11 @@ export function registerRoutes(app: Express) {
             data: {
               classroomId: demoClassroom.id,
               title: "Vocabulary Quiz — Unit 2",
-              description: "Match the 20 vocabulary words to their definitions. Spelling counts.",
-              dueDate: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0],
+              description:
+                "Match the 20 vocabulary words to their definitions. Spelling counts.",
+              dueDate: new Date(Date.now() - 2 * 86400000)
+                .toISOString()
+                .split("T")[0],
               points: 40,
               assignmentType: "quiz",
               slug: "vocabulary-quiz-unit-2",
@@ -5616,36 +6452,49 @@ export function registerRoutes(app: Express) {
               studentId: studentRecord.id,
               content: "Completed the vocabulary quiz.",
               status: "graded",
-              submittedAt: new Date(Date.now() - 1 * 86400000).toISOString().split("T")[0],
+              submittedAt: new Date(Date.now() - 1 * 86400000)
+                .toISOString()
+                .split("T")[0],
               grade: 36,
-              feedback: "Excellent work! You missed 4 definitions — review 'ambiguous', 'resilient', 'benevolent', and 'elusive' for next time.",
+              feedback:
+                "Excellent work! You missed 4 definitions — review 'ambiguous', 'resilient', 'benevolent', and 'elusive' for next time.",
             },
           });
 
           // Mark seed done (v2)
-          await storage.setSystemSetting("DEV_SEED_V2_DONE", "true", "Demo seed data v2 — 3 teachers, 3 students under one parent");
+          await storage.setSystemSetting(
+            "DEV_SEED_V2_DONE",
+            "true",
+            "Demo seed data v2 — 3 teachers, 3 students under one parent",
+          );
         }
 
         // ── Resolve the target user ──
         const DEMO_EMAILS: Record<string, string> = {
-          teacher:  "demo.teacher@lyraprep.dev",
+          teacher: "demo.teacher@lyraprep.dev",
           teacher2: "demo.teacher2@lyraprep.dev",
           teacher3: "demo.teacher3@lyraprep.dev",
-          parent:   "demo.parent@lyraprep.dev",
-          student:  "demo.student@lyraprep.dev",
+          parent: "demo.parent@lyraprep.dev",
+          student: "demo.student@lyraprep.dev",
           student2: "demo.student2@lyraprep.dev",
           student3: "demo.student3@lyraprep.dev",
         };
 
-        const resolvedEmail = targetEmail ?? (legacyRole ? DEMO_EMAILS[legacyRole] : null);
-        if (!resolvedEmail) return res.status(400).json({ error: "Provide email or role" });
+        const resolvedEmail =
+          targetEmail ?? (legacyRole ? DEMO_EMAILS[legacyRole] : null);
+        if (!resolvedEmail)
+          return res.status(400).json({ error: "Provide email or role" });
 
         const targetUser = await storage.getUserByEmail(resolvedEmail);
-        if (!targetUser) return res.status(404).json({ error: "Demo user not found" });
+        if (!targetUser)
+          return res.status(404).json({ error: "Demo user not found" });
 
         const newSessionId = await createSession(targetUser.id);
         setSessionCookie(res, newSessionId);
-        const studentProfile = targetUser.role === "student" ? await storage.getStudentByUserId(targetUser.id) : null;
+        const studentProfile =
+          targetUser.role === "student"
+            ? await storage.getStudentByUserId(targetUser.id)
+            : null;
 
         return res.json({
           user: {
@@ -5723,13 +6572,16 @@ export function registerRoutes(app: Express) {
   // GET /api/admin/users — list all users (admin + super admin). Supports ?search= filter.
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
-      const search = typeof req.query.search === "string" ? req.query.search.trim().toLowerCase() : "";
+      const search =
+        typeof req.query.search === "string"
+          ? req.query.search.trim().toLowerCase()
+          : "";
       let users = await storage.getAllUsers();
       if (search) {
         users = users.filter(
           (u) =>
             u.name.toLowerCase().includes(search) ||
-            u.email.toLowerCase().includes(search)
+            u.email.toLowerCase().includes(search),
         );
       }
       const sanitized = users.map((u) => ({
@@ -5742,7 +6594,9 @@ export function registerRoutes(app: Express) {
         googleId: u.googleId ?? null,
         isAdmin: u.isAdmin ?? false,
         isSuperAdmin: u.isSuperAdmin ?? false,
-        createdAt: u.createdAt ? (u.createdAt as unknown as Date).toISOString() : null,
+        createdAt: u.createdAt
+          ? (u.createdAt as unknown as Date).toISOString()
+          : null,
       }));
       res.json(sanitized);
     } catch (error: any) {
@@ -5756,15 +6610,25 @@ export function registerRoutes(app: Express) {
   app.post("/api/admin/become", requireSuperAdmin, async (req, res) => {
     try {
       const callerUserId = req.session.userId!;
-      const { email: targetEmail, userId: targetUserId } = req.body as { email?: string; userId?: number };
+      const { email: targetEmail, userId: targetUserId } = req.body as {
+        email?: string;
+        userId?: number;
+      };
       const hash = await hashPassword("Demo1234!");
 
-      type UserRecord = { id: number; email: string; name: string; role: string | null; roles: string[]; isSuperAdmin?: boolean | null };
+      type UserRecord = {
+        id: number;
+        email: string;
+        name: string;
+        role: string | null;
+        roles: string[];
+        isSuperAdmin?: boolean | null;
+      };
 
       // Helper: ensure a demo persona user exists
       async function ensurePersona(
         email: string,
-        data: Parameters<typeof storage.createUser>[0]
+        data: Parameters<typeof storage.createUser>[0],
       ): Promise<UserRecord> {
         let u = await storage.getUserByEmail(email);
         if (!u) u = await storage.createUser(data);
@@ -5788,73 +6652,147 @@ export function registerRoutes(app: Express) {
         // Auto-create predefined personas if missing
         if (targetEmail === "demo.teacher@lyraprep.dev") {
           targetUser = await ensurePersona(targetEmail, {
-            email: targetEmail, password: hash, name: "Dr. Sarah Chen",
-            role: "teacher", roles: ["teacher"], isEmailVerified: true,
+            email: targetEmail,
+            password: hash,
+            name: "Dr. Sarah Chen",
+            role: "teacher",
+            roles: ["teacher"],
+            isEmailVerified: true,
             bio: "Experienced educator specialising in Mathematics, Physics, and SAT Prep.",
-            teachingSubjects: ["Mathematics", "Physics", "SAT Prep"], yearsExperience: 9,
+            teachingSubjects: ["Mathematics", "Physics", "SAT Prep"],
+            yearsExperience: 9,
             qualifications: "M.Sc. Applied Mathematics, Certified SAT Tutor",
             specialization: "STEM & College Entrance Exams",
           });
         } else if (targetEmail === "demo.teacher2@lyraprep.dev") {
           targetUser = await ensurePersona(targetEmail, {
-            email: targetEmail, password: hash, name: "Mr. Marcus Johnson",
-            role: "teacher", roles: ["teacher"], isEmailVerified: true,
-            bio: "English Literature and History specialist.", teachingSubjects: ["English", "History"],
-            yearsExperience: 6, qualifications: "B.A. English Literature, PGCE Secondary Education",
+            email: targetEmail,
+            password: hash,
+            name: "Mr. Marcus Johnson",
+            role: "teacher",
+            roles: ["teacher"],
+            isEmailVerified: true,
+            bio: "English Literature and History specialist.",
+            teachingSubjects: ["English", "History"],
+            yearsExperience: 6,
+            qualifications: "B.A. English Literature, PGCE Secondary Education",
             specialization: "Humanities & Creative Writing",
           });
         } else if (targetEmail === "demo.teacher3@lyraprep.dev") {
           targetUser = await ensurePersona(targetEmail, {
-            email: targetEmail, password: hash, name: "Ms. Aisha Patel",
-            role: "teacher", roles: ["teacher"], isEmailVerified: true,
-            bio: "Biology and Chemistry tutor.", teachingSubjects: ["Biology", "Chemistry", "AP Science"],
-            yearsExperience: 11, qualifications: "Ph.D. Biochemistry, AP Certified Teacher",
+            email: targetEmail,
+            password: hash,
+            name: "Ms. Aisha Patel",
+            role: "teacher",
+            roles: ["teacher"],
+            isEmailVerified: true,
+            bio: "Biology and Chemistry tutor.",
+            teachingSubjects: ["Biology", "Chemistry", "AP Science"],
+            yearsExperience: 11,
+            qualifications: "Ph.D. Biochemistry, AP Certified Teacher",
             specialization: "Advanced Sciences & University Prep",
           });
         } else if (targetEmail === "demo.parent@lyraprep.dev") {
           targetUser = await ensurePersona(targetEmail, {
-            email: targetEmail, password: hash, name: "James Wilson",
-            role: "parent", roles: ["parent"], isEmailVerified: true,
+            email: targetEmail,
+            password: hash,
+            name: "James Wilson",
+            role: "parent",
+            roles: ["parent"],
+            isEmailVerified: true,
           });
         } else if (targetEmail === "demo.student@lyraprep.dev") {
           targetUser = await ensurePersona(targetEmail, {
-            email: targetEmail, password: hash, name: "Emily Wilson",
-            role: "student", roles: ["student"], isEmailVerified: true,
+            email: targetEmail,
+            password: hash,
+            name: "Emily Wilson",
+            role: "student",
+            roles: ["student"],
+            isEmailVerified: true,
             favoriteSubject: "Mathematics",
           });
-          if (targetUser && !await storage.getStudentByUserId(targetUser.id)) {
-            await storage.createStudent({ userId: targetUser.id, name: "Emily Wilson", gradeLevel: "Grade 10", badges: [], points: 0 });
+          if (
+            targetUser &&
+            !(await storage.getStudentByUserId(targetUser.id))
+          ) {
+            await storage.createStudent({
+              userId: targetUser.id,
+              name: "Emily Wilson",
+              gradeLevel: "Grade 10",
+              badges: [],
+              points: 0,
+            });
           }
         } else if (targetEmail === "demo.student2@lyraprep.dev") {
           targetUser = await ensurePersona(targetEmail, {
-            email: targetEmail, password: hash, name: "Liam Wilson",
-            role: "student", roles: ["student"], isEmailVerified: true,
+            email: targetEmail,
+            password: hash,
+            name: "Liam Wilson",
+            role: "student",
+            roles: ["student"],
+            isEmailVerified: true,
             favoriteSubject: "History",
           });
-          if (targetUser && !await storage.getStudentByUserId(targetUser.id)) {
-            await storage.createStudent({ userId: targetUser.id, name: "Liam Wilson", gradeLevel: "Grade 7", badges: [], points: 0 });
+          if (
+            targetUser &&
+            !(await storage.getStudentByUserId(targetUser.id))
+          ) {
+            await storage.createStudent({
+              userId: targetUser.id,
+              name: "Liam Wilson",
+              gradeLevel: "Grade 7",
+              badges: [],
+              points: 0,
+            });
           }
         } else if (targetEmail === "demo.student3@lyraprep.dev") {
           targetUser = await ensurePersona(targetEmail, {
-            email: targetEmail, password: hash, name: "Sophie Wilson",
-            role: "student", roles: ["student"], isEmailVerified: true,
+            email: targetEmail,
+            password: hash,
+            name: "Sophie Wilson",
+            role: "student",
+            roles: ["student"],
+            isEmailVerified: true,
             favoriteSubject: "Biology",
           });
-          if (targetUser && !await storage.getStudentByUserId(targetUser.id)) {
-            await storage.createStudent({ userId: targetUser.id, name: "Sophie Wilson", gradeLevel: "Grade 12", badges: [], points: 0 });
+          if (
+            targetUser &&
+            !(await storage.getStudentByUserId(targetUser.id))
+          ) {
+            await storage.createStudent({
+              userId: targetUser.id,
+              name: "Sophie Wilson",
+              gradeLevel: "Grade 12",
+              badges: [],
+              points: 0,
+            });
           }
         }
 
         // After resolving any persona, ensure the demo family links exist
         // so the parent persona always sees all three children.
         await (async () => {
-          const demoParentUser = await storage.getUserByEmail("demo.parent@lyraprep.dev");
+          const demoParentUser = await storage.getUserByEmail(
+            "demo.parent@lyraprep.dev",
+          );
           if (!demoParentUser) return; // parent not created yet — nothing to link
 
           const DEMO_STUDENTS = [
-            { email: "demo.student@lyraprep.dev",  name: "Emily Wilson",  grade: "Grade 10" },
-            { email: "demo.student2@lyraprep.dev", name: "Liam Wilson",   grade: "Grade 7"  },
-            { email: "demo.student3@lyraprep.dev", name: "Sophie Wilson", grade: "Grade 12" },
+            {
+              email: "demo.student@lyraprep.dev",
+              name: "Emily Wilson",
+              grade: "Grade 10",
+            },
+            {
+              email: "demo.student2@lyraprep.dev",
+              name: "Liam Wilson",
+              grade: "Grade 7",
+            },
+            {
+              email: "demo.student3@lyraprep.dev",
+              name: "Sophie Wilson",
+              grade: "Grade 12",
+            },
           ];
 
           for (const s of DEMO_STUDENTS) {
@@ -5865,7 +6803,11 @@ export function registerRoutes(app: Express) {
             let student = await storage.getStudentByUserId(sUser.id);
             if (!student) {
               student = await storage.createStudent({
-                userId: sUser.id, name: s.name, gradeLevel: s.grade, badges: [], points: 0,
+                userId: sUser.id,
+                name: s.name,
+                gradeLevel: s.grade,
+                badges: [],
+                points: 0,
               });
             }
 
@@ -5885,20 +6827,27 @@ export function registerRoutes(app: Express) {
             }
           }
         })();
-
       } else if (targetEmail) {
-        targetUser = (await storage.getUserByEmail(targetEmail)) as UserRecord | null;
-        if (!targetUser) return res.status(404).json({ error: "User not found" });
+        targetUser = (await storage.getUserByEmail(
+          targetEmail,
+        )) as UserRecord | null;
+        if (!targetUser)
+          return res.status(404).json({ error: "User not found" });
       } else if (targetUserId) {
-        targetUser = (await storage.getUserById(Number(targetUserId))) as UserRecord | null;
-        if (!targetUser) return res.status(404).json({ error: "User not found" });
+        targetUser = (await storage.getUserById(
+          Number(targetUserId),
+        )) as UserRecord | null;
+        if (!targetUser)
+          return res.status(404).json({ error: "User not found" });
       } else {
         return res.status(400).json({ error: "Provide email or userId" });
       }
 
       if (!targetUser) return res.status(404).json({ error: "User not found" });
       if (targetUser.isSuperAdmin) {
-        return res.status(403).json({ error: "Cannot impersonate another super admin" });
+        return res
+          .status(403)
+          .json({ error: "Cannot impersonate another super admin" });
       }
       if (targetUser.id === callerUserId) {
         return res.status(400).json({ error: "Cannot impersonate yourself" });
@@ -5910,7 +6859,16 @@ export function registerRoutes(app: Express) {
         where: { id: req.session.sessionId! },
         data: { impersonatingUserId: targetUser.id },
       });
-      logAuthEvent({ event: "impersonation_start", userId: targetUser.id, email: targetUser.email ?? undefined, ip: (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown", detail: `admin ${callerUserId} → ${targetUser.id}` });
+      logAuthEvent({
+        event: "impersonation_start",
+        userId: targetUser.id,
+        email: targetUser.email ?? undefined,
+        ip:
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+          req.socket.remoteAddress ??
+          "unknown",
+        detail: `admin ${callerUserId} → ${targetUser.id}`,
+      });
       res.json({
         user: {
           id: targetUser.id,
@@ -5927,24 +6885,31 @@ export function registerRoutes(app: Express) {
   });
 
   // POST /api/admin/stop-impersonating — super admin ends impersonation and returns to own identity
-  app.post("/api/admin/stop-impersonating", requireSuperAdmin, async (req, res) => {
-    try {
-      await prisma.authSession.update({
-        where: { id: req.session.sessionId! },
-        data: { impersonatingUserId: null },
-      });
-      res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.post(
+    "/api/admin/stop-impersonating",
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        await prisma.authSession.update({
+          where: { id: req.session.sessionId! },
+          data: { impersonatingUserId: null },
+        });
+        res.json({ ok: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/admin/users/search?email=... — lookup a single user by email (super admin only)
   app.get("/api/admin/users/search", requireSuperAdmin, async (req, res) => {
     try {
-      const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+      const email =
+        typeof req.query.email === "string" ? req.query.email.trim() : "";
       if (!email) {
-        return res.status(400).json({ error: "email query parameter is required" });
+        return res
+          .status(400)
+          .json({ error: "email query parameter is required" });
       }
 
       const user = await storage.getUserByEmail(email);
@@ -5972,22 +6937,32 @@ export function registerRoutes(app: Express) {
   // POST /api/admin/sql — execute raw SQL query (super admin only; SELECT/WITH/EXPLAIN only)
   app.post("/api/admin/sql", requireSuperAdmin, async (req, res) => {
     try {
-      const sql = typeof req.body.query === "string" ? req.body.query.trim() : "";
+      const sql =
+        typeof req.body.query === "string" ? req.body.query.trim() : "";
       if (!sql) {
-        return res.status(400).json({ error: "query is required in request body" });
+        return res
+          .status(400)
+          .json({ error: "query is required in request body" });
       }
 
       // Validate read-only intent: first keyword must be SELECT, WITH, or EXPLAIN …
       const statement = sql.split(/\s+/)[0].toUpperCase();
       const ALLOWED_FIRST = ["SELECT", "WITH", "EXPLAIN"];
       if (!ALLOWED_FIRST.includes(statement)) {
-        return res.status(403).json({ error: "Only SELECT / WITH / EXPLAIN queries are permitted via this endpoint." });
+        return res.status(403).json({
+          error:
+            "Only SELECT / WITH / EXPLAIN queries are permitted via this endpoint.",
+        });
       }
 
       // … AND no DML/DDL keywords are allowed anywhere in the query (guards against CTEs with side-effects)
-      const FORBIDDEN_TOKENS = /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE|GRANT|REVOKE|EXECUTE|EXEC|CALL|DO|COPY|VACUUM|ANALYZE|REINDEX|CLUSTER|LOCK|SET|RESET)\b/i;
+      const FORBIDDEN_TOKENS =
+        /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE|GRANT|REVOKE|EXECUTE|EXEC|CALL|DO|COPY|VACUUM|ANALYZE|REINDEX|CLUSTER|LOCK|SET|RESET)\b/i;
       if (FORBIDDEN_TOKENS.test(sql)) {
-        return res.status(403).json({ error: "Query contains disallowed keywords. Only read-only SQL is permitted." });
+        return res.status(403).json({
+          error:
+            "Query contains disallowed keywords. Only read-only SQL is permitted.",
+        });
       }
 
       const rows = await prisma.$queryRawUnsafe(sql);
@@ -5998,115 +6973,166 @@ export function registerRoutes(app: Express) {
   });
 
   // PATCH /api/admin/users/:id/role — change role (super admin only; supports teacher, parent, student)
-  app.patch("/api/admin/users/:id/role", requireSuperAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { role, parentId } = req.body;
-      if (!["teacher", "parent", "student"].includes(role)) {
-        return res.status(400).json({ error: "Role must be teacher, parent, or student" });
-      }
-      const target = await storage.getUserById(id);
-      if (!target) return res.status(404).json({ error: "User not found" });
-
-      // When converting to student, a parentId is required and the Student record must be created
-      if (role === "student") {
-        const pid = parseInt(parentId);
-        if (!pid || isNaN(pid)) {
-          return res.status(400).json({ error: "parentId is required when setting role to student" });
+  app.patch(
+    "/api/admin/users/:id/role",
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const { role, parentId } = req.body;
+        if (!["teacher", "parent", "student"].includes(role)) {
+          return res
+            .status(400)
+            .json({ error: "Role must be teacher, parent, or student" });
         }
-        const parentUser = await storage.getUserById(pid);
-        if (!parentUser) return res.status(404).json({ error: "Parent user not found" });
-        if (parentUser.role !== "parent") return res.status(400).json({ error: "Selected user does not have the parent role" });
+        const target = await storage.getUserById(id);
+        if (!target) return res.status(404).json({ error: "User not found" });
 
-        // Auto-create a Student record if one doesn't already exist for this user
-        const existingStudent = await prisma.student.findUnique({ where: { userId: id } });
-        if (!existingStudent) {
-          const newStudent = await storage.createStudent({
-            userId: id,
-            name: target.name,
-            gradeLevel: "",
-            badges: [],
-            points: 0,
+        // When converting to student, a parentId is required and the Student record must be created
+        if (role === "student") {
+          const pid = parseInt(parentId);
+          if (!pid || isNaN(pid)) {
+            return res.status(400).json({
+              error: "parentId is required when setting role to student",
+            });
+          }
+          const parentUser = await storage.getUserById(pid);
+          if (!parentUser)
+            return res.status(404).json({ error: "Parent user not found" });
+          if (parentUser.role !== "parent")
+            return res
+              .status(400)
+              .json({ error: "Selected user does not have the parent role" });
+
+          // Auto-create a Student record if one doesn't already exist for this user
+          const existingStudent = await prisma.student.findUnique({
+            where: { userId: id },
           });
-          await storage.createChildTeamMember({
-            childId: newStudent.id,
-            parentId: pid,
-            role: "owner",
-            status: "active",
-            acceptedAt: new Date(),
-          });
-        } else {
-          // Ensure the parent is an owner of the existing student (idempotent)
-          const existing = await prisma.childTeamMember.findFirst({ where: { childId: existingStudent.id, parentId: pid } });
-          if (!existing) {
-            await storage.createChildTeamMember({ childId: existingStudent.id, parentId: pid, role: "owner", status: "active", acceptedAt: new Date() });
+          if (!existingStudent) {
+            const newStudent = await storage.createStudent({
+              userId: id,
+              name: target.name,
+              gradeLevel: "",
+              badges: [],
+              points: 0,
+            });
+            await storage.createChildTeamMember({
+              childId: newStudent.id,
+              parentId: pid,
+              role: "owner",
+              status: "active",
+              acceptedAt: new Date(),
+            });
+          } else {
+            // Ensure the parent is an owner of the existing student (idempotent)
+            const existing = await prisma.childTeamMember.findFirst({
+              where: { childId: existingStudent.id, parentId: pid },
+            });
+            if (!existing) {
+              await storage.createChildTeamMember({
+                childId: existingStudent.id,
+                parentId: pid,
+                role: "owner",
+                status: "active",
+                acceptedAt: new Date(),
+              });
+            }
           }
         }
-      }
 
-      const updated = await storage.updateUser(id, { role, roles: [role] });
-      res.json({ success: true, id: updated.id, role: updated.role });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+        const updated = await storage.updateUser(id, { role, roles: [role] });
+        res.json({ success: true, id: updated.id, role: updated.role });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // PATCH /api/admin/users/:id/admin — toggle isAdmin (super admin only; cannot change super admins or self)
-  app.patch("/api/admin/users/:id/admin", requireSuperAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { isAdmin } = req.body;
-      if (typeof isAdmin !== "boolean") {
-        return res.status(400).json({ error: "isAdmin must be boolean" });
+  app.patch(
+    "/api/admin/users/:id/admin",
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const { isAdmin } = req.body;
+        if (typeof isAdmin !== "boolean") {
+          return res.status(400).json({ error: "isAdmin must be boolean" });
+        }
+        if (req.session.userId === id) {
+          return res
+            .status(400)
+            .json({ error: "Cannot change your own admin status" });
+        }
+        const target = await storage.getUserById(id);
+        if (!target) return res.status(404).json({ error: "User not found" });
+        if (target.isSuperAdmin) {
+          return res
+            .status(400)
+            .json({ error: "Cannot change admin status of a super admin" });
+        }
+        const updated = await storage.updateUser(id, { isAdmin });
+        res.json({ success: true, id: updated.id, isAdmin: updated.isAdmin });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-      if (req.session.userId === id) {
-        return res.status(400).json({ error: "Cannot change your own admin status" });
-      }
-      const target = await storage.getUserById(id);
-      if (!target) return res.status(404).json({ error: "User not found" });
-      if (target.isSuperAdmin) {
-        return res.status(400).json({ error: "Cannot change admin status of a super admin" });
-      }
-      const updated = await storage.updateUser(id, { isAdmin });
-      res.json({ success: true, id: updated.id, isAdmin: updated.isAdmin });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // PATCH /api/admin/users/:id/reset-account — reset a student's login credentials (super admin only)
-  app.patch("/api/admin/users/:id/reset-account", requireSuperAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid user ID" });
-      const tempPassword = await resetStudentAccount(id, `superAdmin(${req.session.userId})`);
-      res.json({ tempPassword });
-    } catch (error: any) {
-      res.status(error.status ?? 500).json({ error: error.message });
-    }
-  });
+  app.patch(
+    "/api/admin/users/:id/reset-account",
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id))
+          return res.status(400).json({ error: "Invalid user ID" });
+        const tempPassword = await resetStudentAccount(
+          id,
+          `superAdmin(${req.session.userId})`,
+        );
+        res.json({ tempPassword });
+      } catch (error: any) {
+        res.status(error.status ?? 500).json({ error: error.message });
+      }
+    },
+  );
 
   // PATCH /api/admin/users/:id/super-admin — toggle isSuperAdmin (super admin only; self-demotion guarded)
-  app.patch("/api/admin/users/:id/super-admin", requireSuperAdmin, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { isSuperAdmin } = req.body;
-      if (typeof isSuperAdmin !== "boolean") {
-        return res.status(400).json({ error: "isSuperAdmin must be boolean" });
+  app.patch(
+    "/api/admin/users/:id/super-admin",
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const { isSuperAdmin } = req.body;
+        if (typeof isSuperAdmin !== "boolean") {
+          return res
+            .status(400)
+            .json({ error: "isSuperAdmin must be boolean" });
+        }
+        if (req.session.userId === id && !isSuperAdmin) {
+          return res
+            .status(400)
+            .json({ error: "Cannot remove your own super admin status" });
+        }
+        const updatePayload: Prisma.UserUpdateInput = {
+          isSuperAdmin,
+          ...(isSuperAdmin ? { isAdmin: true } : {}),
+        };
+        const updated = await storage.updateUser(id, updatePayload);
+        res.json({
+          success: true,
+          id: updated.id,
+          isSuperAdmin: updated.isSuperAdmin,
+          isAdmin: updated.isAdmin,
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-      if (req.session.userId === id && !isSuperAdmin) {
-        return res.status(400).json({ error: "Cannot remove your own super admin status" });
-      }
-      const updatePayload: Prisma.UserUpdateInput = {
-        isSuperAdmin,
-        ...(isSuperAdmin ? { isAdmin: true } : {}),
-      };
-      const updated = await storage.updateUser(id, updatePayload);
-      res.json({ success: true, id: updated.id, isSuperAdmin: updated.isSuperAdmin, isAdmin: updated.isAdmin });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // DELETE /api/admin/users/:id — permanently delete a user (super admin only)
   app.delete("/api/admin/users/:id", requireSuperAdmin, async (req, res) => {
@@ -6116,7 +7142,9 @@ export function registerRoutes(app: Express) {
 
       // Guard: cannot delete yourself
       if (req.session.userId === id) {
-        return res.status(400).json({ error: "You cannot delete your own account" });
+        return res
+          .status(400)
+          .json({ error: "You cannot delete your own account" });
       }
 
       const target = await storage.getUserById(id);
@@ -6124,7 +7152,9 @@ export function registerRoutes(app: Express) {
 
       // Guard: cannot delete other super admins
       if (target.isSuperAdmin) {
-        return res.status(400).json({ error: "Cannot delete a super admin account" });
+        return res
+          .status(400)
+          .json({ error: "Cannot delete a super admin account" });
       }
 
       // Clean up non-FK references that won't cascade automatically:
@@ -6133,10 +7163,14 @@ export function registerRoutes(app: Express) {
       await prisma.threadLabel.deleteMany({ where: { teacherUserId: id } });
 
       // 2. If user has a Student record, remove their studentId from Session.studentIds arrays
-      const studentRecord = await prisma.student.findUnique({ where: { userId: id } });
+      const studentRecord = await prisma.student.findUnique({
+        where: { userId: id },
+      });
       if (studentRecord) {
         // ThreadLabel records keyed by studentId
-        await prisma.threadLabel.deleteMany({ where: { studentId: studentRecord.id } });
+        await prisma.threadLabel.deleteMany({
+          where: { studentId: studentRecord.id },
+        });
         // Remove from Session.studentIds arrays via raw SQL (Prisma doesn't support array element removal natively)
         await prisma.$executeRaw`
           UPDATE "Session"
@@ -6158,30 +7192,50 @@ export function registerRoutes(app: Express) {
 
   // Helper: verify classroom belongs to requesting teacher
   async function resolveClassroom(param: string): Promise<any | null> {
-    if (/^\d+$/.test(param)) return storage.getClassroomById(parseInt(param, 10));
+    if (/^\d+$/.test(param))
+      return storage.getClassroomById(parseInt(param, 10));
     return storage.getClassroomBySlug(param);
   }
 
-  async function requireClassroomOwner(req: any, res: any): Promise<any | null> {
+  async function requireClassroomOwner(
+    req: any,
+    res: any,
+  ): Promise<any | null> {
     const param = req.params.classroomId || req.params.id;
     const classroom = await resolveClassroom(param);
-    if (!classroom) { res.status(404).json({ error: "Classroom not found" }); return null; }
-    if (classroom.teacherId !== req.session.userId) { res.status(403).json({ error: "Not your classroom" }); return null; }
+    if (!classroom) {
+      res.status(404).json({ error: "Classroom not found" });
+      return null;
+    }
+    if (classroom.teacherId !== req.session.userId) {
+      res.status(403).json({ error: "Not your classroom" });
+      return null;
+    }
     return classroom;
   }
 
-  async function requireClassroomMember(req: any, res: any): Promise<any | null> {
+  async function requireClassroomMember(
+    req: any,
+    res: any,
+  ): Promise<any | null> {
     const param = req.params.classroomId || req.params.id;
     const classroom = await resolveClassroom(param);
-    if (!classroom) { res.status(404).json({ error: "Classroom not found" }); return null; }
+    if (!classroom) {
+      res.status(404).json({ error: "Classroom not found" });
+      return null;
+    }
     const userId = req.session.userId as number;
     if (classroom.teacherId === userId) return classroom;
     const user = await storage.getUserById(userId);
-    if (!user) { res.status(401).json({ error: "Unauthorized" }); return null; }
+    if (!user) {
+      res.status(401).json({ error: "Unauthorized" });
+      return null;
+    }
     const enrollments = await storage.getEnrollments(classroom.id);
     if (user.role === "student" || user.roles?.includes("student")) {
       const student = await storage.getStudentByUserId(userId);
-      if (student && enrollments.some((e: any) => e.studentId === student.id)) return classroom;
+      if (student && enrollments.some((e: any) => e.studentId === student.id))
+        return classroom;
     }
     if (user.role === "parent" || user.roles?.includes("parent")) {
       const children = await storage.getStudentsByParent(userId);
@@ -6194,13 +7248,15 @@ export function registerRoutes(app: Express) {
 
   // ─── Grade Folders ────────────────────────────────────────────────────────
 
-  const isActorTeacher = (actor: any) => actor?.role === "teacher" || actor?.roles?.includes("teacher");
+  const isActorTeacher = (actor: any) =>
+    actor?.role === "teacher" || actor?.roles?.includes("teacher");
 
   // GET /api/grade-folders — list teacher's grade folders
   app.get("/api/grade-folders", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor))
+        return res.status(403).json({ error: "Teachers only" });
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
       res.json(folders);
     } catch (error: any) {
@@ -6212,7 +7268,8 @@ export function registerRoutes(app: Express) {
   app.post("/api/grade-folders", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor))
+        return res.status(403).json({ error: "Teachers only" });
       const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
       const folder = await storage.createGradeFolder(actor.id, name);
       res.json(folder);
@@ -6225,11 +7282,13 @@ export function registerRoutes(app: Express) {
   app.patch("/api/grade-folders/:id", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor))
+        return res.status(403).json({ error: "Teachers only" });
       const folderId = parseInt(req.params.id);
       const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
-      if (!folders.find(f => f.id === folderId)) return res.status(403).json({ error: "Not your folder" });
+      if (!folders.find((f) => f.id === folderId))
+        return res.status(403).json({ error: "Not your folder" });
       const updated = await storage.updateGradeFolder(folderId, name);
       res.json(updated);
     } catch (error: any) {
@@ -6241,14 +7300,20 @@ export function registerRoutes(app: Express) {
   app.delete("/api/grade-folders/:id", requireAuth, async (req, res) => {
     try {
       const actor = await storage.getUserById(req.session.userId!);
-      if (!actor || !isActorTeacher(actor)) return res.status(403).json({ error: "Teachers only" });
+      if (!actor || !isActorTeacher(actor))
+        return res.status(403).json({ error: "Teachers only" });
       const folderId = parseInt(req.params.id);
       const folders = await storage.getGradeFoldersByTeacher(actor.id);
-      if (!folders.find(f => f.id === folderId)) return res.status(403).json({ error: "Not your folder" });
+      if (!folders.find((f) => f.id === folderId))
+        return res.status(403).json({ error: "Not your folder" });
       // Block delete if active or archived (but not soft-deleted) classrooms are still in this folder
-      const linked = await prisma.classroom.count({ where: { gradeFolderId: folderId, deletedAt: null } });
+      const linked = await prisma.classroom.count({
+        where: { gradeFolderId: folderId, deletedAt: null },
+      });
       if (linked > 0) {
-        return res.status(409).json({ error: `Cannot delete: ${linked} classroom${linked === 1 ? "" : "s"} still in this folder. Move or reassign them first.` });
+        return res.status(409).json({
+          error: `Cannot delete: ${linked} classroom${linked === 1 ? "" : "s"} still in this folder. Move or reassign them first.`,
+        });
       }
       await storage.deleteGradeFolder(folderId);
       res.json({ success: true });
@@ -6262,19 +7327,25 @@ export function registerRoutes(app: Express) {
     try {
       const actor = await storage.getUserById(req.session.userId!);
       if (!actor || !isActorTeacher(actor)) {
-        return res.status(403).json({ error: "Only teachers can create classrooms" });
+        return res
+          .status(403)
+          .json({ error: "Only teachers can create classrooms" });
       }
-      const data = z.object({
-        name: z.string().min(1),
-        subject: z.string().min(1),
-        description: z.string().optional(),
-        gradeFolderId: z.number().nullable().optional(),
-      }).parse(req.body);
+      const data = z
+        .object({
+          name: z.string().min(1),
+          subject: z.string().min(1),
+          description: z.string().optional(),
+          gradeFolderId: z.number().nullable().optional(),
+        })
+        .parse(req.body);
       // Validate folder ownership if gradeFolderId provided
       if (data.gradeFolderId) {
         const teacherFolders = await storage.getGradeFoldersByTeacher(actor.id);
-        if (!teacherFolders.find(f => f.id === data.gradeFolderId)) {
-          return res.status(403).json({ error: "That grade folder does not belong to you" });
+        if (!teacherFolders.find((f) => f.id === data.gradeFolderId)) {
+          return res
+            .status(403)
+            .json({ error: "That grade folder does not belong to you" });
         }
       }
       const classroom = await storage.createClassroom({
@@ -6296,7 +7367,8 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const isActorTeacher = user.role === "teacher" || !!user.roles?.includes("teacher");
+      const isActorTeacher =
+        user.role === "teacher" || !!user.roles?.includes("teacher");
       const isActorStudent = user.role === "student";
       if (isActorTeacher) {
         const classrooms = await storage.getClassroomsByTeacher(user.id);
@@ -6315,18 +7387,24 @@ export function registerRoutes(app: Express) {
   });
 
   // GET /api/classrooms/parent/:studentId — parent views classrooms for their child
-  app.get("/api/classrooms/parent/:studentId", requireAuth, async (req, res) => {
-    try {
-      const studentId = parseInt(req.params.studentId);
-      const student = await storage.getStudentById(studentId);
-      if (!student) return res.status(404).json({ error: "Student not found" });
-      if (!await storage.isTeamMember(req.session.userId!, student.id)) return res.status(403).json({ error: "Not your child" });
-      const classrooms = await storage.getClassroomsForParent(studentId);
-      res.json(classrooms);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/parent/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const studentId = parseInt(req.params.studentId);
+        const student = await storage.getStudentById(studentId);
+        if (!student)
+          return res.status(404).json({ error: "Student not found" });
+        if (!(await storage.isTeamMember(req.session.userId!, student.id)))
+          return res.status(403).json({ error: "Not your child" });
+        const classrooms = await storage.getClassroomsForParent(studentId);
+        res.json(classrooms);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/trash — teacher views their soft-deleted classrooms (within 30-day grace window)
   // Must be registered before /api/classrooms/:id to avoid "trash" being matched as an :id param.
@@ -6334,8 +7412,10 @@ export function registerRoutes(app: Express) {
     try {
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      const isTeacher = user.role === "teacher" || user.roles?.includes("teacher");
-      if (!isTeacher) return res.status(403).json({ error: "Teacher access required" });
+      const isTeacher =
+        user.role === "teacher" || user.roles?.includes("teacher");
+      if (!isTeacher)
+        return res.status(403).json({ error: "Teacher access required" });
       const deleted = await storage.getDeletedClassroomsByTeacher(user.id);
       res.json(deleted);
     } catch (error: any) {
@@ -6359,20 +7439,26 @@ export function registerRoutes(app: Express) {
     try {
       const classroom = await requireClassroomOwner(req, res);
       if (!classroom) return;
-      const data = z.object({
-        name: z.string().min(1).optional(),
-        subject: z.string().min(1).optional(),
-        description: z.string().nullable().optional(),
-        status: z.enum(["active", "archived"]).optional(),
-        gradeFolderId: z.number().nullable().optional(),
-      }).parse(req.body);
+      const data = z
+        .object({
+          name: z.string().min(1).optional(),
+          subject: z.string().min(1).optional(),
+          description: z.string().nullable().optional(),
+          status: z.enum(["active", "archived"]).optional(),
+          gradeFolderId: z.number().nullable().optional(),
+        })
+        .parse(req.body);
       // Validate folder ownership when assigning
       if (data.gradeFolderId) {
         const actor = await storage.getUserById(req.session.userId!);
         if (actor) {
-          const teacherFolders = await storage.getGradeFoldersByTeacher(actor.id);
-          if (!teacherFolders.find(f => f.id === data.gradeFolderId)) {
-            return res.status(403).json({ error: "That grade folder does not belong to you" });
+          const teacherFolders = await storage.getGradeFoldersByTeacher(
+            actor.id,
+          );
+          if (!teacherFolders.find((f) => f.id === data.gradeFolderId)) {
+            return res
+              .status(403)
+              .json({ error: "That grade folder does not belong to you" });
           }
         }
       }
@@ -6393,7 +7479,10 @@ export function registerRoutes(app: Express) {
       const cutoff = new Date(Date.now() - CLASSROOM_DELETE_GRACE_MS);
       await storage.purgeExpiredSoftDeletes(cutoff);
     } catch (err) {
-      console.error("[classroom-purge] Failed to purge expired soft-deletes:", err);
+      console.error(
+        "[classroom-purge] Failed to purge expired soft-deletes:",
+        err,
+      );
     }
   };
   runExpiredDeletionPurge();
@@ -6415,11 +7504,19 @@ export function registerRoutes(app: Express) {
   app.post("/api/classrooms/:id/restore", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid classroom id" });
+      if (isNaN(id))
+        return res.status(400).json({ error: "Invalid classroom id" });
       const classroom = await storage.getSoftDeletedClassroomById(id);
-      if (!classroom) return res.status(404).json({ error: "Classroom not found or already permanently deleted" });
-      if (classroom.teacherId !== req.session.userId) return res.status(403).json({ error: "Not your classroom" });
-      const deletedAt = classroom.deletedAt instanceof Date ? classroom.deletedAt : new Date(classroom.deletedAt!);
+      if (!classroom)
+        return res.status(404).json({
+          error: "Classroom not found or already permanently deleted",
+        });
+      if (classroom.teacherId !== req.session.userId)
+        return res.status(403).json({ error: "Not your classroom" });
+      const deletedAt =
+        classroom.deletedAt instanceof Date
+          ? classroom.deletedAt
+          : new Date(classroom.deletedAt!);
       if (Date.now() - deletedAt.getTime() > CLASSROOM_DELETE_GRACE_MS) {
         return res.status(409).json({ error: "Recovery window has expired" });
       }
@@ -6434,10 +7531,15 @@ export function registerRoutes(app: Express) {
   app.delete("/api/classrooms/:id/permanent", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (isNaN(id)) return res.status(400).json({ error: "Invalid classroom id" });
+      if (isNaN(id))
+        return res.status(400).json({ error: "Invalid classroom id" });
       const classroom = await storage.getSoftDeletedClassroomById(id);
-      if (!classroom) return res.status(404).json({ error: "Classroom not found or not in trash" });
-      if (classroom.teacherId !== req.session.userId) return res.status(403).json({ error: "Not your classroom" });
+      if (!classroom)
+        return res
+          .status(404)
+          .json({ error: "Classroom not found or not in trash" });
+      if (classroom.teacherId !== req.session.userId)
+        return res.status(403).json({ error: "Not your classroom" });
       await storage.hardDeleteClassroom(id);
       res.json({ success: true });
     } catch (error: any) {
@@ -6447,664 +7549,1047 @@ export function registerRoutes(app: Express) {
 
   // POST /api/classrooms/:classroomId/enroll — teacher enrolls a student
   // Only classroom ownership is required; no TutorRequest link needed (classrooms are open group workspaces).
-  app.post("/api/classrooms/:classroomId/enroll", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot enroll students in an archived classroom" });
-      const { studentId } = z.object({ studentId: z.number() }).parse(req.body);
-      const enrollment = await storage.enrollStudent(classroom.id, studentId);
-      res.status(201).json(enrollment);
-    } catch (error: any) {
-      if (error.code === "P2002") return res.status(409).json({ error: "Student is already enrolled" });
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.post(
+    "/api/classrooms/:classroomId/enroll",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot enroll students in an archived classroom" });
+        const { studentId } = z
+          .object({ studentId: z.number() })
+          .parse(req.body);
+        const enrollment = await storage.enrollStudent(classroom.id, studentId);
+        res.status(201).json(enrollment);
+      } catch (error: any) {
+        if (error.code === "P2002")
+          return res.status(409).json({ error: "Student is already enrolled" });
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // DELETE /api/classrooms/:classroomId/students/:studentId — teacher removes a student
-  app.delete("/api/classrooms/:classroomId/students/:studentId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot modify enrollment in an archived classroom" });
-      const studentId = parseInt(req.params.studentId);
-      await storage.unenrollStudent(classroom.id, studentId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.delete(
+    "/api/classrooms/:classroomId/students/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res.status(400).json({
+            error: "Cannot modify enrollment in an archived classroom",
+          });
+        const studentId = parseInt(req.params.studentId);
+        await storage.unenrollStudent(classroom.id, studentId);
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/enrollments — get enrolled students (teacher only)
-  app.get("/api/classrooms/:classroomId/enrollments", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const enrollments = await storage.getEnrollments(classroom.id);
-      res.json(enrollments);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/enrollments",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const enrollments = await storage.getEnrollments(classroom.id);
+        res.json(enrollments);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/posts — post to feed
-  app.post("/api/classrooms/:classroomId/posts", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot post to an archived classroom" });
-      const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
-      const post = await storage.createClassroomPost({ classroomId: classroom.id, authorId: req.session.userId!, content });
+  app.post(
+    "/api/classrooms/:classroomId/posts",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot post to an archived classroom" });
+        const { content } = z
+          .object({ content: z.string().min(1) })
+          .parse(req.body);
+        const post = await storage.createClassroomPost({
+          classroomId: classroom.id,
+          authorId: req.session.userId!,
+          content,
+        });
 
-      res.status(201).json(post);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+        res.status(201).json(post);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/posts — get feed (classroom members only)
-  app.get("/api/classrooms/:classroomId/posts", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const posts = await storage.getClassroomPosts(classroom.id);
-      res.json(posts);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/posts",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const posts = await storage.getClassroomPosts(classroom.id);
+        res.json(posts);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/assignments — teacher creates assignment
-  app.post("/api/classrooms/:classroomId/assignments", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
-      const data = z.object({
-        title: z.string().min(1),
-        description: z.string().optional().default(""),
-        dueDate: z.string().min(1),
-        points: z.number().int().min(1).max(10000),
-        assignmentType: z.enum(["assignment", "test", "quiz", "project"]).default("assignment"),
-        linkUrl: z.string().nullable().optional().transform((v) => {
-          if (!v || !v.trim()) return undefined;
-          const trimmed = v.trim();
-          if (/^https?:\/\//i.test(trimmed)) return trimmed;
-          return `https://${trimmed}`;
-        }),
-        formSchema: z.array(z.object({
-          id: z.string(),
-          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox", "true_false"]),
-          label: z.string(),
-          required: z.boolean().default(false),
-          options: z.array(z.string()).optional(),
-        })).nullable().optional(),
-        answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
-      }).parse(req.body);
+  app.post(
+    "/api/classrooms/:classroomId/assignments",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot add assignments to an archived classroom" });
+        const data = z
+          .object({
+            title: z.string().min(1),
+            description: z.string().optional().default(""),
+            dueDate: z.string().min(1),
+            points: z.number().int().min(1).max(10000),
+            assignmentType: z
+              .enum(["assignment", "test", "quiz", "project"])
+              .default("assignment"),
+            linkUrl: z
+              .string()
+              .nullable()
+              .optional()
+              .transform((v) => {
+                if (!v || !v.trim()) return undefined;
+                const trimmed = v.trim();
+                if (/^https?:\/\//i.test(trimmed)) return trimmed;
+                return `https://${trimmed}`;
+              }),
+            formSchema: z
+              .array(
+                z.object({
+                  id: z.string(),
+                  type: z.enum([
+                    "short",
+                    "paragraph",
+                    "multiple_choice",
+                    "checkbox",
+                    "true_false",
+                  ]),
+                  label: z.string(),
+                  required: z.boolean().default(false),
+                  options: z.array(z.string()).optional(),
+                }),
+              )
+              .nullable()
+              .optional(),
+            answerKey: z
+              .record(z.string(), z.union([z.string(), z.array(z.string())]))
+              .nullable()
+              .optional(),
+          })
+          .parse(req.body);
 
-      const finalData = { ...data };
-      if (data.formSchema == null) finalData.answerKey = undefined;
+        const finalData = { ...data };
+        if (data.formSchema == null) finalData.answerKey = undefined;
 
-      const rawMaterialIds = req.body.materialIds;
-      let materialIds: number[] | undefined;
-      if (Array.isArray(rawMaterialIds)) {
-        materialIds = rawMaterialIds.map(Number).filter((n) => !isNaN(n));
-      } else if (typeof rawMaterialIds === "string") {
-        try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
+        const rawMaterialIds = req.body.materialIds;
+        let materialIds: number[] | undefined;
+        if (Array.isArray(rawMaterialIds)) {
+          materialIds = rawMaterialIds.map(Number).filter((n) => !isNaN(n));
+        } else if (typeof rawMaterialIds === "string") {
+          try {
+            const p = JSON.parse(rawMaterialIds);
+            materialIds = Array.isArray(p)
+              ? p.map(Number).filter((n) => !isNaN(n))
+              : undefined;
+          } catch {
+            /* ignore */
+          }
+        }
+        if (materialIds && materialIds.length > 0) {
+          const validCount = await prisma.classroomMaterial.count({
+            where: { id: { in: materialIds }, classroomId: classroom.id },
+          });
+          if (validCount !== materialIds.length)
+            return res.status(400).json({
+              error:
+                "One or more classwork items do not belong to this classroom",
+            });
+        }
+
+        const assignment = await storage.createClassroomAssignment(
+          { classroomId: classroom.id, ...finalData },
+          materialIds,
+        );
+
+        // Notify enrolled students of new assignment (fire-and-forget)
+        prisma.classroomEnrollment
+          .findMany({
+            where: { classroomId: classroom.id },
+            include: { student: { select: { id: true, userId: true } } },
+          })
+          .then((enrollments) => {
+            enrollments.forEach(({ student }) => {
+              if (!student.userId) return;
+              storage
+                .createNotification({
+                  userId: student.userId,
+                  type: "new_assignment",
+                  title: "New Assignment",
+                  body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+                  link: `/classrooms/${classroom.slug ?? classroom.id}`,
+                })
+                .catch(console.error);
+              maybeEmailNotification(student.userId, {
+                title: "New Assignment",
+                body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+                link: `/classrooms/${classroom.slug ?? classroom.id}`,
+              }).catch(() => {});
+            });
+          })
+          .catch(console.error);
+
+        res.status(201).json(assignment);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
       }
-      if (materialIds && materialIds.length > 0) {
-        const validCount = await prisma.classroomMaterial.count({ where: { id: { in: materialIds }, classroomId: classroom.id } });
-        if (validCount !== materialIds.length) return res.status(400).json({ error: "One or more classwork items do not belong to this classroom" });
-      }
-
-      const assignment = await storage.createClassroomAssignment({ classroomId: classroom.id, ...finalData }, materialIds);
-
-      // Notify enrolled students of new assignment (fire-and-forget)
-      prisma.classroomEnrollment.findMany({
-        where: { classroomId: classroom.id },
-        include: { student: { select: { id: true, userId: true } } },
-      }).then((enrollments) => {
-        enrollments.forEach(({ student }) => {
-          if (!student.userId) return;
-          storage.createNotification({
-            userId: student.userId,
-            type: "new_assignment",
-            title: "New Assignment",
-            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
-          }).catch(console.error);
-          maybeEmailNotification(student.userId, {
-            title: "New Assignment",
-            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
-          }).catch(() => {});
-        });
-      }).catch(console.error);
-
-      res.status(201).json(assignment);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // POST /api/classrooms/:classroomId/assignments/with-file — teacher creates assignment with optional file
-  app.post("/api/classrooms/:classroomId/assignments/with-file", requireAuth, memoryUpload.single("file"), async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add assignments to an archived classroom" });
-      const rawFormSchema = req.body.formSchema;
-      const data = z.object({
-        title: z.string().min(1),
-        description: z.string().optional().default(""),
-        dueDate: z.string().min(1),
-        points: z.preprocess((v) => { const n = parseInt(v as string, 10); return isNaN(n) ? undefined : n; }, z.number().int().min(1).max(10000)),
-        assignmentType: z.enum(["assignment", "test", "quiz", "project"]).default("assignment"),
-        linkUrl: z.string().optional().transform((v) => {
-          if (!v || !v.trim()) return undefined;
-          const trimmed = v.trim();
-          if (/^https?:\/\//i.test(trimmed)) return trimmed;
-          return `https://${trimmed}`;
-        }),
-      }).parse(req.body);
+  app.post(
+    "/api/classrooms/:classroomId/assignments/with-file",
+    requireAuth,
+    memoryUpload.single("file"),
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot add assignments to an archived classroom" });
+        const rawFormSchema = req.body.formSchema;
+        const data = z
+          .object({
+            title: z.string().min(1),
+            description: z.string().optional().default(""),
+            dueDate: z.string().min(1),
+            points: z.preprocess((v) => {
+              const n = parseInt(v as string, 10);
+              return isNaN(n) ? undefined : n;
+            }, z.number().int().min(1).max(10000)),
+            assignmentType: z
+              .enum(["assignment", "test", "quiz", "project"])
+              .default("assignment"),
+            linkUrl: z
+              .string()
+              .optional()
+              .transform((v) => {
+                if (!v || !v.trim()) return undefined;
+                const trimmed = v.trim();
+                if (/^https?:\/\//i.test(trimmed)) return trimmed;
+                return `https://${trimmed}`;
+              }),
+          })
+          .parse(req.body);
 
-      let formSchema: z.infer<typeof formQuestionSchema>[] | undefined;
-      if (rawFormSchema) {
-        try {
-          const parsed = JSON.parse(rawFormSchema);
-          const validated = z.array(formQuestionSchema).safeParse(parsed);
-          formSchema = validated.success ? validated.data : undefined;
-        } catch { formSchema = undefined; }
+        let formSchema: z.infer<typeof formQuestionSchema>[] | undefined;
+        if (rawFormSchema) {
+          try {
+            const parsed = JSON.parse(rawFormSchema);
+            const validated = z.array(formQuestionSchema).safeParse(parsed);
+            formSchema = validated.success ? validated.data : undefined;
+          } catch {
+            formSchema = undefined;
+          }
+        }
+
+        let answerKey: Record<string, string | string[]> | undefined;
+        const rawAnswerKey = req.body.answerKey;
+        if (rawAnswerKey && formSchema !== undefined) {
+          try {
+            const parsed = JSON.parse(rawAnswerKey);
+            const validated = z
+              .record(z.string(), z.union([z.string(), z.array(z.string())]))
+              .nullable()
+              .optional()
+              .safeParse(parsed);
+            if (validated.success && validated.data) answerKey = validated.data;
+          } catch {
+            answerKey = undefined;
+          }
+        }
+
+        let fileUrl: string | undefined;
+        if (req.file) {
+          const uploadResult = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+            "classroom-assignments",
+          );
+          if (!uploadResult.success)
+            return res
+              .status(500)
+              .json({ error: uploadResult.error ?? "File upload failed" });
+          fileUrl = uploadResult.url;
+        }
+
+        const linkUrl = data.linkUrl || undefined;
+
+        let materialIds: number[] | undefined;
+        const rawMaterialIds = req.body.materialIds;
+        if (rawMaterialIds) {
+          try {
+            const p = JSON.parse(rawMaterialIds);
+            materialIds = Array.isArray(p)
+              ? p.map(Number).filter((n) => !isNaN(n))
+              : undefined;
+          } catch {
+            /* ignore */
+          }
+        }
+        if (materialIds && materialIds.length > 0) {
+          const validCount = await prisma.classroomMaterial.count({
+            where: { id: { in: materialIds }, classroomId: classroom.id },
+          });
+          if (validCount !== materialIds.length)
+            return res.status(400).json({
+              error:
+                "One or more classwork items do not belong to this classroom",
+            });
+        }
+
+        const assignment = await storage.createClassroomAssignment(
+          {
+            classroomId: classroom.id,
+            ...data,
+            fileUrl,
+            linkUrl,
+            ...(formSchema !== undefined ? { formSchema } : {}),
+            ...(answerKey !== undefined ? { answerKey } : {}),
+          },
+          materialIds,
+        );
+
+        // Notify enrolled students of new assignment (fire-and-forget)
+        prisma.classroomEnrollment
+          .findMany({
+            where: { classroomId: classroom.id },
+            include: { student: { select: { id: true, userId: true } } },
+          })
+          .then((enrollments) => {
+            enrollments.forEach(({ student }) => {
+              if (!student.userId) return;
+              storage
+                .createNotification({
+                  userId: student.userId,
+                  type: "new_assignment",
+                  title: "New Assignment",
+                  body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+                  link: `/classrooms/${classroom.slug ?? classroom.id}`,
+                })
+                .catch(console.error);
+              maybeEmailNotification(student.userId, {
+                title: "New Assignment",
+                body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
+                link: `/classrooms/${classroom.slug ?? classroom.id}`,
+              }).catch(() => {});
+            });
+          })
+          .catch(console.error);
+
+        res.status(201).json(assignment);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
       }
-
-      let answerKey: Record<string, string | string[]> | undefined;
-      const rawAnswerKey = req.body.answerKey;
-      if (rawAnswerKey && formSchema !== undefined) {
-        try {
-          const parsed = JSON.parse(rawAnswerKey);
-          const validated = z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional().safeParse(parsed);
-          if (validated.success && validated.data) answerKey = validated.data;
-        } catch { answerKey = undefined; }
-      }
-
-      let fileUrl: string | undefined;
-      if (req.file) {
-        const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-assignments");
-        if (!uploadResult.success) return res.status(500).json({ error: uploadResult.error ?? "File upload failed" });
-        fileUrl = uploadResult.url;
-      }
-
-      const linkUrl = data.linkUrl || undefined;
-
-      let materialIds: number[] | undefined;
-      const rawMaterialIds = req.body.materialIds;
-      if (rawMaterialIds) {
-        try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
-      }
-      if (materialIds && materialIds.length > 0) {
-        const validCount = await prisma.classroomMaterial.count({ where: { id: { in: materialIds }, classroomId: classroom.id } });
-        if (validCount !== materialIds.length) return res.status(400).json({ error: "One or more classwork items do not belong to this classroom" });
-      }
-
-      const assignment = await storage.createClassroomAssignment({
-        classroomId: classroom.id, ...data, fileUrl, linkUrl,
-        ...(formSchema !== undefined ? { formSchema } : {}),
-        ...(answerKey !== undefined ? { answerKey } : {}),
-      }, materialIds);
-
-      // Notify enrolled students of new assignment (fire-and-forget)
-      prisma.classroomEnrollment.findMany({
-        where: { classroomId: classroom.id },
-        include: { student: { select: { id: true, userId: true } } },
-      }).then((enrollments) => {
-        enrollments.forEach(({ student }) => {
-          if (!student.userId) return;
-          storage.createNotification({
-            userId: student.userId,
-            type: "new_assignment",
-            title: "New Assignment",
-            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
-          }).catch(console.error);
-          maybeEmailNotification(student.userId, {
-            title: "New Assignment",
-            body: `A new assignment has been posted in "${classroom.name}": "${assignment.title}"`,
-            link: `/classrooms/${classroom.slug ?? classroom.id}`,
-          }).catch(() => {});
-        });
-      }).catch(console.error);
-
-      res.status(201).json(assignment);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // GET /api/classrooms/:classroomId/assignments — list assignments (classroom members only)
-  app.get("/api/classrooms/:classroomId/assignments", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const assignments = await storage.getClassroomAssignments(classroom.id);
-      res.json(assignments);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/assignments",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const assignments = await storage.getClassroomAssignments(classroom.id);
+        res.json(assignments);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/assignments/slug/:assignmentSlug — fetch single assignment by slug or numeric ID
-  app.get("/api/classrooms/:classroomId/assignments/slug/:assignmentSlug", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const param = req.params.assignmentSlug;
-      const assignment = /^\d+$/.test(param)
-        ? await storage.getClassroomAssignmentById(classroom.id, parseInt(param, 10))
-        : await storage.getClassroomAssignmentBySlug(classroom.id, param);
-      if (!assignment) return res.status(404).json({ error: "Assignment not found" });
-      res.json(assignment);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/assignments/slug/:assignmentSlug",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const param = req.params.assignmentSlug;
+        const assignment = /^\d+$/.test(param)
+          ? await storage.getClassroomAssignmentById(
+              classroom.id,
+              parseInt(param, 10),
+            )
+          : await storage.getClassroomAssignmentBySlug(classroom.id, param);
+        if (!assignment)
+          return res.status(404).json({ error: "Assignment not found" });
+        res.json(assignment);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // PATCH /api/classrooms/:classroomId/assignments/:assignmentId — teacher edits assignment (JSON)
-  app.patch("/api/classrooms/:classroomId/assignments/:assignmentId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit assignments in an archived classroom" });
-      const assignmentId = parseInt(req.params.assignmentId);
-      if (isNaN(assignmentId)) return res.status(400).json({ error: "Invalid assignment ID" });
-      const existing = await prisma.classroomAssignment.findFirst({ where: { id: assignmentId, classroomId: classroom.id } });
-      if (!existing) return res.status(404).json({ error: "Assignment not found" });
+  app.patch(
+    "/api/classrooms/:classroomId/assignments/:assignmentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res.status(400).json({
+            error: "Cannot edit assignments in an archived classroom",
+          });
+        const assignmentId = parseInt(req.params.assignmentId);
+        if (isNaN(assignmentId))
+          return res.status(400).json({ error: "Invalid assignment ID" });
+        const existing = await prisma.classroomAssignment.findFirst({
+          where: { id: assignmentId, classroomId: classroom.id },
+        });
+        if (!existing)
+          return res.status(404).json({ error: "Assignment not found" });
 
-      const rawData = z.object({
-        title: z.string().min(1).optional(),
-        description: z.string().optional(),
-        dueDate: z.string().min(1).optional(),
-        points: z.number().int().min(1).max(10000).optional().nullable().transform((v) => (v == null ? undefined : v)),
-        assignmentType: z.enum(["assignment", "test", "quiz", "project"]).optional(),
-        fileUrl: z.string().url().nullable().optional(),
-        linkUrl: z.string().nullable().optional().transform((v) => {
-          if (!v || !v.trim()) return null;
-          const trimmed = v.trim();
-          if (/^https?:\/\//i.test(trimmed)) return trimmed;
-          return `https://${trimmed}`;
-        }),
-        formSchema: z.array(z.object({
-          id: z.string(),
-          type: z.enum(["short", "paragraph", "multiple_choice", "checkbox", "true_false"]),
-          label: z.string(),
-          required: z.boolean().default(false),
-          options: z.array(z.string()).optional(),
-        })).nullable().optional(),
-        answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
-      }).parse(req.body);
+        const rawData = z
+          .object({
+            title: z.string().min(1).optional(),
+            description: z.string().optional(),
+            dueDate: z.string().min(1).optional(),
+            points: z
+              .number()
+              .int()
+              .min(1)
+              .max(10000)
+              .optional()
+              .nullable()
+              .transform((v) => (v == null ? undefined : v)),
+            assignmentType: z
+              .enum(["assignment", "test", "quiz", "project"])
+              .optional(),
+            fileUrl: z.string().url().nullable().optional(),
+            linkUrl: z
+              .string()
+              .nullable()
+              .optional()
+              .transform((v) => {
+                if (!v || !v.trim()) return null;
+                const trimmed = v.trim();
+                if (/^https?:\/\//i.test(trimmed)) return trimmed;
+                return `https://${trimmed}`;
+              }),
+            formSchema: z
+              .array(
+                z.object({
+                  id: z.string(),
+                  type: z.enum([
+                    "short",
+                    "paragraph",
+                    "multiple_choice",
+                    "checkbox",
+                    "true_false",
+                  ]),
+                  label: z.string(),
+                  required: z.boolean().default(false),
+                  options: z.array(z.string()).optional(),
+                }),
+              )
+              .nullable()
+              .optional(),
+            answerKey: z
+              .record(z.string(), z.union([z.string(), z.array(z.string())]))
+              .nullable()
+              .optional(),
+          })
+          .parse(req.body);
 
-      const data = { ...rawData };
-      if (rawData.formSchema === null && rawData.answerKey != null) {
-        data.answerKey = null;
+        const data = { ...rawData };
+        if (rawData.formSchema === null && rawData.answerKey != null) {
+          data.answerKey = null;
+        }
+
+        const rawMaterialIds = req.body.materialIds;
+        let materialIds: number[] | undefined;
+        if (Array.isArray(rawMaterialIds)) {
+          materialIds = rawMaterialIds.map(Number).filter((n) => !isNaN(n));
+        } else if (typeof rawMaterialIds === "string") {
+          try {
+            const p = JSON.parse(rawMaterialIds);
+            materialIds = Array.isArray(p)
+              ? p.map(Number).filter((n) => !isNaN(n))
+              : undefined;
+          } catch {
+            /* ignore */
+          }
+        }
+        if (materialIds && materialIds.length > 0) {
+          const validCount = await prisma.classroomMaterial.count({
+            where: { id: { in: materialIds }, classroomId: classroom.id },
+          });
+          if (validCount !== materialIds.length)
+            return res.status(400).json({
+              error:
+                "One or more classwork items do not belong to this classroom",
+            });
+        }
+
+        const updated = await storage.updateClassroomAssignment(
+          assignmentId,
+          data,
+          materialIds,
+        );
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
       }
-
-      const rawMaterialIds = req.body.materialIds;
-      let materialIds: number[] | undefined;
-      if (Array.isArray(rawMaterialIds)) {
-        materialIds = rawMaterialIds.map(Number).filter((n) => !isNaN(n));
-      } else if (typeof rawMaterialIds === "string") {
-        try { const p = JSON.parse(rawMaterialIds); materialIds = Array.isArray(p) ? p.map(Number).filter((n) => !isNaN(n)) : undefined; } catch { /* ignore */ }
-      }
-      if (materialIds && materialIds.length > 0) {
-        const validCount = await prisma.classroomMaterial.count({ where: { id: { in: materialIds }, classroomId: classroom.id } });
-        if (validCount !== materialIds.length) return res.status(400).json({ error: "One or more classwork items do not belong to this classroom" });
-      }
-
-      const updated = await storage.updateClassroomAssignment(assignmentId, data, materialIds);
-      res.json(updated);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // DELETE /api/classrooms/:classroomId/assignments/:assignmentId — teacher deletes assignment
-  app.delete("/api/classrooms/:classroomId/assignments/:assignmentId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      await storage.deleteClassroomAssignment(parseInt(req.params.assignmentId));
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.delete(
+    "/api/classrooms/:classroomId/assignments/:assignmentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        await storage.deleteClassroomAssignment(
+          parseInt(req.params.assignmentId),
+        );
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/assignments/:assignmentId/submissions — teacher views submissions
-  app.get("/api/classrooms/:classroomId/assignments/:assignmentId/submissions", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const submissions = await storage.getSubmissionsForAssignment(parseInt(req.params.assignmentId));
-      res.json(submissions);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/assignments/:assignmentId/submissions",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const submissions = await storage.getSubmissionsForAssignment(
+          parseInt(req.params.assignmentId),
+        );
+        res.json(submissions);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/my-submissions — student/parent views their own submissions
-  app.get("/api/classrooms/:classroomId/my-submissions", requireAuth, async (req, res) => {
-    try {
-      const classroomId = parseInt(req.params.classroomId);
-      const user = await storage.getUserById(req.session.userId!);
-      if (!user) return res.status(401).json({ error: "Unauthorized" });
-      let studentId: number;
-      if (user.role === "student") {
-        const student = await storage.getStudentByUserId(user.id);
-        if (!student) return res.json([]);
-        studentId = student.id;
-      } else if (user.role === "parent") {
-        const sid = parseInt(req.query.studentId as string);
-        if (!sid) return res.status(400).json({ error: "studentId query param required" });
-        const student = await storage.getStudentById(sid);
-        if (!student || !await storage.isTeamMember(user.id, student.id)) return res.status(403).json({ error: "Not your child" });
-        studentId = student.id;
-      } else {
-        return res.status(403).json({ error: "Forbidden" });
+  app.get(
+    "/api/classrooms/:classroomId/my-submissions",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroomId = parseInt(req.params.classroomId);
+        const user = await storage.getUserById(req.session.userId!);
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
+        let studentId: number;
+        if (user.role === "student") {
+          const student = await storage.getStudentByUserId(user.id);
+          if (!student) return res.json([]);
+          studentId = student.id;
+        } else if (user.role === "parent") {
+          const sid = parseInt(req.query.studentId as string);
+          if (!sid)
+            return res
+              .status(400)
+              .json({ error: "studentId query param required" });
+          const student = await storage.getStudentById(sid);
+          if (!student || !(await storage.isTeamMember(user.id, student.id)))
+            return res.status(403).json({ error: "Not your child" });
+          studentId = student.id;
+        } else {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+        const submissions = await storage.getSubmissionsForStudent(
+          studentId,
+          classroomId,
+        );
+        res.json(submissions);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-      const submissions = await storage.getSubmissionsForStudent(studentId, classroomId);
-      res.json(submissions);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // POST /api/classrooms/:classroomId/assignments/:assignmentId/submit — student submits
-  app.post("/api/classrooms/:classroomId/assignments/:assignmentId/submit", requireAuth, memoryUpload.single("file"), async (req, res) => {
-    try {
-      const classroomId = parseInt(req.params.classroomId);
-      const assignmentId = parseInt(req.params.assignmentId);
-      const classroom = await storage.getClassroomById(classroomId);
-      if (!classroom) return res.status(404).json({ error: "Classroom not found" });
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot submit to an archived classroom" });
-      const user = await storage.getUserById(req.session.userId!);
-      if (!user || user.role !== "student") return res.status(403).json({ error: "Students only" });
-      const student = await storage.getStudentByUserId(user.id);
-      if (!student) return res.status(403).json({ error: "Student profile not found" });
-      const { content, formAnswers: formAnswersRaw } = z.object({
-        content: z.string().optional().default(""),
-        formAnswers: z.string().optional(),
-      }).parse(req.body);
-      const assignments = await storage.getClassroomAssignments(classroomId);
-      const assignment = assignments.find((a) => a.id === assignmentId);
-      if (!assignment) return res.status(404).json({ error: "Assignment not found" });
-      
-      let fileUrl: string | undefined;
-      if (req.file) {
-        const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classroom-submissions");
-        if (!uploadResult.success || !uploadResult.url) {
-          return res.status(500).json({ error: uploadResult.error ?? "File upload failed" });
-        }
-        fileUrl = uploadResult.url;
-      }
+  app.post(
+    "/api/classrooms/:classroomId/assignments/:assignmentId/submit",
+    requireAuth,
+    memoryUpload.single("file"),
+    async (req, res) => {
+      try {
+        const classroomId = parseInt(req.params.classroomId);
+        const assignmentId = parseInt(req.params.assignmentId);
+        const classroom = await storage.getClassroomById(classroomId);
+        if (!classroom)
+          return res.status(404).json({ error: "Classroom not found" });
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot submit to an archived classroom" });
+        const user = await storage.getUserById(req.session.userId!);
+        if (!user || user.role !== "student")
+          return res.status(403).json({ error: "Students only" });
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student)
+          return res.status(403).json({ error: "Student profile not found" });
+        const { content, formAnswers: formAnswersRaw } = z
+          .object({
+            content: z.string().optional().default(""),
+            formAnswers: z.string().optional(),
+          })
+          .parse(req.body);
+        const assignments = await storage.getClassroomAssignments(classroomId);
+        const assignment = assignments.find((a) => a.id === assignmentId);
+        if (!assignment)
+          return res.status(404).json({ error: "Assignment not found" });
 
-      let formAnswers: Record<string, string | string[]> | undefined;
-      if (formAnswersRaw) {
-        try { formAnswers = JSON.parse(formAnswersRaw); } catch { formAnswers = undefined; }
-      }
-
-      // Validate required questions server-side
-      if (Array.isArray(assignment.formSchema) && assignment.formSchema.length > 0) {
-        const answers = formAnswers ?? {};
-        const missingLabels: string[] = [];
-        for (const q of assignment.formSchema as Array<{ id: string; label: string; type: string; required: boolean }>) {
-          if (!q.required) continue;
-          const answer = answers[q.id];
-          const empty = q.type === "checkbox"
-            ? !Array.isArray(answer) || answer.length === 0
-            : !answer || (typeof answer === "string" && !answer.trim());
-          if (empty) missingLabels.push(q.label || "Untitled question");
-        }
-        if (missingLabels.length > 0) {
-          return res.status(422).json({ error: `Required question${missingLabels.length > 1 ? "s" : ""} not answered: ${missingLabels.join(", ")}` });
-        }
-      }
-
-      // Auto-score if answer key is present
-      let autoGrade: number | null = null;
-      const answerKeyRaw = assignment.answerKey;
-      if (
-        answerKeyRaw &&
-        typeof answerKeyRaw === "object" &&
-        !Array.isArray(answerKeyRaw) &&
-        Array.isArray(assignment.formSchema) &&
-        assignment.formSchema.length > 0
-      ) {
-        const answerKey = answerKeyRaw as Record<string, string | string[]>;
-        const effectiveAnswers = formAnswers ?? {};
-        const keyedQuestions = (assignment.formSchema as Array<{ id: string; type: string }>).filter((q) => answerKey[q.id] !== undefined);
-        const keyedTotal = keyedQuestions.length;
-        if (keyedTotal > 0) {
-          let correct = 0;
-          for (const q of keyedQuestions) {
-            const correctAnswer = answerKey[q.id];
-            const studentAnswer = effectiveAnswers[q.id];
-            if (q.type === "checkbox") {
-              const expected = (Array.isArray(correctAnswer) ? correctAnswer : [correctAnswer]).map((v) => v.trim().toLowerCase()).sort();
-              const actual = (Array.isArray(studentAnswer) ? studentAnswer : [studentAnswer ?? ""]).map((v) => v.trim().toLowerCase()).sort();
-              if (expected.length === actual.length && expected.every((v, i) => v === actual[i])) correct++;
-            } else {
-              const expected = (typeof correctAnswer === "string" ? correctAnswer : correctAnswer[0] ?? "").trim().toLowerCase();
-              const actual = (typeof studentAnswer === "string" ? studentAnswer : (Array.isArray(studentAnswer) ? studentAnswer[0] : "") ?? "").trim().toLowerCase();
-              if (expected && actual && expected === actual) correct++;
-            }
+        let fileUrl: string | undefined;
+        if (req.file) {
+          const uploadResult = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+            "classroom-submissions",
+          );
+          if (!uploadResult.success || !uploadResult.url) {
+            return res
+              .status(500)
+              .json({ error: uploadResult.error ?? "File upload failed" });
           }
-          autoGrade = Math.round((correct / keyedTotal) * assignment.points);
+          fileUrl = uploadResult.url;
         }
-      }
 
-      // Check if this is a resubmission of a returned submission (to notify teacher)
-      const priorSub = await prisma.classroomSubmission.findUnique({
-        where: { assignmentId_studentId: { assignmentId, studentId: student.id } },
-        select: { status: true },
-      });
-      const isResubmission = priorSub?.status === "returned";
-
-      const submission = await storage.submitClassroomAssignment(assignmentId, student.id, content, assignment.dueDate, fileUrl, formAnswers, autoGrade);
-
-      // Notify the teacher on every submission (first-time or resubmission).
-      // Links point directly to the submission review page so the teacher can
-      // open the work in one click.
-      const teacherUser = await storage.getUserById(classroom.teacherId);
-      if (teacherUser) {
-        const reviewLink = `/classrooms/${classroom.slug ?? classroom.id}/submissions/${submission.id}/review`;
-        if (isResubmission) {
-          storage.createNotification({
-            userId: teacherUser.id,
-            type: "submission_resubmitted",
-            title: "Submission Resubmitted",
-            body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
-            link: reviewLink,
-          }).catch(console.error);
-          maybeEmailNotification(teacherUser.id, {
-            title: "Submission Resubmitted",
-            body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
-            link: reviewLink,
-          }).catch(() => {});
-        } else {
-          // First submission — teacher was previously never notified
-          storage.createNotification({
-            userId: teacherUser.id,
-            type: "new_submission",
-            title: "New Submission",
-            body: `${student.name} submitted "${assignment.title}".`,
-            link: reviewLink,
-          }).catch(console.error);
-          maybeEmailNotification(teacherUser.id, {
-            title: "New Submission",
-            body: `${student.name} submitted "${assignment.title}".`,
-            link: reviewLink,
-          }).catch(() => {});
+        let formAnswers: Record<string, string | string[]> | undefined;
+        if (formAnswersRaw) {
+          try {
+            formAnswers = JSON.parse(formAnswersRaw);
+          } catch {
+            formAnswers = undefined;
+          }
         }
-      }
 
-      res.json(submission);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+        // Validate required questions server-side
+        if (
+          Array.isArray(assignment.formSchema) &&
+          assignment.formSchema.length > 0
+        ) {
+          const answers = formAnswers ?? {};
+          const missingLabels: string[] = [];
+          for (const q of assignment.formSchema as Array<{
+            id: string;
+            label: string;
+            type: string;
+            required: boolean;
+          }>) {
+            if (!q.required) continue;
+            const answer = answers[q.id];
+            const empty =
+              q.type === "checkbox"
+                ? !Array.isArray(answer) || answer.length === 0
+                : !answer || (typeof answer === "string" && !answer.trim());
+            if (empty) missingLabels.push(q.label || "Untitled question");
+          }
+          if (missingLabels.length > 0) {
+            return res.status(422).json({
+              error: `Required question${missingLabels.length > 1 ? "s" : ""} not answered: ${missingLabels.join(", ")}`,
+            });
+          }
+        }
+
+        // Auto-score if answer key is present
+        let autoGrade: number | null = null;
+        const answerKeyRaw = assignment.answerKey;
+        if (
+          answerKeyRaw &&
+          typeof answerKeyRaw === "object" &&
+          !Array.isArray(answerKeyRaw) &&
+          Array.isArray(assignment.formSchema) &&
+          assignment.formSchema.length > 0
+        ) {
+          const answerKey = answerKeyRaw as Record<string, string | string[]>;
+          const effectiveAnswers = formAnswers ?? {};
+          const keyedQuestions = (
+            assignment.formSchema as Array<{ id: string; type: string }>
+          ).filter((q) => answerKey[q.id] !== undefined);
+          const keyedTotal = keyedQuestions.length;
+          if (keyedTotal > 0) {
+            let correct = 0;
+            for (const q of keyedQuestions) {
+              const correctAnswer = answerKey[q.id];
+              const studentAnswer = effectiveAnswers[q.id];
+              if (q.type === "checkbox") {
+                const expected = (
+                  Array.isArray(correctAnswer) ? correctAnswer : [correctAnswer]
+                )
+                  .map((v) => v.trim().toLowerCase())
+                  .sort();
+                const actual = (
+                  Array.isArray(studentAnswer)
+                    ? studentAnswer
+                    : [studentAnswer ?? ""]
+                )
+                  .map((v) => v.trim().toLowerCase())
+                  .sort();
+                if (
+                  expected.length === actual.length &&
+                  expected.every((v, i) => v === actual[i])
+                )
+                  correct++;
+              } else {
+                const expected = (
+                  typeof correctAnswer === "string"
+                    ? correctAnswer
+                    : (correctAnswer[0] ?? "")
+                )
+                  .trim()
+                  .toLowerCase();
+                const actual = (
+                  typeof studentAnswer === "string"
+                    ? studentAnswer
+                    : ((Array.isArray(studentAnswer) ? studentAnswer[0] : "") ??
+                      "")
+                )
+                  .trim()
+                  .toLowerCase();
+                if (expected && actual && expected === actual) correct++;
+              }
+            }
+            autoGrade = Math.round((correct / keyedTotal) * assignment.points);
+          }
+        }
+
+        // Check if this is a resubmission of a returned submission (to notify teacher)
+        const priorSub = await prisma.classroomSubmission.findUnique({
+          where: {
+            assignmentId_studentId: { assignmentId, studentId: student.id },
+          },
+          select: { status: true },
+        });
+        const isResubmission = priorSub?.status === "returned";
+
+        const submission = await storage.submitClassroomAssignment(
+          assignmentId,
+          student.id,
+          content,
+          assignment.dueDate,
+          fileUrl,
+          formAnswers,
+          autoGrade,
+        );
+
+        // Notify the teacher on every submission (first-time or resubmission).
+        // Links point directly to the submission review page so the teacher can
+        // open the work in one click.
+        const teacherUser = await storage.getUserById(classroom.teacherId);
+        if (teacherUser) {
+          const reviewLink = `/classrooms/${classroom.slug ?? classroom.id}/submissions/${submission.id}/review`;
+          if (isResubmission) {
+            storage
+              .createNotification({
+                userId: teacherUser.id,
+                type: "submission_resubmitted",
+                title: "Submission Resubmitted",
+                body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
+                link: reviewLink,
+              })
+              .catch(console.error);
+            maybeEmailNotification(teacherUser.id, {
+              title: "Submission Resubmitted",
+              body: `${student.name} has resubmitted "${assignment.title}" after revision.`,
+              link: reviewLink,
+            }).catch(() => {});
+          } else {
+            // First submission — teacher was previously never notified
+            storage
+              .createNotification({
+                userId: teacherUser.id,
+                type: "new_submission",
+                title: "New Submission",
+                body: `${student.name} submitted "${assignment.title}".`,
+                link: reviewLink,
+              })
+              .catch(console.error);
+            maybeEmailNotification(teacherUser.id, {
+              title: "New Submission",
+              body: `${student.name} submitted "${assignment.title}".`,
+              link: reviewLink,
+            }).catch(() => {});
+          }
+        }
+
+        res.json(submission);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/submissions/:submissionId — teacher views single submission
-  app.get("/api/classrooms/:classroomId/submissions/:submissionId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const submissionId = parseInt(req.params.submissionId);
-      const sub = await storage.getClassroomSubmissionById(submissionId);
-      if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
-      res.json(sub);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/submissions/:submissionId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const submissionId = parseInt(req.params.submissionId);
+        const sub = await storage.getClassroomSubmissionById(submissionId);
+        if (!sub || sub.assignment.classroomId !== classroom.id)
+          return res.status(404).json({ error: "Submission not found" });
+        res.json(sub);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // PATCH /api/classrooms/:classroomId/submissions/:submissionId/grade — teacher grades
-  app.patch("/api/classrooms/:classroomId/submissions/:submissionId/grade", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const { grade, feedback } = z.object({
-        grade: z.number().int().min(0),
-        feedback: z.string().nullable().optional(),
-      }).parse(req.body);
-      // Get assignment to know max points
-      const submissionId = parseInt(req.params.submissionId);
-      const sub = await prisma.classroomSubmission.findUnique({
-        where: { id: submissionId },
-        include: { assignment: { select: { points: true, classroomId: true, title: true, slug: true } } },
-      });
-      if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
-      const updated = await storage.gradeClassroomSubmission(submissionId, grade, feedback ?? null, sub.assignment.points);
+  app.patch(
+    "/api/classrooms/:classroomId/submissions/:submissionId/grade",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const { grade, feedback } = z
+          .object({
+            grade: z.number().int().min(0),
+            feedback: z.string().nullable().optional(),
+          })
+          .parse(req.body);
+        // Get assignment to know max points
+        const submissionId = parseInt(req.params.submissionId);
+        const sub = await prisma.classroomSubmission.findUnique({
+          where: { id: submissionId },
+          include: {
+            assignment: {
+              select: {
+                points: true,
+                classroomId: true,
+                title: true,
+                slug: true,
+              },
+            },
+          },
+        });
+        if (!sub || sub.assignment.classroomId !== classroom.id)
+          return res.status(404).json({ error: "Submission not found" });
+        const updated = await storage.gradeClassroomSubmission(
+          submissionId,
+          grade,
+          feedback ?? null,
+          sub.assignment.points,
+        );
 
-      // Notify student their classroom submission was graded
-      const gradedStudent = await storage.getStudentById(sub.studentId);
-      if (gradedStudent?.userId) {
-        const assignmentTitle = sub.assignment.title;
-        const assignmentLink = `/classrooms/${classroom.slug ?? classroom.id}`;
-        const pct = sub.assignment.points > 0 ? Math.round((grade / sub.assignment.points) * 100) : grade;
-        const notifBody = `Your submission for "${assignmentTitle}" has been graded: ${pct}%`;
-        storage.createNotification({
-          userId: gradedStudent.userId,
-          type: "assignment_graded",
-          title: "Assignment Graded",
-          body: notifBody,
-          link: assignmentLink,
-        }).catch(console.error);
-        maybeEmailNotification(gradedStudent.userId, {
-          title: "Assignment Graded",
-          body: notifBody,
-          link: assignmentLink,
-        }).catch(() => {});
-        // Also notify team parents
-        storage.getTeamMemberUserIds(gradedStudent.id).then((parentIds) => {
-          parentIds.forEach((pid) => {
-            const parentBody = `${gradedStudent.name}'s submission for "${assignmentTitle}" has been graded: ${pct}%`;
-            storage.createNotification({
-              userId: pid,
+        // Notify student their classroom submission was graded
+        const gradedStudent = await storage.getStudentById(sub.studentId);
+        if (gradedStudent?.userId) {
+          const assignmentTitle = sub.assignment.title;
+          const assignmentLink = `/classrooms/${classroom.slug ?? classroom.id}`;
+          const pct =
+            sub.assignment.points > 0
+              ? Math.round((grade / sub.assignment.points) * 100)
+              : grade;
+          const notifBody = `Your submission for "${assignmentTitle}" has been graded: ${pct}%`;
+          storage
+            .createNotification({
+              userId: gradedStudent.userId,
               type: "assignment_graded",
               title: "Assignment Graded",
-              body: parentBody,
-              link: "/dashboard/children",
-            }).catch(console.error);
-            maybeEmailNotification(pid, {
-              title: "Assignment Graded",
-              body: parentBody,
-              link: "/dashboard/children",
-            }).catch(() => {});
-          });
-        }).catch(console.error);
-      }
+              body: notifBody,
+              link: assignmentLink,
+            })
+            .catch(console.error);
+          maybeEmailNotification(gradedStudent.userId, {
+            title: "Assignment Graded",
+            body: notifBody,
+            link: assignmentLink,
+          }).catch(() => {});
+          // Also notify team parents
+          storage
+            .getTeamMemberUserIds(gradedStudent.id)
+            .then((parentIds) => {
+              parentIds.forEach((pid) => {
+                const parentBody = `${gradedStudent.name}'s submission for "${assignmentTitle}" has been graded: ${pct}%`;
+                storage
+                  .createNotification({
+                    userId: pid,
+                    type: "assignment_graded",
+                    title: "Assignment Graded",
+                    body: parentBody,
+                    link: "/dashboard/children",
+                  })
+                  .catch(console.error);
+                maybeEmailNotification(pid, {
+                  title: "Assignment Graded",
+                  body: parentBody,
+                  link: "/dashboard/children",
+                }).catch(() => {});
+              });
+            })
+            .catch(console.error);
+        }
 
-      res.json(updated);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // PATCH /api/classrooms/:classroomId/submissions/:submissionId/return — teacher returns for revision
-  app.patch("/api/classrooms/:classroomId/submissions/:submissionId/return", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const submissionId = parseInt(req.params.submissionId);
-      const { returnNote } = z.object({
-        returnNote: z.string().trim().min(1, "A note is required when returning a submission"),
-      }).parse(req.body);
-      const sub = await storage.getClassroomSubmissionById(submissionId);
-      if (!sub || sub.assignment.classroomId !== classroom.id) return res.status(404).json({ error: "Submission not found" });
-      const updated = await storage.returnClassroomSubmission(submissionId, returnNote);
+  app.patch(
+    "/api/classrooms/:classroomId/submissions/:submissionId/return",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const submissionId = parseInt(req.params.submissionId);
+        const { returnNote } = z
+          .object({
+            returnNote: z
+              .string()
+              .trim()
+              .min(1, "A note is required when returning a submission"),
+          })
+          .parse(req.body);
+        const sub = await storage.getClassroomSubmissionById(submissionId);
+        if (!sub || sub.assignment.classroomId !== classroom.id)
+          return res.status(404).json({ error: "Submission not found" });
+        const updated = await storage.returnClassroomSubmission(
+          submissionId,
+          returnNote,
+        );
 
-      // Notify the student their submission was returned for revision
-      const returnedStudent = await storage.getStudentById(sub.studentId);
-      if (returnedStudent?.userId) {
-        const assignmentTitle = sub.assignment.title;
-        const classworkLink = `/classrooms/${classroom.slug ?? classroom.id}/classwork/${sub.assignment.slug ?? sub.assignment.id}`;
-        const studentBody = `Your submission for "${assignmentTitle}" has been returned — please review your teacher's note and resubmit.`;
-        storage.createNotification({
-          userId: returnedStudent.userId,
-          type: "submission_returned",
-          title: "Submission Returned for Revision",
-          body: studentBody,
-          link: classworkLink,
-        }).catch(console.error);
-        maybeEmailNotification(returnedStudent.userId, {
-          title: "Submission Returned for Revision",
-          body: studentBody,
-          link: classworkLink,
-        }).catch(() => {});
-        // Also notify every parent on the child's team
-        storage.getTeamMemberUserIds(returnedStudent.id).then((parentIds) => {
-          parentIds.forEach((pid) => {
-            const parentBody = `${returnedStudent.name}'s submission for "${assignmentTitle}" was returned for revision.`;
-            storage.createNotification({
-              userId: pid,
+        // Notify the student their submission was returned for revision
+        const returnedStudent = await storage.getStudentById(sub.studentId);
+        if (returnedStudent?.userId) {
+          const assignmentTitle = sub.assignment.title;
+          const classworkLink = `/classrooms/${classroom.slug ?? classroom.id}/classwork/${sub.assignment.slug ?? sub.assignment.id}`;
+          const studentBody = `Your submission for "${assignmentTitle}" has been returned — please review your teacher's note and resubmit.`;
+          storage
+            .createNotification({
+              userId: returnedStudent.userId,
               type: "submission_returned",
               title: "Submission Returned for Revision",
-              body: parentBody,
-              link: "/dashboard/children",
-            }).catch(console.error);
-            maybeEmailNotification(pid, {
-              title: "Submission Returned for Revision",
-              body: parentBody,
-              link: "/dashboard/children",
-            }).catch(() => {});
-          });
-        }).catch(console.error);
-      }
+              body: studentBody,
+              link: classworkLink,
+            })
+            .catch(console.error);
+          maybeEmailNotification(returnedStudent.userId, {
+            title: "Submission Returned for Revision",
+            body: studentBody,
+            link: classworkLink,
+          }).catch(() => {});
+          // Also notify every parent on the child's team
+          storage
+            .getTeamMemberUserIds(returnedStudent.id)
+            .then((parentIds) => {
+              parentIds.forEach((pid) => {
+                const parentBody = `${returnedStudent.name}'s submission for "${assignmentTitle}" was returned for revision.`;
+                storage
+                  .createNotification({
+                    userId: pid,
+                    type: "submission_returned",
+                    title: "Submission Returned for Revision",
+                    body: parentBody,
+                    link: "/dashboard/children",
+                  })
+                  .catch(console.error);
+                maybeEmailNotification(pid, {
+                  title: "Submission Returned for Revision",
+                  body: parentBody,
+                  link: "/dashboard/children",
+                }).catch(() => {});
+              });
+            })
+            .catch(console.error);
+        }
 
-      res.json(updated);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/materials — teacher adds classwork (JSON body)
-  app.post("/api/classrooms/:classroomId/materials", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add classwork to an archived classroom" });
-      const data = z.object({
-        title: z.string().min(1),
-        description: z.string().default(""),
-        url: z.string().url().optional().nullable(),
-        attachments: z.array(z.string().url()).optional(),
-      }).parse(req.body);
-      const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data });
+  app.post(
+    "/api/classrooms/:classroomId/materials",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot add classwork to an archived classroom" });
+        const data = z
+          .object({
+            title: z.string().min(1),
+            description: z.string().default(""),
+            url: z.string().url().optional().nullable(),
+            attachments: z.array(z.string().url()).optional(),
+          })
+          .parse(req.body);
+        const material = await storage.createClassroomMaterial({
+          classroomId: classroom.id,
+          ...data,
+        });
 
-      res.status(201).json(material);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+        res.status(201).json(material);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/materials/with-file — teacher adds classwork with file upload
   app.post(
@@ -7115,110 +8600,169 @@ export function registerRoutes(app: Express) {
       try {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
-        if (classroom.status === "archived") return res.status(400).json({ error: "Cannot add classwork to an archived classroom" });
-        const data = z.object({
-          title: z.string().min(1),
-          description: z.string().default(""),
-        }).parse(req.body);
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot add classwork to an archived classroom" });
+        const data = z
+          .object({
+            title: z.string().min(1),
+            description: z.string().default(""),
+          })
+          .parse(req.body);
         let url: string | null = null;
         if (req.file) {
-          const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classwork");
+          const uploadResult = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+            "classwork",
+          );
           if (!uploadResult.success || !uploadResult.url) {
-            return res.status(500).json({ error: uploadResult.error || "File upload failed" });
+            return res
+              .status(500)
+              .json({ error: uploadResult.error || "File upload failed" });
           }
           url = uploadResult.url;
         }
-        const material = await storage.createClassroomMaterial({ classroomId: classroom.id, ...data, url });
+        const material = await storage.createClassroomMaterial({
+          classroomId: classroom.id,
+          ...data,
+          url,
+        });
 
         res.status(201).json(material);
       } catch (error: any) {
         res.status(400).json({ error: error.message });
       }
-    }
+    },
   );
 
   // GET /api/classrooms/:classroomId/materials — get classwork (classroom members only)
-  app.get("/api/classrooms/:classroomId/materials", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const materials = await storage.getClassroomMaterials(classroom.id);
-      res.json(materials);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/materials",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const materials = await storage.getClassroomMaterials(classroom.id);
+        res.json(materials);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/materials/slug/:slug — fetch single classwork by slug (classroom members)
   // NOTE: must be registered BEFORE /:materialId to avoid "slug" being parsed as an integer
-  app.get("/api/classrooms/:classroomId/materials/slug/:slug", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const material = await prisma.classroomMaterial.findFirst({
-        where: { classroomId: classroom.id, slug: req.params.slug },
-        include: { assignmentLinks: { select: { assignmentId: true } } },
-      });
-      if (!material) return res.status(404).json({ error: "Classwork not found" });
-      res.json({
-        id: material.id, classroomId: material.classroomId, title: material.title,
-        description: material.description, url: material.url ?? null,
-        attachments: material.attachments ?? [],
-        slug: material.slug ?? null,
-        uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
-        linkedAssignmentIds: material.assignmentLinks.map((l) => l.assignmentId),
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/materials/slug/:slug",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const material = await prisma.classroomMaterial.findFirst({
+          where: { classroomId: classroom.id, slug: req.params.slug },
+          include: { assignmentLinks: { select: { assignmentId: true } } },
+        });
+        if (!material)
+          return res.status(404).json({ error: "Classwork not found" });
+        res.json({
+          id: material.id,
+          classroomId: material.classroomId,
+          title: material.title,
+          description: material.description,
+          url: material.url ?? null,
+          attachments: material.attachments ?? [],
+          slug: material.slug ?? null,
+          uploadedAt:
+            material.uploadedAt instanceof Date
+              ? material.uploadedAt.toISOString()
+              : material.uploadedAt,
+          linkedAssignmentIds: material.assignmentLinks.map(
+            (l) => l.assignmentId,
+          ),
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:classroomId/materials/:materialId — fetch single classwork by ID (classroom members)
-  app.get("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const materialId = parseInt(req.params.materialId);
-      if (isNaN(materialId)) return res.status(400).json({ error: "Invalid material ID" });
-      const material = await prisma.classroomMaterial.findFirst({
-        where: { id: materialId, classroomId: classroom.id },
-        include: { assignmentLinks: { select: { assignmentId: true } } },
-      });
-      if (!material) return res.status(404).json({ error: "Classwork not found" });
-      res.json({
-        id: material.id, classroomId: material.classroomId, title: material.title,
-        description: material.description, url: material.url ?? null,
-        attachments: material.attachments ?? [],
-        slug: material.slug ?? null,
-        uploadedAt: material.uploadedAt instanceof Date ? material.uploadedAt.toISOString() : material.uploadedAt,
-        linkedAssignmentIds: material.assignmentLinks.map((l) => l.assignmentId),
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/materials/:materialId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const materialId = parseInt(req.params.materialId);
+        if (isNaN(materialId))
+          return res.status(400).json({ error: "Invalid material ID" });
+        const material = await prisma.classroomMaterial.findFirst({
+          where: { id: materialId, classroomId: classroom.id },
+          include: { assignmentLinks: { select: { assignmentId: true } } },
+        });
+        if (!material)
+          return res.status(404).json({ error: "Classwork not found" });
+        res.json({
+          id: material.id,
+          classroomId: material.classroomId,
+          title: material.title,
+          description: material.description,
+          url: material.url ?? null,
+          attachments: material.attachments ?? [],
+          slug: material.slug ?? null,
+          uploadedAt:
+            material.uploadedAt instanceof Date
+              ? material.uploadedAt.toISOString()
+              : material.uploadedAt,
+          linkedAssignmentIds: material.assignmentLinks.map(
+            (l) => l.assignmentId,
+          ),
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // PATCH /api/classrooms/:classroomId/materials/:materialId — teacher edits classwork (JSON)
-  app.patch("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit classwork in an archived classroom" });
-      const materialId = parseInt(req.params.materialId);
-      const existing = await prisma.classroomMaterial.findUnique({ where: { id: materialId }, select: { classroomId: true } });
-      if (!existing || existing.classroomId !== classroom.id) return res.status(404).json({ error: "Classwork not found" });
-      const data = z.object({
-        title: z.string().min(1).optional(),
-        description: z.string().optional(),
-        url: z.string().url().optional().nullable(),
-        attachments: z.array(z.string().url()).optional(),
-      }).parse(req.body);
-      const updated = await storage.updateClassroomMaterial(materialId, data);
-      res.json(updated);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
-  });
+  app.patch(
+    "/api/classrooms/:classroomId/materials/:materialId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot edit classwork in an archived classroom" });
+        const materialId = parseInt(req.params.materialId);
+        const existing = await prisma.classroomMaterial.findUnique({
+          where: { id: materialId },
+          select: { classroomId: true },
+        });
+        if (!existing || existing.classroomId !== classroom.id)
+          return res.status(404).json({ error: "Classwork not found" });
+        const data = z
+          .object({
+            title: z.string().min(1).optional(),
+            description: z.string().optional(),
+            url: z.string().url().optional().nullable(),
+            attachments: z.array(z.string().url()).optional(),
+          })
+          .parse(req.body);
+        const updated = await storage.updateClassroomMaterial(materialId, data);
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
 
   // PATCH /api/classrooms/:classroomId/materials/:materialId/with-file — teacher edits classwork with new file
   app.patch(
@@ -7229,55 +8773,83 @@ export function registerRoutes(app: Express) {
       try {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
-        if (classroom.status === "archived") return res.status(400).json({ error: "Cannot edit classwork in an archived classroom" });
+        if (classroom.status === "archived")
+          return res
+            .status(400)
+            .json({ error: "Cannot edit classwork in an archived classroom" });
         const materialId = parseInt(req.params.materialId);
-        const existing = await prisma.classroomMaterial.findUnique({ where: { id: materialId }, select: { classroomId: true } });
-        if (!existing || existing.classroomId !== classroom.id) return res.status(404).json({ error: "Classwork not found" });
-        const data = z.object({
-          title: z.string().min(1).optional(),
-          description: z.string().optional(),
-          clearUrl: z.string().optional(),
-        }).parse(req.body);
+        const existing = await prisma.classroomMaterial.findUnique({
+          where: { id: materialId },
+          select: { classroomId: true },
+        });
+        if (!existing || existing.classroomId !== classroom.id)
+          return res.status(404).json({ error: "Classwork not found" });
+        const data = z
+          .object({
+            title: z.string().min(1).optional(),
+            description: z.string().optional(),
+            clearUrl: z.string().optional(),
+          })
+          .parse(req.body);
         const { clearUrl, ...rest } = data;
         let url: string | null | undefined = undefined;
         if (req.file) {
-          const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, "classwork");
+          const uploadResult = await uploadBufferToCloudinary(
+            req.file.buffer,
+            req.file.originalname,
+            "classwork",
+          );
           if (!uploadResult.success || !uploadResult.url) {
-            return res.status(500).json({ error: uploadResult.error || "File upload failed" });
+            return res
+              .status(500)
+              .json({ error: uploadResult.error || "File upload failed" });
           }
           url = uploadResult.url;
         } else if (clearUrl === "true") {
           url = null;
         }
-        const updated = await storage.updateClassroomMaterial(materialId, { ...rest, ...(url !== undefined ? { url } : {}) });
+        const updated = await storage.updateClassroomMaterial(materialId, {
+          ...rest,
+          ...(url !== undefined ? { url } : {}),
+        });
         res.json(updated);
       } catch (error: any) {
         res.status(400).json({ error: error.message });
       }
-    }
+    },
   );
 
   // DELETE /api/classrooms/:classroomId/materials/:materialId — teacher removes classwork
-  app.delete("/api/classrooms/:classroomId/materials/:materialId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const materialId = parseInt(req.params.materialId);
-      const existing = await prisma.classroomMaterial.findUnique({ where: { id: materialId }, select: { classroomId: true } });
-      if (!existing || existing.classroomId !== classroom.id) return res.status(404).json({ error: "Classwork not found" });
-      await storage.deleteClassroomMaterial(materialId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.delete(
+    "/api/classrooms/:classroomId/materials/:materialId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const materialId = parseInt(req.params.materialId);
+        const existing = await prisma.classroomMaterial.findUnique({
+          where: { id: materialId },
+          select: { classroomId: true },
+        });
+        if (!existing || existing.classroomId !== classroom.id)
+          return res.status(404).json({ error: "Classwork not found" });
+        await storage.deleteClassroomMaterial(materialId);
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // ========== NOTIFICATION ROUTES ==========
 
   // GET /api/notifications — list notifications for current user
   app.get("/api/notifications", requireAuth, async (req, res) => {
     try {
-      const notifications = await storage.getNotificationsForUser(req.session.userId!);
+      const notifications = await storage.getNotificationsForUser(
+        req.session.userId!,
+      );
       res.json(notifications);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -7313,7 +8885,10 @@ export function registerRoutes(app: Express) {
   // PATCH /api/notifications/:id/read — mark a single notification as read
   app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
     try {
-      await storage.markNotificationRead(parseInt(req.params.id), req.session.userId!);
+      await storage.markNotificationRead(
+        parseInt(req.params.id),
+        req.session.userId!,
+      );
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -7323,244 +8898,380 @@ export function registerRoutes(app: Express) {
   // ─── Seen-content endpoints ────────────────────────────────────────────────
 
   // GET /api/classrooms/:classroomId/my-seen — IDs the current user has seen, scoped to this classroom's content
-  app.get("/api/classrooms/:classroomId/my-seen", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const userId = req.session.userId!;
-      const cid = classroom.id;
+  app.get(
+    "/api/classrooms/:classroomId/my-seen",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const userId = req.session.userId!;
+        const cid = classroom.id;
 
-      // Fetch content IDs that actually belong to this classroom
-      const [classroomPosts, classroomMaterials, classroomAssignments] = await Promise.all([
-        prisma.classroomPost.findMany({ where: { classroomId: cid }, select: { id: true } }),
-        prisma.classroomMaterial.findMany({ where: { classroomId: cid }, select: { id: true } }),
-        prisma.classroomAssignment.findMany({ where: { classroomId: cid }, select: { id: true } }),
-      ]);
-      const postSet = new Set(classroomPosts.map((p) => p.id));
-      const materialSet = new Set(classroomMaterials.map((m) => m.id));
-      const assignmentSet = new Set(classroomAssignments.map((a) => a.id));
+        // Fetch content IDs that actually belong to this classroom
+        const [classroomPosts, classroomMaterials, classroomAssignments] =
+          await Promise.all([
+            prisma.classroomPost.findMany({
+              where: { classroomId: cid },
+              select: { id: true },
+            }),
+            prisma.classroomMaterial.findMany({
+              where: { classroomId: cid },
+              select: { id: true },
+            }),
+            prisma.classroomAssignment.findMany({
+              where: { classroomId: cid },
+              select: { id: true },
+            }),
+          ]);
+        const postSet = new Set(classroomPosts.map((p) => p.id));
+        const materialSet = new Set(classroomMaterials.map((m) => m.id));
+        const assignmentSet = new Set(classroomAssignments.map((a) => a.id));
 
-      // Fetch what the user has seen, filtered to this classroom's content
-      const [seenPosts, seenMaterials, seenAssignments] = await Promise.all([
-        prisma.classroomContentSeen.findMany({ where: { userId, contentType: "post" }, select: { contentId: true } }),
-        prisma.classroomContentSeen.findMany({ where: { userId, contentType: "material" }, select: { contentId: true } }),
-        prisma.classroomContentSeen.findMany({ where: { userId, contentType: "assignment" }, select: { contentId: true } }),
-      ]);
+        // Fetch what the user has seen, filtered to this classroom's content
+        const [seenPosts, seenMaterials, seenAssignments] = await Promise.all([
+          prisma.classroomContentSeen.findMany({
+            where: { userId, contentType: "post" },
+            select: { contentId: true },
+          }),
+          prisma.classroomContentSeen.findMany({
+            where: { userId, contentType: "material" },
+            select: { contentId: true },
+          }),
+          prisma.classroomContentSeen.findMany({
+            where: { userId, contentType: "assignment" },
+            select: { contentId: true },
+          }),
+        ]);
 
-      res.json({
-        postIds: seenPosts.map((r) => r.contentId).filter((id) => postSet.has(id)),
-        materialIds: seenMaterials.map((r) => r.contentId).filter((id) => materialSet.has(id)),
-        assignmentIds: seenAssignments.map((r) => r.contentId).filter((id) => assignmentSet.has(id)),
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+        res.json({
+          postIds: seenPosts
+            .map((r) => r.contentId)
+            .filter((id) => postSet.has(id)),
+          materialIds: seenMaterials
+            .map((r) => r.contentId)
+            .filter((id) => materialSet.has(id)),
+          assignmentIds: seenAssignments
+            .map((r) => r.contentId)
+            .filter((id) => assignmentSet.has(id)),
+        });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/posts/:postId/seen
-  app.post("/api/classrooms/:classroomId/posts/:postId/seen", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const postId = parseInt(req.params.postId);
-      if (isNaN(postId)) return res.status(400).json({ error: "Invalid post ID" });
-      const post = await prisma.classroomPost.findFirst({ where: { id: postId, classroomId: classroom.id } });
-      if (!post) return res.status(404).json({ error: "Post not found in this classroom" });
-      await storage.markContentSeen(req.session.userId!, "post", postId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.post(
+    "/api/classrooms/:classroomId/posts/:postId/seen",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const postId = parseInt(req.params.postId);
+        if (isNaN(postId))
+          return res.status(400).json({ error: "Invalid post ID" });
+        const post = await prisma.classroomPost.findFirst({
+          where: { id: postId, classroomId: classroom.id },
+        });
+        if (!post)
+          return res
+            .status(404)
+            .json({ error: "Post not found in this classroom" });
+        await storage.markContentSeen(req.session.userId!, "post", postId);
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/materials/:materialId/seen
-  app.post("/api/classrooms/:classroomId/materials/:materialId/seen", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const materialId = parseInt(req.params.materialId);
-      if (isNaN(materialId)) return res.status(400).json({ error: "Invalid material ID" });
-      const material = await prisma.classroomMaterial.findFirst({ where: { id: materialId, classroomId: classroom.id } });
-      if (!material) return res.status(404).json({ error: "Material not found in this classroom" });
-      await storage.markContentSeen(req.session.userId!, "material", materialId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.post(
+    "/api/classrooms/:classroomId/materials/:materialId/seen",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const materialId = parseInt(req.params.materialId);
+        if (isNaN(materialId))
+          return res.status(400).json({ error: "Invalid material ID" });
+        const material = await prisma.classroomMaterial.findFirst({
+          where: { id: materialId, classroomId: classroom.id },
+        });
+        if (!material)
+          return res
+            .status(404)
+            .json({ error: "Material not found in this classroom" });
+        await storage.markContentSeen(
+          req.session.userId!,
+          "material",
+          materialId,
+        );
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/assignments/:assignmentId/seen
-  app.post("/api/classrooms/:classroomId/assignments/:assignmentId/seen", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const assignmentId = parseInt(req.params.assignmentId);
-      if (isNaN(assignmentId)) return res.status(400).json({ error: "Invalid assignment ID" });
-      const assignment = await prisma.classroomAssignment.findFirst({ where: { id: assignmentId, classroomId: classroom.id } });
-      if (!assignment) return res.status(404).json({ error: "Assignment not found in this classroom" });
-      await storage.markContentSeen(req.session.userId!, "assignment", assignmentId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.post(
+    "/api/classrooms/:classroomId/assignments/:assignmentId/seen",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const assignmentId = parseInt(req.params.assignmentId);
+        if (isNaN(assignmentId))
+          return res.status(400).json({ error: "Invalid assignment ID" });
+        const assignment = await prisma.classroomAssignment.findFirst({
+          where: { id: assignmentId, classroomId: classroom.id },
+        });
+        if (!assignment)
+          return res
+            .status(404)
+            .json({ error: "Assignment not found in this classroom" });
+        await storage.markContentSeen(
+          req.session.userId!,
+          "assignment",
+          assignmentId,
+        );
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // ─── Grading Policy ─────────────────────────────────────────────────────────
 
   // GET /api/classrooms/:classroomId/grading-policy — latest policy for classroom
-  app.get("/api/classrooms/:classroomId/grading-policy", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
-      const policy = await prisma.gradingPolicy.findFirst({
-        where: { classroomId: classroom.id },
-        orderBy: { id: "desc" },
-      });
-      res.json(policy ?? null);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:classroomId/grading-policy",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const policy = await prisma.gradingPolicy.findFirst({
+          where: { classroomId: classroom.id },
+          orderBy: { id: "desc" },
+        });
+        res.json(policy ?? null);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
 
   // POST /api/classrooms/:classroomId/grading-policy — teacher saves new policy snapshot
-  app.post("/api/classrooms/:classroomId/grading-policy", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const data = z.object({
-        assignmentWeight: z.number().int().min(0).max(100),
-        testWeight: z.number().int().min(0).max(100),
-        quizWeight: z.number().int().min(0).max(100),
-        projectWeight: z.number().int().min(0).max(100),
-      }).refine(
-        (d) => d.assignmentWeight + d.testWeight + d.quizWeight + d.projectWeight === 100,
-        { message: "Weights must sum to 100" }
-      ).parse(req.body);
-      const policy = await prisma.gradingPolicy.create({
-        data: { classroomId: classroom.id, ...data },
-      });
-      res.status(201).json(policy);
-    } catch (error: any) {
-      // Distinguish validation errors (user-visible) from server faults
-      if (error?.name === "ZodError") {
-        const msg = error.errors?.[0]?.message ?? "Weights must sum to exactly 100";
-        return res.status(400).json({ error: msg });
+  app.post(
+    "/api/classrooms/:classroomId/grading-policy",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const data = z
+          .object({
+            assignmentWeight: z.number().int().min(0).max(100),
+            testWeight: z.number().int().min(0).max(100),
+            quizWeight: z.number().int().min(0).max(100),
+            projectWeight: z.number().int().min(0).max(100),
+          })
+          .refine(
+            (d) =>
+              d.assignmentWeight +
+                d.testWeight +
+                d.quizWeight +
+                d.projectWeight ===
+              100,
+            { message: "Weights must sum to 100" },
+          )
+          .parse(req.body);
+        const policy = await prisma.gradingPolicy.create({
+          data: { classroomId: classroom.id, ...data },
+        });
+        res.status(201).json(policy);
+      } catch (error: any) {
+        // Distinguish validation errors (user-visible) from server faults
+        if (error?.name === "ZodError") {
+          const msg =
+            error.errors?.[0]?.message ?? "Weights must sum to exactly 100";
+          return res.status(400).json({ error: msg });
+        }
+        res.status(500).json({ error: "Failed to save grading policy" });
       }
-      res.status(500).json({ error: "Failed to save grading policy" });
-    }
-  });
+    },
+  );
 
   // ─── Grade Breakdown ─────────────────────────────────────────────────────────
 
   // GET /api/classrooms/:classroomId/grade-breakdown/:studentId
-  app.get("/api/classrooms/:classroomId/grade-breakdown/:studentId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomMember(req, res);
-      if (!classroom) return;
+  app.get(
+    "/api/classrooms/:classroomId/grade-breakdown/:studentId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
 
-      const targetStudentId = parseInt(req.params.studentId);
-      if (isNaN(targetStudentId)) return res.status(400).json({ error: "Invalid student ID" });
+        const targetStudentId = parseInt(req.params.studentId);
+        if (isNaN(targetStudentId))
+          return res.status(400).json({ error: "Invalid student ID" });
 
-      // Auth check: teacher can view any enrolled student; students/parents can only view their own / their child's
-      const userId = req.session.userId as number;
-      const user = await storage.getUserById(userId);
-      if (!user) return res.status(401).json({ error: "Unauthorized" });
+        // Auth check: teacher can view any enrolled student; students/parents can only view their own / their child's
+        const userId = req.session.userId as number;
+        const user = await storage.getUserById(userId);
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-      if (user.role === "student") {
-        const student = await storage.getStudentByUserId(userId);
-        if (!student || student.id !== targetStudentId) return res.status(403).json({ error: "Forbidden" });
-      } else if (user.role === "parent") {
-        const children = await storage.getStudentsByParent(userId);
-        if (!children.some((c: any) => c.id === targetStudentId)) return res.status(403).json({ error: "Forbidden" });
-      }
-      // teacher: already verified they're the classroom owner via requireClassroomMember
+        if (user.role === "student") {
+          const student = await storage.getStudentByUserId(userId);
+          if (!student || student.id !== targetStudentId)
+            return res.status(403).json({ error: "Forbidden" });
+        } else if (user.role === "parent") {
+          const children = await storage.getStudentsByParent(userId);
+          if (!children.some((c: any) => c.id === targetStudentId))
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        // teacher: already verified they're the classroom owner via requireClassroomMember
 
-      // Verify targetStudentId is enrolled in this classroom (prevents IDOR for all roles)
-      const enrollment = await prisma.classroomEnrollment.findFirst({
-        where: { classroomId: classroom.id, studentId: targetStudentId },
-      });
-      if (!enrollment) return res.status(404).json({ error: "Student not enrolled in this classroom" });
+        // Verify targetStudentId is enrolled in this classroom (prevents IDOR for all roles)
+        const enrollment = await prisma.classroomEnrollment.findFirst({
+          where: { classroomId: classroom.id, studentId: targetStudentId },
+        });
+        if (!enrollment)
+          return res
+            .status(404)
+            .json({ error: "Student not enrolled in this classroom" });
 
-      // Fetch assignments and submissions
-      const assignments = await prisma.classroomAssignment.findMany({
-        where: { classroomId: classroom.id },
-        orderBy: { createdAt: "asc" },
-      });
-      const submissions = await prisma.classroomSubmission.findMany({
-        where: { assignmentId: { in: assignments.map((a) => a.id) }, studentId: targetStudentId },
-      });
+        // Fetch assignments and submissions
+        const assignments = await prisma.classroomAssignment.findMany({
+          where: { classroomId: classroom.id },
+          orderBy: { createdAt: "asc" },
+        });
+        const submissions = await prisma.classroomSubmission.findMany({
+          where: {
+            assignmentId: { in: assignments.map((a) => a.id) },
+            studentId: targetStudentId,
+          },
+        });
 
-      const policy = await prisma.gradingPolicy.findFirst({
-        where: { classroomId: classroom.id },
-        orderBy: { id: "desc" },
-      });
+        const policy = await prisma.gradingPolicy.findFirst({
+          where: { classroomId: classroom.id },
+          orderBy: { id: "desc" },
+        });
 
-      const ALL_TYPES = ["assignment", "test", "quiz", "project"] as const;
-      const TYPE_LABELS: Record<string, string> = {
-        assignment: "Assignments",
-        test: "Tests",
-        quiz: "Quizzes",
-        project: "Projects",
-      };
+        const ALL_TYPES = ["assignment", "test", "quiz", "project"] as const;
+        const TYPE_LABELS: Record<string, string> = {
+          assignment: "Assignments",
+          test: "Tests",
+          quiz: "Quizzes",
+          project: "Projects",
+        };
 
-      const subMap = Object.fromEntries(submissions.map((s) => [s.assignmentId, s]));
-      const defaultWeights = { assignment: 25, test: 25, quiz: 25, project: 25 };
-      const weights = policy
-        ? { assignment: policy.assignmentWeight, test: policy.testWeight, quiz: policy.quizWeight, project: policy.projectWeight }
-        : defaultWeights;
+        const subMap = Object.fromEntries(
+          submissions.map((s) => [s.assignmentId, s]),
+        );
+        const defaultWeights = {
+          assignment: 25,
+          test: 25,
+          quiz: 25,
+          project: 25,
+        };
+        const weights = policy
+          ? {
+              assignment: policy.assignmentWeight,
+              test: policy.testWeight,
+              quiz: policy.quizWeight,
+              project: policy.projectWeight,
+            }
+          : defaultWeights;
 
-      type BreakdownStatus = "graded" | "pending" | "zero-weight";
-      const breakdown = ALL_TYPES.map((type) => {
-        const typeAssignments = assignments.filter((a) => a.assignmentType === type);
-        const gradedSubs = typeAssignments
-          .map((a) => subMap[a.id])
-          .filter((s) => s && s.grade !== null && s.grade !== undefined);
+        type BreakdownStatus = "graded" | "pending" | "zero-weight";
+        const breakdown = ALL_TYPES.map((type) => {
+          const typeAssignments = assignments.filter(
+            (a) => a.assignmentType === type,
+          );
+          const gradedSubs = typeAssignments
+            .map((a) => subMap[a.id])
+            .filter((s) => s && s.grade !== null && s.grade !== undefined);
 
-        const isGraded = gradedSubs.length > 0;
-        const configuredWeight = weights[type];
+          const isGraded = gradedSubs.length > 0;
+          const configuredWeight = weights[type];
 
-        let average: number | null = null;
-        if (isGraded) {
-          const totalPossible = typeAssignments
-            .filter((a) => subMap[a.id]?.grade != null)
-            .reduce((s, a) => s + a.points, 0);
-          const totalEarned = gradedSubs.reduce((s, sub) => s + (sub.grade ?? 0), 0);
-          average = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+          let average: number | null = null;
+          if (isGraded) {
+            const totalPossible = typeAssignments
+              .filter((a) => subMap[a.id]?.grade != null)
+              .reduce((s, a) => s + a.points, 0);
+            const totalEarned = gradedSubs.reduce(
+              (s, sub) => s + (sub.grade ?? 0),
+              0,
+            );
+            average =
+              totalPossible > 0
+                ? Math.round((totalEarned / totalPossible) * 100)
+                : 0;
+          }
+
+          // zero-weight always takes precedence; otherwise graded if submissions exist, else pending
+          let status: BreakdownStatus;
+          if (configuredWeight === 0) status = "zero-weight";
+          else if (!isGraded) status = "pending";
+          else status = "graded";
+
+          return {
+            type,
+            label: TYPE_LABELS[type],
+            configuredWeight,
+            effectiveWeight: 0,
+            average,
+            status,
+          };
+        });
+
+        // Renormalize weights among graded (non-zero-weight, non-pending) types
+        const gradedItems = breakdown.filter((b) => b.status === "graded");
+        const totalConfiguredWeight = gradedItems.reduce(
+          (s, b) => s + b.configuredWeight,
+          0,
+        );
+        if (totalConfiguredWeight > 0) {
+          gradedItems.forEach((b) => {
+            b.effectiveWeight = Math.round(
+              (b.configuredWeight / totalConfiguredWeight) * 100,
+            );
+          });
         }
 
-        // zero-weight always takes precedence; otherwise graded if submissions exist, else pending
-        let status: BreakdownStatus;
-        if (configuredWeight === 0) status = "zero-weight";
-        else if (!isGraded) status = "pending";
-        else status = "graded";
+        let overall: number | null = null;
+        if (gradedItems.length > 0 && totalConfiguredWeight > 0) {
+          overall = Math.round(
+            gradedItems.reduce(
+              (s, b) =>
+                s +
+                (b.average ?? 0) * (b.configuredWeight / totalConfiguredWeight),
+              0,
+            ),
+          );
+        }
 
-        return { type, label: TYPE_LABELS[type], configuredWeight, effectiveWeight: 0, average, status };
-      });
+        const pendingTypes = breakdown
+          .filter((b) => b.status === "pending")
+          .map((b) => b.label);
+        const isPartial = pendingTypes.length > 0 && gradedItems.length > 0;
 
-      // Renormalize weights among graded (non-zero-weight, non-pending) types
-      const gradedItems = breakdown.filter((b) => b.status === "graded");
-      const totalConfiguredWeight = gradedItems.reduce((s, b) => s + b.configuredWeight, 0);
-      if (totalConfiguredWeight > 0) {
-        gradedItems.forEach((b) => {
-          b.effectiveWeight = Math.round((b.configuredWeight / totalConfiguredWeight) * 100);
-        });
+        res.json({ overall, isPartial, pendingTypes, policy, breakdown });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
       }
-
-      let overall: number | null = null;
-      if (gradedItems.length > 0 && totalConfiguredWeight > 0) {
-        overall = Math.round(
-          gradedItems.reduce((s, b) => s + (b.average ?? 0) * (b.configuredWeight / totalConfiguredWeight), 0)
-        );
-      }
-
-      const pendingTypes = breakdown.filter((b) => b.status === "pending").map((b) => b.label);
-      const isPartial = pendingTypes.length > 0 && gradedItems.length > 0;
-
-      res.json({ overall, isPartial, pendingTypes, policy, breakdown });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+    },
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DRAFT ROUTES
@@ -7569,129 +9280,236 @@ export function registerRoutes(app: Express) {
   // ── Student submission drafts ───────────────────────────────────────────────
 
   // GET /api/classrooms/:id/assignments/:aId/draft  — load student draft
-  app.get("/api/classrooms/:id/assignments/:aId/draft", requireAuth, async (req, res) => {
-    try {
-      const userId = req.session.userId!;
-      const student = await storage.getStudentByUserId(userId);
-      if (!student) return res.status(403).json({ error: "Students only" });
-      const assignmentId = parseInt(req.params.aId, 10);
-      const draft = await storage.getSubmissionDraft(student.id, assignmentId);
-      res.json(draft ?? null);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:id/assignments/:aId/draft",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = req.session.userId!;
+        const student = await storage.getStudentByUserId(userId);
+        if (!student) return res.status(403).json({ error: "Students only" });
+        const assignmentId = parseInt(req.params.aId, 10);
+        const draft = await storage.getSubmissionDraft(
+          student.id,
+          assignmentId,
+        );
+        res.json(draft ?? null);
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // PUT /api/classrooms/:id/assignments/:aId/draft  — save/update student draft
-  app.put("/api/classrooms/:id/assignments/:aId/draft", requireAuth, async (req, res) => {
-    try {
-      const userId = req.session.userId!;
-      const student = await storage.getStudentByUserId(userId);
-      if (!student) return res.status(403).json({ error: "Students only" });
-      const classroomId = parseInt(req.params.id, 10);
-      const assignmentId = parseInt(req.params.aId, 10);
-      const { content = "", formAnswers } = req.body;
-      const draft = await storage.upsertSubmissionDraft(student.id, assignmentId, classroomId, content, formAnswers ?? null);
-      res.json(draft);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.put(
+    "/api/classrooms/:id/assignments/:aId/draft",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = req.session.userId!;
+        const student = await storage.getStudentByUserId(userId);
+        if (!student) return res.status(403).json({ error: "Students only" });
+        const classroomId = parseInt(req.params.id, 10);
+        const assignmentId = parseInt(req.params.aId, 10);
+        const { content = "", formAnswers } = req.body;
+        const draft = await storage.upsertSubmissionDraft(
+          student.id,
+          assignmentId,
+          classroomId,
+          content,
+          formAnswers ?? null,
+        );
+        res.json(draft);
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // DELETE /api/classrooms/:id/assignments/:aId/draft  — clear student draft
-  app.delete("/api/classrooms/:id/assignments/:aId/draft", requireAuth, async (req, res) => {
-    try {
-      const userId = req.session.userId!;
-      const student = await storage.getStudentByUserId(userId);
-      if (!student) return res.status(403).json({ error: "Students only" });
-      const assignmentId = parseInt(req.params.aId, 10);
-      await storage.deleteSubmissionDraft(student.id, assignmentId);
-      res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.delete(
+    "/api/classrooms/:id/assignments/:aId/draft",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const userId = req.session.userId!;
+        const student = await storage.getStudentByUserId(userId);
+        if (!student) return res.status(403).json({ error: "Students only" });
+        const assignmentId = parseInt(req.params.aId, 10);
+        await storage.deleteSubmissionDraft(student.id, assignmentId);
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // ── Teacher assignment drafts ───────────────────────────────────────────────
 
   // GET /api/classrooms/:id/assignment-draft  — load "new assignment" draft
-  app.get("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const draft = await storage.getAssignmentDraft(req.session.userId!, classroom.id, null);
-      res.json(draft ?? null);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:id/assignment-draft",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const draft = await storage.getAssignmentDraft(
+          req.session.userId!,
+          classroom.id,
+          null,
+        );
+        res.json(draft ?? null);
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // PUT /api/classrooms/:id/assignment-draft  — save "new assignment" draft
-  app.put("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const { title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds } = req.body;
-      const draft = await storage.upsertAssignmentDraft(req.session.userId!, classroom.id, null, {
-        title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds,
-      });
-      res.json(draft);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.put(
+    "/api/classrooms/:id/assignment-draft",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const {
+          title,
+          description,
+          dueDate,
+          points,
+          assignmentType,
+          linkUrl,
+          formSchema,
+          answerKey,
+          linkedMaterialIds,
+        } = req.body;
+        const draft = await storage.upsertAssignmentDraft(
+          req.session.userId!,
+          classroom.id,
+          null,
+          {
+            title,
+            description,
+            dueDate,
+            points,
+            assignmentType,
+            linkUrl,
+            formSchema,
+            answerKey,
+            linkedMaterialIds,
+          },
+        );
+        res.json(draft);
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // DELETE /api/classrooms/:id/assignment-draft  — clear "new assignment" draft
-  app.delete("/api/classrooms/:id/assignment-draft", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      await storage.deleteAssignmentDraft(req.session.userId!, classroom.id, null);
-      res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.delete(
+    "/api/classrooms/:id/assignment-draft",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        await storage.deleteAssignmentDraft(
+          req.session.userId!,
+          classroom.id,
+          null,
+        );
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // GET /api/classrooms/:id/assignment-draft/:aId  — load "edit assignment" draft
-  app.get("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const assignmentId = parseInt(req.params.aId, 10);
-      const draft = await storage.getAssignmentDraft(req.session.userId!, classroom.id, assignmentId);
-      res.json(draft ?? null);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.get(
+    "/api/classrooms/:id/assignment-draft/:aId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const assignmentId = parseInt(req.params.aId, 10);
+        const draft = await storage.getAssignmentDraft(
+          req.session.userId!,
+          classroom.id,
+          assignmentId,
+        );
+        res.json(draft ?? null);
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // PUT /api/classrooms/:id/assignment-draft/:aId  — save "edit assignment" draft
-  app.put("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const assignmentId = parseInt(req.params.aId, 10);
-      const { title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds } = req.body;
-      const draft = await storage.upsertAssignmentDraft(req.session.userId!, classroom.id, assignmentId, {
-        title, description, dueDate, points, assignmentType, linkUrl, formSchema, answerKey, linkedMaterialIds,
-      });
-      res.json(draft);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.put(
+    "/api/classrooms/:id/assignment-draft/:aId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const assignmentId = parseInt(req.params.aId, 10);
+        const {
+          title,
+          description,
+          dueDate,
+          points,
+          assignmentType,
+          linkUrl,
+          formSchema,
+          answerKey,
+          linkedMaterialIds,
+        } = req.body;
+        const draft = await storage.upsertAssignmentDraft(
+          req.session.userId!,
+          classroom.id,
+          assignmentId,
+          {
+            title,
+            description,
+            dueDate,
+            points,
+            assignmentType,
+            linkUrl,
+            formSchema,
+            answerKey,
+            linkedMaterialIds,
+          },
+        );
+        res.json(draft);
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 
   // DELETE /api/classrooms/:id/assignment-draft/:aId  — clear "edit assignment" draft
-  app.delete("/api/classrooms/:id/assignment-draft/:aId", requireAuth, async (req, res) => {
-    try {
-      const classroom = await requireClassroomOwner(req, res);
-      if (!classroom) return;
-      const assignmentId = parseInt(req.params.aId, 10);
-      await storage.deleteAssignmentDraft(req.session.userId!, classroom.id, assignmentId);
-      res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  app.delete(
+    "/api/classrooms/:id/assignment-draft/:aId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const assignmentId = parseInt(req.params.aId, 10);
+        await storage.deleteAssignmentDraft(
+          req.session.userId!,
+          classroom.id,
+          assignmentId,
+        );
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      }
+    },
+  );
 }

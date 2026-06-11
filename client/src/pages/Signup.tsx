@@ -33,7 +33,8 @@ export default function Signup() {
   const { signup, googleSignIn } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  // const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  const googleClientId = "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com";
 
   // ?teamInvite=<token>: store in localStorage so Login.tsx can pick it up after email verification
   const teamInviteToken = (() => {

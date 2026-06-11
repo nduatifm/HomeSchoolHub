@@ -4,7 +4,8 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import App from "./App";
 import "./index.css";
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+// const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+const googleClientId = "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com";
 
 // GoogleOAuthProvider must be outside StrictMode — StrictMode double-invokes
 // effects in development, causing google.accounts.id.initialize() to be called

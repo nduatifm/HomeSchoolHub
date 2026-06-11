@@ -31,7 +31,8 @@ export default function Login() {
   const { login, googleSignIn } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  // const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  const googleClientId = "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com";
 
   const teamInviteToken = (() => {
     try { return new URLSearchParams(window.location.search).get("teamInvite") || null; } catch { return null; }
@@ -54,10 +55,10 @@ export default function Login() {
       window.history.replaceState({}, "", clean);
       const messages: Record<string, string> = {
         no_credential: "Google Sign-In failed — no credential received. Please try again.",
-        invalid_token:  "Google Sign-In failed — could not verify your identity. Please try again.",
-        csrf:           "Google Sign-In failed — security check failed. Please try again.",
-        server_error:   "Google Sign-In failed — server error. Please try again.",
-        no_account:     "No account found for that Google address. Please sign up first.",
+        invalid_token: "Google Sign-In failed — could not verify your identity. Please try again.",
+        csrf: "Google Sign-In failed — security check failed. Please try again.",
+        server_error: "Google Sign-In failed — server error. Please try again.",
+        no_account: "No account found for that Google address. Please sign up first.",
       };
       toast({ title: messages[googleError] ?? "Google Sign-In failed. Please try again.", type: "error", duration: 6000 });
     } catch { /* ignore */ }
