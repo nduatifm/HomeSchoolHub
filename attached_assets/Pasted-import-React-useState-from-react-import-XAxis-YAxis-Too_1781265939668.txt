@@ -1,0 +1,928 @@
+import React, { useState } from "react";
+import {
+    XAxis,
+    YAxis,
+    Tooltip,
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell,
+    Line,
+    Area,
+    CartesianGrid,
+    ComposedChart
+} from "recharts";
+import {
+    ShieldCheck,
+    TrendingUp,
+    Smile,
+    Heart,
+    PiggyBank,
+    CheckCircle2,
+    ChevronRight,
+    Eye,
+    EyeOff,
+    DollarSign,
+    ListChecks,
+    Play,
+    Repeat,
+    Clock,
+    AlertCircle,
+    Wallet,
+    CalendarDays,
+    GitFork,
+    BarChart2
+} from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Link } from "wouter";
+import { navigate } from "wouter/use-browser-location";
+import { SEO, GoogleSitelinks } from "@/components/seo";
+import logoFull from '@/assets/Logos/Logo Files/PNG/02.png';
+import happyCouple from '@/assets/Happy_Couple_2.jpg';
+import { analytics } from "@/lib/analytics";
+import vid from "../assets/video.mp4";
+import hero from "../assets/hero.webp";
+import PricingPage from "./PricingPage";
+
+// organic leaf and vine structure
+const BotanicalPattern = ({ className }: { className?: string }) => (
+    <svg className={className} viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            {/* Main Vine 1 */}
+            <path d="M100,400 C150,250 250,150 400,50" />
+            {/* Leaves for Vine 1 - Left Side */}
+            <path d="M120,340 C90,320 80,280 110,260 C120,270 130,290 120,340" fill="currentColor" fillOpacity="0.1" />
+            <path d="M150,260 C110,240 100,190 140,170 C155,185 165,210 150,260" fill="currentColor" fillOpacity="0.1" />
+            <path d="M190,190 C150,160 140,110 180,90 C195,110 205,140 190,190" fill="currentColor" fillOpacity="0.1" />
+            <path d="M240,130 C200,100 190,50 230,30 C245,50 255,80 240,130" fill="currentColor" fillOpacity="0.1" />
+            <path d="M300,80 C270,50 260,10 300,-10 C310,10 320,40 300,80" fill="currentColor" fillOpacity="0.1" />
+            {/* Leaves for Vine 1 - Right Side */}
+            <path d="M130,350 C160,370 200,360 210,320 C190,320 160,330 130,350" fill="currentColor" fillOpacity="0.1" />
+            <path d="M165,270 C205,290 250,280 260,230 C235,235 200,245 165,270" fill="currentColor" fillOpacity="0.1" />
+            <path d="M210,195 C250,210 295,190 300,140 C275,150 240,165 210,195" fill="currentColor" fillOpacity="0.1" />
+            <path d="M265,130 C305,140 350,115 355,70 C330,80 295,100 265,130" fill="currentColor" fillOpacity="0.1" />
+            <path d="M330,70 C365,80 405,55 410,15 C385,25 355,45 330,70" fill="currentColor" fillOpacity="0.1" />
+
+            {/* Main Vine 2 */}
+            <path d="M0,350 C100,300 200,200 250,0" />
+            {/* Leaves for Vine 2 - Left Side */}
+            <path d="M30,330 C10,300 -10,260 20,230 C35,250 45,280 30,330" fill="currentColor" fillOpacity="0.1" />
+            <path d="M70,280 C40,240 20,190 60,160 C75,185 85,220 70,280" fill="currentColor" fillOpacity="0.1" />
+            <path d="M120,210 C90,170 70,120 110,90 C125,115 135,150 120,210" fill="currentColor" fillOpacity="0.1" />
+            <path d="M170,130 C140,90 120,40 160,10 C175,35 185,70 170,130" fill="currentColor" fillOpacity="0.1" />
+            {/* Leaves for Vine 2 - Right Side */}
+            <path d="M40,335 C80,360 120,340 130,290 C105,295 70,310 40,335" fill="currentColor" fillOpacity="0.1" />
+            <path d="M90,265 C135,285 180,260 185,200 C160,210 120,230 90,265" fill="currentColor" fillOpacity="0.1" />
+            <path d="M145,185 C190,200 230,170 235,110 C210,125 170,150 145,185" fill="currentColor" fillOpacity="0.1" />
+            <path d="M200,95 C240,110 275,80 280,25 C255,40 220,65 200,95" fill="currentColor" fillOpacity="0.1" />
+
+            {/* Accent sweeps / Palm-like fronds */}
+            <path d="M250,400 C280,300 350,200 450,150" strokeWidth="1" opacity="1" />
+            <path d="M300,400 C320,320 380,250 480,210" strokeWidth="1" opacity="1" />
+            <path d="M-50,200 C50,180 150,100 200,-50" strokeWidth="1" opacity="1" />
+        </g>
+    </svg>
+);
+
+const OrganicBackground = () => (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[50%] w-[40rem] h-[40rem] rounded-full bg-[#dcfce7] opacity-20 blur-[100px]"></div>
+        <div className="absolute top-[20%] left-[-15%] w-[35rem] h-[35rem] rounded-full bg-[#fef3c7] opacity-30 blur-[80px]"></div>
+        <div className="absolute top-[60%] right-[-10%] w-[45rem] h-[45rem] rounded-full bg-[#dcfce7] opacity-30 blur-[120px]"></div>
+        <div className="absolute bottom-[-15%] left-[10%] w-[30rem] h-[30rem] rounded-full bg-[#fef3c7] opacity-20 blur-[90px]"></div>
+        <BotanicalPattern className="absolute top-[-5%] right-[-10%] w-[800px] h-[800px] text-[#428a58] transform rotate-12 opacity-[0.08]" />
+        <BotanicalPattern className="absolute top-[5%] left-[-5%] w-[500px] h-[500px] text-[#5ba4a4] transform rotate-[110deg] opacity-[0.05]" />
+        <BotanicalPattern className="absolute top-[25%] left-[-15%] w-[700px] h-[700px] text-[#428a58] transform -rotate-45 opacity-[0.06]" />
+        <BotanicalPattern className="absolute top-[40%] right-[-5%] w-[600px] h-[600px] text-[#428a58] transform rotate-[200deg] opacity-[0.05]" />
+        <BotanicalPattern className="absolute bottom-[-5%] right-[-10%] w-[850px] h-[850px] text-[#428a58] transform rotate-[165deg] opacity-[0.1]" />
+        <BotanicalPattern className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] text-[#5ba4a4] transform rotate-[60deg] opacity-[0.08]" />
+        <BotanicalPattern className="absolute bottom-[20%] left-[40%] w-[400px] h-[400px] text-[#85c9a8] transform -rotate-[30deg] opacity-[0.1]" />
+    </div>
+);
+
+// --- Dummy Data ---
+const pieData = [
+    { name: "Housing", value: 44, color: "#6366f1" },
+    { name: "Utilities", value: 43, color: "#10b981" },
+    { name: "Groceries", value: 12, color: "#f59e0b" },
+    { name: "Other", value: 1, color: "#8b5cf6" },
+];
+
+const trendData = [
+    { name: "Oct 2025", income: 3800, expenses: 1500, net: 2300 },
+    { name: "Nov 2025", income: 4000, expenses: 1400, net: 2600 },
+    { name: "Dec 2025", income: 4000, expenses: 1450, net: 2550 },
+    { name: "Jan 2026", income: 4200, expenses: 1300, net: 2900 },
+    { name: "Feb 2026", income: 4000, expenses: 1388, net: 2612 },
+    { name: "Mar 2026", income: 5000, expenses: 1250, net: 3750 },
+];
+
+const billsData = [
+    { name: "Rent", amount: "$1,500", freq: "Monthly", due: "Mar 28", status: "paid" },
+    { name: "Electricity", amount: "$120", freq: "Monthly", due: "Mar 25", status: "paid" },
+    { name: "Car Loan", amount: "$450", freq: "Monthly", due: "Apr 1", status: "overdue" },
+    { name: "Internet", amount: "$85", freq: "Monthly", due: "Apr 2", status: "upcoming" },
+    { name: "Phone Plan", amount: "$65", freq: "Monthly", due: "Apr 8", status: "upcoming" },
+    { name: "Netflix", amount: "$18", freq: "Monthly", due: "Apr 5", status: "upcoming" },
+    { name: "Gym", amount: "$45", freq: "Monthly", due: "Apr 10", status: "upcoming" },
+    { name: "Health Ins.", amount: "$210", freq: "Bi-weekly", due: "Apr 12", status: "upcoming" },
+];
+
+const budgetAllocations = [
+    { name: "Housing", pct: 40, amount: "$2,640", color: "#6366f1", spent: 82 },
+    { name: "Food", pct: 15, amount: "$990", color: "#10b981", spent: 58 },
+    { name: "Transport", pct: 10, amount: "$660", color: "#f59e0b", spent: 43 },
+    { name: "Savings", pct: 20, amount: "$1,320", color: "#3b82f6", spent: 100 },
+    { name: "Other", pct: 15, amount: "$990", color: "#8b5cf6", spent: 27 },
+];
+
+const incomeSources = [
+    { name: "Primary Salary", amount: "$4,800", freq: "Monthly", color: "#428a58" },
+    { name: "Freelance Work", amount: "$1,200", freq: "Monthly", color: "#5ba4a4" },
+    { name: "Side Income", amount: "$600", freq: "Monthly", color: "#e89a5e" },
+];
+
+// --- Helper Components ---
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-white/95 backdrop-blur-md p-3 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/80 text-xs min-w-[120px] z-50">
+                {label && <p className="font-bold text-gray-800 mb-2 border-b border-gray-100 pb-1.5">{label}</p>}
+                {!label && payload[0].payload.name && <p className="font-bold text-gray-800 mb-2 border-b border-gray-100 pb-1.5">{payload[0].payload.name}</p>}
+                {payload.map((entry: any, index: number) => {
+                    const name = entry.name === 'val1' ? 'Current' : entry.name === 'val2' ? 'Previous' : entry.name === 'value' ? 'Amount' : entry.name;
+                    return (
+                        <div key={index} className="flex items-center justify-between gap-4 mt-1.5">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: entry.color || entry.fill }}></div>
+                                <span className="text-gray-600 font-medium">{name}</span>
+                            </div>
+                            <span className="font-bold text-gray-900">
+                                ${typeof entry.value === 'number' ? entry.value.toLocaleString() : entry.value}
+                            </span>
+                        </div>
+                    )
+                })}
+            </div>
+        );
+    }
+    return null;
+};
+
+const Card = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
+    <div
+        className={`bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/60 p-6 ${className}`}
+    >
+        {children}
+    </div>
+);
+
+const SectionTitle = ({ title, subtitle, center = false }: { title: string, subtitle?: string, center?: boolean }) => (
+    <div className={`mb-8 md:mb-10 ${center ? "text-center" : "text-left"}`}>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 tracking-tight mb-3">
+            {title}
+        </h2>
+        {subtitle && (
+            <p className="text-gray-500 text-sm sm:text-base md:text-lg max-w-2xl mx-auto">{subtitle}</p>
+        )}
+    </div>
+);
+
+export default function Landing() {
+    const { login, isLoading, openAuthModal } = useAuth();
+
+    const [chartFilters, setChartFilters] = useState({
+        income: true,
+        expenses: true,
+        net: true
+    });
+
+    const handleLogin = () => {
+        analytics.ctaClicked('get_started');
+        openAuthModal('login');
+    };
+
+    const handleSignUp = () => {
+        analytics.ctaClicked('get_started');
+        openAuthModal('signup');
+    };
+
+    return (
+        <>
+            <SEO />
+            <GoogleSitelinks />
+
+            <div className="min-h-screen bg-[#fcfcfc] font-sans text-gray-800 relative">
+                {/* 1. TOP WHITE SECTION (Hero, Features, How it Works) */}
+                <section className="relative w-full pt-10 pb-16 overflow-hidden">
+                    <OrganicBackground />
+
+                    <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        {/* Header */}
+                        <header className="flex justify-between items-center mb-8 md:mb-16">
+                            <img
+                                src={logoFull}
+                                alt="MoneyTallyHQ"
+                                className="h-8 sm:h-10 w-auto"
+                            />
+                            <div className="flex gap-2 sm:gap-4 items-center">
+                                <Link
+                                    href="/pricing"
+                                    className="hidden sm:inline-flex text-sm sm:text-base font-semibold px-3 py-2.5 min-h-[44px] items-center hover:text-[#428a58] transition-colors"
+                                >Pricing</Link>
+                                <button
+                                    className="text-sm sm:text-base font-semibold cursor-pointer px-3 py-2.5 min-h-[44px] min-w-[44px] inline-flex items-center hover:text-[#5ba4a4] transition-colors"
+                                    onClick={handleLogin}
+                                    disabled={isLoading}
+                                >Login</button>
+                                <button
+                                    className="text-sm sm:text-base font-semibold cursor-pointer px-4 py-2.5 min-h-[44px] inline-flex items-center bg-[#428a58] text-white rounded-full hover:bg-[#346e46] transition-colors"
+                                    onClick={handleSignUp}
+                                    disabled={isLoading}
+                                >Signup</button>
+                            </div>
+                        </header>
+
+                        {/* Hero */}
+                        <div className="mb-12 md:mb-24 flex flex-col lg:flex-row items-center gap-8 md:gap-12 lg:gap-16">
+                            <div className="flex-[1.2] text-center lg:text-left">
+                                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 tracking-tight mb-4 md:mb-6 leading-tight">
+                                    Budget with Intention,{" "}
+                                    <br className="hidden lg:block" />
+                                    Live with Clarity
+                                </h1>
+                                <p className="text-sm sm:text-base md:text-lg text-gray-600 mb-8 md:mb-10 max-w-2xl mx-auto lg:mx-0">
+                                    Most apps show you where your money went. MoneyTallyHQ helps you decide where it's going.
+                                </p>
+                                <div className="flex flex-wrap justify-center lg:justify-start gap-4">
+                                    <button
+                                        className="px-8 py-3 min-h-[44px] bg-[#428a58] text-white rounded-full font-bold hover:bg-[#346e46] transition-all shadow-md"
+                                        onClick={handleSignUp}
+                                        disabled={isLoading}
+                                    >
+                                        Get Started Free
+                                    </button>
+                                </div>
+                                <div className="flex justify-center lg:justify-start mt-3">
+                                    <Link href="/pricing" className="text-sm text-gray-500 hover:text-[#428a58] transition-colors">
+                                        See pricing →
+                                    </Link>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 w-full max-w-sm sm:max-w-md lg:max-w-xl relative">
+                                <div className="relative z-10 rounded-2xl overflow-hidden shadow-xl border border-gray-100">
+                                    <img
+                                        src={hero}
+                                        alt="Money Tally Dashboard Preview"
+                                        className="w-full h-auto max-h-[400px] sm:max-h-[450px] object-cover transform hover:scale-[1.02] transition-transform duration-500"
+                                    />
+                                </div>
+                                <div className="absolute -top-6 -right-6 w-48 h-48 bg-[#dcfce7] rounded-full -z-10 opacity-60 blur-3xl"></div>
+                            </div>
+                        </div>
+
+                        {/* How it Works */}
+                        <div className="mb-12 md:mb-24">
+                            <SectionTitle
+                                title="How it Works"
+                                subtitle="Start with your income, create a budget and add your bills. Every dollar gets a purpose from day one."
+                                center
+                            />
+
+                            <div className="relative max-w-4xl mx-auto mb-14">
+                                <div className="hidden md:block absolute top-[42px] left-[calc(16.67%+22px)] right-[calc(16.67%+22px)] h-px bg-gradient-to-r from-[#5ba4a4]/30 via-[#428a58]/40 to-[#e89a5e]/30 z-0" />
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative z-10">
+                                    {/* Step 1 */}
+                                    <div className="bg-white border border-gray-100 rounded-2xl p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="w-12 h-12 mx-auto bg-[#eff6ff] text-[#5ba4a4] rounded-xl flex items-center justify-center mb-4 border border-blue-100 shadow-sm">
+                                            <DollarSign size={22} strokeWidth={1.5} />
+                                        </div>
+                                        <div className="text-[10px] font-bold text-[#5ba4a4]/70 uppercase tracking-widest mb-1.5">Step 1</div>
+                                        <h3 className="font-bold text-gray-900 text-sm mb-2">What do you earn?</h3>
+                                        <p className="text-xs text-gray-500 leading-relaxed">
+                                            Add your income sources — salary, freelance, side income. Set your currency and pay frequency to anchor everything that follows.
+                                        </p>
+                                    </div>
+
+                                    {/* Step 2 */}
+                                    <div className="bg-white border border-[#428a58]/20 rounded-2xl p-6 text-center shadow-md relative">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#428a58] text-white text-[9px] font-bold px-3 py-1 rounded-full tracking-wider shadow">
+                                            YOUR FOUNDATION
+                                        </div>
+                                        <div className="w-12 h-12 mx-auto bg-[#f0f9f4] text-[#428a58] rounded-xl flex items-center justify-center mb-4 border border-green-100 shadow-sm">
+                                            <ListChecks size={22} strokeWidth={1.5} />
+                                        </div>
+                                        <div className="text-[10px] font-bold text-[#428a58]/60 uppercase tracking-widest mb-1.5">Step 2</div>
+                                        <h3 className="font-bold text-gray-900 text-sm mb-2">How do you spend?</h3>
+                                        <p className="text-xs text-gray-500 leading-relaxed">
+                                            Build your budget categories and add recurring bills. See exactly what's committed before the month even starts.
+                                        </p>
+                                    </div>
+
+                                    {/* Step 3 */}
+                                    <div className="bg-white border border-gray-100 rounded-2xl p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="w-12 h-12 mx-auto bg-[#fff7ed] text-[#e89a5e] rounded-xl flex items-center justify-center mb-4 border border-orange-100 shadow-sm">
+                                            <TrendingUp size={22} strokeWidth={1.5} />
+                                        </div>
+                                        <div className="text-[10px] font-bold text-[#e89a5e]/70 uppercase tracking-widest mb-1.5">Step 3</div>
+                                        <h3 className="font-bold text-gray-900 text-sm mb-2">Where does it go?</h3>
+                                        <p className="text-xs text-gray-500 leading-relaxed">
+                                            Allocate your income across every category. Track, review, and adjust — your money works for your plan, not the other way around.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Video */}
+                            <div className="max-w-4xl mx-auto">
+                                <div className="flex items-center justify-center gap-2.5 mb-5">
+                                    <div className="w-7 h-7 rounded-full bg-[#428a58] flex items-center justify-center shadow">
+                                        <Play size={13} fill="white" strokeWidth={0} className="ml-0.5" />
+                                    </div>
+                                    <span className="text-sm font-semibold text-gray-700">See it in action</span>
+                                    <div className="h-px flex-1 max-w-[60px] bg-gray-200" />
+                                </div>
+
+                                <div className="rounded-2xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.13)] ring-1 ring-gray-200/60 bg-gray-900">
+                                    <video
+                                        src={vid}
+                                        autoPlay
+                                        muted
+                                        loop
+                                        playsInline
+                                        preload="metadata"
+                                        className="w-full block"
+                                    >
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
+
+                                <p className="text-center text-xs text-gray-400 mt-3 leading-relaxed">
+                                    From setup to clarity — MoneyTallyHQ gets you organized in minutes, not weeks.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Features showcase */}
+                        <div className="mb-10">
+                            <SectionTitle
+                                title="Built for budgeters, not investors"
+                                subtitle="Everything you need to run a zero-based budget and work toward becoming debt-free. All in one place."
+                                center
+                            />
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                                {/* Left: Bills & Recurring Expenses */}
+                                <Card className="lg:col-span-2 overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+                                    <div className="flex justify-between items-center mb-5">
+                                        <div>
+                                            <h3 className="font-bold text-base text-gray-900">Bills & Recurring Expenses</h3>
+                                            <p className="text-[11px] text-gray-400 mt-0.5">Track every obligation — so due dates don't catch you off guard</p>
+                                        </div>
+                                        <span className="text-[10px] bg-[#f0f9f4] text-[#428a58] font-bold px-2.5 py-1 rounded-full border border-[#428a58]/20">
+                                            8 bills · $2,493/mo
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-12 text-[9px] font-bold text-gray-300 mb-2 uppercase tracking-widest border-b border-gray-100 pb-2">
+                                        <div className="col-span-5 sm:col-span-4">Bill</div>
+                                        <div className="col-span-3 sm:col-span-2">Amount</div>
+                                        <div className="hidden sm:block sm:col-span-2">Frequency</div>
+                                        <div className="hidden sm:block sm:col-span-2">Due</div>
+                                        <div className="col-span-4 sm:col-span-2 text-right">Status</div>
+                                    </div>
+
+                                    <div className="space-y-0.5">
+                                        {billsData.map((bill, i) => (
+                                            <div
+                                                key={i}
+                                                className={`grid grid-cols-12 items-center py-2 px-1 rounded-lg text-xs transition-colors hover:bg-gray-50 ${bill.status === "overdue" ? "bg-red-50/60" : ""}`}
+                                            >
+                                                <div className="col-span-5 sm:col-span-4 font-semibold text-gray-800 truncate pr-1">{bill.name}</div>
+                                                <div className="col-span-3 sm:col-span-2 text-gray-600 font-medium">{bill.amount}</div>
+                                                <div className="hidden sm:block sm:col-span-2">
+                                                    <span className="inline-flex items-center gap-1 text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-semibold">
+                                                        <Repeat size={8} />{bill.freq}
+                                                    </span>
+                                                </div>
+                                                <div className="hidden sm:block sm:col-span-2 text-gray-400 text-[11px]">{bill.due}</div>
+                                                <div className="col-span-4 sm:col-span-2 text-right">
+                                                    {bill.status === "paid" && (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] bg-[#f0fdf4] text-[#16a34a] px-2 py-0.5 rounded-full font-bold border border-[#bbf7d0]">
+                                                            <CheckCircle2 size={9} />Paid
+                                                        </span>
+                                                    )}
+                                                    {bill.status === "overdue" && (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold border border-red-200">
+                                                            <AlertCircle size={9} />Overdue
+                                                        </span>
+                                                    )}
+                                                    {bill.status === "upcoming" && (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] bg-[#eff6ff] text-[#3b82f6] px-2 py-0.5 rounded-full font-bold border border-[#bfdbfe]">
+                                                            <Clock size={9} />Due soon
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+
+                                {/* Right column */}
+                                <div className="space-y-6">
+                                    <Card className="shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-sm text-gray-900">Budget Allocation</h3>
+                                            <span className="text-[10px] text-gray-400 font-semibold">This month</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <div className="w-16 h-16 flex-shrink-0">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie data={budgetAllocations} innerRadius={20} outerRadius={30} paddingAngle={2} dataKey="pct" startAngle={90} endAngle={-270}>
+                                                            {budgetAllocations.map((entry, index) => (
+                                                                <Cell key={index} fill={entry.color} style={{ outline: "none" }} />
+                                                            ))}
+                                                        </Pie>
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-gray-900">$6,600 / mo</div>
+                                                <div className="text-[10px] text-gray-400">total income</div>
+                                                <div className="text-[10px] text-[#428a58] font-semibold mt-1">5 categories</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2.5">
+                                            {budgetAllocations.map((cat, i) => (
+                                                <div key={i}>
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                                                            <span className="text-[11px] font-semibold text-gray-700">{cat.name}</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-500 font-medium">{cat.pct}% · {cat.amount}</div>
+                                                    </div>
+                                                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all" style={{ width: `${cat.spent}%`, backgroundColor: cat.color, opacity: 0.75 }} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+
+                                    <Card className="shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-sm text-gray-900">Income Sources</h3>
+                                            <Wallet size={14} className="text-gray-300" />
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {incomeSources.map((src, i) => (
+                                                <div key={i} className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: src.color }} />
+                                                        <div>
+                                                            <div className="text-xs font-semibold text-gray-800">{src.name}</div>
+                                                            <div className="text-[9px] text-gray-400 font-medium">{src.freq}</div>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-xs font-bold text-gray-700">{src.amount}<span className="text-[9px] text-gray-400 font-normal">/mo</span></span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
+                                            <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Total monthly</span>
+                                            <span className="text-sm font-bold text-[#428a58]">$6,600</span>
+                                        </div>
+                                    </Card>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* 2. BEIGE SECTION */}
+                <section className="w-full bg-[#f4f1e8] py-16 relative">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="mb-12">
+                            <SectionTitle title="Smart Financial Insights" subtitle="A clear view of how your income, expenses, and net cash move." center={true} />
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                                <Card className="lg:col-span-2 flex flex-col justify-between">
+                                    <div className="mb-6">
+                                        <h3 className="font-bold text-lg text-gray-900 mb-1">Income vs Expenses Trend</h3>
+                                        <p className="text-sm text-gray-500">Track your financial performance over time.</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                                        <div className="bg-[#f0fdf4] border border-[#bbf7d0] p-4 rounded-xl">
+                                            <div className="text-xs font-semibold text-[#166534] mb-1 flex justify-between">
+                                                Current Income <span className="text-[#16a34a]">↗ 25.0%</span>
+                                            </div>
+                                            <div className="text-2xl font-bold text-[#14532d]">$5,000.00</div>
+                                            <div className="text-[10px] text-[#22c55e] text-right mt-1">vs last month</div>
+                                        </div>
+                                        <div className="bg-[#fef2f2] border border-[#fecaca] p-4 rounded-xl">
+                                            <div className="text-xs font-semibold text-[#991b1b] mb-1 flex justify-between">
+                                                Current Expenses <span className="text-[#dc2626]">↘ 10.0%</span>
+                                            </div>
+                                            <div className="text-2xl font-bold text-[#7f1d1d]">$1,250.00</div>
+                                            <div className="text-[10px] text-[#ef4444] text-right mt-1">vs last month</div>
+                                        </div>
+                                        <div className="bg-[#eff6ff] border border-[#bfdbfe] p-4 rounded-xl">
+                                            <div className="text-xs font-semibold text-[#1e3a8a] mb-1 flex justify-between">
+                                                Net Income <span className="text-[#2563eb]">↗ 78.0%</span>
+                                            </div>
+                                            <div className="text-2xl font-bold text-[#1e3a8a]">$3,750.00</div>
+                                            <div className="text-[10px] text-[#3b82f6] text-right mt-1">vs last month</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="h-64 w-full mt-4">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <ComposedChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.1} />
+                                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                                    </linearGradient>
+                                                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.1} />
+                                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} dy={10} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                                                <Tooltip content={<CustomTooltip />} />
+                                                {chartFilters.income && (
+                                                    <Area type="monotone" dataKey="income" name="Income" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorIncome)" activeDot={{ r: 6, fill: "#22c55e", stroke: "#fff", strokeWidth: 2 }} />
+                                                )}
+                                                {chartFilters.expenses && (
+                                                    <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorExpense)" activeDot={{ r: 6, fill: "#ef4444", stroke: "#fff", strokeWidth: 2 }} />
+                                                )}
+                                                {chartFilters.net && (
+                                                    <Line type="monotone" dataKey="net" name="Net Income" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }} activeDot={{ r: 6, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }} />
+                                                )}
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-6">
+                                        <button
+                                            onClick={() => setChartFilters(prev => ({ ...prev, income: !prev.income }))}
+                                            className={`flex items-center gap-2 text-xs font-semibold border px-3 sm:px-4 py-1.5 rounded-full transition-all ${chartFilters.income ? 'text-gray-700 border-gray-200 bg-white shadow-sm hover:bg-gray-50' : 'text-gray-400 border-gray-100 bg-gray-50 opacity-60'}`}
+                                        >
+                                            <div className={`w-2.5 h-2.5 rounded-full ${chartFilters.income ? 'bg-[#22c55e]' : 'bg-gray-300'}`}></div>
+                                            Income
+                                            {chartFilters.income ? <Eye size={14} className="ml-1 text-gray-400" /> : <EyeOff size={14} className="ml-1 text-gray-400" />}
+                                        </button>
+                                        <button
+                                            onClick={() => setChartFilters(prev => ({ ...prev, expenses: !prev.expenses }))}
+                                            className={`flex items-center gap-2 text-xs font-semibold border px-3 sm:px-4 py-1.5 rounded-full transition-all ${chartFilters.expenses ? 'text-gray-700 border-gray-200 bg-white shadow-sm hover:bg-gray-50' : 'text-gray-400 border-gray-100 bg-gray-50 opacity-60'}`}
+                                        >
+                                            <div className={`w-2.5 h-2.5 rounded-full ${chartFilters.expenses ? 'bg-[#ef4444]' : 'bg-gray-300'}`}></div>
+                                            Expenses
+                                            {chartFilters.expenses ? <Eye size={14} className="ml-1 text-gray-400" /> : <EyeOff size={14} className="ml-1 text-gray-400" />}
+                                        </button>
+                                        <button
+                                            onClick={() => setChartFilters(prev => ({ ...prev, net: !prev.net }))}
+                                            className={`flex items-center gap-2 text-xs font-semibold border px-3 sm:px-4 py-1.5 rounded-full transition-all ${chartFilters.net ? 'text-gray-700 border-gray-200 bg-white shadow-sm hover:bg-gray-50' : 'text-gray-400 border-gray-100 bg-gray-50 opacity-60'}`}
+                                        >
+                                            <div className={`w-2.5 h-2.5 rounded-full ${chartFilters.net ? 'bg-[#3b82f6]' : 'bg-gray-300'}`}></div>
+                                            Net Income
+                                            {chartFilters.net ? <Eye size={14} className="ml-1 text-gray-400" /> : <EyeOff size={14} className="ml-1 text-gray-400" />}
+                                        </button>
+                                    </div>
+                                </Card>
+
+                                <Card className="flex flex-col relative justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <BarChart2 size={18} className="text-blue-600" />
+                                            <h3 className="font-bold text-lg text-blue-800">Expenses by Category</h3>
+                                        </div>
+                                        <p className="text-[11px] text-gray-500 mb-8 leading-tight">
+                                            Breakdown of all expenses grouped by their budget categories.
+                                        </p>
+                                    </div>
+
+                                    <div className="relative w-full h-56 flex justify-center items-center">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={pieData} innerRadius={65} outerRadius={95} paddingAngle={0} dataKey="value" stroke="#fff" strokeWidth={4}>
+                                                    {pieData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.color} style={{ outline: 'none' }} className="hover:opacity-90 transition-opacity cursor-pointer" />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip content={<CustomTooltip />} cursor={false} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-1">
+                                            <span className="text-[10px] text-blue-400 font-bold tracking-wider mb-1 uppercase">TOTAL</span>
+                                            <span className="text-xl font-extrabold text-gray-900">$1,250.00</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6">
+                                        <h4 className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-3">BREAKDOWN</h4>
+                                        <div className="flex flex-col gap-2.5 text-xs font-medium text-gray-600">
+                                            {pieData.map((d, i) => (
+                                                <div key={i} className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }}></div>
+                                                        <span>{d.name}</span>
+                                                    </div>
+                                                    <span className="font-bold text-blue-600">{d.value}%</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* 3. BOTTOM WHITE SECTION */}
+                <section className="relative w-full pt-20 pb-16 overflow-hidden bg-white">
+                    <OrganicBackground />
+
+                    <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+                        {/* Why Choose MoneyTallyHQ */}
+                        <div className="mb-12 md:mb-24">
+                            <div className="bg-[#f4f1e8] rounded-3xl overflow-hidden border-t-2 border-[#428a58]">
+                                <div className="flex flex-col lg:flex-row">
+
+                                    <div className="lg:w-[42%] flex flex-col">
+                                        <div className="overflow-hidden flex-1 min-h-[260px] sm:min-h-[320px] lg:min-h-[500px] relative">
+                                            <img
+                                                src={happyCouple}
+                                                alt="Couple managing finances together"
+                                                className="w-full h-full object-cover object-top hover:scale-[1.02] transition-transform duration-700"
+                                            />
+                                            <div className="absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-[#f4f1e8] to-transparent pointer-events-none"></div>
+                                        </div>
+
+                                        <div className="px-4 sm:px-8 pb-4 sm:pb-8 -mt-2 bg-[#f4f1e8]">
+                                            <h2 className="text-2xl font-bold mb-3 text-gray-900 leading-snug">
+                                                Why Choose MoneyTallyHQ?
+                                            </h2>
+                                            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                                                Other apps track what you spent. MoneyTallyHQ helps you plan what to spend before the month begins. Every dollar assigned, and your path to debt-free always in sight.
+                                            </p>
+                                            <button
+                                                className="inline-flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-full text-sm font-bold hover:bg-gray-700 transition-colors group"
+                                                onClick={handleSignUp}
+                                                disabled={isLoading}
+                                            >
+                                                Start for Free
+                                                <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="hidden lg:block w-px bg-gray-200/60 my-8"></div>
+
+                                    <div className="lg:w-[58%] p-4 sm:p-8 flex flex-col justify-center">
+                                        <p className="text-[10px] font-bold text-[#428a58] uppercase tracking-widest mb-6">
+                                            What makes us different
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {[
+                                                {
+                                                    index: "01",
+                                                    icon: <CalendarDays size={20} className="text-[#428a58]" />,
+                                                    bg: "bg-[#f0f9f4] border-[#c6e8d4]",
+                                                    iconBg: "bg-white",
+                                                    title: "Plan before you spend",
+                                                    body: "Assign every dollar before the month starts. When your budget hits zero, you're done — and fully in control.",
+                                                },
+                                                {
+                                                    index: "02",
+                                                    icon: <GitFork size={20} className="text-[#5ba4a4]" />,
+                                                    bg: "bg-[#f0f8f8] border-[#c0dede]",
+                                                    iconBg: "bg-white",
+                                                    title: "See your money flow",
+                                                    body: "The Flow Planner maps every dollar from income to bills to savings goals, visually.",
+                                                },
+                                                {
+                                                    index: "03",
+                                                    icon: <ShieldCheck size={20} className="text-[#6366f1]" />,
+                                                    bg: "bg-[#f5f5ff] border-[#d1d1fb]",
+                                                    iconBg: "bg-white",
+                                                    title: "Your data stays yours, always",
+                                                    body: "You enter your numbers — no account connections required. Your financial data stays completely in your control.",
+                                                },
+                                                {
+                                                    index: "04",
+                                                    icon: <ListChecks size={20} className="text-[#f59e0b]" />,
+                                                    bg: "bg-[#fffbf0] border-[#fde9a2]",
+                                                    iconBg: "bg-white",
+                                                    title: "Every bill. Every due date. In one place.",
+                                                    body: "Track recurring obligations with due dates and payment status so nothing slips through the cracks.",
+                                                },
+                                            ].map((card, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={`${card.bg} border rounded-2xl p-5 flex flex-col gap-3 hover:shadow-sm transition-shadow relative`}
+                                                >
+                                                    <span className="absolute top-4 right-4 text-[11px] font-bold text-gray-200 select-none">
+                                                        {card.index}
+                                                    </span>
+                                                    <div className={`w-9 h-9 rounded-xl ${card.iconBg} shadow-sm flex items-center justify-center`}>
+                                                        {card.icon}
+                                                    </div>
+                                                    <h4 className="font-bold text-sm text-gray-900 leading-snug">{card.title}</h4>
+                                                    <p className="text-xs text-gray-500 leading-relaxed">{card.body}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Customer Voices */}
+                        <div className="mb-12 md:mb-24 relative">
+                            <div className="text-center mb-8 md:mb-10">
+                                <p className="text-[10px] font-bold text-[#428a58] uppercase tracking-widest mb-3">
+                                    What users are saying
+                                </p>
+                                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 tracking-tight mb-3">
+                                    Customer Voices
+                                </h2>
+                                <p className="text-gray-500 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
+                                    People who wanted more intention around their money and found a system that works for them.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {[
+                                    {
+                                        name: "Sarah K.",
+                                        role: "Freelance Designer",
+                                        quote: "I tried other apps. They showed me everything but told me nothing. MoneyTallyHQ gave me a system — and I actually started making real progress on my debt.",
+                                        img: 10,
+                                    },
+                                    {
+                                        name: "Ben H.",
+                                        role: "Software Engineer",
+                                        quote: "I don't want my budget to sync. I want it to work. MoneyTallyHQ is the first app that actually makes me think before I spend.",
+                                        img: 11,
+                                    },
+                                    {
+                                        name: "Sam K.",
+                                        role: "Small Business Owner",
+                                        quote: "Simple, private, and focused. No upsells, no bank connections, no noise. Just clarity.",
+                                        img: 12,
+                                    },
+                                ].map((t, i) => (
+                                    <Card key={i} className="text-center py-8 flex flex-col items-center">
+                                        <div className="w-11 h-11 bg-gray-100 rounded-full mx-auto mb-4 overflow-hidden shadow-sm flex-shrink-0">
+                                            <img
+                                                src={`https://i.pravatar.cc/100?img=${t.img}`}
+                                                alt={t.name}
+                                                className="w-full h-full object-cover grayscale opacity-80"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-gray-600 font-medium mb-5 leading-relaxed flex-1">
+                                            "{t.quote}"
+                                        </p>
+                                        <div className="w-8 h-px bg-gray-200 mb-4"></div>
+                                        <p className="font-bold text-xs text-gray-900">{t.name}</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">{t.role}</p>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Impact & Benefits */}
+                        <div className="mb-12 md:mb-24 text-center">
+                            <div className="mb-8 md:mb-10">
+                                <p className="text-[10px] font-bold text-[#428a58] uppercase tracking-widest mb-3">
+                                    Why it matters
+                                </p>
+                                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 tracking-tight mb-3">
+                                    The Impact & Benefits
+                                </h2>
+                                <p className="text-gray-500 text-sm sm:text-base md:text-lg max-w-xl mx-auto">
+                                    MoneyTallyHQ is designed to do more than track numbers — it helps you build a clearer, more intentional relationship with money.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
+                                <div className="flex flex-col items-center">
+                                    <div className="w-16 h-16 bg-[#f0f9f4] rounded-full flex items-center justify-center mb-4 text-[#428a58] border border-[#c6e8d4]">
+                                        <Smile size={28} strokeWidth={1.5} />
+                                    </div>
+                                    <h3 className="font-bold text-base mb-2">Less stress. More control.</h3>
+                                    <p className="text-gray-500 text-sm max-w-[240px] leading-relaxed">
+                                        When every dollar has a job, there's nothing left to wonder about.
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col items-center">
+                                    <div className="w-16 h-16 bg-[#fff0f5] rounded-full flex items-center justify-center mb-4 text-[#e85e8a] border border-[#fcc6d9]">
+                                        <Heart size={28} strokeWidth={1.5} />
+                                    </div>
+                                    <h3 className="font-bold text-base mb-2">A budget that works for you.</h3>
+                                    <p className="text-gray-500 text-sm max-w-[240px] leading-relaxed">
+                                        Not a template. Not a sync. A budget you build around your actual life.
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col items-center">
+                                    <div className="w-16 h-16 bg-[#fffbf0] rounded-full flex items-center justify-center mb-4 text-[#f59e0b] border border-[#fde9a2]">
+                                        <PiggyBank size={28} strokeWidth={1.5} />
+                                    </div>
+                                    <h3 className="font-bold text-base mb-2">A structured approach to debt freedom.</h3>
+                                    <p className="text-gray-500 text-sm max-w-[240px] leading-relaxed">
+                                        Set your debt payoff targets and build a budget designed to support that goal — at a pace that works for you.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CTA Banner */}
+                        <div className="mb-10 md:mb-16">
+                            <div className="bg-[#4a8a64] rounded-3xl p-6 sm:p-8 md:p-12 text-center text-white relative overflow-hidden shadow-xl">
+                                <div className="relative z-10">
+                                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 tracking-tight">
+                                        Start Your Zero-Based Budget
+                                    </h2>
+                                    <p className="text-white/70 text-sm font-medium mb-6 md:mb-8">
+                                        No credit card required. No 7-day trial clock. Just start.
+                                    </p>
+                                    <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-sm mx-auto">
+                                        <button
+                                            className="px-8 py-3 min-h-[44px] rounded-full border border-white text-white text-sm font-bold hover:bg-white hover:text-[#4a8a64] transition-colors w-full sm:w-auto"
+                                            onClick={handleLogin}
+                                            disabled={isLoading}
+                                        >
+                                            Log In
+                                        </button>
+                                        <button
+                                            className="px-8 py-3 min-h-[44px] rounded-full bg-white text-[#4a8a64] text-sm font-bold hover:bg-gray-100 transition-colors w-full sm:w-auto"
+                                            onClick={handleSignUp}
+                                            disabled={isLoading}
+                                        >
+                                            Sign Up Free
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pricing */}
+                        <PricingPage isComponent={true} />
+                    </div>
+                </section>
+
+                {/* Footer */}
+                <footer className="bg-white border-t border-gray-100 pt-16 pb-8 relative z-10">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+                            <div>
+                                <div className="flex items-center gap-2 text-[#428a58] font-black text-xl tracking-tight mb-3">
+                                    <img src={logoFull} alt="MoneyTallyHQ" className="h-10 w-auto" />
+                                </div>
+                                <p className="text-gray-500 text-sm max-w-sm leading-relaxed">
+                                    A zero-based budgeting tool built for people who want to get debt-free — no noise, just a clear plan that puts you in control.
+                                </p>
+                            </div>
+
+                            <div className="text-xs sm:text-sm font-bold text-[#428a58] bg-[#f0f9f4] border border-[#85c9a8]/30 px-4 sm:px-5 py-2.5 rounded-full shadow-sm flex items-center gap-2 self-start md:self-auto">
+                                <span className="text-base sm:text-lg leading-none">✨</span> Every dollar a job. Every goal a step closer.
+                            </div>
+                        </div>
+
+                        <div className="border-t border-gray-100 pt-8 flex flex-col-reverse md:flex-row justify-between items-center gap-4 md:gap-0">
+                            <p className="text-gray-400 text-sm font-medium">
+                                © {new Date().getFullYear()} MoneyTallyHQ. All rights reserved.
+                            </p>
+                            <div className="flex gap-6 text-sm text-gray-500 font-semibold">
+                                <a href="/terms" className="hover:text-[#428a58] transition-colors">Terms of Use</a>
+                                <a href="/privacy" className="hover:text-[#428a58] transition-colors">Privacy Policy</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+            <style>
+                {`
+                    .recharts-tooltip-wrapper {
+                        z-index: 9999 !important;
+                    }
+                `}
+            </style>
+        </>
+    );
+}
