@@ -189,7 +189,7 @@ export default function Login() {
     <div className="min-h-screen bg-background flex">
 
       {/* ── LEFT PANEL — photo + quote ── */}
-      <div className="hidden lg:flex lg:w-[520px] shrink-0 relative overflow-hidden flex-col">
+      <div className="hidden lg:flex lg:w-[572px] shrink-0 relative overflow-hidden flex-col">
 
         {/* Background photo */}
         <img
