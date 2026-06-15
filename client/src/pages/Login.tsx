@@ -23,6 +23,27 @@ import { ApiError, apiRequest } from "@/lib/queryClient";
 import { handleGoogleSignIn, loadGoogleSignInAvailability } from "@/lib/googleSignIn";
 import { Link } from "wouter";
 import { AlertCircle, Mail, CheckCircle } from "lucide-react";
+import parentChild1 from "../assets/parent_child_1.jpg";
+
+const BotanicalPattern = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M100,400 C150,250 250,150 400,50" />
+      <path d="M120,340 C90,320 80,280 110,260 C120,270 130,290 120,340" fill="currentColor" fillOpacity="0.15" />
+      <path d="M150,260 C110,240 100,190 140,170 C155,185 165,210 150,260" fill="currentColor" fillOpacity="0.15" />
+      <path d="M190,190 C150,160 140,110 180,90 C195,110 205,140 190,190" fill="currentColor" fillOpacity="0.15" />
+      <path d="M240,130 C200,100 190,50 230,30 C245,50 255,80 240,130" fill="currentColor" fillOpacity="0.15" />
+      <path d="M130,350 C160,370 200,360 210,320 C190,320 160,330 130,350" fill="currentColor" fillOpacity="0.15" />
+      <path d="M165,270 C205,290 250,280 260,230 C235,235 200,245 165,270" fill="currentColor" fillOpacity="0.15" />
+      <path d="M210,195 C250,210 295,190 300,140 C275,150 240,165 210,195" fill="currentColor" fillOpacity="0.15" />
+      <path d="M0,350 C100,300 200,200 250,0" />
+      <path d="M30,330 C10,300 -10,260 20,230 C35,250 45,280 30,330" fill="currentColor" fillOpacity="0.15" />
+      <path d="M70,280 C40,240 20,190 60,160 C75,185 85,220 70,280" fill="currentColor" fillOpacity="0.15" />
+      <path d="M40,335 C80,360 120,340 130,290 C105,295 70,310 40,335" fill="currentColor" fillOpacity="0.15" />
+      <path d="M90,265 C135,285 180,260 185,200 C160,210 120,230 90,265" fill="currentColor" fillOpacity="0.15" />
+    </g>
+  </svg>
+);
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -166,27 +187,58 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-[420px] bg-primary flex-col justify-between p-10 shrink-0">
-        <Logo variant="sidebar" className="text-white [&_span]:text-white" />
-        <div>
-          <blockquote className="text-white/90 text-lg font-medium leading-relaxed mb-4">
-            "Education is the most powerful weapon which you can use to change the world."
-          </blockquote>
-          <p className="text-white/60 text-sm">— Nelson Mandela</p>
+
+      {/* ── LEFT PANEL — photo + quote ── */}
+      <div className="hidden lg:flex lg:w-[460px] shrink-0 relative overflow-hidden flex-col">
+
+        {/* Background photo */}
+        <img
+          src={parentChild1}
+          alt="Parent and child learning"
+          className="absolute inset-0 w-full h-full object-cover object-top"
+        />
+
+        {/* Gradient overlays — top dark strip (logo) + bottom dark strip (quote) */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/10 to-black/75 z-10" />
+
+        {/* Botanical pattern over image */}
+        <BotanicalPattern className="absolute inset-0 w-full h-full text-white z-20 opacity-[0.08]" />
+
+        {/* Content */}
+        <div className="relative z-30 flex flex-col justify-between h-full p-10">
+
+          {/* Logo */}
+          <Logo variant="sidebar" className="text-white [&_span]:text-white" />
+
+          {/* Quote */}
+          <div>
+            <div className="text-white/40 text-7xl font-serif leading-none mb-2 select-none">"</div>
+            <blockquote className="text-white text-xl font-semibold leading-relaxed mb-4 drop-shadow-sm">
+              Education is the most powerful weapon which you can use to change the world.
+            </blockquote>
+            <p className="text-white/60 text-sm font-medium tracking-wide">— Nelson Mandela</p>
+          </div>
+
+          {/* Footer */}
+          <p className="text-white/35 text-xs">© {new Date().getFullYear()} Lyra Preparatory</p>
         </div>
-        <p className="text-white/50 text-xs">© {new Date().getFullYear()} Lyra Preparatory</p>
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm">
+      {/* ── RIGHT PANEL — form ── */}
+      <div className="flex-1 flex items-center justify-center p-6 bg-background relative overflow-hidden">
+
+        {/* Subtle botanical hint on right panel */}
+        <BotanicalPattern className="absolute -bottom-20 -right-20 w-[420px] h-[420px] text-primary opacity-[0.035] pointer-events-none" />
+
+        <div className="w-full max-w-sm relative z-10">
+
+          {/* Mobile logo (hidden on desktop since left panel has it) */}
           <div className="lg:hidden mb-8">
             <Logo />
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-foreground mb-1">Sign in</h1>
+            <h1 className="text-2xl font-bold text-foreground mb-1">Welcome back</h1>
             <p className="text-sm text-muted-foreground">Enter your email or username and password to continue</p>
           </div>
 
@@ -281,28 +333,11 @@ export default function Login() {
                 disabled={isLoading}
                 data-testid="button-google-signin"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  width="20"
-                  height="20"
-                >
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
                 <span>Continue with Google</span>
               </Button>
@@ -331,6 +366,7 @@ export default function Login() {
         </div>
       </div>
 
+      {/* ── Role selection dialog (Google Sign-In) — untouched ── */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
