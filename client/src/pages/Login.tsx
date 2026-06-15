@@ -189,7 +189,7 @@ export default function Login() {
     <div className="min-h-screen bg-background flex">
 
       {/* ── LEFT PANEL — photo + quote ── */}
-      <div className="hidden lg:flex lg:w-[460px] shrink-0 relative overflow-hidden flex-col">
+      <div className="hidden lg:flex lg:w-[520px] shrink-0 relative overflow-hidden flex-col">
 
         {/* Background photo */}
         <img
@@ -199,7 +199,7 @@ export default function Login() {
         />
 
         {/* Gradient overlays — top dark strip (logo) + bottom dark strip (quote) */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/10 to-black/75 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/20 to-black/90 z-10" />
 
         {/* Botanical pattern over image */}
         <BotanicalPattern className="absolute inset-0 w-full h-full text-white z-20 opacity-[0.08]" />
@@ -213,7 +213,7 @@ export default function Login() {
           {/* Quote */}
           <div>
             <div className="text-white/40 text-7xl font-serif leading-none mb-2 select-none">"</div>
-            <blockquote className="text-white text-xl font-semibold leading-relaxed mb-4 drop-shadow-sm">
+            <blockquote className="text-white text-xl font-semibold leading-relaxed mb-4 drop-shadow-lg [text-shadow:0_2px_8px_rgba(0,0,0,0.6)]">
               Education is the most powerful weapon which you can use to change the world.
             </blockquote>
             <p className="text-white/60 text-sm font-medium tracking-wide">— Nelson Mandela</p>
