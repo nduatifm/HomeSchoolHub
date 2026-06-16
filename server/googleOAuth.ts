@@ -11,8 +11,7 @@ const PENDING_TTL_MS = 5 * 60 * 1000;
 
 export const GOOGLE_STRATEGY = "google";
 
-const FALLBACK_CLIENT_ID =
-  "92937113563-pbbl6p4p161pdc36voaetu1u2v5mdtfp.apps.googleusercontent.com";
+const FALLBACK_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 
 function getSecret(): string {
   return (
@@ -42,7 +41,9 @@ export function getGoogleOAuth2Client(redirectUri: string): OAuth2Client {
 export function getGoogleRedirectUri(req: Request): string {
   const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol;
   const host =
-    (req.headers["x-forwarded-host"] as string) || req.headers.host || "localhost";
+    (req.headers["x-forwarded-host"] as string) ||
+    req.headers.host ||
+    "localhost";
   return `${proto}://${host}/api/auth/google/callback`;
 }
 
@@ -133,19 +134,22 @@ export function setPendingGoogleAuth(
   data: Omit<PendingGoogleAuth, "exp">,
 ): void {
   const isProd = process.env.NODE_ENV === "production";
-  res.cookie(PENDING_COOKIE, signPayload({ ...data, exp: Date.now() + PENDING_TTL_MS }), {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "strict" : "lax",
-    maxAge: PENDING_TTL_MS,
-    path: "/",
-  });
+  res.cookie(
+    PENDING_COOKIE,
+    signPayload({ ...data, exp: Date.now() + PENDING_TTL_MS }),
+    {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "strict" : "lax",
+      maxAge: PENDING_TTL_MS,
+      path: "/",
+    },
+  );
 }
 
 export function readPendingGoogleAuth(req: Request): PendingGoogleAuth | null {
-  const token = (req as Request & { cookies?: Record<string, string> }).cookies?.[
-    PENDING_COOKIE
-  ];
+  const token = (req as Request & { cookies?: Record<string, string> })
+    .cookies?.[PENDING_COOKIE];
   if (!token) return null;
   return verifySignedPayload<PendingGoogleAuth>(token);
 }
@@ -169,7 +173,11 @@ export function redirectWithGoogleError(
 }
 
 export function sanitizeNextPath(next: unknown): string {
-  if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//")) {
+  if (
+    typeof next !== "string" ||
+    !next.startsWith("/") ||
+    next.startsWith("//")
+  ) {
     return "/dashboard";
   }
   return next;
