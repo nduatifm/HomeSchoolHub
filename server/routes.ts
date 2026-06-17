@@ -8224,7 +8224,14 @@ export function registerRoutes(app: Express) {
           try {
             const parsed = JSON.parse(rawFileUrlsAssign);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              fileUrl = JSON.stringify(parsed.filter((u: unknown) => typeof u === "string" && u));
+              const validated = parsed.filter(
+                (u: unknown) => typeof u === "string" && u &&
+                  (u.startsWith("https://res.cloudinary.com/") || u.startsWith("https://cloudinary.com/"))
+              );
+              if (validated.length > 10)
+                return res.status(400).json({ error: "Too many file attachments (max 10)" });
+              if (validated.length > 0)
+                fileUrl = JSON.stringify(validated);
             }
           } catch { /* ignore */ }
         } else if (req.file) {
@@ -8579,7 +8586,14 @@ export function registerRoutes(app: Express) {
           try {
             const parsed = JSON.parse(rawFileUrlsSub);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              fileUrl = JSON.stringify(parsed.filter((u: unknown) => typeof u === "string" && u));
+              const validated = parsed.filter(
+                (u: unknown) => typeof u === "string" && u &&
+                  (u.startsWith("https://res.cloudinary.com/") || u.startsWith("https://cloudinary.com/"))
+              );
+              if (validated.length > 10)
+                return res.status(400).json({ error: "Too many file attachments (max 10)" });
+              if (validated.length > 0)
+                fileUrl = JSON.stringify(validated);
             }
           } catch { /* ignore */ }
         } else if (req.file) {

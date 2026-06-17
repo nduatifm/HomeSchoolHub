@@ -352,7 +352,7 @@ export default function EditAssignmentPage() {
         fd.append("file", attachedFile);
         fd.append("folder", "classroom-assignments");
         const uploaded = await apiUpload("/api/upload", fd);
-        fileUrl = uploaded.url as string;
+        fileUrl = JSON.stringify([uploaded.url as string]);
       } else if (clearFile) {
         fileUrl = null;
       }
