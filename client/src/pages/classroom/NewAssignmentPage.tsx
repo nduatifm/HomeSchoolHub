@@ -66,7 +66,9 @@ export default function NewAssignmentPage() {
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
   const [assignmentType, setAssignmentType] = useState<ItemType | "">("");
   const [linkUrl, setLinkUrl] = useState("");
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const MAX_ATTACH_FILES = 5;
+  const MAX_ATTACH_BYTES = 20 * 1024 * 1024; // 20MB
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<number[]>([]);
   const [materialSearch, setMaterialSearch] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -80,7 +82,7 @@ export default function NewAssignmentPage() {
   const serverDraftAppliedRef = useRef(false);
   const serverDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isDirty = !!(form.title.trim() || form.description.trim() || form.dueDate || attachedFile || formQuestions.length > 0 || linkUrl.trim());
+  const isDirty = !!(form.title.trim() || form.description.trim() || form.dueDate || attachedFiles.length > 0 || formQuestions.length > 0 || linkUrl.trim());
 
   function autoGrowTitle() {
     const el = titleRef.current;
@@ -265,7 +267,21 @@ export default function NewAssignmentPage() {
   }
 
   const createMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      let fileUrls: string[] = [];
+      if (attachedFiles.length > 0) {
+        fileUrls = await Promise.all(
+          attachedFiles.map(async (file) => {
+            const uploadFd = new FormData();
+            uploadFd.append("file", file);
+            uploadFd.append("folder", "classroom-assignments");
+            const r = await fetch("/api/upload", { method: "POST", credentials: "include", body: uploadFd });
+            const data = await r.json();
+            if (!r.ok || !data.url) throw new Error(data.error ?? "File upload failed");
+            return data.url as string;
+          }),
+        );
+      }
       const fd = new FormData();
       fd.append("title", form.title);
       fd.append("description", form.description);
@@ -273,7 +289,7 @@ export default function NewAssignmentPage() {
       fd.append("points", form.points);
       fd.append("assignmentType", assignmentType);
       if (linkUrl.trim()) fd.append("linkUrl", linkUrl.trim());
-      if (attachedFile) fd.append("file", attachedFile);
+      if (fileUrls.length > 0) fd.append("fileUrls", JSON.stringify(fileUrls));
       if (formQuestions.length > 0) {
         fd.append("formSchema", JSON.stringify(formQuestions));
       }
@@ -335,8 +351,15 @@ export default function NewAssignmentPage() {
   function handleFileDrop(e: React.DragEvent) {
     e.preventDefault();
     setIsDragging(false);
-    const f = e.dataTransfer.files?.[0] ?? null;
-    if (f) setAttachedFile(f);
+    const incoming = e.dataTransfer.files;
+    if (!incoming || incoming.length === 0) return;
+    const arr = Array.from(incoming);
+    const totalAfter = attachedFiles.length + arr.length;
+    if (totalAfter > MAX_ATTACH_FILES) {
+      return; // silently ignore — UI shows the cap
+    }
+    const valid = arr.filter((f) => f.size <= MAX_ATTACH_BYTES);
+    setAttachedFiles((prev) => [...prev, ...valid].slice(0, MAX_ATTACH_FILES));
   }
 
   if (classroomLoading) {
@@ -732,31 +755,37 @@ export default function NewAssignmentPage() {
                   </div>
                 </div>
 
-                {/* Attachment */}
+                {/* Attachments */}
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Attachment
-                    <span className="normal-case font-normal tracking-normal ml-1.5 text-muted-foreground/60 text-xs">optional</span>
+                    Attachments
+                    <span className="normal-case font-normal tracking-normal ml-1.5 text-muted-foreground/60 text-xs">
+                      optional · up to {MAX_ATTACH_FILES} files, 20 MB each
+                    </span>
                   </p>
 
-                  {attachedFile ? (
-                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/30">
-                      <Paperclip className="h-4 w-4 text-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{attachedFile.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(attachedFile.size / (1024 * 1024)).toFixed(1)} MB
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setAttachedFile(null)}
-                        className="shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                  {attachedFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {attachedFiles.map((f, i) => (
+                        <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/30">
+                          <Paperclip className="h-4 w-4 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{f.name}</p>
+                            <p className="text-xs text-muted-foreground">{(f.size / (1024 * 1024)).toFixed(1)} MB</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setAttachedFiles((prev) => prev.filter((_, j) => j !== i))}
+                            className="shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
+                  )}
+
+                  {attachedFiles.length < MAX_ATTACH_FILES && (
                     <label
                       className={`flex flex-col items-center gap-2 px-4 py-5 rounded-xl border-2 border-dashed cursor-pointer transition-all text-center ${
                         isDragging
@@ -770,15 +799,19 @@ export default function NewAssignmentPage() {
                       <Paperclip className={`h-5 w-5 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Drop a file or <span className="text-primary">browse</span>
+                          {attachedFiles.length === 0 ? <>Drop files or <span className="text-primary">browse</span></> : "Add another file"}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">PDF, image, Word, or text</p>
                       </div>
                       <input
                         type="file"
+                        multiple
                         className="hidden"
                         accept="image/*,.pdf,.doc,.docx,.txt"
-                        onChange={(e) => setAttachedFile(e.target.files?.[0] ?? null)}
+                        onChange={(e) => {
+                          const arr = Array.from(e.target.files ?? []).filter((f) => f.size <= MAX_ATTACH_BYTES);
+                          setAttachedFiles((prev) => [...prev, ...arr].slice(0, MAX_ATTACH_FILES));
+                        }}
                       />
                     </label>
                   )}

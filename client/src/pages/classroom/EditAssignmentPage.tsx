@@ -832,26 +832,32 @@ export default function EditAssignmentPage() {
                     <span className="normal-case font-normal tracking-normal ml-1.5 text-muted-foreground/60 text-xs">optional</span>
                   </p>
 
-                  {showExistingFile && (
-                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/30">
-                      <Paperclip className="h-4 w-4 text-primary shrink-0" />
-                      <a
-                        href={existingFileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline flex-1 truncate"
-                      >
-                        Current attachment
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => setClearFile(true)}
-                        className="shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-muted transition-colors"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
+                  {showExistingFile && (() => {
+                    const existingUrls = (() => {
+                      if (!existingFileUrl) return [];
+                      try { const p = JSON.parse(existingFileUrl); if (Array.isArray(p)) return p.filter(Boolean); } catch {}
+                      return [existingFileUrl];
+                    })();
+                    return (
+                      <div className="space-y-1.5">
+                        {existingUrls.map((url, i) => (
+                          <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/30">
+                            <Paperclip className="h-4 w-4 text-primary shrink-0" />
+                            <a href={url} target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline flex-1 truncate">
+                              {existingUrls.length > 1 ? `Attachment ${i + 1}` : "Current attachment"}
+                            </a>
+                            {i === 0 && (
+                              <button type="button" onClick={() => setClearFile(true)}
+                                className="shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-muted transition-colors">
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {clearFile && !attachedFile && (
                     <div className="flex items-center justify-between text-xs text-muted-foreground px-1">

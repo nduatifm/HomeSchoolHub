@@ -182,34 +182,48 @@ export default function SubmissionReviewPage() {
               <p className="text-sm text-muted-foreground italic">No text answer submitted.</p>
             )}
 
-            {submission.fileUrl && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Submitted File</p>
-                <a
-                  href={submission.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline font-medium"
-                >
-                  <Paperclip className="h-4 w-4" />View submission file<ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            )}
+            {(() => {
+              const subUrls = (() => {
+                if (!submission.fileUrl) return [];
+                try { const p = JSON.parse(submission.fileUrl); if (Array.isArray(p)) return p.filter(Boolean); } catch {}
+                return [submission.fileUrl];
+              })();
+              return subUrls.length > 0 ? (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Submitted File{subUrls.length > 1 ? "s" : ""}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {subUrls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-primary hover:underline font-medium">
+                        <Paperclip className="h-4 w-4" />File {subUrls.length > 1 ? i + 1 : "attachment"}<ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
 
             {/* Attachment on the assignment itself */}
-            {assignment.fileUrl && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Assignment Resource</p>
-                <a
-                  href={assignment.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary hover:underline"
-                >
-                  <Paperclip className="h-4 w-4" />View attached resource<ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            )}
+            {(() => {
+              const assignUrls = (() => {
+                if (!assignment.fileUrl) return [];
+                try { const p = JSON.parse(assignment.fileUrl); if (Array.isArray(p)) return p.filter(Boolean); } catch {}
+                return [assignment.fileUrl];
+              })();
+              return assignUrls.length > 0 ? (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Assignment Resource{assignUrls.length > 1 ? "s" : ""}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {assignUrls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary hover:underline">
+                        <Paperclip className="h-4 w-4" />{assignUrls.length > 1 ? `Resource ${i + 1}` : "View attached resource"}<ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
           </div>
 
           {/* Returned / previously-returned banner — shown whenever a returnNote exists,

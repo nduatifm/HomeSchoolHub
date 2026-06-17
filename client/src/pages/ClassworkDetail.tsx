@@ -157,7 +157,8 @@ const ACCEPTED_MIME = new Set([
   "text/plain",
 ]);
 const ACCEPTED_EXT = /\.(jpe?g|png|gif|webp|pdf|docx?|txt)$/i;
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB
+const MAX_FILES = 5;
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -165,12 +166,35 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function parseFileUrls(fileUrl?: string | null): string[] {
+  if (!fileUrl) return [];
+  try {
+    const parsed = JSON.parse(fileUrl);
+    if (Array.isArray(parsed)) return parsed.filter(Boolean);
+  } catch {}
+  return [fileUrl];
+}
+
+async function uploadFilesToStorage(files: File[], folder: string): Promise<string[]> {
+  return Promise.all(
+    files.map(async (file) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("folder", folder);
+      const r = await fetch("/api/upload", { method: "POST", credentials: "include", body: fd });
+      const data = await r.json();
+      if (!r.ok || !data.url) throw new Error(data.error ?? "Upload failed");
+      return data.url as string;
+    }),
+  );
+}
+
 function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   assignment: ClassroomAssignment; classroomId: number; studentId: number; isArchived: boolean;
 }) {
   const draftKey = `draft:${classroomId}:${assignment.id}`;
   const [text, setText] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
@@ -325,25 +349,37 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       })
     : [];
 
-  function validateAndSetFile(f: File | null | undefined) {
+  function validateAndAddFiles(incoming: FileList | File[] | null | undefined) {
     setFileError(null);
-    if (!f) return;
-    if (!ACCEPTED_MIME.has(f.type) && !ACCEPTED_EXT.test(f.name)) {
-      setFileError("Only images, PDFs, Word docs, and text files are allowed.");
+    if (!incoming || incoming.length === 0) return;
+    const arr = Array.from(incoming);
+    const totalAfter = files.length + arr.length;
+    if (totalAfter > MAX_FILES) {
+      setFileError(`You can attach up to ${MAX_FILES} files.`);
       return;
     }
-    if (f.size > MAX_FILE_BYTES) {
-      setFileError("File must be 10 MB or smaller.");
-      return;
+    for (const f of arr) {
+      if (!ACCEPTED_MIME.has(f.type) && !ACCEPTED_EXT.test(f.name)) {
+        setFileError("Only images, PDFs, Word docs, and text files are allowed.");
+        return;
+      }
+      if (f.size > MAX_FILE_BYTES) {
+        setFileError(`"${f.name}" exceeds the 20 MB limit.`);
+        return;
+      }
     }
-    setFile(f);
+    setFiles((prev) => [...prev, ...arr]);
   }
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      let fileUrls: string[] = [];
+      if (files.length > 0) {
+        fileUrls = await uploadFilesToStorage(files, "classroom-submissions");
+      }
       const formData = new FormData();
       formData.append("content", text);
-      if (file) formData.append("file", file);
+      if (fileUrls.length > 0) formData.append("fileUrls", JSON.stringify(fileUrls));
       if (hasFormSchema && Object.keys(formAnswers).length > 0) {
         formData.append("formAnswers", JSON.stringify(formAnswers));
       }
@@ -360,13 +396,13 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "my-submissions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "draft"] });
       setText("");
-      setFile(null);
+      setFiles([]);
       setFormAnswers({});
       setDraftRestored(false);
       setAutoSaveStatus("idle");
       toast({ title: "Submitted!", type: "success" });
     },
-    onError: () => toast({ title: "Couldn't submit — try again.", type: "error" }),
+    onError: (err: any) => toast({ title: err?.message ?? "Couldn't submit — try again.", type: "error" }),
   });
 
   const isReturned = mySubmission?.status === "returned";
@@ -414,11 +450,15 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
             ) : mySubmission.content ? (
               <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
             ) : null}
-            {mySubmission.fileUrl && (
-              <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
-                <FileText className="h-3.5 w-3.5" />View your file
-              </a>
+            {parseFileUrls(mySubmission.fileUrl).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {parseFileUrls(mySubmission.fileUrl).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                    <FileText className="h-3.5 w-3.5" />File {parseFileUrls(mySubmission.fileUrl).length > 1 ? i + 1 : "attachment"}
+                  </a>
+                ))}
+              </div>
             )}
             {mySubmission.status !== "graded" && mySubmission.grade !== null && assignment.answerKey && (
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-3.5 py-2.5 flex gap-2.5 items-start mt-2">
@@ -495,32 +535,40 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               )}
             </div>
 
-            {/* Step 2 — File (optional) */}
+            {/* Step 2 — Files (optional, up to 5) */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="h-5 w-5 rounded-full bg-muted text-muted-foreground text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
-                <p className="text-xs font-semibold text-muted-foreground">Attach a file</p>
+                <p className="text-xs font-semibold text-muted-foreground">
+                  Attach files
+                  {files.length > 0 && <span className="ml-1.5 text-primary">{files.length}/{MAX_FILES}</span>}
+                </p>
               </div>
-              {file ? (
-                <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
-                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <FileText className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { setFile(null); setFileError(null); }}
-                    className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-md hover:bg-destructive/10 shrink-0"
-                  >
-                    Remove
-                  </button>
+              {files.length > 0 && (
+                <div className="space-y-2 mb-2">
+                  {files.map((f, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <FileText className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{f.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatBytes(f.size)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setFiles((prev) => prev.filter((_, j) => j !== i)); setFileError(null); }}
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-md hover:bg-destructive/10 shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ) : (
+              )}
+              {files.length < MAX_FILES && (
                 <label
-                  className={`flex flex-col items-center justify-center gap-2 cursor-pointer rounded-xl border-2 border-dashed px-4 py-6 transition-colors ${
+                  className={`flex flex-col items-center justify-center gap-2 cursor-pointer rounded-xl border-2 border-dashed px-4 py-5 transition-colors ${
                     dragOver
                       ? "border-primary bg-primary/5 text-primary"
                       : "border-border text-muted-foreground hover:border-primary/50 hover:text-primary/70"
@@ -530,17 +578,18 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                   onDrop={(e) => {
                     e.preventDefault();
                     setDragOver(false);
-                    validateAndSetFile(e.dataTransfer.files?.[0]);
+                    validateAndAddFiles(e.dataTransfer.files);
                   }}
                 >
-                  <Upload className="h-6 w-6" />
-                  <span className="text-sm font-medium">Drop a file here or click to browse</span>
-                  <span className="text-xs text-muted-foreground/70">Photos, PDFs, or Word docs — up to 10 MB</span>
+                  <Upload className="h-5 w-5" />
+                  <span className="text-sm font-medium">{files.length === 0 ? "Drop files here or click to browse" : "Add another file"}</span>
+                  <span className="text-xs text-muted-foreground/70">Photos, PDFs, or Word docs — up to 20 MB each · max {MAX_FILES} files</span>
                   <input
                     type="file"
+                    multiple
                     className="hidden"
                     accept="image/*,.pdf,.doc,.docx,.txt"
-                    onChange={(e) => validateAndSetFile(e.target.files?.[0])}
+                    onChange={(e) => validateAndAddFiles(e.target.files)}
                   />
                 </label>
               )}
@@ -561,7 +610,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               disabled={
                 submitMutation.isPending ||
                 missingRequiredQuestions.length > 0 ||
-                (!hasFormSchema && !text.trim() && !file)
+                (!hasFormSchema && !text.trim() && !files.length)
               }
               onClick={() => submitMutation.mutate()}
             >
@@ -727,15 +776,16 @@ export default function ClassworkDetail() {
             {assignment.description && (
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{assignment.description}</p>
             )}
-            {assignment.fileUrl && (
-              <a
-                href={assignment.fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
-              >
-                <FileText className="h-3.5 w-3.5" />View attached resource
-              </a>
+            {parseFileUrls(assignment.fileUrl).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {parseFileUrls(assignment.fileUrl).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                    <FileText className="h-3.5 w-3.5" />
+                    {parseFileUrls(assignment.fileUrl).length > 1 ? `Resource ${i + 1}` : "View attached resource"}
+                  </a>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
