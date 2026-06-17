@@ -197,6 +197,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   const [files, setFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [formAnswers, setFormAnswers] = useState<Record<string, string | string[]>>({});
   const [draftRestored, setDraftRestored] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -375,7 +376,12 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     mutationFn: async () => {
       let fileUrls: string[] = [];
       if (files.length > 0) {
-        fileUrls = await uploadFilesToStorage(files, "classroom-submissions");
+        setIsUploadingFiles(true);
+        try {
+          fileUrls = await uploadFilesToStorage(files, "classroom-submissions");
+        } finally {
+          setIsUploadingFiles(false);
+        }
       }
       const formData = new FormData();
       formData.append("content", text);
@@ -614,9 +620,11 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               }
               onClick={() => submitMutation.mutate()}
             >
-              {submitMutation.isPending
-                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Turning in…</>
-                : isReturned ? "Turn In Again" : "Turn In"
+              {isUploadingFiles
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading {files.length} file{files.length !== 1 ? "s" : ""}…</>
+                : submitMutation.isPending
+                  ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Turning in…</>
+                  : isReturned ? "Turn In Again" : "Turn In"
               }
             </Button>
           </CardContent>
@@ -661,10 +669,16 @@ function ParentPanel({ assignment, classroomId, studentId }: { assignment: Class
             ) : mySubmission.content ? (
               <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
             ) : null}
-            {mySubmission.fileUrl && (
-              <a href={mySubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline">
-                <FileText className="h-3.5 w-3.5" />{mySubmission.fileUrl.split("/").pop()?.split("?")[0] || "View attached file"}
-              </a>
+            {parseFileUrls(mySubmission.fileUrl).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {parseFileUrls(mySubmission.fileUrl).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
+                    <FileText className="h-3.5 w-3.5" />
+                    File {parseFileUrls(mySubmission.fileUrl).length > 1 ? i + 1 : "attachment"}
+                  </a>
+                ))}
+              </div>
             )}
             {mySubmission.status === "returned" && (
               <div className="flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2.5 mt-1">
