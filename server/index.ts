@@ -157,19 +157,30 @@ setupGooglePassport();
 app.use(passport.initialize());
 
 // Rate limiting — auth routes always limited; API limiter loosened in dev
+//
+// keyGenerator: prefer session userId so each logged-in user has their own
+// counter rather than sharing a counter with everyone behind the same proxy IP.
+// Unauthenticated requests (login, signup) fall back to IP as usual.
+const sessionOrIpKey = (req: Request): string => {
+  const userId = (req.session as any)?.userId;
+  return userId ? `uid:${userId}` : (req.ip ?? "unknown");
+};
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (_req: Request) => _req.ip ?? "unknown", // auth endpoints are pre-session; use IP
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
 });
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: isProd ? 100 : 500,
+  max: isProd ? 300 : 500, // raised from 100 — sidebar polls ~14 req/min per user; 100 was too low
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: sessionOrIpKey, // per-user when logged in, per-IP otherwise
   message: { error: "Too many requests, please try again later." },
 });
 
@@ -188,8 +199,12 @@ app.post("/api/auth/google/complete", authLimiter);
 app.post("/api/auth/forgot-password", authLimiter);
 app.post("/api/auth/reset-password", authLimiter);
 app.post("/api/auth/resend-verification", authLimiter);
-// Also rate-limit invite acceptance (contains auth logic)
-app.use("/api/students", authLimiter);
+// Rate-limit only the student creation endpoint (not all /api/students/* routes).
+// The old `app.use("/api/students", authLimiter)` was blanket-covering dashboard
+// fetch routes (e.g. /api/students/me, /api/students/:id/classroom-notifications)
+// which poll every 15 seconds and caused legitimate users to hit the 10-req/15min
+// cap within ~75 seconds, locking them out of their dashboard.
+app.post("/api/students/create-direct", authLimiter);
 // Team invite acceptance contains token-based auth logic — must be rate-limited
 app.use("/api/team-invite", authLimiter);
 app.use("/api", apiLimiter);
