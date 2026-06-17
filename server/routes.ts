@@ -8219,7 +8219,15 @@ export function registerRoutes(app: Express) {
         }
 
         let fileUrl: string | undefined;
-        if (req.file) {
+        const rawFileUrlsAssign = req.body.fileUrls;
+        if (rawFileUrlsAssign) {
+          try {
+            const parsed = JSON.parse(rawFileUrlsAssign);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              fileUrl = JSON.stringify(parsed.filter((u: unknown) => typeof u === "string" && u));
+            }
+          } catch { /* ignore */ }
+        } else if (req.file) {
           const uploadResult = await uploadBufferToCloudinary(
             req.file.buffer,
             req.file.originalname,
@@ -8229,7 +8237,7 @@ export function registerRoutes(app: Express) {
             return res
               .status(500)
               .json({ error: uploadResult.error ?? "File upload failed" });
-          fileUrl = uploadResult.url;
+          fileUrl = JSON.stringify([uploadResult.url]);
         }
 
         const linkUrl = data.linkUrl || undefined;
@@ -8566,7 +8574,15 @@ export function registerRoutes(app: Express) {
           return res.status(404).json({ error: "Assignment not found" });
 
         let fileUrl: string | undefined;
-        if (req.file) {
+        const rawFileUrlsSub = req.body.fileUrls;
+        if (rawFileUrlsSub) {
+          try {
+            const parsed = JSON.parse(rawFileUrlsSub);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              fileUrl = JSON.stringify(parsed.filter((u: unknown) => typeof u === "string" && u));
+            }
+          } catch { /* ignore */ }
+        } else if (req.file) {
           const uploadResult = await uploadBufferToCloudinary(
             req.file.buffer,
             req.file.originalname,
@@ -8577,7 +8593,7 @@ export function registerRoutes(app: Express) {
               .status(500)
               .json({ error: uploadResult.error ?? "File upload failed" });
           }
-          fileUrl = uploadResult.url;
+          fileUrl = JSON.stringify([uploadResult.url]);
         }
 
         let formAnswers: Record<string, string | string[]> | undefined;

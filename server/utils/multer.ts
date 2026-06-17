@@ -5,11 +5,11 @@ import path from 'path';
 export const memoryUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fileSize: 20 * 1024 * 1024, // 20MB max file size
   },
   fileFilter: (req, file, cb) => {
-    // Allow images and PDFs
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt/;
+    // Allow images and documents
+    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|txt/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
