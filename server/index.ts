@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import cors from "cors";
 import passport from "passport";
 import { registerRoutes } from "./routes";
@@ -158,12 +158,16 @@ app.use(passport.initialize());
 
 // Rate limiting — auth routes always limited; API limiter loosened in dev
 //
-// keyGenerator: prefer session userId so each logged-in user has their own
-// counter rather than sharing a counter with everyone behind the same proxy IP.
-// Unauthenticated requests (login, signup) fall back to IP as usual.
+// keyGenerator: prefer the raw lyra_session cookie token so each authenticated
+// session gets its own rate-limit counter, independent of shared proxy IPs.
+// cookieParser() runs before the limiters so req.cookies is already populated.
+// NOTE: req.session.userId cannot be used here — this app's session is a
+// custom per-route async lookup (not express-session middleware), so req.session
+// is always undefined at limiter evaluation time.
+// Unauthenticated requests (no cookie) fall back to IP as usual.
 const sessionOrIpKey = (req: Request): string => {
-  const userId = (req.session as any)?.userId;
-  return userId ? `uid:${userId}` : (req.ip ?? "unknown");
+  const sessionToken = (req as any).cookies?.lyra_session;
+  return sessionToken ? `session:${sessionToken}` : ipKeyGenerator(req);
 };
 
 const authLimiter = rateLimit({
@@ -171,7 +175,8 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (_req: Request) => _req.ip ?? "unknown", // auth endpoints are pre-session; use IP
+  // auth endpoints are always pre-session; use the library's IPv6-safe IP key
+  keyGenerator: (req: Request) => ipKeyGenerator(req),
   message: { error: "Too many login attempts. Please try again in 15 minutes." },
 });
 
