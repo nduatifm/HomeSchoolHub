@@ -377,6 +377,7 @@ export interface IStorage {
   completePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
   uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
   getPlannerTaskById(taskId: number): Promise<any | null>;
+  getPlannerWeeklyStars(studentId: number, weekStart: string, weekEnd: string): Promise<{ total: number; earnedByDate: Record<string, number> }>;
 }
 
 class PrismaStorage implements IStorage {
@@ -2958,6 +2959,27 @@ class PrismaStorage implements IStorage {
 
   async uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void> {
     await prisma.plannerTaskCompletion.deleteMany({ where: { taskId, studentId, date } });
+  }
+
+  async getPlannerWeeklyStars(studentId: number, weekStart: string, weekEnd: string): Promise<{ total: number; earnedByDate: Record<string, number> }> {
+    const completions = await prisma.plannerTaskCompletion.findMany({
+      where: { studentId, date: { gte: weekStart, lte: weekEnd } },
+      include: { task: { select: { reward: true } } },
+    });
+
+    const earnedByDate: Record<string, number> = {};
+    let total = 0;
+
+    for (const c of completions) {
+      const reward = c.task?.reward;
+      const stars = reward === "3stars" ? 3 : reward === "2stars" ? 2 : reward === "1star" ? 1 : 0;
+      if (stars > 0) {
+        earnedByDate[c.date] = (earnedByDate[c.date] ?? 0) + stars;
+        total += stars;
+      }
+    }
+
+    return { total, earnedByDate };
   }
 }
 

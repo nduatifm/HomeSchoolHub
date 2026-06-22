@@ -72,15 +72,14 @@ const CATEGORY_META: Record<string, { label: string; color: string; bg: string; 
 };
 
 const REPEAT_LABELS: Record<string, string> = {
-  once: "Once",
-  daily: "Every day",
-  weekdays: "Weekdays",
-  weekly: "Every week",
+  once: "Once", daily: "Every day", weekdays: "Weekdays", weekly: "Every week",
 };
 
-const REWARD_STARS: Record<string, number> = {
+const REWARD_VALUES: Record<string, number> = {
   "": 0, "1star": 1, "2stars": 2, "3stars": 3,
 };
+
+// ─── Date utils ───────────────────────────────────────────────────────────────
 
 function pad(n: number) { return String(n).padStart(2, "0"); }
 function toDateStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -91,13 +90,23 @@ function formatDateDisplay(dateStr: string) {
 }
 function formatDateShort(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 function isToday(dateStr: string) { return dateStr === todayStr(); }
 
-// ─── Stars ────────────────────────────────────────────────────────────────────
+function getWeekStart(dateStr?: string): string {
+  const now = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() + diff);
+  return toDateStr(mon);
+}
+
+// ─── Star badge ───────────────────────────────────────────────────────────────
+
 function StarBadge({ reward }: { reward?: string | null }) {
-  const count = REWARD_STARS[reward ?? ""] ?? 0;
+  const count = REWARD_VALUES[reward ?? ""] ?? 0;
   if (!count) return null;
   return (
     <span className="flex items-center gap-0.5 text-amber-500 text-xs font-semibold">
@@ -113,17 +122,19 @@ function MiniCalendar({
   selected,
   onSelect,
   monthSummary,
+  calYear,
+  calMonth,
+  onMonthChange,
 }: {
   selected: string;
   onSelect: (d: string) => void;
   monthSummary: Record<string, { total: number; done: number }>;
+  calYear: number;
+  calMonth: number;
+  onMonthChange: (year: number, month: number) => void;
 }) {
-  const [view, setView] = useState<{ year: number; month: number }>(() => {
-    const d = new Date(selected + "T00:00:00");
-    return { year: d.getFullYear(), month: d.getMonth() + 1 };
-  });
-
-  const { year, month } = view;
+  const year = calYear;
+  const month = calMonth;
   const firstDow = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthLabel = new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -134,31 +145,29 @@ function MiniCalendar({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
+  const prevMonth = () => {
+    const d = new Date(year, month - 2, 1);
+    onMonthChange(d.getFullYear(), d.getMonth() + 1);
+  };
+  const nextMonth = () => {
+    const d = new Date(year, month, 1);
+    onMonthChange(d.getFullYear(), d.getMonth() + 1);
+  };
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <span className="text-sm font-semibold text-gray-800">{monthLabel}</span>
         <div className="flex gap-1">
-          <button
-            onClick={() => {
-              const d = new Date(year, month - 2, 1);
-              setView({ year: d.getFullYear(), month: d.getMonth() + 1 });
-            }}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={prevMonth} className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => {
-              const d = new Date(year, month, 1);
-              setView({ year: d.getFullYear(), month: d.getMonth() + 1 });
-            }}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={nextMonth} className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
+
       <div className="px-3 py-2">
         <div className="grid grid-cols-7 mb-1">
           {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
@@ -181,8 +190,8 @@ function MiniCalendar({
                 onClick={() => onSelect(dateStr)}
                 className={`
                   aspect-square flex flex-col items-center justify-center rounded-md text-xs font-medium transition-colors relative
-                  ${isSelected && !isToday_ ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300" : ""}
                   ${isToday_ ? "bg-blue-600 text-white font-bold" : ""}
+                  ${isSelected && !isToday_ ? "bg-blue-100 text-blue-700 ring-1 ring-blue-300" : ""}
                   ${!isSelected && !isToday_ ? "text-gray-600 hover:bg-gray-100" : ""}
                 `}
               >
@@ -195,6 +204,7 @@ function MiniCalendar({
           })}
         </div>
       </div>
+
       <div className="px-4 pb-3 flex gap-4">
         <span className="flex items-center gap-1.5 text-xs text-gray-500">
           <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Has tasks
@@ -202,6 +212,99 @@ function MiniCalendar({
         <span className="flex items-center gap-1.5 text-xs text-gray-500">
           <span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> All done
         </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Upcoming panel ───────────────────────────────────────────────────────────
+function UpcomingPanel({
+  monthSummary,
+  selectedDate,
+  onSelect,
+}: {
+  monthSummary: Record<string, { total: number; done: number }>;
+  selectedDate: string;
+  onSelect: (d: string) => void;
+}) {
+  const upcoming = useMemo(() => {
+    const today = new Date(todayStr() + "T00:00:00");
+    const result: { date: string; total: number; done: number }[] = [];
+    for (let i = 0; i <= 13; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const ds = toDateStr(d);
+      const s = monthSummary[ds];
+      if (s && s.total > 0) result.push({ date: ds, ...s });
+      if (result.length >= 7) break;
+    }
+    return result;
+  }, [monthSummary]);
+
+  if (upcoming.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-gray-100">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Coming up</span>
+      </div>
+      <div className="py-1">
+        {upcoming.map(({ date, total, done }) => {
+          const isSelected = date === selectedDate;
+          const d = new Date(date + "T00:00:00");
+          const label = isToday(date) ? "Today"
+            : date === toDateStr(new Date(new Date().setDate(new Date().getDate() + 1))) ? "Tomorrow"
+            : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+          const pending = total - done;
+          const allDone = done === total;
+
+          return (
+            <button
+              key={date}
+              onClick={() => onSelect(date)}
+              className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-gray-50 ${isSelected ? "bg-blue-50" : ""}`}
+            >
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${allDone ? "bg-green-500" : "bg-blue-500"}`} />
+              <span className="flex-1 min-w-0">
+                <span className={`text-xs font-medium ${isSelected ? "text-blue-700" : "text-gray-700"}`}>{label}</span>
+              </span>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${allDone ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                {allDone ? "✓" : `${pending} left`}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Stars this week panel (student only) ─────────────────────────────────────
+function StarsThisWeekPanel({ studentId }: { studentId: number }) {
+  const weekStart = getWeekStart();
+
+  const { data } = useQuery<{ total: number; earnedByDate: Record<string, number> }>({
+    queryKey: ["/api/planner/students", studentId, "weekly-stars", weekStart],
+    queryFn: () => apiRequest(`/api/planner/students/${studentId}/weekly-stars?weekStart=${weekStart}`),
+    enabled: !!studentId,
+  });
+
+  const total = data?.total ?? 0;
+  if (total === 0) return null;
+
+  return (
+    <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5">
+          {Array.from({ length: Math.min(total, 5) }).map((_, i) => (
+            <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+          ))}
+          {total > 5 && <span className="text-xs font-semibold text-amber-600 ml-1">+{total - 5}</span>}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-amber-800">{total} star{total !== 1 ? "s" : ""} this week!</p>
+          <p className="text-xs text-amber-600">Keep it up!</p>
+        </div>
       </div>
     </div>
   );
@@ -242,6 +345,7 @@ function TaskCard({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "weekly-stars"] });
     },
     onError: () => toast({ title: "Couldn't update task — try again.", type: "error" }),
   });
@@ -253,6 +357,8 @@ function TaskCard({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
       toast({ title: "Task removed" });
     },
     onError: () => toast({ title: "Couldn't remove task — try again.", type: "error" }),
@@ -260,7 +366,6 @@ function TaskCard({
 
   return (
     <div className={`bg-white border rounded-xl px-4 py-3 flex items-start gap-3 shadow-sm transition-all hover:shadow-md ${isDone ? "opacity-60" : ""}`}>
-      {/* Checkbox — only students can check off */}
       {isStudent ? (
         <button
           onClick={() => toggleMutation.mutate()}
@@ -272,12 +377,11 @@ function TaskCard({
           {isDone && <Check className="w-3 h-3 text-white stroke-[3]" />}
         </button>
       ) : (
-        <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 ${isDone ? "bg-green-500 border-green-500" : "border-gray-200"}`}>
+        <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center ${isDone ? "bg-green-500 border-green-500" : "border-gray-200"}`}>
           {isDone && <Check className="w-3 h-3 text-white stroke-[3]" />}
         </div>
       )}
 
-      {/* Body */}
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium text-gray-800 ${isDone ? "line-through text-gray-400" : ""}`}>{task.title}</p>
         <div className="flex flex-wrap items-center gap-2 mt-1.5">
@@ -299,7 +403,6 @@ function TaskCard({
         {task.note && <p className="text-xs text-gray-500 mt-1 italic">{task.note}</p>}
       </div>
 
-      {/* Delete */}
       {canDelete && (
         <button
           onClick={() => deleteMutation.mutate()}
@@ -369,23 +472,18 @@ function AddTaskDialog({
         queryClient.invalidateQueries({ queryKey: ["/api/planner/students", sid, "day"] });
         queryClient.invalidateQueries({ queryKey: ["/api/planner/students", sid, "month"] });
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
       toast({ title: "Task added!" });
       onClose();
-      setTitle("");
-      setCategory(isStudent ? "school" : "chore");
-      setStartDate(defaultDate);
-      setTime("");
-      setNote("");
-      setReward("");
-      setRepeat("once");
+      setTitle(""); setCategory(isStudent ? "school" : "chore"); setStartDate(defaultDate);
+      setTime(""); setNote(""); setReward(""); setRepeat("once");
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't add task — try again.", type: "error" }),
   });
 
   const toggleChild = (id: number) =>
-    setSelectedChildren((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedChildren((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
   const canSubmit = title.trim().length > 0 && (isStudent || selectedChildren.length > 0);
 
@@ -400,7 +498,6 @@ function AddTaskDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Title */}
           <div>
             <Label htmlFor="task-title" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Task</Label>
             <Input
@@ -414,7 +511,6 @@ function AddTaskDialog({
             />
           </div>
 
-          {/* Multi-child picker — parent only */}
           {!isStudent && children.length > 1 && (
             <div>
               <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">For</Label>
@@ -432,9 +528,7 @@ function AddTaskDialog({
                     type="button"
                     onClick={() => toggleChild(c.id)}
                     className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                      selectedChildren.includes(c.id)
-                        ? "bg-primary text-white border-primary"
-                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      selectedChildren.includes(c.id) ? "bg-primary text-white border-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     {c.name}
@@ -444,14 +538,11 @@ function AddTaskDialog({
             </div>
           )}
 
-          {/* Category + Date row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Category</Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="mt-1 h-9">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(isStudent ? ["school", "reading"] : ["chore", "school", "reading", "activity"]).map((c) => (
                     <SelectItem key={c} value={c}>{CATEGORY_META[c].label}</SelectItem>
@@ -461,32 +552,19 @@ function AddTaskDialog({
             </div>
             <div>
               <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start date</Label>
-              <Input
-                type="date"
-                className="mt-1 h-9"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+              <Input type="date" className="mt-1 h-9" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
           </div>
 
-          {/* Time + Repeat row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Time (optional)</Label>
-              <Input
-                type="time"
-                className="mt-1 h-9"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-              />
+              <Input type="time" className="mt-1 h-9" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
             <div>
               <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Repeat</Label>
               <Select value={repeat} onValueChange={setRepeat}>
-                <SelectTrigger className="mt-1 h-9">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="once">Once</SelectItem>
                   <SelectItem value="daily">Every day</SelectItem>
@@ -497,14 +575,11 @@ function AddTaskDialog({
             </div>
           </div>
 
-          {/* Reward — parent only */}
           {!isStudent && (
             <div>
               <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Reward (optional)</Label>
               <Select value={reward} onValueChange={setReward}>
-                <SelectTrigger className="mt-1 h-9">
-                  <SelectValue placeholder="No reward" />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="No reward" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">No reward</SelectItem>
                   <SelectItem value="1star">⭐ 1 Star</SelectItem>
@@ -515,7 +590,6 @@ function AddTaskDialog({
             </div>
           )}
 
-          {/* Note */}
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Note (optional)</Label>
             <Textarea
@@ -530,10 +604,7 @@ function AddTaskDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button
-            onClick={() => createMutation.mutate()}
-            disabled={!canSubmit || createMutation.isPending}
-          >
+          <Button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}>
             {createMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
             Add Task
           </Button>
@@ -543,28 +614,20 @@ function AddTaskDialog({
   );
 }
 
-// ─── Day View (for a single student) ─────────────────────────────────────────
-function StudentDayView({
-  studentId,
-  studentName,
+// ─── Task group (tasks for one day, one student) ──────────────────────────────
+function DayTaskGroup({
+  tasks,
   date,
+  studentId,
   isStudent,
   currentUserId,
 }: {
-  studentId: number;
-  studentName: string;
+  tasks: PlannerTask[];
   date: string;
+  studentId: number;
   isStudent: boolean;
   currentUserId: number;
 }) {
-  const [addOpen, setAddOpen] = useState(false);
-
-  const { data: tasks = [], isLoading } = useQuery<PlannerTask[]>({
-    queryKey: ["/api/planner/students", studentId, "day", date],
-    queryFn: () =>
-      apiRequest(`/api/planner/students/${studentId}/day?date=${date}`),
-  });
-
   const grouped = useMemo(() => {
     const g: Record<string, PlannerTask[]> = {};
     for (const t of tasks) {
@@ -574,21 +637,68 @@ function StudentDayView({
     return g;
   }, [tasks]);
 
+  if (tasks.length === 0) return null;
+
+  return (
+    <div className="space-y-5">
+      {Object.entries(grouped).map(([cat, catTasks]) => (
+        <div key={cat}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${CATEGORY_META[cat]?.color ?? "text-gray-500"}`}>
+              {CATEGORY_META[cat]?.icon}
+              {CATEGORY_META[cat]?.label ?? cat}
+            </span>
+            <span className="text-xs text-gray-300">{catTasks.length}</span>
+          </div>
+          <div className="space-y-2">
+            {catTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                date={date}
+                studentId={studentId}
+                isStudent={isStudent}
+                canDelete={isStudent
+                  ? task.createdByUserId === currentUserId && (task.category === "school" || task.category === "reading")
+                  : true
+                }
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Student day view ─────────────────────────────────────────────────────────
+function StudentDayView({
+  studentId,
+  date,
+  currentUserId,
+}: {
+  studentId: number;
+  date: string;
+  currentUserId: number;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+
+  const { data: tasks = [], isLoading } = useQuery<PlannerTask[]>({
+    queryKey: ["/api/planner/students", studentId, "day", date],
+    queryFn: () => apiRequest(`/api/planner/students/${studentId}/day?date=${date}`),
+    enabled: !!studentId,
+  });
+
   const total = tasks.length;
   const done = tasks.filter((t) => t.completions.some((c) => c.date === date)).length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
-      </div>
-    );
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
   }
 
   return (
     <div>
-      {/* Progress bar */}
       {total > 0 && (
         <div className="mb-5">
           <div className="flex justify-between text-xs mb-1.5">
@@ -596,52 +706,22 @@ function StudentDayView({
             <span className="font-semibold text-green-600">{done} of {total} done</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
+            <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
           </div>
         </div>
       )}
 
-      {/* Tasks by category */}
       {tasks.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center border border-dashed border-gray-200 rounded-xl">
           <CalendarDays className="w-10 h-10 text-gray-200" />
           <p className="text-sm font-medium text-gray-500">No tasks for this day</p>
-          <p className="text-xs text-gray-400 max-w-[200px]">
-            {isStudent ? "Add your own school or reading reminders below." : `Add tasks for ${studentName} with the + button above.`}
-          </p>
+          <p className="text-xs text-gray-400 max-w-[200px]">Add school or reading reminders below.</p>
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setAddOpen(true)}>
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add task
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add reminder
           </Button>
         </div>
       ) : (
-        <div className="space-y-5">
-          {Object.entries(grouped).map(([cat, catTasks]) => (
-            <div key={cat}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${CATEGORY_META[cat]?.color ?? "text-gray-500"}`}>
-                  {CATEGORY_META[cat]?.icon}
-                  {CATEGORY_META[cat]?.label ?? cat}
-                </span>
-                <span className="text-xs text-gray-300">{catTasks.length}</span>
-              </div>
-              <div className="space-y-2">
-                {catTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    date={date}
-                    studentId={studentId}
-                    isStudent={isStudent}
-                    canDelete={isStudent ? task.createdByUserId === currentUserId : true}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <DayTaskGroup tasks={tasks} date={date} studentId={studentId} isStudent={true} currentUserId={currentUserId} />
       )}
 
       <AddTaskDialog
@@ -649,24 +729,24 @@ function StudentDayView({
         onClose={() => setAddOpen(false)}
         defaultDate={date}
         defaultStudentId={studentId}
-        children={[{ id: studentId, name: studentName }]}
-        isStudent={isStudent}
+        children={[{ id: studentId, name: "" }]}
+        isStudent={true}
         userId={currentUserId}
       />
     </div>
   );
 }
 
-// ─── Parent family overview ───────────────────────────────────────────────────
+// ─── Parent family overview — all children at once ────────────────────────────
 function ParentFamilyView({
   date,
   currentUserId,
+  onAddTask,
 }: {
   date: string;
   currentUserId: number;
+  onAddTask: () => void;
 }) {
-  const [addOpen, setAddOpen] = useState(false);
-
   const { data, isLoading } = useQuery<{ children: ChildInfo[]; tasks: Record<number, PlannerTask[]> }>({
     queryKey: ["/api/planner/family/day", date],
     queryFn: () => apiRequest(`/api/planner/family/day?date=${date}`),
@@ -676,11 +756,7 @@ function ParentFamilyView({
   const tasksByChild = data?.tasks ?? {};
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
-      </div>
-    );
+    return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
   }
 
   if (children.length === 0) {
@@ -688,9 +764,9 @@ function ParentFamilyView({
       <div className="flex flex-col items-center gap-3 py-20 text-center">
         <Users className="w-12 h-12 text-gray-200" />
         <p className="text-sm font-medium text-gray-500">No children linked yet</p>
-        <p className="text-xs text-gray-400">Invite a student from the Invite Student page first.</p>
+        <p className="text-xs text-gray-400">Invite a student to get started.</p>
         <Button size="sm" variant="outline" onClick={() => (window.location.href = "/invites")}>
-          <Link className="w-3.5 h-3.5 mr-1.5" /> Go to Invites
+          <Link className="w-3.5 h-3.5 mr-1.5" /> Invite Student
         </Button>
       </div>
     );
@@ -702,92 +778,40 @@ function ParentFamilyView({
         const tasks: PlannerTask[] = tasksByChild[child.id] ?? [];
         const total = tasks.length;
         const done = tasks.filter((t) => t.completions.some((c) => c.date === date)).length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
         return (
           <div key={child.id}>
+            {/* Child header */}
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-800">{child.name}</h3>
-              <span className="text-xs text-gray-400">{done}/{total} done</span>
-            </div>
-            {tasks.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No tasks for this day</p>
-            ) : (
-              <div className="space-y-2">
-                {tasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    date={date}
-                    studentId={child.id}
-                    isStudent={false}
-                    canDelete={true}
-                  />
-                ))}
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
+                  {child.name.charAt(0).toUpperCase()}
+                </div>
+                <h3 className="font-semibold text-gray-800 text-sm">{child.name}</h3>
               </div>
+              {total > 0 && (
+                <span className="text-xs text-gray-400">{done}/{total} done</span>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            {total > 0 && (
+              <div className="mb-3">
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )}
+
+            {tasks.length === 0 ? (
+              <p className="text-xs text-gray-400 italic py-2">No tasks for this day</p>
+            ) : (
+              <DayTaskGroup tasks={tasks} date={date} studentId={child.id} isStudent={false} currentUserId={currentUserId} />
             )}
           </div>
         );
       })}
-
-      <AddTaskDialog
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        defaultDate={date}
-        defaultStudentId={children[0]?.id ?? 0}
-        children={children}
-        isStudent={false}
-        userId={currentUserId}
-      />
-
-      {/* Floating add */}
-      <div className="fixed bottom-8 right-8">
-        <Button
-          size="lg"
-          className="rounded-full shadow-lg h-12 px-5"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="w-5 h-5 mr-2" /> Add Task
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Month summary hook (per-student) ────────────────────────────────────────
-function useMonthSummary(studentId: number | null, year: number, month: number) {
-  return useQuery<Record<string, { total: number; done: number }>>({
-    queryKey: ["/api/planner/students", studentId, "month", year, month],
-    queryFn: () =>
-      apiRequest(`/api/planner/students/${studentId}/month?year=${year}&month=${month}`),
-    enabled: !!studentId,
-  });
-}
-
-// ─── Parent child selector ────────────────────────────────────────────────────
-function ParentChildSelector({
-  children,
-  selected,
-  onSelect,
-}: {
-  children: ChildInfo[];
-  selected: number | null;
-  onSelect: (id: number) => void;
-}) {
-  if (children.length <= 1) return null;
-  return (
-    <div className="flex gap-2 mb-4 flex-wrap">
-      {children.map((c) => (
-        <button
-          key={c.id}
-          onClick={() => onSelect(c.id)}
-          className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
-            selected === c.id
-              ? "bg-primary text-white border-primary"
-              : "border-gray-200 text-gray-600 hover:bg-gray-50"
-          }`}
-        >
-          {c.name}
-        </button>
-      ))}
     </div>
   );
 }
@@ -799,25 +823,22 @@ export default function PlannerPage() {
   const isStudent = user?.role === "student";
 
   const [selectedDate, setSelectedDate] = useState(todayStr());
-  const [viewYear, setViewYear] = useState(new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(new Date().getMonth() + 1);
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
   const [addOpen, setAddOpen] = useState(false);
-  const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
 
-  // Parent: fetch children list
-  const { data: familyData } = useQuery<{ children: ChildInfo[]; tasks: Record<number, PlannerTask[]> }>({
-    queryKey: ["/api/planner/family/day", selectedDate],
-    queryFn: () => apiRequest(`/api/planner/family/day?date=${selectedDate}`),
-    enabled: isParent,
-  });
-  const children = familyData?.children ?? [];
+  // When user selects a date: also sync calendar month view
+  const handleSelectDate = (d: string) => {
+    setSelectedDate(d);
+    const dObj = new Date(d + "T00:00:00");
+    setCalYear(dObj.getFullYear());
+    setCalMonth(dObj.getMonth() + 1);
+  };
 
-  // Resolve the active student id
-  const activeChildId = useMemo(() => {
-    if (!isParent) return null;
-    if (selectedChildId && children.some((c) => c.id === selectedChildId)) return selectedChildId;
-    return children[0]?.id ?? null;
-  }, [isParent, selectedChildId, children]);
+  const handleMonthChange = (year: number, month: number) => {
+    setCalYear(year);
+    setCalMonth(month);
+  };
 
   // Student: fetch own student record
   const { data: myStudent } = useQuery<{ id: number; name: string }>({
@@ -826,22 +847,47 @@ export default function PlannerPage() {
     enabled: isStudent,
   });
 
-  const plannerStudentId = isParent ? activeChildId : myStudent?.id ?? null;
+  // Parent: fetch children list (to know who to show Add Task dialog for)
+  const { data: familyDayData } = useQuery<{ children: ChildInfo[]; tasks: Record<number, PlannerTask[]> }>({
+    queryKey: ["/api/planner/family/day", selectedDate],
+    queryFn: () => apiRequest(`/api/planner/family/day?date=${selectedDate}`),
+    enabled: isParent,
+  });
+  const children = familyDayData?.children ?? [];
 
-  // Month summary for calendar dots
-  const { data: monthSummary = {} } = useMonthSummary(plannerStudentId, viewYear, viewMonth);
+  // Month summary — STUDENT: their own summary; PARENT: aggregate across all children
+  const { data: studentMonthSummary = {} } = useQuery<Record<string, { total: number; done: number }>>({
+    queryKey: ["/api/planner/students", myStudent?.id, "month", calYear, calMonth],
+    queryFn: () => apiRequest(`/api/planner/students/${myStudent!.id}/month?year=${calYear}&month=${calMonth}`),
+    enabled: isStudent && !!myStudent?.id,
+  });
 
-  // Update viewYear/viewMonth when selectedDate changes
-  const handleSelectDate = (d: string) => {
-    setSelectedDate(d);
-    const dObj = new Date(d + "T00:00:00");
-    setViewYear(dObj.getFullYear());
-    setViewMonth(dObj.getMonth() + 1);
-  };
+  const { data: familyMonthData } = useQuery<{
+    children: ChildInfo[];
+    summaries: Record<number, Record<string, { total: number; done: number }>>;
+  }>({
+    queryKey: ["/api/planner/family/month", calYear, calMonth],
+    queryFn: () => apiRequest(`/api/planner/family/month?year=${calYear}&month=${calMonth}`),
+    enabled: isParent,
+  });
 
-  const today = todayStr();
-  const activeChildInfo = isParent ? children.find((c) => c.id === activeChildId) : null;
-  const studentName = isParent ? (activeChildInfo?.name ?? "Child") : (myStudent?.name ?? user?.name ?? "");
+  // Aggregate family month summary: for each date, total = union of any child's tasks
+  const familyMonthSummary = useMemo<Record<string, { total: number; done: number }>>(() => {
+    if (!familyMonthData) return {};
+    const result: Record<string, { total: number; done: number }> = {};
+    for (const childSummary of Object.values(familyMonthData.summaries)) {
+      for (const [date, s] of Object.entries(childSummary)) {
+        if (!result[date]) result[date] = { total: 0, done: 0 };
+        result[date].total += s.total;
+        result[date].done += s.done;
+      }
+    }
+    return result;
+  }, [familyMonthData]);
+
+  const monthSummary = isParent ? familyMonthSummary : studentMonthSummary;
+
+  const plannerStudentId = isStudent ? (myStudent?.id ?? null) : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -856,11 +902,11 @@ export default function PlannerPage() {
             <div>
               <h1 className="text-xl font-bold text-gray-900 leading-tight">My Planner</h1>
               <p className="text-xs text-gray-500 leading-none mt-0.5">
-                {isParent ? "Manage daily tasks for your children" : "Your daily tasks & reminders"}
+                {isParent ? "Manage daily tasks for your family" : "Your daily tasks & reminders"}
               </p>
             </div>
           </div>
-          {(isParent || isStudent) && plannerStudentId && (
+          {(isParent || (isStudent && plannerStudentId)) && (
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4 mr-1.5" /> Add Task
             </Button>
@@ -868,22 +914,23 @@ export default function PlannerPage() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-5">
-          {/* Left: calendar */}
+          {/* Left: calendar + coming up + stars */}
           <div className="lg:w-[280px] shrink-0 space-y-4">
             <MiniCalendar
               selected={selectedDate}
               onSelect={handleSelectDate}
               monthSummary={monthSummary}
+              calYear={calYear}
+              calMonth={calMonth}
+              onMonthChange={handleMonthChange}
             />
 
-            {/* Quick nav */}
+            {/* Quick date nav */}
             <div className="flex gap-2">
               <button
-                onClick={() => handleSelectDate(today)}
+                onClick={() => handleSelectDate(todayStr())}
                 className={`flex-1 text-xs py-2 px-3 rounded-lg border transition-colors ${
-                  selectedDate === today
-                    ? "bg-primary text-white border-primary"
-                    : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                  selectedDate === todayStr() ? "bg-primary text-white border-primary" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 Today
@@ -894,7 +941,7 @@ export default function PlannerPage() {
                   d.setDate(d.getDate() - 1);
                   handleSelectDate(toDateStr(d));
                 }}
-                className="w-9 text-xs py-2 px-2.5 rounded-lg border bg-white border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                className="w-9 py-2 px-2.5 rounded-lg border bg-white border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -904,14 +951,22 @@ export default function PlannerPage() {
                   d.setDate(d.getDate() + 1);
                   handleSelectDate(toDateStr(d));
                 }}
-                className="w-9 text-xs py-2 px-2.5 rounded-lg border bg-white border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                className="w-9 py-2 px-2.5 rounded-lg border bg-white border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Stars this week — student only */}
+            {isStudent && plannerStudentId && (
+              <StarsThisWeekPanel studentId={plannerStudentId} />
+            )}
+
+            {/* Coming up panel */}
+            <UpcomingPanel monthSummary={monthSummary} selectedDate={selectedDate} onSelect={handleSelectDate} />
           </div>
 
-          {/* Right: tasks panel */}
+          {/* Right: tasks */}
           <div className="flex-1 min-w-0">
             {/* Date heading */}
             <div className="flex items-baseline gap-3 mb-5">
@@ -926,48 +981,26 @@ export default function PlannerPage() {
               )}
             </div>
 
-            {/* Parent: child selector + per-child view */}
+            {/* Parent: family overview (all children shown at once) */}
             {isParent && (
-              <>
-                <ParentChildSelector
-                  children={children}
-                  selected={activeChildId}
-                  onSelect={setSelectedChildId}
-                />
-                {activeChildId ? (
-                  <StudentDayView
-                    studentId={activeChildId}
-                    studentName={activeChildInfo?.name ?? "Child"}
-                    date={selectedDate}
-                    isStudent={false}
-                    currentUserId={user?.id ?? 0}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-3 py-16 text-center">
-                    <Users className="w-10 h-10 text-gray-200" />
-                    <p className="text-sm text-gray-400">No children linked yet</p>
-                    <Button size="sm" variant="outline" onClick={() => (window.location.href = "/invites")}>
-                      Invite Student
-                    </Button>
-                  </div>
-                )}
-              </>
+              <ParentFamilyView
+                date={selectedDate}
+                currentUserId={user?.id ?? 0}
+                onAddTask={() => setAddOpen(true)}
+              />
             )}
 
-            {/* Student: own view */}
+            {/* Student: own tasks */}
             {isStudent && myStudent && (
               <StudentDayView
                 studentId={myStudent.id}
-                studentName={myStudent.name}
                 date={selectedDate}
-                isStudent={true}
                 currentUserId={user?.id ?? 0}
               />
             )}
 
-            {/* Loading state for student */}
             {isStudent && !myStudent && (
-              <div className="flex items-center justify-center py-16">
+              <div className="flex justify-center py-16">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
               </div>
             )}
@@ -975,14 +1008,14 @@ export default function PlannerPage() {
         </div>
       </div>
 
-      {/* Add Task dialog (from header button) */}
-      {plannerStudentId && (
+      {/* Global Add Task dialog */}
+      {(isParent ? children.length > 0 : !!plannerStudentId) && (
         <AddTaskDialog
           open={addOpen}
           onClose={() => setAddOpen(false)}
           defaultDate={selectedDate}
-          defaultStudentId={plannerStudentId}
-          children={isParent ? children : [{ id: plannerStudentId, name: studentName }]}
+          defaultStudentId={isParent ? (children[0]?.id ?? 0) : (plannerStudentId ?? 0)}
+          children={isParent ? children : [{ id: plannerStudentId ?? 0, name: myStudent?.name ?? "" }]}
           isStudent={isStudent}
           userId={user?.id ?? 0}
         />

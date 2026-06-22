@@ -10054,9 +10054,12 @@ export function registerRoutes(app: Express) {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "student") {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
-        // Students can only delete their own tasks
+        // Students can only delete their own school/reading tasks
         if (task.createdByUserId !== req.session.userId) {
           return res.status(403).json({ error: "Students can only delete tasks they created" });
+        }
+        if (task.category !== "school" && task.category !== "reading") {
+          return res.status(403).json({ error: "Students can only delete school or reading tasks" });
         }
       } else {
         return res.status(403).json({ error: "Forbidden" });
@@ -10115,6 +10118,43 @@ export function registerRoutes(app: Express) {
 
       await storage.uncompletePlannerTask(taskId, studentId, parsed.data.date);
       res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/students/:studentId/weekly-stars?weekStart=YYYY-MM-DD
+  app.get("/api/planner/students/:studentId/weekly-stars", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // Default weekStart to Monday of the current week
+      let weekStart = req.query.weekStart as string;
+      if (!weekStart) {
+        const now = new Date();
+        const day = now.getDay(); // 0=Sun
+        const diffToMon = (day === 0 ? -6 : 1 - day);
+        const mon = new Date(now);
+        mon.setDate(now.getDate() + diffToMon);
+        weekStart = mon.toISOString().slice(0, 10);
+      }
+      const startD = new Date(weekStart + "T00:00:00");
+      const endD = new Date(startD);
+      endD.setDate(startD.getDate() + 6);
+      const weekEnd = endD.toISOString().slice(0, 10);
+
+      const stars = await storage.getPlannerWeeklyStars(studentId, weekStart, weekEnd);
+      res.json(stars);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
