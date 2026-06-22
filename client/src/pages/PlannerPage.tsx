@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
@@ -79,15 +79,16 @@ function formatDateDisplay(dateStr: string) {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 function isToday(dateStr: string) { return dateStr === todayStr(); }
-function tomorrowStr() {
-  const d = new Date(); d.setDate(d.getDate() + 1); return toDateStr(d);
-}
-function getWeekStart(): string {
+// Stable: call once at module load; only stale if the page stays open past midnight
+// For a planner that's used daily, this is acceptable — a page refresh fixes it.
+const TODAY = todayStr();
+const TOMORROW = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return toDateStr(d); })();
+const WEEK_START = (() => {
   const now = new Date();
   const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
   const mon = new Date(now); mon.setDate(now.getDate() + diff);
   return toDateStr(mon);
-}
+})();
 
 // ─── Star badge ───────────────────────────────────────────────────────────────
 function StarBadge({ reward }: { reward?: string | null }) {
@@ -196,17 +197,15 @@ function UpcomingPanel({
   selectedDate: string;
   onSelect: (d: string) => void;
 }) {
-  const fromDate = todayStr();
-
   const { data: studentUpcoming = [] } = useQuery<{ date: string; total: number; done: number }[]>({
-    queryKey: ["/api/planner/students", studentId, "upcoming", fromDate],
-    queryFn: () => apiRequest(`/api/planner/students/${studentId}/upcoming?fromDate=${fromDate}&days=7`),
+    queryKey: ["/api/planner/students", studentId, "upcoming", TODAY],
+    queryFn: () => apiRequest(`/api/planner/students/${studentId}/upcoming?fromDate=${TODAY}&days=7`),
     enabled: !isParent && !!studentId,
   });
 
   const { data: familyUpcomingData } = useQuery<{ children: ChildInfo[]; upcoming: { date: string; childCount: number; total: number; done: number }[] }>({
-    queryKey: ["/api/planner/family/upcoming", fromDate],
-    queryFn: () => apiRequest(`/api/planner/family/upcoming?fromDate=${fromDate}&days=7`),
+    queryKey: ["/api/planner/family/upcoming", TODAY],
+    queryFn: () => apiRequest(`/api/planner/family/upcoming?fromDate=${TODAY}&days=7`),
     enabled: isParent,
   });
 
@@ -226,7 +225,7 @@ function UpcomingPanel({
           const isSelected = row.date === selectedDate;
           const d = new Date(row.date + "T00:00:00");
           const label = isToday(row.date) ? "Today"
-            : row.date === tomorrowStr() ? "Tomorrow"
+            : row.date === TOMORROW ? "Tomorrow"
             : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
           const pending = row.total - row.done;
           const allDone = row.done === row.total;
@@ -258,10 +257,9 @@ function UpcomingPanel({
 
 // ─── Student Stars this week ──────────────────────────────────────────────────
 function StudentStarsPanel({ studentId }: { studentId: number }) {
-  const weekStart = getWeekStart();
   const { data } = useQuery<{ total: number; earnedByDate: Record<string, number> }>({
-    queryKey: ["/api/planner/students", studentId, "weekly-stars", weekStart],
-    queryFn: () => apiRequest(`/api/planner/students/${studentId}/weekly-stars?weekStart=${weekStart}`),
+    queryKey: ["/api/planner/students", studentId, "weekly-stars", WEEK_START],
+    queryFn: () => apiRequest(`/api/planner/students/${studentId}/weekly-stars?weekStart=${WEEK_START}`),
     enabled: !!studentId,
   });
   const total = data?.total ?? 0;
@@ -286,10 +284,9 @@ function StudentStarsPanel({ studentId }: { studentId: number }) {
 
 // ─── Parent Stars this week (per child) ───────────────────────────────────────
 function ParentStarsPanel() {
-  const weekStart = getWeekStart();
   const { data } = useQuery<{ children: ChildInfo[]; stars: Record<number, number>; weekStart: string }>({
-    queryKey: ["/api/planner/family/stars", weekStart],
-    queryFn: () => apiRequest(`/api/planner/family/stars?weekStart=${weekStart}`),
+    queryKey: ["/api/planner/family/stars", WEEK_START],
+    queryFn: () => apiRequest(`/api/planner/family/stars?weekStart=${WEEK_START}`),
   });
 
   const children = data?.children ?? [];
@@ -420,7 +417,7 @@ function TaskCard({
 
 // ─── Add Task Dialog ───────────────────────────────────────────────────────────
 function AddTaskDialog({
-  open, onClose, defaultDate, defaultStudentId, children, isStudent, userId,
+  open, onClose, defaultDate, defaultStudentId, children, isStudent,
 }: {
   open: boolean;
   onClose: () => void;
@@ -428,7 +425,6 @@ function AddTaskDialog({
   defaultStudentId: number;
   children: ChildInfo[];
   isStudent: boolean;
-  userId: number;
 }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
@@ -441,6 +437,20 @@ function AddTaskDialog({
   const [selectedChildren, setSelectedChildren] = useState<number[]>(
     defaultStudentId ? [defaultStudentId] : [],
   );
+
+  // Reset all fields whenever the dialog opens, picking up the current defaultDate
+  useEffect(() => {
+    if (open) {
+      setTitle("");
+      setCategory(isStudent ? "school" : "chore");
+      setStartDate(defaultDate);
+      setTime("");
+      setNote("");
+      setReward("none");
+      setRepeat("once");
+      setSelectedChildren(defaultStudentId ? [defaultStudentId] : []);
+    }
+  }, [open]); // intentionally only on `open` transition
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -473,9 +483,7 @@ function AddTaskDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
       toast({ title: "Task added!" });
-      onClose();
-      setTitle(""); setCategory(isStudent ? "school" : "chore"); setStartDate(defaultDate);
-      setTime(""); setNote(""); setReward("none"); setRepeat("once");
+      onClose(); // useEffect will reset form on next open
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't add task — try again.", type: "error" }),
   });
@@ -716,7 +724,6 @@ function StudentDayView({
         defaultStudentId={studentId}
         children={[{ id: studentId, name: "" }]}
         isStudent={true}
-        userId={currentUserId}
       />
     </div>
   );
@@ -877,7 +884,8 @@ export default function PlannerPage() {
               </p>
             </div>
           </div>
-          {(isParent || (isStudent && plannerStudentId)) && (
+          {/* Only show Add Task when the dialog would actually work */}
+          {(isParent ? children.length > 0 : !!plannerStudentId) && (
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4 mr-1.5" /> Add Task
             </Button>
@@ -963,7 +971,7 @@ export default function PlannerPage() {
         </div>
       </div>
 
-      {/* Global Add Task dialog */}
+      {/* Global Add Task dialog — only mounted when it has valid targets */}
       {(isParent ? children.length > 0 : !!plannerStudentId) && (
         <AddTaskDialog
           open={addOpen}
@@ -972,7 +980,6 @@ export default function PlannerPage() {
           defaultStudentId={isParent ? (children[0]?.id ?? 0) : (plannerStudentId ?? 0)}
           children={isParent ? children : [{ id: plannerStudentId ?? 0, name: myStudent?.name ?? "" }]}
           isStudent={isStudent}
-          userId={user?.id ?? 0}
         />
       )}
     </div>

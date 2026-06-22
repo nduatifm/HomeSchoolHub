@@ -9921,6 +9921,11 @@ export function registerRoutes(app: Express) {
 
   // ========== PLANNER ROUTES ==========
 
+  // Return the current local date as YYYY-MM-DD (avoids UTC-offset date shifts)
+  function localDateStr(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
   // Helper: assert caller is a parent of the given student (via ChildTeamMember)
   async function assertPlannerParentAccess(callerId: number, studentId: number, res: Response): Promise<boolean> {
     const children = await storage.getStudentsByParent(callerId);
@@ -9946,7 +9951,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/planner/students/:studentId/day", requireAuth, async (req, res) => {
     try {
       const studentId = parseInt(req.params.studentId, 10);
-      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const date = (req.query.date as string) || localDateStr();
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
 
@@ -10146,12 +10151,12 @@ export function registerRoutes(app: Express) {
         const diffToMon = (day === 0 ? -6 : 1 - day);
         const mon = new Date(now);
         mon.setDate(now.getDate() + diffToMon);
-        weekStart = mon.toISOString().slice(0, 10);
+        weekStart = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, "0")}-${String(mon.getDate()).padStart(2, "0")}`;
       }
       const startD = new Date(weekStart + "T00:00:00");
       const endD = new Date(startD);
       endD.setDate(startD.getDate() + 6);
-      const weekEnd = endD.toISOString().slice(0, 10);
+      const weekEnd = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
 
       const stars = await storage.getPlannerWeeklyStars(studentId, weekStart, weekEnd);
       res.json(stars);
@@ -10206,11 +10211,11 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const fromDate = (req.query.fromDate as string) || new Date().toISOString().slice(0, 10);
+      const fromDate = (req.query.fromDate as string) || localDateStr();
       const days = Math.min(parseInt(req.query.days as string, 10) || 7, 14);
       const endD = new Date(fromDate + "T00:00:00");
       endD.setDate(endD.getDate() + days - 1);
-      const toDate = endD.toISOString().slice(0, 10);
+      const toDate = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
 
       const rows = await storage.getPlannerDateRangeSummary(studentId, fromDate, toDate);
       res.json(rows);
@@ -10225,11 +10230,11 @@ export function registerRoutes(app: Express) {
       const user = await storage.getUserById(req.session.userId!);
       if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
 
-      const fromDate = (req.query.fromDate as string) || new Date().toISOString().slice(0, 10);
+      const fromDate = (req.query.fromDate as string) || localDateStr();
       const days = Math.min(parseInt(req.query.days as string, 10) || 7, 14);
       const endD = new Date(fromDate + "T00:00:00");
       endD.setDate(endD.getDate() + days - 1);
-      const toDate = endD.toISOString().slice(0, 10);
+      const toDate = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
 
       const children = await storage.getStudentsByParent(req.session.userId!);
       const childIds = children.map((c) => c.id);
@@ -10252,11 +10257,11 @@ export function registerRoutes(app: Express) {
         const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
         const mon = new Date(now);
         mon.setDate(now.getDate() + diff);
-        weekStart = mon.toISOString().slice(0, 10);
+        weekStart = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, "0")}-${String(mon.getDate()).padStart(2, "0")}`;
       }
       const endD = new Date(weekStart + "T00:00:00");
       endD.setDate(endD.getDate() + 6);
-      const weekEnd = endD.toISOString().slice(0, 10);
+      const weekEnd = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
 
       const children = await storage.getStudentsByParent(req.session.userId!);
       const childIds = children.map((c) => c.id);
@@ -10273,7 +10278,7 @@ export function registerRoutes(app: Express) {
       const user = await storage.getUserById(req.session.userId!);
       if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
 
-      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const date = (req.query.date as string) || localDateStr();
       const children = await storage.getStudentsByParent(req.session.userId!);
 
       const result: Record<number, any[]> = {};
