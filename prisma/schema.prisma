@@ -80,6 +80,7 @@ model User {
   childTeamMemberships       ChildTeamMember[]           @relation("TeamMemberUser")
   childTeamInvitesSent       ChildTeamMember[]           @relation("TeamInvitedBy")
   assignmentDrafts           AssignmentDraft[]           @relation("TeacherAssignmentDrafts")
+  plannerTasksCreated        PlannerTask[]               @relation("PlannerTaskCreator")
 
   @@index([email])
   @@index([googleId])
@@ -109,6 +110,8 @@ model Student {
   childTeamMembers           ChildTeamMember[]          @relation("ChildTeamChild")
   threadMessages             Message[]
   submissionDrafts           SubmissionDraft[]
+  plannerTasks               PlannerTask[]
+  plannerCompletions         PlannerTaskCompletion[]
 
   @@index([userId])
 }
@@ -692,4 +695,42 @@ model GradingPolicy {
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
   @@index([classroomId])
+}
+
+// ─── Planner ─────────────────────────────────────────────────────────────────
+
+model PlannerTask {
+  id              Int      @id @default(autoincrement())
+  studentId       Int
+  createdByUserId Int
+  title           String
+  category        String   @default("chore")
+  startDate       String
+  time            String?
+  note            String?
+  reward          String?
+  repeat          String   @default("once")
+  createdAt       DateTime @default(now())
+
+  student         Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy       User                  @relation("PlannerTaskCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  completions     PlannerTaskCompletion[]
+
+  @@index([studentId])
+  @@index([createdByUserId])
+  @@index([startDate])
+}
+
+model PlannerTaskCompletion {
+  id          Int      @id @default(autoincrement())
+  taskId      Int
+  studentId   Int
+  date        String
+  completedAt DateTime @default(now())
+
+  task    PlannerTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, date, studentId])
+  @@index([studentId, date])
 }

@@ -19,6 +19,7 @@ import {
   Trash2,
   Bell,
   BarChart2,
+  CalendarDays,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -114,6 +115,7 @@ export default function ModernSidebar() {
   const parentItems: SidebarItem[] = [
     { icon: <Users className="w-4 h-4" />, label: "My Children", href: "/children" },
     { icon: <School className="w-4 h-4" />, label: "Classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
+    { icon: <CalendarDays className="w-4 h-4" />, label: "My Planner", href: "/planner" },
     { icon: <GraduationCap className="w-4 h-4" />, label: "Find a Tutor", href: "/find-tutor" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Invite Student", href: "/invites" },
     { icon: <FileText className="w-4 h-4" />, label: "Progress Reports", href: "/reports" },
@@ -122,6 +124,7 @@ export default function ModernSidebar() {
 
   const studentItems: SidebarItem[] = [
     { icon: <School className="w-4 h-4" />, label: "Classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
+    { icon: <CalendarDays className="w-4 h-4" />, label: "My Planner", href: "/planner" },
     { icon: <BarChart2 className="w-4 h-4" />, label: "Grades", href: "/grades" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", href: "/feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", href: "/messages", badge: unreadCount },

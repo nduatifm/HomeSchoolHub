@@ -9918,4 +9918,250 @@ export function registerRoutes(app: Express) {
       }
     },
   );
+
+  // ========== PLANNER ROUTES ==========
+
+  // Helper: assert caller is a parent of the given student (via ChildTeamMember)
+  async function assertPlannerParentAccess(callerId: number, studentId: number, res: Response): Promise<boolean> {
+    const children = await storage.getStudentsByParent(callerId);
+    const ok = children.some((c) => c.id === studentId);
+    if (!ok) {
+      res.status(403).json({ error: "Not authorized to manage this student's planner" });
+      return false;
+    }
+    return true;
+  }
+
+  // Helper: assert caller is the student themselves
+  async function assertPlannerStudentAccess(callerId: number, studentId: number, res: Response): Promise<boolean> {
+    const student = await storage.getStudentByUserId(callerId);
+    if (!student || student.id !== studentId) {
+      res.status(403).json({ error: "Not authorized" });
+      return false;
+    }
+    return true;
+  }
+
+  // GET /api/planner/students/:studentId/day?date=YYYY-MM-DD
+  app.get("/api/planner/students/:studentId/day", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const tasks = await storage.getPlannerTasksForDate(studentId, date);
+      res.json(tasks);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/students/:studentId/month?year=&month=
+  app.get("/api/planner/students/:studentId/month", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const year = parseInt(req.query.year as string, 10) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string, 10) || new Date().getMonth() + 1;
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const summary = await storage.getPlannerMonthSummary(studentId, year, month);
+      res.json(summary);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/planner/students/:studentId/tasks — parent creates task for child, or student creates own school/reading task
+  app.post("/api/planner/students/:studentId/tasks", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const schema = z.object({
+        title: z.string().min(1).max(200),
+        category: z.enum(["chore", "school", "reading", "activity"]),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        time: z.string().nullable().optional(),
+        note: z.string().max(500).nullable().optional(),
+        reward: z.string().nullable().optional(),
+        repeat: z.enum(["once", "daily", "weekdays", "weekly"]).default("once"),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+      const { title, category, startDate, time, note, reward, repeat } = parsed.data;
+
+      if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+        // Students can only create school/reading tasks
+        if (category !== "school" && category !== "reading") {
+          return res.status(403).json({ error: "Students can only add school or reading tasks" });
+        }
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const task = await storage.createPlannerTask({
+        studentId,
+        createdByUserId: req.session.userId!,
+        title,
+        category,
+        startDate,
+        time: time ?? null,
+        note: note ?? null,
+        reward: reward ?? null,
+        repeat,
+      });
+      res.json(task);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/planner/students/:studentId/tasks/:taskId
+  app.delete("/api/planner/students/:studentId/tasks/:taskId", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+        // Students can only delete their own tasks
+        if (task.createdByUserId !== req.session.userId) {
+          return res.status(403).json({ error: "Students can only delete tasks they created" });
+        }
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await storage.deletePlannerTask(taskId);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/planner/students/:studentId/tasks/:taskId/complete — student checks off a task for a date
+  app.post("/api/planner/students/:studentId/tasks/:taskId/complete", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const schema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "date is required (YYYY-MM-DD)" });
+
+      // Only the student themselves can check off tasks
+      if (user.role !== "student") return res.status(403).json({ error: "Only students can complete tasks" });
+      if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      await storage.completePlannerTask(taskId, studentId, parsed.data.date);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/planner/students/:studentId/tasks/:taskId/complete — un-check a task
+  app.delete("/api/planner/students/:studentId/tasks/:taskId/complete", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const schema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "date is required (YYYY-MM-DD)" });
+
+      if (user.role !== "student") return res.status(403).json({ error: "Only students can toggle task completion" });
+      if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      await storage.uncompletePlannerTask(taskId, studentId, parsed.data.date);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/family/day?date= — parent: get tasks for all children on a date
+  app.get("/api/planner/family/day", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
+
+      const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const children = await storage.getStudentsByParent(req.session.userId!);
+
+      const result: Record<number, any[]> = {};
+      await Promise.all(
+        children.map(async (child) => {
+          result[child.id] = await storage.getPlannerTasksForDate(child.id, date);
+        }),
+      );
+
+      res.json({ children: children.map((c) => ({ id: c.id, name: c.name })), tasks: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/family/month?year=&month= — parent: month summary for all children
+  app.get("/api/planner/family/month", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
+
+      const year = parseInt(req.query.year as string, 10) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string, 10) || new Date().getMonth() + 1;
+      const children = await storage.getStudentsByParent(req.session.userId!);
+
+      const result: Record<number, Record<string, { total: number; done: number }>> = {};
+      await Promise.all(
+        children.map(async (child) => {
+          result[child.id] = await storage.getPlannerMonthSummary(child.id, year, month);
+        }),
+      );
+
+      res.json({ children: children.map((c) => ({ id: c.id, name: c.name })), summaries: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 }

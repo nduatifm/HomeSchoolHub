@@ -357,6 +357,26 @@ export interface IStorage {
   }): Promise<any>;
   getAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<any | null>;
   deleteAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<void>;
+
+  // ─── Planner ──────────────────────────────────────────────────────────────
+  createPlannerTask(data: {
+    studentId: number;
+    createdByUserId: number;
+    title: string;
+    category: string;
+    startDate: string;
+    time?: string | null;
+    note?: string | null;
+    reward?: string | null;
+    repeat: string;
+  }): Promise<any>;
+  getPlannerTasksForDate(studentId: number, date: string): Promise<any[]>;
+  getPlannerTasksForDateRange(studentId: number, startDate: string, endDate: string): Promise<any[]>;
+  getPlannerMonthSummary(studentId: number, year: number, month: number): Promise<Record<string, { total: number; done: number }>>;
+  deletePlannerTask(taskId: number): Promise<void>;
+  completePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
+  uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
+  getPlannerTaskById(taskId: number): Promise<any | null>;
 }
 
 class PrismaStorage implements IStorage {
@@ -2807,6 +2827,137 @@ class PrismaStorage implements IStorage {
     } else {
       await prisma.assignmentDraft.deleteMany({ where: { teacherId, classroomId, assignmentId: null } });
     }
+  }
+
+  // ─── Planner ──────────────────────────────────────────────────────────────
+
+  async createPlannerTask(data: {
+    studentId: number;
+    createdByUserId: number;
+    title: string;
+    category: string;
+    startDate: string;
+    time?: string | null;
+    note?: string | null;
+    reward?: string | null;
+    repeat: string;
+  }): Promise<any> {
+    return prisma.plannerTask.create({
+      data,
+      include: { completions: true },
+    });
+  }
+
+  async getPlannerTaskById(taskId: number): Promise<any | null> {
+    return prisma.plannerTask.findUnique({
+      where: { id: taskId },
+      include: { completions: true },
+    });
+  }
+
+  // Returns all tasks that are active on `date` for a student, based on repeat rules.
+  // A task is active on `date` if:
+  //   once      → startDate === date
+  //   daily     → startDate <= date
+  //   weekdays  → startDate <= date AND date is Mon–Fri (JS getDay 1-5)
+  //   weekly    → startDate <= date AND same weekday as startDate
+  async getPlannerTasksForDate(studentId: number, date: string): Promise<any[]> {
+    const tasks = await prisma.plannerTask.findMany({
+      where: {
+        studentId,
+        startDate: { lte: date },
+      },
+      include: { completions: { where: { date, studentId } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const d = new Date(date + "T00:00:00");
+    const dayOfWeek = d.getDay(); // 0=Sun … 6=Sat
+
+    return tasks.filter((t) => {
+      if (t.repeat === "once") return t.startDate === date;
+      if (t.repeat === "daily") return true;
+      if (t.repeat === "weekdays") return dayOfWeek >= 1 && dayOfWeek <= 5;
+      if (t.repeat === "weekly") {
+        const start = new Date(t.startDate + "T00:00:00");
+        return start.getDay() === dayOfWeek;
+      }
+      return false;
+    });
+  }
+
+  async getPlannerTasksForDateRange(studentId: number, startDate: string, endDate: string): Promise<any[]> {
+    return prisma.plannerTask.findMany({
+      where: {
+        studentId,
+        startDate: { lte: endDate },
+      },
+      include: {
+        completions: {
+          where: { studentId, date: { gte: startDate, lte: endDate } },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  async getPlannerMonthSummary(studentId: number, year: number, month: number): Promise<Record<string, { total: number; done: number }>> {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const firstDay = `${year}-${pad(month)}-01`;
+    const lastDay = `${year}-${pad(month)}-${new Date(year, month, 0).getDate()}`;
+
+    const tasks = await this.getPlannerTasksForDateRange(studentId, firstDay, lastDay);
+
+    const result: Record<string, { total: number; done: number }> = {};
+
+    // Iterate each day in the month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = `${year}-${pad(month)}-${pad(d)}`;
+      const dayOfWeek = new Date(date + "T00:00:00").getDay();
+
+      let total = 0;
+      let done = 0;
+
+      for (const task of tasks) {
+        let active = false;
+        if (task.startDate > date) continue;
+        if (task.repeat === "once") active = task.startDate === date;
+        else if (task.repeat === "daily") active = true;
+        else if (task.repeat === "weekdays") active = dayOfWeek >= 1 && dayOfWeek <= 5;
+        else if (task.repeat === "weekly") {
+          const start = new Date(task.startDate + "T00:00:00");
+          active = start.getDay() === dayOfWeek;
+        }
+
+        if (active) {
+          total++;
+          if (task.completions.some((c: any) => c.date === date)) done++;
+        }
+      }
+
+      if (total > 0) {
+        result[date] = { total, done };
+      }
+    }
+
+    return result;
+  }
+
+  async deletePlannerTask(taskId: number): Promise<void> {
+    await prisma.plannerTask.delete({ where: { id: taskId } });
+  }
+
+  async completePlannerTask(taskId: number, studentId: number, date: string): Promise<void> {
+    await prisma.plannerTaskCompletion.upsert({
+      where: { taskId_date_studentId: { taskId, date, studentId } },
+      update: {},
+      create: { taskId, studentId, date },
+    });
+  }
+
+  async uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void> {
+    await prisma.plannerTaskCompletion.deleteMany({ where: { taskId, studentId, date } });
   }
 }
 
