@@ -41,7 +41,6 @@ import {
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 interface PlannerTask {
   id: number;
   studentId: number;
@@ -57,30 +56,21 @@ interface PlannerTask {
   completions: { id: number; taskId: number; studentId: number; date: string; completedAt: string }[];
 }
 
-interface ChildInfo {
-  id: number;
-  name: string;
-}
+interface ChildInfo { id: number; name: string; }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
 const CATEGORY_META: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   chore:    { label: "Chore",    color: "text-amber-700",  bg: "bg-amber-50 border-amber-200",   icon: <Home className="w-3.5 h-3.5" /> },
   school:   { label: "School",   color: "text-blue-700",   bg: "bg-blue-50 border-blue-200",     icon: <BookOpen className="w-3.5 h-3.5" /> },
   reading:  { label: "Reading",  color: "text-purple-700", bg: "bg-purple-50 border-purple-200", icon: <BookOpen className="w-3.5 h-3.5" /> },
   activity: { label: "Activity", color: "text-green-700",  bg: "bg-green-50 border-green-200",   icon: <Dumbbell className="w-3.5 h-3.5" /> },
 };
-
 const REPEAT_LABELS: Record<string, string> = {
   once: "Once", daily: "Every day", weekdays: "Weekdays", weekly: "Every week",
 };
-
-const REWARD_VALUES: Record<string, number> = {
-  "": 0, "1star": 1, "2stars": 2, "3stars": 3,
-};
+const REWARD_VALUES: Record<string, number> = { "1star": 1, "2stars": 2, "3stars": 3 };
 
 // ─── Date utils ───────────────────────────────────────────────────────────────
-
 function pad(n: number) { return String(n).padStart(2, "0"); }
 function toDateStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function todayStr() { return toDateStr(new Date()); }
@@ -88,23 +78,18 @@ function formatDateDisplay(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
-function formatDateShort(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
 function isToday(dateStr: string) { return dateStr === todayStr(); }
-
-function getWeekStart(dateStr?: string): string {
-  const now = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const mon = new Date(now);
-  mon.setDate(now.getDate() + diff);
+function tomorrowStr() {
+  const d = new Date(); d.setDate(d.getDate() + 1); return toDateStr(d);
+}
+function getWeekStart(): string {
+  const now = new Date();
+  const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
+  const mon = new Date(now); mon.setDate(now.getDate() + diff);
   return toDateStr(mon);
 }
 
 // ─── Star badge ───────────────────────────────────────────────────────────────
-
 function StarBadge({ reward }: { reward?: string | null }) {
   const count = REWARD_VALUES[reward ?? ""] ?? 0;
   if (!count) return null;
@@ -117,14 +102,9 @@ function StarBadge({ reward }: { reward?: string | null }) {
   );
 }
 
-// ─── Mini Calendar ────────────────────────────────────────────────────────────
+// ─── Mini Calendar ─────────────────────────────────────────────────────────────
 function MiniCalendar({
-  selected,
-  onSelect,
-  monthSummary,
-  calYear,
-  calMonth,
-  onMonthChange,
+  selected, onSelect, monthSummary, calYear, calMonth, onMonthChange,
 }: {
   selected: string;
   onSelect: (d: string) => void;
@@ -133,11 +113,10 @@ function MiniCalendar({
   calMonth: number;
   onMonthChange: (year: number, month: number) => void;
 }) {
-  const year = calYear;
-  const month = calMonth;
-  const firstDow = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const firstDow = new Date(calYear, calMonth - 1, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+  const monthLabel = new Date(calYear, calMonth - 1, 1)
+    .toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const cells: (number | null)[] = [
     ...Array(firstDow).fill(null),
@@ -145,45 +124,37 @@ function MiniCalendar({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const prevMonth = () => {
-    const d = new Date(year, month - 2, 1);
-    onMonthChange(d.getFullYear(), d.getMonth() + 1);
-  };
-  const nextMonth = () => {
-    const d = new Date(year, month, 1);
-    onMonthChange(d.getFullYear(), d.getMonth() + 1);
-  };
+  const prevMonth = () => { const d = new Date(calYear, calMonth - 2, 1); onMonthChange(d.getFullYear(), d.getMonth() + 1); };
+  const nextMonth = () => { const d = new Date(calYear, calMonth, 1); onMonthChange(d.getFullYear(), d.getMonth() + 1); };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <span className="text-sm font-semibold text-gray-800">{monthLabel}</span>
         <div className="flex gap-1">
-          <button onClick={prevMonth} className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+          <button onClick={prevMonth} className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={nextMonth} className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+          <button onClick={nextMonth} className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
-
       <div className="px-3 py-2">
         <div className="grid grid-cols-7 mb-1">
-          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          {["Su","Mo","Tu","We","Th","Fr","Sa"].map((d) => (
             <div key={d} className="text-center text-[10px] font-semibold text-gray-400 uppercase py-1">{d}</div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-0.5">
           {cells.map((day, i) => {
             if (!day) return <div key={i} />;
-            const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+            const dateStr = `${calYear}-${pad(calMonth)}-${pad(day)}`;
             const isSelected = dateStr === selected;
             const isToday_ = dateStr === todayStr();
             const summary = monthSummary[dateStr];
             const hasTasks = !!summary && summary.total > 0;
             const allDone = hasTasks && summary.done === summary.total;
-
             return (
               <button
                 key={i}
@@ -204,7 +175,6 @@ function MiniCalendar({
           })}
         </div>
       </div>
-
       <div className="px-4 pb-3 flex gap-4">
         <span className="flex items-center gap-1.5 text-xs text-gray-500">
           <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Has tasks
@@ -217,31 +187,34 @@ function MiniCalendar({
   );
 }
 
-// ─── Upcoming panel ───────────────────────────────────────────────────────────
+// ─── Upcoming panel (API-backed, cross-month safe) ────────────────────────────
 function UpcomingPanel({
-  monthSummary,
-  selectedDate,
-  onSelect,
+  isParent, studentId, selectedDate, onSelect,
 }: {
-  monthSummary: Record<string, { total: number; done: number }>;
+  isParent: boolean;
+  studentId?: number;
   selectedDate: string;
   onSelect: (d: string) => void;
 }) {
-  const upcoming = useMemo(() => {
-    const today = new Date(todayStr() + "T00:00:00");
-    const result: { date: string; total: number; done: number }[] = [];
-    for (let i = 0; i <= 13; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const ds = toDateStr(d);
-      const s = monthSummary[ds];
-      if (s && s.total > 0) result.push({ date: ds, ...s });
-      if (result.length >= 7) break;
-    }
-    return result;
-  }, [monthSummary]);
+  const fromDate = todayStr();
 
-  if (upcoming.length === 0) return null;
+  const { data: studentUpcoming = [] } = useQuery<{ date: string; total: number; done: number }[]>({
+    queryKey: ["/api/planner/students", studentId, "upcoming", fromDate],
+    queryFn: () => apiRequest(`/api/planner/students/${studentId}/upcoming?fromDate=${fromDate}&days=7`),
+    enabled: !isParent && !!studentId,
+  });
+
+  const { data: familyUpcomingData } = useQuery<{ children: ChildInfo[]; upcoming: { date: string; childCount: number; total: number; done: number }[] }>({
+    queryKey: ["/api/planner/family/upcoming", fromDate],
+    queryFn: () => apiRequest(`/api/planner/family/upcoming?fromDate=${fromDate}&days=7`),
+    enabled: isParent,
+  });
+
+  const rows = isParent
+    ? (familyUpcomingData?.upcoming ?? [])
+    : studentUpcoming;
+
+  if (rows.length === 0) return null;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -249,24 +222,28 @@ function UpcomingPanel({
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Coming up</span>
       </div>
       <div className="py-1">
-        {upcoming.map(({ date, total, done }) => {
-          const isSelected = date === selectedDate;
-          const d = new Date(date + "T00:00:00");
-          const label = isToday(date) ? "Today"
-            : date === toDateStr(new Date(new Date().setDate(new Date().getDate() + 1))) ? "Tomorrow"
+        {rows.map((row) => {
+          const isSelected = row.date === selectedDate;
+          const d = new Date(row.date + "T00:00:00");
+          const label = isToday(row.date) ? "Today"
+            : row.date === tomorrowStr() ? "Tomorrow"
             : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-          const pending = total - done;
-          const allDone = done === total;
+          const pending = row.total - row.done;
+          const allDone = row.done === row.total;
+          const childCount = (row as any).childCount;
 
           return (
             <button
-              key={date}
-              onClick={() => onSelect(date)}
+              key={row.date}
+              onClick={() => onSelect(row.date)}
               className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-gray-50 ${isSelected ? "bg-blue-50" : ""}`}
             >
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${allDone ? "bg-green-500" : "bg-blue-500"}`} />
               <span className="flex-1 min-w-0">
                 <span className={`text-xs font-medium ${isSelected ? "text-blue-700" : "text-gray-700"}`}>{label}</span>
+                {isParent && childCount > 0 && (
+                  <span className="block text-[10px] text-gray-400">{childCount} child{childCount !== 1 ? "ren" : ""}</span>
+                )}
               </span>
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${allDone ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
                 {allDone ? "✓" : `${pending} left`}
@@ -279,27 +256,24 @@ function UpcomingPanel({
   );
 }
 
-// ─── Stars this week panel (student only) ─────────────────────────────────────
-function StarsThisWeekPanel({ studentId }: { studentId: number }) {
+// ─── Student Stars this week ──────────────────────────────────────────────────
+function StudentStarsPanel({ studentId }: { studentId: number }) {
   const weekStart = getWeekStart();
-
   const { data } = useQuery<{ total: number; earnedByDate: Record<string, number> }>({
     queryKey: ["/api/planner/students", studentId, "weekly-stars", weekStart],
     queryFn: () => apiRequest(`/api/planner/students/${studentId}/weekly-stars?weekStart=${weekStart}`),
     enabled: !!studentId,
   });
-
   const total = data?.total ?? 0;
   if (total === 0) return null;
-
   return (
     <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <div className="flex items-center gap-0.5">
           {Array.from({ length: Math.min(total, 5) }).map((_, i) => (
             <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
           ))}
-          {total > 5 && <span className="text-xs font-semibold text-amber-600 ml-1">+{total - 5}</span>}
+          {total > 5 && <span className="text-xs font-bold text-amber-600 ml-1">+{total - 5}</span>}
         </div>
         <div>
           <p className="text-sm font-semibold text-amber-800">{total} star{total !== 1 ? "s" : ""} this week!</p>
@@ -310,13 +284,45 @@ function StarsThisWeekPanel({ studentId }: { studentId: number }) {
   );
 }
 
-// ─── Task Card ────────────────────────────────────────────────────────────────
+// ─── Parent Stars this week (per child) ───────────────────────────────────────
+function ParentStarsPanel() {
+  const weekStart = getWeekStart();
+  const { data } = useQuery<{ children: ChildInfo[]; stars: Record<number, number>; weekStart: string }>({
+    queryKey: ["/api/planner/family/stars", weekStart],
+    queryFn: () => apiRequest(`/api/planner/family/stars?weekStart=${weekStart}`),
+  });
+
+  const children = data?.children ?? [];
+  const stars = data?.stars ?? {};
+  const childrenWithStars = children.filter((c) => (stars[c.id] ?? 0) > 0);
+  if (childrenWithStars.length === 0) return null;
+
+  return (
+    <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 shadow-sm">
+      <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">⭐ Stars this week</p>
+      <div className="space-y-1.5">
+        {childrenWithStars.map((c) => {
+          const count = stars[c.id] ?? 0;
+          return (
+            <div key={c.id} className="flex items-center justify-between">
+              <span className="text-xs font-medium text-amber-800">{c.name}</span>
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
+                  <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                ))}
+                {count > 5 && <span className="text-[10px] font-bold text-amber-600 ml-0.5">+{count - 5}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Task Card ─────────────────────────────────────────────────────────────────
 function TaskCard({
-  task,
-  date,
-  studentId,
-  canDelete,
-  isStudent,
+  task, date, studentId, canDelete, isStudent,
 }: {
   task: PlannerTask;
   date: string;
@@ -330,22 +336,23 @@ function TaskCard({
 
   const toggleMutation = useMutation({
     mutationFn: async () => {
-      if (isDone) {
-        await apiRequest(`/api/planner/students/${studentId}/tasks/${task.id}/complete`, {
-          method: "DELETE",
-          body: JSON.stringify({ date }),
-        });
-      } else {
-        await apiRequest(`/api/planner/students/${studentId}/tasks/${task.id}/complete`, {
-          method: "POST",
-          body: JSON.stringify({ date }),
-        });
-      }
+      const res = (await apiRequest(
+        `/api/planner/tasks/${task.id}/toggle`,
+        { method: "PATCH", body: JSON.stringify({ date, studentId }) },
+      )) as { ok: boolean; isDone: boolean; reward?: string | null };
+      return res;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "upcoming"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "weekly-stars"] });
+      // Show success toast with earned stars
+      if (result.isDone && result.reward && REWARD_VALUES[result.reward] > 0) {
+        const count = REWARD_VALUES[result.reward];
+        const stars = Array.from({ length: count }, () => "⭐").join("");
+        toast({ title: `${stars} You earned ${count} star${count !== 1 ? "s" : ""}!` });
+      }
     },
     onError: () => toast({ title: "Couldn't update task — try again.", type: "error" }),
   });
@@ -359,6 +366,7 @@ function TaskCard({
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
       toast({ title: "Task removed" });
     },
     onError: () => toast({ title: "Couldn't remove task — try again.", type: "error" }),
@@ -381,7 +389,6 @@ function TaskCard({
           {isDone && <Check className="w-3 h-3 text-white stroke-[3]" />}
         </div>
       )}
-
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium text-gray-800 ${isDone ? "line-through text-gray-400" : ""}`}>{task.title}</p>
         <div className="flex flex-wrap items-center gap-2 mt-1.5">
@@ -389,20 +396,15 @@ function TaskCard({
             {meta.icon} {meta.label}
           </span>
           {task.time && (
-            <span className="flex items-center gap-1 text-xs text-gray-500">
-              <Clock className="w-3 h-3" /> {task.time}
-            </span>
+            <span className="flex items-center gap-1 text-xs text-gray-500"><Clock className="w-3 h-3" /> {task.time}</span>
           )}
           {task.repeat !== "once" && (
-            <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Repeat className="w-3 h-3" /> {REPEAT_LABELS[task.repeat]}
-            </span>
+            <span className="flex items-center gap-1 text-xs text-gray-400"><Repeat className="w-3 h-3" /> {REPEAT_LABELS[task.repeat]}</span>
           )}
           <StarBadge reward={task.reward} />
         </div>
         {task.note && <p className="text-xs text-gray-500 mt-1 italic">{task.note}</p>}
       </div>
-
       {canDelete && (
         <button
           onClick={() => deleteMutation.mutate()}
@@ -416,15 +418,9 @@ function TaskCard({
   );
 }
 
-// ─── Add Task Dialog ──────────────────────────────────────────────────────────
+// ─── Add Task Dialog ───────────────────────────────────────────────────────────
 function AddTaskDialog({
-  open,
-  onClose,
-  defaultDate,
-  defaultStudentId,
-  children,
-  isStudent,
-  userId,
+  open, onClose, defaultDate, defaultStudentId, children, isStudent, userId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -440,7 +436,7 @@ function AddTaskDialog({
   const [startDate, setStartDate] = useState(defaultDate);
   const [time, setTime] = useState("");
   const [note, setNote] = useState("");
-  const [reward, setReward] = useState("");
+  const [reward, setReward] = useState("none");
   const [repeat, setRepeat] = useState("once");
   const [selectedChildren, setSelectedChildren] = useState<number[]>(
     defaultStudentId ? [defaultStudentId] : [],
@@ -459,7 +455,7 @@ function AddTaskDialog({
               startDate,
               time: time || null,
               note: note || null,
-              reward: reward || null,
+              reward: reward === "none" ? null : reward,
               repeat,
             }),
           }),
@@ -471,13 +467,15 @@ function AddTaskDialog({
       targets.forEach((sid) => {
         queryClient.invalidateQueries({ queryKey: ["/api/planner/students", sid, "day"] });
         queryClient.invalidateQueries({ queryKey: ["/api/planner/students", sid, "month"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/planner/students", sid, "upcoming"] });
       });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
       toast({ title: "Task added!" });
       onClose();
       setTitle(""); setCategory(isStudent ? "school" : "chore"); setStartDate(defaultDate);
-      setTime(""); setNote(""); setReward(""); setRepeat("once");
+      setTime(""); setNote(""); setReward("none"); setRepeat("once");
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't add task — try again.", type: "error" }),
   });
@@ -496,7 +494,6 @@ function AddTaskDialog({
             Add Task
           </DialogTitle>
         </DialogHeader>
-
         <div className="space-y-4 py-2">
           <div>
             <Label htmlFor="task-title" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Task</Label>
@@ -579,9 +576,9 @@ function AddTaskDialog({
             <div>
               <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Reward (optional)</Label>
               <Select value={reward} onValueChange={setReward}>
-                <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="No reward" /></SelectTrigger>
+                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No reward</SelectItem>
+                  <SelectItem value="none">No reward</SelectItem>
                   <SelectItem value="1star">⭐ 1 Star</SelectItem>
                   <SelectItem value="2stars">⭐⭐ 2 Stars</SelectItem>
                   <SelectItem value="3stars">⭐⭐⭐ 3 Stars</SelectItem>
@@ -601,7 +598,6 @@ function AddTaskDialog({
             />
           </div>
         </div>
-
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}>
@@ -614,13 +610,9 @@ function AddTaskDialog({
   );
 }
 
-// ─── Task group (tasks for one day, one student) ──────────────────────────────
+// ─── Task group by category ────────────────────────────────────────────────────
 function DayTaskGroup({
-  tasks,
-  date,
-  studentId,
-  isStudent,
-  currentUserId,
+  tasks, date, studentId, isStudent, currentUserId,
 }: {
   tasks: PlannerTask[];
   date: string;
@@ -660,8 +652,7 @@ function DayTaskGroup({
                 isStudent={isStudent}
                 canDelete={isStudent
                   ? task.createdByUserId === currentUserId && (task.category === "school" || task.category === "reading")
-                  : true
-                }
+                  : true}
               />
             ))}
           </div>
@@ -671,11 +662,9 @@ function DayTaskGroup({
   );
 }
 
-// ─── Student day view ─────────────────────────────────────────────────────────
+// ─── Student day view ──────────────────────────────────────────────────────────
 function StudentDayView({
-  studentId,
-  date,
-  currentUserId,
+  studentId, date, currentUserId,
 }: {
   studentId: number;
   date: string;
@@ -693,9 +682,7 @@ function StudentDayView({
   const done = tasks.filter((t) => t.completions.some((c) => c.date === date)).length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  if (isLoading) {
-    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
-  }
+  if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
 
   return (
     <div>
@@ -710,7 +697,6 @@ function StudentDayView({
           </div>
         </div>
       )}
-
       {tasks.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center border border-dashed border-gray-200 rounded-xl">
           <CalendarDays className="w-10 h-10 text-gray-200" />
@@ -723,7 +709,6 @@ function StudentDayView({
       ) : (
         <DayTaskGroup tasks={tasks} date={date} studentId={studentId} isStudent={true} currentUserId={currentUserId} />
       )}
-
       <AddTaskDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
@@ -737,15 +722,12 @@ function StudentDayView({
   );
 }
 
-// ─── Parent family overview — all children at once ────────────────────────────
+// ─── Parent family overview — all children at once ─────────────────────────────
 function ParentFamilyView({
-  date,
-  currentUserId,
-  onAddTask,
+  date, currentUserId,
 }: {
   date: string;
   currentUserId: number;
-  onAddTask: () => void;
 }) {
   const { data, isLoading } = useQuery<{ children: ChildInfo[]; tasks: Record<number, PlannerTask[]> }>({
     queryKey: ["/api/planner/family/day", date],
@@ -755,9 +737,7 @@ function ParentFamilyView({
   const children = data?.children ?? [];
   const tasksByChild = data?.tasks ?? {};
 
-  if (isLoading) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
-  }
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
 
   if (children.length === 0) {
     return (
@@ -782,7 +762,6 @@ function ParentFamilyView({
 
         return (
           <div key={child.id}>
-            {/* Child header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
@@ -790,12 +769,8 @@ function ParentFamilyView({
                 </div>
                 <h3 className="font-semibold text-gray-800 text-sm">{child.name}</h3>
               </div>
-              {total > 0 && (
-                <span className="text-xs text-gray-400">{done}/{total} done</span>
-              )}
+              {total > 0 && <span className="text-xs text-gray-400">{done}/{total} done</span>}
             </div>
-
-            {/* Progress bar */}
             {total > 0 && (
               <div className="mb-3">
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -803,12 +778,10 @@ function ParentFamilyView({
                 </div>
               </div>
             )}
-
-            {tasks.length === 0 ? (
-              <p className="text-xs text-gray-400 italic py-2">No tasks for this day</p>
-            ) : (
-              <DayTaskGroup tasks={tasks} date={date} studentId={child.id} isStudent={false} currentUserId={currentUserId} />
-            )}
+            {tasks.length === 0
+              ? <p className="text-xs text-gray-400 italic py-2">No tasks for this day</p>
+              : <DayTaskGroup tasks={tasks} date={date} studentId={child.id} isStudent={false} currentUserId={currentUserId} />
+            }
           </div>
         );
       })}
@@ -816,7 +789,7 @@ function ParentFamilyView({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function PlannerPage() {
   const { user } = useAuth();
   const isParent = user?.role === "parent";
@@ -827,7 +800,6 @@ export default function PlannerPage() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
   const [addOpen, setAddOpen] = useState(false);
 
-  // When user selects a date: also sync calendar month view
   const handleSelectDate = (d: string) => {
     setSelectedDate(d);
     const dObj = new Date(d + "T00:00:00");
@@ -847,7 +819,7 @@ export default function PlannerPage() {
     enabled: isStudent,
   });
 
-  // Parent: fetch children list (to know who to show Add Task dialog for)
+  // Parent: fetch children list for AddTask dialog
   const { data: familyDayData } = useQuery<{ children: ChildInfo[]; tasks: Record<number, PlannerTask[]> }>({
     queryKey: ["/api/planner/family/day", selectedDate],
     queryFn: () => apiRequest(`/api/planner/family/day?date=${selectedDate}`),
@@ -855,7 +827,7 @@ export default function PlannerPage() {
   });
   const children = familyDayData?.children ?? [];
 
-  // Month summary — STUDENT: their own summary; PARENT: aggregate across all children
+  // Month summary — student uses their own; parent uses family-wide aggregate
   const { data: studentMonthSummary = {} } = useQuery<Record<string, { total: number; done: number }>>({
     queryKey: ["/api/planner/students", myStudent?.id, "month", calYear, calMonth],
     queryFn: () => apiRequest(`/api/planner/students/${myStudent!.id}/month?year=${calYear}&month=${calMonth}`),
@@ -871,7 +843,7 @@ export default function PlannerPage() {
     enabled: isParent,
   });
 
-  // Aggregate family month summary: for each date, total = union of any child's tasks
+  // Aggregate family month summary into a single calendar dot map
   const familyMonthSummary = useMemo<Record<string, { total: number; done: number }>>(() => {
     if (!familyMonthData) return {};
     const result: Record<string, { total: number; done: number }> = {};
@@ -886,7 +858,6 @@ export default function PlannerPage() {
   }, [familyMonthData]);
 
   const monthSummary = isParent ? familyMonthSummary : studentMonthSummary;
-
   const plannerStudentId = isStudent ? (myStudent?.id ?? null) : null;
 
   return (
@@ -914,7 +885,7 @@ export default function PlannerPage() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-5">
-          {/* Left: calendar + coming up + stars */}
+          {/* Left sidebar: calendar + stars + upcoming */}
           <div className="lg:w-[280px] shrink-0 space-y-4">
             <MiniCalendar
               selected={selectedDate}
@@ -936,67 +907,51 @@ export default function PlannerPage() {
                 Today
               </button>
               <button
-                onClick={() => {
-                  const d = new Date(selectedDate + "T00:00:00");
-                  d.setDate(d.getDate() - 1);
-                  handleSelectDate(toDateStr(d));
-                }}
+                onClick={() => { const d = new Date(selectedDate + "T00:00:00"); d.setDate(d.getDate() - 1); handleSelectDate(toDateStr(d)); }}
                 className="w-9 py-2 px-2.5 rounded-lg border bg-white border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
-                onClick={() => {
-                  const d = new Date(selectedDate + "T00:00:00");
-                  d.setDate(d.getDate() + 1);
-                  handleSelectDate(toDateStr(d));
-                }}
+                onClick={() => { const d = new Date(selectedDate + "T00:00:00"); d.setDate(d.getDate() + 1); handleSelectDate(toDateStr(d)); }}
                 className="w-9 py-2 px-2.5 rounded-lg border bg-white border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-center"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Stars this week — student only */}
-            {isStudent && plannerStudentId && (
-              <StarsThisWeekPanel studentId={plannerStudentId} />
-            )}
+            {/* Stars this week */}
+            {isStudent && plannerStudentId && <StudentStarsPanel studentId={plannerStudentId} />}
+            {isParent && <ParentStarsPanel />}
 
-            {/* Coming up panel */}
-            <UpcomingPanel monthSummary={monthSummary} selectedDate={selectedDate} onSelect={handleSelectDate} />
+            {/* Coming up (API-backed, cross-month safe) */}
+            <UpcomingPanel
+              isParent={isParent}
+              studentId={plannerStudentId ?? undefined}
+              selectedDate={selectedDate}
+              onSelect={handleSelectDate}
+            />
           </div>
 
-          {/* Right: tasks */}
+          {/* Right: task list */}
           <div className="flex-1 min-w-0">
-            {/* Date heading */}
             <div className="flex items-baseline gap-3 mb-5">
               <h2 className="text-xl font-bold text-gray-900">
                 {isToday(selectedDate) ? "Today" : formatDateDisplay(selectedDate)}
               </h2>
-              {!isToday(selectedDate) && (
-                <span className="text-sm text-gray-400">{formatDateShort(selectedDate)}</span>
-              )}
               {isToday(selectedDate) && (
                 <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Today</span>
               )}
             </div>
 
-            {/* Parent: family overview (all children shown at once) */}
+            {/* Parent: all children shown simultaneously */}
             {isParent && (
-              <ParentFamilyView
-                date={selectedDate}
-                currentUserId={user?.id ?? 0}
-                onAddTask={() => setAddOpen(true)}
-              />
+              <ParentFamilyView date={selectedDate} currentUserId={user?.id ?? 0} />
             )}
 
             {/* Student: own tasks */}
             {isStudent && myStudent && (
-              <StudentDayView
-                studentId={myStudent.id}
-                date={selectedDate}
-                currentUserId={user?.id ?? 0}
-              />
+              <StudentDayView studentId={myStudent.id} date={selectedDate} currentUserId={user?.id ?? 0} />
             )}
 
             {isStudent && !myStudent && (

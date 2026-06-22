@@ -378,6 +378,9 @@ export interface IStorage {
   uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
   getPlannerTaskById(taskId: number): Promise<any | null>;
   getPlannerWeeklyStars(studentId: number, weekStart: string, weekEnd: string): Promise<{ total: number; earnedByDate: Record<string, number> }>;
+  getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string): Promise<{ date: string; total: number; done: number }[]>;
+  getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string): Promise<{ date: string; childCount: number; total: number; done: number }[]>;
+  getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string): Promise<Record<number, number>>;
 }
 
 class PrismaStorage implements IStorage {
@@ -2980,6 +2983,65 @@ class PrismaStorage implements IStorage {
     }
 
     return { total, earnedByDate };
+  }
+
+  async getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string): Promise<{ date: string; total: number; done: number }[]> {
+    const tasks = await this.getPlannerTasksForDateRange(studentId, fromDate, toDate);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const result: { date: string; total: number; done: number }[] = [];
+
+    let cur = new Date(fromDate + "T00:00:00");
+    const end = new Date(toDate + "T00:00:00");
+    while (cur <= end) {
+      const date = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+      const dow = cur.getDay();
+      let total = 0, done = 0;
+      for (const task of tasks) {
+        if (task.startDate > date) continue;
+        let active = false;
+        if (task.repeat === "once") active = task.startDate === date;
+        else if (task.repeat === "daily") active = true;
+        else if (task.repeat === "weekdays") active = dow >= 1 && dow <= 5;
+        else if (task.repeat === "weekly") active = new Date(task.startDate + "T00:00:00").getDay() === dow;
+        if (active) {
+          total++;
+          if (task.completions.some((c: any) => c.date === date)) done++;
+        }
+      }
+      if (total > 0) result.push({ date, total, done });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return result;
+  }
+
+  async getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string): Promise<{ date: string; childCount: number; total: number; done: number }[]> {
+    const perChild = await Promise.all(childIds.map((id) => this.getPlannerDateRangeSummary(id, fromDate, toDate)));
+    const merged: Record<string, { total: number; done: number; childCount: number }> = {};
+    for (const childRows of perChild) {
+      for (const row of childRows) {
+        if (!merged[row.date]) merged[row.date] = { total: 0, done: 0, childCount: 0 };
+        merged[row.date].total += row.total;
+        merged[row.date].done += row.done;
+        merged[row.date].childCount += 1;
+      }
+    }
+    return Object.entries(merged)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+  }
+
+  async getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string): Promise<Record<number, number>> {
+    const completions = await prisma.plannerTaskCompletion.findMany({
+      where: { studentId: { in: childIds }, date: { gte: weekStart, lte: weekEnd } },
+      include: { task: { select: { reward: true } } },
+    });
+    const result: Record<number, number> = {};
+    for (const c of completions) {
+      const reward = c.task?.reward;
+      const stars = reward === "3stars" ? 3 : reward === "2stars" ? 2 : reward === "1star" ? 1 : 0;
+      if (stars > 0) result[c.studentId] = (result[c.studentId] ?? 0) + stars;
+    }
+    return result;
   }
 }
 
