@@ -2955,6 +2955,7 @@ class PrismaStorage implements IStorage {
       for (const task of tasks) {
         let active = false;
         if (task.startDate > date) continue;
+        if (task.endDate && date > task.endDate) continue;
         if (task.repeat === "once") active = task.startDate === date;
         else if (task.repeat === "daily") active = true;
         else if (task.repeat === "weekdays") active = dayOfWeek >= 1 && dayOfWeek <= 5;
@@ -3027,6 +3028,7 @@ class PrismaStorage implements IStorage {
       let total = 0, done = 0;
       for (const task of tasks) {
         if (task.startDate > date) continue;
+        if (task.endDate && date > task.endDate) continue;
         let active = false;
         if (task.repeat === "once") active = task.startDate === date;
         else if (task.repeat === "daily") active = true;

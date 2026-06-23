@@ -374,7 +374,9 @@ function TaskCard({
   parentChildren: ChildInfo[];
 }) {
   const queryClient = useQueryClient();
-  const isDone = task.completions.some((c) => c.date === date);
+  const serverDone = task.completions.some((c) => c.date === date);
+  const [optimisticDone, setOptimisticDone] = useState<boolean | null>(null);
+  const isDone = optimisticDone ?? serverDone;
   const meta = CATEGORY_META[task.category] ?? CATEGORY_META.chore;
   const [editOpen, setEditOpen] = useState(false);
 
@@ -386,11 +388,23 @@ function TaskCard({
       )) as { ok: boolean; isDone: boolean; reward?: string | null };
       return res;
     },
+    onMutate: () => {
+      setOptimisticDone(!serverDone);
+    },
     onSuccess: (result) => {
+      setOptimisticDone(null);
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "upcoming"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "weekly-stars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/stars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/stars"] });
       // Show success toast with earned stars
       if (result.isDone && result.reward && REWARD_VALUES[result.reward] > 0) {
         const count = REWARD_VALUES[result.reward];
@@ -398,7 +412,10 @@ function TaskCard({
         toast({ title: `${stars} You earned ${count} star${count !== 1 ? "s" : ""}!` });
       }
     },
-    onError: () => toast({ title: "Couldn't update task — try again.", type: "error" }),
+    onError: () => {
+      setOptimisticDone(null);
+      toast({ title: "Couldn't update task — try again.", type: "error" });
+    },
   });
 
   const deleteMutation = useMutation({
