@@ -772,7 +772,11 @@ function EditTaskDialog({
             <div>
               <p className="text-xs text-gray-400 mb-1">Assigned to</p>
               <Select value={assignedStudentId} onValueChange={setAssignedStudentId}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm">
+                  <span className="text-sm">
+                    {parentChildren.find((c) => String(c.id) === assignedStudentId)?.name ?? "Select child"}
+                  </span>
+                </SelectTrigger>
                 <SelectContent>
                   {parentChildren.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
