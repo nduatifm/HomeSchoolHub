@@ -10265,9 +10265,8 @@ export function registerRoutes(app: Express) {
       const task = await storage.getPlannerTaskById(taskId);
       if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
 
-      // Check current state — filter by studentId to avoid orphan completions from
-      // other students on the same task causing the toggle to permanently return isDone:false
-      const isDone = task.completions.some((c: any) => c.date === date && c.studentId === studentId);
+      // Query the DB directly so orphan completions (wrong studentId) never interfere
+      const isDone = await storage.isPlannerTaskDone(taskId, studentId, date);
       if (isDone) {
         await storage.uncompletePlannerTask(taskId, studentId, date);
         res.json({ ok: true, isDone: false });

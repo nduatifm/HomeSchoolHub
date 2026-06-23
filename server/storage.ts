@@ -384,6 +384,7 @@ export interface IStorage {
   getPlannerTasksForDateRange(studentId: number, startDate: string, endDate: string): Promise<any[]>;
   getPlannerMonthSummary(studentId: number, year: number, month: number): Promise<Record<string, { total: number; done: number }>>;
   deletePlannerTask(taskId: number): Promise<void>;
+  isPlannerTaskDone(taskId: number, studentId: number, date: string): Promise<boolean>;
   completePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
   uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
   getPlannerTaskById(taskId: number): Promise<any | null>;
@@ -2982,11 +2983,17 @@ class PrismaStorage implements IStorage {
     await prisma.plannerTask.delete({ where: { id: taskId } });
   }
 
+  async isPlannerTaskDone(taskId: number, studentId: number, date: string): Promise<boolean> {
+    const count = await prisma.plannerTaskCompletion.count({
+      where: { taskId, studentId, date },
+    });
+    return count > 0;
+  }
+
   async completePlannerTask(taskId: number, studentId: number, date: string): Promise<void> {
-    await prisma.plannerTaskCompletion.upsert({
-      where: { taskId_date_studentId: { taskId, date, studentId } },
-      update: {},
-      create: { taskId, studentId, date },
+    await prisma.plannerTaskCompletion.createMany({
+      data: [{ taskId, studentId, date }],
+      skipDuplicates: true,
     });
   }
 
