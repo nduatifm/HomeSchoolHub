@@ -190,9 +190,10 @@ function MiniCalendar({
 
 // ─── Upcoming panel (API-backed, cross-month safe) ────────────────────────────
 function UpcomingPanel({
-  isParent, studentId, selectedDate, onSelect,
+  isParent, isTeacher, studentId, selectedDate, onSelect,
 }: {
   isParent: boolean;
+  isTeacher?: boolean;
   studentId?: number;
   selectedDate: string;
   onSelect: (d: string) => void;
@@ -200,18 +201,26 @@ function UpcomingPanel({
   const { data: studentUpcoming = [] } = useQuery<{ date: string; total: number; done: number }[]>({
     queryKey: ["/api/planner/students", studentId, "upcoming", TODAY],
     queryFn: () => apiRequest(`/api/planner/students/${studentId}/upcoming?fromDate=${TODAY}&days=7`),
-    enabled: !isParent && !!studentId,
+    enabled: !isParent && !isTeacher && !!studentId,
   });
 
-  const { data: familyUpcomingData } = useQuery<{ children: ChildInfo[]; upcoming: { date: string; childCount: number; total: number; done: number }[] }>({
+  const { data: familyUpcomingData } = useQuery<{ upcoming: { date: string; childCount: number; total: number; done: number }[] }>({
     queryKey: ["/api/planner/family/upcoming", TODAY],
     queryFn: () => apiRequest(`/api/planner/family/upcoming?fromDate=${TODAY}&days=7`),
     enabled: isParent,
   });
 
+  const { data: classUpcomingData } = useQuery<{ upcoming: { date: string; childCount: number; total: number; done: number }[] }>({
+    queryKey: ["/api/planner/class/upcoming", TODAY],
+    queryFn: () => apiRequest(`/api/planner/class/upcoming?fromDate=${TODAY}&days=7`),
+    enabled: !!isTeacher,
+  });
+
   const rows = isParent
     ? (familyUpcomingData?.upcoming ?? [])
-    : studentUpcoming;
+    : isTeacher
+      ? (classUpcomingData?.upcoming ?? [])
+      : studentUpcoming;
 
   if (rows.length === 0) return null;
 
@@ -317,6 +326,41 @@ function ParentStarsPanel() {
   );
 }
 
+// ─── Teacher Stars this week (per student) ────────────────────────────────────
+function TeacherStarsPanel() {
+  const { data } = useQuery<{ students: ChildInfo[]; stars: Record<number, number>; weekStart: string }>({
+    queryKey: ["/api/planner/class/stars", WEEK_START],
+    queryFn: () => apiRequest(`/api/planner/class/stars?weekStart=${WEEK_START}`),
+  });
+
+  const students = data?.students ?? [];
+  const stars = data?.stars ?? {};
+  const studentsWithStars = students.filter((s) => (stars[s.id] ?? 0) > 0);
+  if (studentsWithStars.length === 0) return null;
+
+  return (
+    <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 shadow-sm">
+      <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">⭐ Stars this week</p>
+      <div className="space-y-1.5">
+        {studentsWithStars.map((s) => {
+          const count = stars[s.id] ?? 0;
+          return (
+            <div key={s.id} className="flex items-center justify-between">
+              <span className="text-xs font-medium text-amber-800">{s.name}</span>
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: Math.min(count, 5) }).map((_, i) => (
+                  <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                ))}
+                {count > 5 && <span className="text-[10px] font-bold text-amber-600 ml-0.5">+{count - 5}</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Task Card ─────────────────────────────────────────────────────────────────
 function TaskCard({
   task, date, studentId, canDelete, canEdit, isStudent, parentChildren,
@@ -367,6 +411,9 @@ function TaskCard({
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/upcoming"] });
       toast({ title: "Task removed" });
     },
     onError: () => toast({ title: "Couldn't remove task — try again.", type: "error" }),
@@ -510,6 +557,9 @@ function AddTaskDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/class/upcoming"] });
       toast({ title: "Task added!" });
       onClose(); // useEffect will reset form on next open
     },
@@ -1001,11 +1051,76 @@ function ParentFamilyView({
   );
 }
 
+// ─── Teacher class overview — all assigned students at once ───────────────────
+function TeacherClassView({
+  date, currentUserId,
+}: {
+  date: string;
+  currentUserId: number;
+}) {
+  const { data, isLoading } = useQuery<{ students: ChildInfo[]; tasks: Record<number, PlannerTask[]> }>({
+    queryKey: ["/api/planner/class/day", date],
+    queryFn: () => apiRequest(`/api/planner/class/day?date=${date}`),
+  });
+
+  const students = data?.students ?? [];
+  const tasksByStudent = data?.tasks ?? {};
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-300" /></div>;
+
+  if (students.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-20 text-center">
+        <Users className="w-12 h-12 text-gray-200" />
+        <p className="text-sm font-medium text-gray-500">No students assigned yet</p>
+        <p className="text-xs text-gray-400">Students will appear here once they join your class.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {students.map((student) => {
+        const tasks: PlannerTask[] = tasksByStudent[student.id] ?? [];
+        const total = tasks.length;
+        const done = tasks.filter((t) => t.completions.some((c) => c.date === date)).length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        return (
+          <div key={student.id}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
+                  {student.name.charAt(0).toUpperCase()}
+                </div>
+                <h3 className="font-semibold text-gray-800 text-sm">{student.name}</h3>
+              </div>
+              {total > 0 && <span className="text-xs text-gray-400">{done}/{total} done</span>}
+            </div>
+            {total > 0 && (
+              <div className="mb-3">
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )}
+            {tasks.length === 0
+              ? <p className="text-xs text-gray-400 italic py-2">No tasks for this day</p>
+              : <DayTaskGroup tasks={tasks} date={date} studentId={student.id} isStudent={false} currentUserId={currentUserId} parentChildren={students} />
+            }
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function PlannerPage() {
   const { user } = useAuth();
   const isParent = user?.role === "parent";
   const isStudent = user?.role === "student";
+  const isTeacher = user?.role === "teacher";
 
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
@@ -1039,7 +1154,15 @@ export default function PlannerPage() {
   });
   const children = familyDayData?.children ?? [];
 
-  // Month summary — student uses their own; parent uses family-wide aggregate
+  // Teacher: fetch assigned students for AddTask dialog
+  const { data: classDayData } = useQuery<{ students: ChildInfo[]; tasks: Record<number, PlannerTask[]> }>({
+    queryKey: ["/api/planner/class/day", selectedDate],
+    queryFn: () => apiRequest(`/api/planner/class/day?date=${selectedDate}`),
+    enabled: isTeacher,
+  });
+  const teacherStudents = classDayData?.students ?? [];
+
+  // Month summary — student, parent (family-wide aggregate), or teacher (class-wide)
   const { data: studentMonthSummary = {} } = useQuery<Record<string, { total: number; done: number }>>({
     queryKey: ["/api/planner/students", myStudent?.id, "month", calYear, calMonth],
     queryFn: () => apiRequest(`/api/planner/students/${myStudent!.id}/month?year=${calYear}&month=${calMonth}`),
@@ -1055,7 +1178,16 @@ export default function PlannerPage() {
     enabled: isParent,
   });
 
-  // Aggregate family month summary into a single calendar dot map
+  const { data: classMonthData } = useQuery<{
+    students: ChildInfo[];
+    summaries: Record<number, Record<string, { total: number; done: number }>>;
+  }>({
+    queryKey: ["/api/planner/class/month", calYear, calMonth],
+    queryFn: () => apiRequest(`/api/planner/class/month?year=${calYear}&month=${calMonth}`),
+    enabled: isTeacher,
+  });
+
+  // Aggregate month summaries into a single calendar dot map
   const familyMonthSummary = useMemo<Record<string, { total: number; done: number }>>(() => {
     if (!familyMonthData) return {};
     const result: Record<string, { total: number; done: number }> = {};
@@ -1069,8 +1201,24 @@ export default function PlannerPage() {
     return result;
   }, [familyMonthData]);
 
-  const monthSummary = isParent ? familyMonthSummary : studentMonthSummary;
+  const classMonthSummary = useMemo<Record<string, { total: number; done: number }>>(() => {
+    if (!classMonthData) return {};
+    const result: Record<string, { total: number; done: number }> = {};
+    for (const studentSummary of Object.values(classMonthData.summaries)) {
+      for (const [date, s] of Object.entries(studentSummary)) {
+        if (!result[date]) result[date] = { total: 0, done: 0 };
+        result[date].total += s.total;
+        result[date].done += s.done;
+      }
+    }
+    return result;
+  }, [classMonthData]);
+
+  const monthSummary = isParent ? familyMonthSummary : isTeacher ? classMonthSummary : studentMonthSummary;
   const plannerStudentId = isStudent ? (myStudent?.id ?? null) : null;
+
+  // Whether Add Task button should appear
+  const canAddTask = isParent ? children.length > 0 : isTeacher ? teacherStudents.length > 0 : !!plannerStudentId;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1085,12 +1233,11 @@ export default function PlannerPage() {
             <div>
               <h1 className="text-xl font-bold text-gray-900 leading-tight">My Planner</h1>
               <p className="text-xs text-gray-500 leading-none mt-0.5">
-                {isParent ? "Manage daily tasks for your family" : "Your daily tasks & reminders"}
+                {isParent ? "Manage daily tasks for your family" : isTeacher ? "Manage tasks for your students" : "Your daily tasks & reminders"}
               </p>
             </div>
           </div>
-          {/* Only show Add Task when the dialog would actually work */}
-          {(isParent ? children.length > 0 : !!plannerStudentId) && (
+          {canAddTask && (
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4 mr-1.5" /> Add Task
             </Button>
@@ -1136,10 +1283,12 @@ export default function PlannerPage() {
             {/* Stars this week */}
             {isStudent && plannerStudentId && <StudentStarsPanel studentId={plannerStudentId} />}
             {isParent && <ParentStarsPanel />}
+            {isTeacher && <TeacherStarsPanel />}
 
             {/* Coming up (API-backed, cross-month safe) */}
             <UpcomingPanel
               isParent={isParent}
+              isTeacher={isTeacher}
               studentId={plannerStudentId ?? undefined}
               selectedDate={selectedDate}
               onSelect={handleSelectDate}
@@ -1162,6 +1311,11 @@ export default function PlannerPage() {
               <ParentFamilyView date={selectedDate} currentUserId={user?.id ?? 0} />
             )}
 
+            {/* Teacher: all assigned students shown simultaneously */}
+            {isTeacher && (
+              <TeacherClassView date={selectedDate} currentUserId={user?.id ?? 0} />
+            )}
+
             {/* Student: own tasks */}
             {isStudent && myStudent && (
               <StudentDayView studentId={myStudent.id} date={selectedDate} currentUserId={user?.id ?? 0} />
@@ -1177,13 +1331,21 @@ export default function PlannerPage() {
       </div>
 
       {/* Global Add Task dialog — only mounted when it has valid targets */}
-      {(isParent ? children.length > 0 : !!plannerStudentId) && (
+      {canAddTask && (
         <AddTaskDialog
           open={addOpen}
           onClose={() => setAddOpen(false)}
           defaultDate={selectedDate}
-          defaultStudentId={isParent ? (children[0]?.id ?? 0) : (plannerStudentId ?? 0)}
-          children={isParent ? children : [{ id: plannerStudentId ?? 0, name: myStudent?.name ?? "" }]}
+          defaultStudentId={
+            isParent ? (children[0]?.id ?? 0)
+            : isTeacher ? (teacherStudents[0]?.id ?? 0)
+            : (plannerStudentId ?? 0)
+          }
+          children={
+            isParent ? children
+            : isTeacher ? teacherStudents
+            : [{ id: plannerStudentId ?? 0, name: myStudent?.name ?? "" }]
+          }
           isStudent={isStudent}
         />
       )}

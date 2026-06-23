@@ -9947,6 +9947,17 @@ export function registerRoutes(app: Express) {
     return true;
   }
 
+  // Helper: assert caller is a teacher with this student assigned
+  async function assertPlannerTeacherAccess(callerId: number, studentId: number, res: Response): Promise<boolean> {
+    const students = await storage.getStudentsByTeacher(callerId);
+    const ok = students.some((s) => s.id === studentId);
+    if (!ok) {
+      res.status(403).json({ error: "Not authorized to manage this student's planner" });
+      return false;
+    }
+    return true;
+  }
+
   // GET /api/planner/students/:studentId/day?date=YYYY-MM-DD
   app.get("/api/planner/students/:studentId/day", requireAuth, async (req, res) => {
     try {
@@ -9959,6 +9970,8 @@ export function registerRoutes(app: Express) {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "parent") {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
       } else {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -9983,6 +9996,8 @@ export function registerRoutes(app: Express) {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "parent") {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
       } else {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -10017,6 +10032,8 @@ export function registerRoutes(app: Express) {
 
       if (user.role === "parent") {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "student") {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
         // Students can only create school/reading tasks
@@ -10044,15 +10061,20 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/planner/students/:studentId/tasks/:taskId — parent edits a task
+  // PATCH /api/planner/students/:studentId/tasks/:taskId — parent or teacher edits a task
   app.patch("/api/planner/students/:studentId/tasks/:taskId", requireAuth, async (req, res) => {
     try {
       const studentId = parseInt(req.params.studentId, 10);
       const taskId = parseInt(req.params.taskId, 10);
       const user = await storage.getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
-      if (user.role !== "parent") return res.status(403).json({ error: "Only parents can edit tasks" });
-      if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      if (user.role !== "parent" && user.role !== "teacher") return res.status(403).json({ error: "Only parents or teachers can edit tasks" });
+
+      if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      }
 
       const task = await storage.getPlannerTaskById(taskId);
       if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
@@ -10070,9 +10092,13 @@ export function registerRoutes(app: Express) {
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
 
-      // If reassigning to a different child, verify parent owns that child too
+      // If reassigning to a different student, verify caller has access to the new student too
       if (parsed.data.newStudentId && parsed.data.newStudentId !== studentId) {
-        if (!(await assertPlannerParentAccess(req.session.userId!, parsed.data.newStudentId, res))) return;
+        if (user.role === "parent") {
+          if (!(await assertPlannerParentAccess(req.session.userId!, parsed.data.newStudentId, res))) return;
+        } else {
+          if (!(await assertPlannerTeacherAccess(req.session.userId!, parsed.data.newStudentId, res))) return;
+        }
       }
 
       const updated = await storage.updatePlannerTask(taskId, {
@@ -10104,6 +10130,8 @@ export function registerRoutes(app: Express) {
 
       if (user.role === "parent") {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "student") {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
         // Students can only delete their own school/reading tasks
@@ -10186,6 +10214,8 @@ export function registerRoutes(app: Express) {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "parent") {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
       } else {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -10217,7 +10247,7 @@ export function registerRoutes(app: Express) {
     try {
       const taskId = parseInt(req.params.taskId, 10);
       const user = await storage.getUserById(req.session.userId!);
-      if (!user || (user.role !== "student" && user.role !== "parent")) return res.status(403).json({ error: "Student or parent access only" });
+      if (!user || !["student", "parent", "teacher"].includes(user.role)) return res.status(403).json({ error: "Access denied" });
 
       const schema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), studentId: z.number().int() });
       const parsed = schema.safeParse(req.body);
@@ -10226,6 +10256,8 @@ export function registerRoutes(app: Express) {
       const { date, studentId } = parsed.data;
       if (user.role === "student") {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
       } else {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
       }
@@ -10258,6 +10290,8 @@ export function registerRoutes(app: Express) {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "parent") {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
       } else {
         return res.status(403).json({ error: "Forbidden" });
       }
@@ -10363,6 +10397,101 @@ export function registerRoutes(app: Express) {
       );
 
       res.json({ children: children.map((c) => ({ id: c.id, name: c.name })), summaries: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Teacher "class" planner routes (mirrors family/* for parents) ─────────────
+
+  // GET /api/planner/class/day?date= — teacher: get tasks for all their students on a date
+  app.get("/api/planner/class/day", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      const date = (req.query.date as string) || localDateStr();
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+
+      const result: Record<number, any[]> = {};
+      await Promise.all(
+        students.map(async (s) => {
+          result[s.id] = await storage.getPlannerTasksForDate(s.id, date);
+        }),
+      );
+
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), tasks: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/class/month?year=&month= — teacher: month summary for all their students
+  app.get("/api/planner/class/month", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      const year = parseInt(req.query.year as string, 10) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string, 10) || new Date().getMonth() + 1;
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+
+      const result: Record<number, Record<string, { total: number; done: number }>> = {};
+      await Promise.all(
+        students.map(async (s) => {
+          result[s.id] = await storage.getPlannerMonthSummary(s.id, year, month);
+        }),
+      );
+
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), summaries: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/class/upcoming?fromDate=&days= — teacher: upcoming tasks for all students
+  app.get("/api/planner/class/upcoming", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      const fromDate = (req.query.fromDate as string) || localDateStr();
+      const days = Math.min(parseInt(req.query.days as string, 10) || 7, 14);
+      const endD = new Date(fromDate + "T00:00:00");
+      endD.setDate(endD.getDate() + days - 1);
+      const toDate = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+      const studentIds = students.map((s) => s.id);
+      const rows = await storage.getPlannerFamilyDateRangeSummary(studentIds, fromDate, toDate);
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), upcoming: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/class/stars?weekStart= — teacher: weekly stars for all students
+  app.get("/api/planner/class/stars", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      let weekStart = req.query.weekStart as string;
+      if (!weekStart) {
+        const now = new Date();
+        const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
+        const mon = new Date(now);
+        mon.setDate(now.getDate() + diff);
+        weekStart = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, "0")}-${String(mon.getDate()).padStart(2, "0")}`;
+      }
+      const endD = new Date(weekStart + "T00:00:00");
+      endD.setDate(endD.getDate() + 6);
+      const weekEnd = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+      const studentIds = students.map((s) => s.id);
+      const starsByStudent = await storage.getPlannerFamilyStars(studentIds, weekStart, weekEnd);
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), stars: starsByStudent, weekStart, weekEnd });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
