@@ -10005,7 +10005,7 @@ export function registerRoutes(app: Express) {
         title: z.string().min(1).max(200),
         category: z.enum(["chore", "school", "reading", "activity"]),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        time: z.string().nullable().optional(),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
         note: z.string().max(500).nullable().optional(),
         reward: z.string().nullable().optional(),
         repeat: z.enum(["once", "daily", "weekdays", "weekly"]).default("once"),
@@ -10013,7 +10013,7 @@ export function registerRoutes(app: Express) {
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
 
-      const { title, category, startDate, time, note, reward, repeat } = parsed.data;
+      const { title, category, startDate, endDate, note, reward, repeat } = parsed.data;
 
       if (user.role === "parent") {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
@@ -10033,7 +10033,7 @@ export function registerRoutes(app: Express) {
         title,
         category,
         startDate,
-        time: time ?? null,
+        endDate: endDate ?? null,
         note: note ?? null,
         reward: reward ?? null,
         repeat,

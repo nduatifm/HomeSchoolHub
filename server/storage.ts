@@ -365,7 +365,7 @@ export interface IStorage {
     title: string;
     category: string;
     startDate: string;
-    time?: string | null;
+    endDate?: string | null;
     note?: string | null;
     reward?: string | null;
     repeat: string;
@@ -2841,7 +2841,7 @@ class PrismaStorage implements IStorage {
     title: string;
     category: string;
     startDate: string;
-    time?: string | null;
+    endDate?: string | null;
     note?: string | null;
     reward?: string | null;
     repeat: string;
@@ -2879,6 +2879,8 @@ class PrismaStorage implements IStorage {
     const dayOfWeek = d.getDay(); // 0=Sun … 6=Sat
 
     return tasks.filter((t) => {
+      // Stop recurring tasks after their endDate (if set)
+      if (t.endDate && date > t.endDate) return false;
       if (t.repeat === "once") return t.startDate === date;
       if (t.repeat === "daily") return true;
       if (t.repeat === "weekdays") return dayOfWeek >= 1 && dayOfWeek <= 5;

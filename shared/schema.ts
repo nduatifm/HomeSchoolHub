@@ -668,7 +668,7 @@ export const plannerTaskSchema = z.object({
   title: z.string(),
   category: z.enum(plannerCategories).default("chore"),
   startDate: z.string(),
-  time: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
   reward: z.string().nullable().optional(),
   repeat: z.enum(plannerRepeats).default("once"),

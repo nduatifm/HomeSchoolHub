@@ -707,6 +707,7 @@ model PlannerTask {
   category        String   @default("chore")
   startDate       String
   time            String?
+  endDate         String?
   note            String?
   reward          String?
   repeat          String   @default("once")

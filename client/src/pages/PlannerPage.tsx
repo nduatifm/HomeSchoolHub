@@ -29,7 +29,6 @@ import {
   Plus,
   Trash2,
   Check,
-  Clock,
   Repeat,
   Star,
   BookOpen,
@@ -392,8 +391,11 @@ function TaskCard({
           <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide border rounded-full px-2 py-0.5 ${meta.bg} ${meta.color}`}>
             {meta.icon} {meta.label}
           </span>
-          {task.time && (
-            <span className="flex items-center gap-1 text-xs text-gray-500"><Clock className="w-3 h-3" /> {task.time}</span>
+          {task.endDate && (
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <CalendarDays className="w-3 h-3" />
+              ends {new Date(task.endDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
           )}
           {task.repeat !== "once" && (
             <span className="flex items-center gap-1 text-xs text-gray-400"><Repeat className="w-3 h-3" /> {REPEAT_LABELS[task.repeat]}</span>
@@ -430,7 +432,7 @@ function AddTaskDialog({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<string>(isStudent ? "school" : "chore");
   const [startDate, setStartDate] = useState(defaultDate);
-  const [time, setTime] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [note, setNote] = useState("");
   const [reward, setReward] = useState("none");
   const [repeat, setRepeat] = useState("once");
@@ -444,7 +446,7 @@ function AddTaskDialog({
       setTitle("");
       setCategory(isStudent ? "school" : "chore");
       setStartDate(defaultDate);
-      setTime("");
+      setEndDate("");
       setNote("");
       setReward("none");
       setRepeat("once");
@@ -463,7 +465,7 @@ function AddTaskDialog({
               title: title.trim(),
               category,
               startDate,
-              time: time || null,
+              endDate: endDate || null,
               note: note || null,
               reward: reward === "none" ? null : reward,
               repeat,
@@ -495,59 +497,54 @@ function AddTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-primary" />
-            Add Task
-          </DialogTitle>
+          <DialogTitle>Add Task</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div>
-            <Label htmlFor="task-title" className="text-xs font-semibold uppercase tracking-wide text-gray-500">Task</Label>
-            <Input
-              id="task-title"
-              className="mt-1"
-              placeholder="e.g. Clean your room"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && canSubmit && createMutation.mutate()}
-              autoFocus
-            />
-          </div>
 
+        <div className="space-y-3 py-1">
+          {/* Title */}
+          <Input
+            placeholder="What needs to be done?"
+            className="text-sm"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && canSubmit && createMutation.mutate()}
+            autoFocus
+          />
+
+          {/* For — child chips (parent with multiple children only) */}
           {!isStudent && children.length > 1 && (
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">For</Label>
-              <div className="mt-1.5 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-xs text-gray-400 self-center mr-1">For:</span>
+              <button
+                type="button"
+                onClick={() => setSelectedChildren(children.map((c) => c.id))}
+                className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                All
+              </button>
+              {children.map((c) => (
                 <button
+                  key={c.id}
                   type="button"
-                  onClick={() => setSelectedChildren(children.map((c) => c.id))}
-                  className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                  onClick={() => toggleChild(c.id)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    selectedChildren.includes(c.id) ? "bg-primary text-white border-primary" : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  }`}
                 >
-                  All children
+                  {c.name}
                 </button>
-                {children.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => toggleChild(c.id)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                      selectedChildren.includes(c.id) ? "bg-primary text-white border-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    {c.name}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Category + Repeat */}
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Category</Label>
+              <p className="text-xs text-gray-400 mb-1">Category</p>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(isStudent ? ["school", "reading"] : ["chore", "school", "reading", "activity"]).map((c) => (
                     <SelectItem key={c} value={c}>{CATEGORY_META[c].label}</SelectItem>
@@ -556,20 +553,9 @@ function AddTaskDialog({
               </Select>
             </div>
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Start date</Label>
-              <Input type="date" className="mt-1 h-9" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Time (optional)</Label>
-              <Input type="time" className="mt-1 h-9" value={time} onChange={(e) => setTime(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Repeat</Label>
+              <p className="text-xs text-gray-400 mb-1">Repeat</p>
               <Select value={repeat} onValueChange={setRepeat}>
-                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="once">Once</SelectItem>
                   <SelectItem value="daily">Every day</SelectItem>
@@ -580,11 +566,24 @@ function AddTaskDialog({
             </div>
           </div>
 
+          {/* Start date + End date */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Start date</p>
+              <Input type="date" className="h-9 text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">End date <span className="text-gray-300">(optional)</span></p>
+              <Input type="date" className="h-9 text-sm" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Reward — parent only */}
           {!isStudent && (
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Reward (optional)</Label>
+              <p className="text-xs text-gray-400 mb-1">Reward</p>
               <Select value={reward} onValueChange={setReward}>
-                <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No reward</SelectItem>
                   <SelectItem value="1star">⭐ 1 Star</SelectItem>
@@ -595,21 +594,20 @@ function AddTaskDialog({
             </div>
           )}
 
-          <div>
-            <Label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Note (optional)</Label>
-            <Textarea
-              className="mt-1 text-sm resize-none"
-              placeholder="Any extra details…"
-              rows={2}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
+          {/* Note */}
+          <Textarea
+            className="text-sm resize-none"
+            placeholder="Add a note… (optional)"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}>
-            {createMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+
+        <DialogFooter className="mt-1">
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}>
+            {createMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
             Add Task
           </Button>
         </DialogFooter>
