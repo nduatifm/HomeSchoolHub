@@ -378,6 +378,7 @@ export interface IStorage {
     note?: string | null;
     reward?: string | null;
     repeat: string;
+    studentId?: number;
   }): Promise<any>;
   getPlannerTasksForDate(studentId: number, date: string): Promise<any[]>;
   getPlannerTasksForDateRange(studentId: number, startDate: string, endDate: string): Promise<any[]>;
@@ -2869,6 +2870,7 @@ class PrismaStorage implements IStorage {
     note?: string | null;
     reward?: string | null;
     repeat: string;
+    studentId?: number;
   }): Promise<any> {
     return prisma.plannerTask.update({
       where: { id: taskId },

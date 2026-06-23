@@ -10065,15 +10065,25 @@ export function registerRoutes(app: Express) {
         note: z.string().max(500).nullable().optional(),
         reward: z.string().nullable().optional(),
         repeat: z.enum(["once", "daily", "weekdays", "weekly"]),
+        newStudentId: z.number().int().optional(),
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
 
+      // If reassigning to a different child, verify parent owns that child too
+      if (parsed.data.newStudentId && parsed.data.newStudentId !== studentId) {
+        if (!(await assertPlannerParentAccess(req.session.userId!, parsed.data.newStudentId, res))) return;
+      }
+
       const updated = await storage.updatePlannerTask(taskId, {
-        ...parsed.data,
+        title: parsed.data.title,
+        category: parsed.data.category,
+        startDate: parsed.data.startDate,
         endDate: parsed.data.endDate ?? null,
         note: parsed.data.note ?? null,
         reward: parsed.data.reward ?? null,
+        repeat: parsed.data.repeat,
+        studentId: parsed.data.newStudentId,
       });
       res.json(updated);
     } catch (err: any) {
@@ -10202,19 +10212,23 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/planner/tasks/:taskId/toggle — toggle complete/uncomplete for a date
+  // PATCH /api/planner/tasks/:taskId/toggle — toggle complete/uncomplete for a date (student or parent)
   app.patch("/api/planner/tasks/:taskId/toggle", requireAuth, async (req, res) => {
     try {
       const taskId = parseInt(req.params.taskId, 10);
       const user = await storage.getUserById(req.session.userId!);
-      if (!user || user.role !== "student") return res.status(403).json({ error: "Student access only" });
+      if (!user || (user.role !== "student" && user.role !== "parent")) return res.status(403).json({ error: "Student or parent access only" });
 
       const schema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), studentId: z.number().int() });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "date and studentId required" });
 
       const { date, studentId } = parsed.data;
-      if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      }
 
       const task = await storage.getPlannerTaskById(taskId);
       if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });

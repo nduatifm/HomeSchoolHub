@@ -319,7 +319,7 @@ function ParentStarsPanel() {
 
 // ─── Task Card ─────────────────────────────────────────────────────────────────
 function TaskCard({
-  task, date, studentId, canDelete, canEdit, isStudent,
+  task, date, studentId, canDelete, canEdit, isStudent, parentChildren,
 }: {
   task: PlannerTask;
   date: string;
@@ -327,6 +327,7 @@ function TaskCard({
   canDelete: boolean;
   canEdit: boolean;
   isStudent: boolean;
+  parentChildren: ChildInfo[];
 }) {
   const queryClient = useQueryClient();
   const isDone = task.completions.some((c) => c.date === date);
@@ -373,21 +374,20 @@ function TaskCard({
 
   return (
     <div className={`bg-white border rounded-xl px-4 py-3 flex items-start gap-3 shadow-sm transition-all hover:shadow-md ${isDone ? "opacity-60" : ""}`}>
-      {isStudent ? (
-        <button
-          onClick={() => toggleMutation.mutate()}
-          disabled={toggleMutation.isPending}
-          className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-            isDone ? "bg-green-500 border-green-500" : "border-gray-300 hover:border-green-400 hover:bg-green-50"
-          }`}
-        >
-          {isDone && <Check className="w-3 h-3 text-white stroke-[3]" />}
-        </button>
-      ) : (
-        <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center ${isDone ? "bg-green-500 border-green-500" : "border-gray-200"}`}>
-          {isDone && <Check className="w-3 h-3 text-white stroke-[3]" />}
-        </div>
-      )}
+      {/* Checkbox: clickable for students and parents */}
+      <button
+        onClick={() => toggleMutation.mutate()}
+        disabled={toggleMutation.isPending}
+        className={`mt-0.5 w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+          isDone
+            ? "bg-green-500 border-green-500"
+            : isStudent
+              ? "border-gray-300 hover:border-green-400 hover:bg-green-50"
+              : "border-gray-300 hover:border-green-400 hover:bg-green-50"
+        }`}
+      >
+        {isDone && <Check className="w-3 h-3 text-white stroke-[3]" />}
+      </button>
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-medium text-gray-800 ${isDone ? "line-through text-gray-400" : ""}`}>{task.title}</p>
         <div className="flex flex-wrap items-center gap-2 mt-1.5">
@@ -436,6 +436,7 @@ function TaskCard({
           onClose={() => setEditOpen(false)}
           task={task}
           studentId={studentId}
+          parentChildren={parentChildren}
         />
       )}
     </div>
@@ -643,12 +644,13 @@ function AddTaskDialog({
 
 // ─── Edit Task Dialog ──────────────────────────────────────────────────────────
 function EditTaskDialog({
-  open, onClose, task, studentId,
+  open, onClose, task, studentId, parentChildren,
 }: {
   open: boolean;
   onClose: () => void;
   task: PlannerTask;
   studentId: number;
+  parentChildren: ChildInfo[];
 }) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(task.title);
@@ -658,6 +660,7 @@ function EditTaskDialog({
   const [note, setNote] = useState(task.note ?? "");
   const [reward, setReward] = useState(task.reward ?? "none");
   const [repeat, setRepeat] = useState(task.repeat as string);
+  const [assignedStudentId, setAssignedStudentId] = useState(String(studentId));
 
   // Re-seed fields whenever the dialog opens (handles switching between tasks)
   useEffect(() => {
@@ -669,11 +672,13 @@ function EditTaskDialog({
       setNote(task.note ?? "");
       setReward(task.reward ?? "none");
       setRepeat(task.repeat);
+      setAssignedStudentId(String(studentId));
     }
   }, [open, task.id]);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
+      const newId = parseInt(assignedStudentId, 10);
       await apiRequest(`/api/planner/students/${studentId}/tasks/${task.id}`, {
         method: "PATCH",
         body: JSON.stringify({
@@ -684,16 +689,22 @@ function EditTaskDialog({
           note: note.trim() || null,
           reward: reward === "none" ? null : reward,
           repeat,
+          newStudentId: newId !== studentId ? newId : undefined,
         }),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "day"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "upcoming"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
       queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
+      // Also invalidate original and (possibly new) student caches
+      const newId = parseInt(assignedStudentId, 10);
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
+      if (newId !== studentId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/planner/students", newId, "day"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/planner/students", newId, "month"] });
+      }
       toast({ title: "Task updated!" });
       onClose();
     },
@@ -756,6 +767,21 @@ function EditTaskDialog({
             </div>
           </div>
 
+          {/* Child selector — only shown when parent has more than one child */}
+          {parentChildren.length > 1 && (
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Assigned to</p>
+              <Select value={assignedStudentId} onValueChange={setAssignedStudentId}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {parentChildren.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div>
             <p className="text-xs text-gray-400 mb-1">Reward</p>
             <Select value={reward} onValueChange={setReward}>
@@ -792,13 +818,14 @@ function EditTaskDialog({
 
 // ─── Task group by category ────────────────────────────────────────────────────
 function DayTaskGroup({
-  tasks, date, studentId, isStudent, currentUserId,
+  tasks, date, studentId, isStudent, currentUserId, parentChildren,
 }: {
   tasks: PlannerTask[];
   date: string;
   studentId: number;
   isStudent: boolean;
   currentUserId: number;
+  parentChildren: ChildInfo[];
 }) {
   const grouped = useMemo(() => {
     const g: Record<string, PlannerTask[]> = {};
@@ -834,6 +861,7 @@ function DayTaskGroup({
                   ? task.createdByUserId === currentUserId && (task.category === "school" || task.category === "reading")
                   : true}
                 canEdit={!isStudent}
+                parentChildren={parentChildren}
               />
             ))}
           </div>
@@ -888,7 +916,7 @@ function StudentDayView({
           </Button>
         </div>
       ) : (
-        <DayTaskGroup tasks={tasks} date={date} studentId={studentId} isStudent={true} currentUserId={currentUserId} />
+        <DayTaskGroup tasks={tasks} date={date} studentId={studentId} isStudent={true} currentUserId={currentUserId} parentChildren={[]} />
       )}
       <AddTaskDialog
         open={addOpen}
@@ -960,7 +988,7 @@ function ParentFamilyView({
             )}
             {tasks.length === 0
               ? <p className="text-xs text-gray-400 italic py-2">No tasks for this day</p>
-              : <DayTaskGroup tasks={tasks} date={date} studentId={child.id} isStudent={false} currentUserId={currentUserId} />
+              : <DayTaskGroup tasks={tasks} date={date} studentId={child.id} isStudent={false} currentUserId={currentUserId} parentChildren={children} />
             }
           </div>
         );
