@@ -107,6 +107,7 @@ export default function ModernSidebar() {
   const teacherItems: SidebarItem[] = [
     { icon: <School className="w-4 h-4" />, label: "Classrooms", href: "/classrooms", badge: classroomBadge, badgeCap: 9 },
     { icon: <User className="w-4 h-4" />, label: "Students", href: "/students" },
+    { icon: <CalendarDays className="w-4 h-4" />, label: "My Planner", href: "/planner" },
     { icon: <UserPlus className="w-4 h-4" />, label: "Tutor Requests", href: "/requests", badge: pendingRequestCount, badgeCap: 9 },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Feedback", href: "/feedback" },
     { icon: <Send className="w-4 h-4" />, label: "Messages", href: "/messages", badge: unreadCount },
