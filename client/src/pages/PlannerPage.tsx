@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Pencil,
   Trash2,
   Check,
   Repeat,
@@ -47,7 +48,7 @@ interface PlannerTask {
   title: string;
   category: "chore" | "school" | "reading" | "activity";
   startDate: string;
-  time?: string | null;
+  endDate?: string | null;
   note?: string | null;
   reward?: string | null;
   repeat: "once" | "daily" | "weekdays" | "weekly";
@@ -318,17 +319,19 @@ function ParentStarsPanel() {
 
 // ─── Task Card ─────────────────────────────────────────────────────────────────
 function TaskCard({
-  task, date, studentId, canDelete, isStudent,
+  task, date, studentId, canDelete, canEdit, isStudent,
 }: {
   task: PlannerTask;
   date: string;
   studentId: number;
   canDelete: boolean;
+  canEdit: boolean;
   isStudent: boolean;
 }) {
   const queryClient = useQueryClient();
   const isDone = task.completions.some((c) => c.date === date);
   const meta = CATEGORY_META[task.category] ?? CATEGORY_META.chore;
+  const [editOpen, setEditOpen] = useState(false);
 
   const toggleMutation = useMutation({
     mutationFn: async () => {
@@ -404,14 +407,36 @@ function TaskCard({
         </div>
         {task.note && <p className="text-xs text-gray-500 mt-1 italic">{task.note}</p>}
       </div>
-      {canDelete && (
-        <button
-          onClick={() => deleteMutation.mutate()}
-          disabled={deleteMutation.isPending}
-          className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-        >
-          {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-        </button>
+      {/* Parent action buttons */}
+      {(canEdit || canDelete) && (
+        <div className="flex-shrink-0 flex items-center gap-0.5 mt-0.5">
+          {canEdit && (
+            <button
+              onClick={() => setEditOpen(true)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-primary hover:bg-primary/5 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            >
+              {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            </button>
+          )}
+        </div>
+      )}
+
+      {canEdit && (
+        <EditTaskDialog
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          task={task}
+          studentId={studentId}
+        />
       )}
     </div>
   );
@@ -616,6 +641,155 @@ function AddTaskDialog({
   );
 }
 
+// ─── Edit Task Dialog ──────────────────────────────────────────────────────────
+function EditTaskDialog({
+  open, onClose, task, studentId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  task: PlannerTask;
+  studentId: number;
+}) {
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState(task.title);
+  const [category, setCategory] = useState(task.category as string);
+  const [startDate, setStartDate] = useState(task.startDate);
+  const [endDate, setEndDate] = useState(task.endDate ?? "");
+  const [note, setNote] = useState(task.note ?? "");
+  const [reward, setReward] = useState(task.reward ?? "none");
+  const [repeat, setRepeat] = useState(task.repeat as string);
+
+  // Re-seed fields whenever the dialog opens (handles switching between tasks)
+  useEffect(() => {
+    if (open) {
+      setTitle(task.title);
+      setCategory(task.category);
+      setStartDate(task.startDate);
+      setEndDate(task.endDate ?? "");
+      setNote(task.note ?? "");
+      setReward(task.reward ?? "none");
+      setRepeat(task.repeat);
+    }
+  }, [open, task.id]);
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest(`/api/planner/students/${studentId}/tasks/${task.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: title.trim(),
+          category,
+          startDate,
+          endDate: endDate || null,
+          note: note.trim() || null,
+          reward: reward === "none" ? null : reward,
+          repeat,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/students", studentId, "upcoming"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/day"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/month"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/planner/family/upcoming"] });
+      toast({ title: "Task updated!" });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't update task — try again.", type: "error" }),
+  });
+
+  const canSubmit = title.trim().length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Edit Task</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-1">
+          <Input
+            placeholder="What needs to be done?"
+            className="text-sm"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && canSubmit && updateMutation.mutate()}
+            autoFocus
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Category</p>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(["chore", "school", "reading", "activity"] as const).map((c) => (
+                    <SelectItem key={c} value={c}>{CATEGORY_META[c].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Repeat</p>
+              <Select value={repeat} onValueChange={setRepeat}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">Once</SelectItem>
+                  <SelectItem value="daily">Every day</SelectItem>
+                  <SelectItem value="weekdays">Weekdays</SelectItem>
+                  <SelectItem value="weekly">Every week</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Start date</p>
+              <Input type="date" className="h-9 text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">End date <span className="text-gray-300">(optional)</span></p>
+              <Input type="date" className="h-9 text-sm" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Reward</p>
+            <Select value={reward} onValueChange={setReward}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No reward</SelectItem>
+                <SelectItem value="1star">⭐ 1 Star</SelectItem>
+                <SelectItem value="2stars">⭐⭐ 2 Stars</SelectItem>
+                <SelectItem value="3stars">⭐⭐⭐ 3 Stars</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Textarea
+            className="text-sm resize-none"
+            placeholder="Add a note… (optional)"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
+
+        <DialogFooter className="mt-1">
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={() => updateMutation.mutate()} disabled={!canSubmit || updateMutation.isPending}>
+            {updateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Pencil className="w-3.5 h-3.5 mr-1.5" />}
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Task group by category ────────────────────────────────────────────────────
 function DayTaskGroup({
   tasks, date, studentId, isStudent, currentUserId,
@@ -659,6 +833,7 @@ function DayTaskGroup({
                 canDelete={isStudent
                   ? task.createdByUserId === currentUserId && (task.category === "school" || task.category === "reading")
                   : true}
+                canEdit={!isStudent}
               />
             ))}
           </div>

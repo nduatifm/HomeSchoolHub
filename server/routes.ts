@@ -10044,6 +10044,43 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // PATCH /api/planner/students/:studentId/tasks/:taskId — parent edits a task
+  app.patch("/api/planner/students/:studentId/tasks/:taskId", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      if (user.role !== "parent") return res.status(403).json({ error: "Only parents can edit tasks" });
+      if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      const schema = z.object({
+        title: z.string().min(1).max(200),
+        category: z.enum(["chore", "school", "reading", "activity"]),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+        note: z.string().max(500).nullable().optional(),
+        reward: z.string().nullable().optional(),
+        repeat: z.enum(["once", "daily", "weekdays", "weekly"]),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+      const updated = await storage.updatePlannerTask(taskId, {
+        ...parsed.data,
+        endDate: parsed.data.endDate ?? null,
+        note: parsed.data.note ?? null,
+        reward: parsed.data.reward ?? null,
+      });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // DELETE /api/planner/students/:studentId/tasks/:taskId
   app.delete("/api/planner/students/:studentId/tasks/:taskId", requireAuth, async (req, res) => {
     try {
