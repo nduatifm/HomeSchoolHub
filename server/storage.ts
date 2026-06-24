@@ -382,16 +382,16 @@ export interface IStorage {
   }): Promise<any>;
   getPlannerTasksForDate(studentId: number, date: string): Promise<any[]>;
   getPlannerTasksForDateRange(studentId: number, startDate: string, endDate: string): Promise<any[]>;
-  getPlannerMonthSummary(studentId: number, year: number, month: number): Promise<Record<string, { total: number; done: number }>>;
+  getPlannerMonthSummary(studentId: number, year: number, month: number, categories?: string[]): Promise<Record<string, { total: number; done: number }>>;
   deletePlannerTask(taskId: number): Promise<void>;
   isPlannerTaskDone(taskId: number, studentId: number, date: string): Promise<boolean>;
   completePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
   uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
   getPlannerTaskById(taskId: number): Promise<any | null>;
   getPlannerWeeklyStars(studentId: number, weekStart: string, weekEnd: string): Promise<{ total: number; earnedByDate: Record<string, number> }>;
-  getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string): Promise<{ date: string; total: number; done: number }[]>;
-  getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string): Promise<{ date: string; childCount: number; total: number; done: number }[]>;
-  getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string): Promise<Record<number, number>>;
+  getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; total: number; done: number }[]>;
+  getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; childCount: number; total: number; done: number }[]>;
+  getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string, categories?: string[]): Promise<Record<number, number>>;
 }
 
 class PrismaStorage implements IStorage {
@@ -2935,12 +2935,13 @@ class PrismaStorage implements IStorage {
     });
   }
 
-  async getPlannerMonthSummary(studentId: number, year: number, month: number): Promise<Record<string, { total: number; done: number }>> {
+  async getPlannerMonthSummary(studentId: number, year: number, month: number, categories?: string[]): Promise<Record<string, { total: number; done: number }>> {
     const pad = (n: number) => String(n).padStart(2, "0");
     const firstDay = `${year}-${pad(month)}-01`;
     const lastDay = `${year}-${pad(month)}-${new Date(year, month, 0).getDate()}`;
 
-    const tasks = await this.getPlannerTasksForDateRange(studentId, firstDay, lastDay);
+    const allTasks = await this.getPlannerTasksForDateRange(studentId, firstDay, lastDay);
+    const tasks = categories ? allTasks.filter((t: any) => categories.includes(t.category)) : allTasks;
 
     const result: Record<string, { total: number; done: number }> = {};
 
@@ -3022,8 +3023,9 @@ class PrismaStorage implements IStorage {
     return { total, earnedByDate };
   }
 
-  async getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string): Promise<{ date: string; total: number; done: number }[]> {
-    const tasks = await this.getPlannerTasksForDateRange(studentId, fromDate, toDate);
+  async getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; total: number; done: number }[]> {
+    const allTasks = await this.getPlannerTasksForDateRange(studentId, fromDate, toDate);
+    const tasks = categories ? allTasks.filter((t: any) => categories.includes(t.category)) : allTasks;
     const pad = (n: number) => String(n).padStart(2, "0");
     const result: { date: string; total: number; done: number }[] = [];
 
@@ -3052,8 +3054,8 @@ class PrismaStorage implements IStorage {
     return result;
   }
 
-  async getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string): Promise<{ date: string; childCount: number; total: number; done: number }[]> {
-    const perChild = await Promise.all(childIds.map((id) => this.getPlannerDateRangeSummary(id, fromDate, toDate)));
+  async getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; childCount: number; total: number; done: number }[]> {
+    const perChild = await Promise.all(childIds.map((id) => this.getPlannerDateRangeSummary(id, fromDate, toDate, categories)));
     const merged: Record<string, { total: number; done: number; childCount: number }> = {};
     for (const childRows of perChild) {
       for (const row of childRows) {
@@ -3068,9 +3070,13 @@ class PrismaStorage implements IStorage {
       .map(([date, v]) => ({ date, ...v }));
   }
 
-  async getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string): Promise<Record<number, number>> {
+  async getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string, categories?: string[]): Promise<Record<number, number>> {
     const completions = await prisma.plannerTaskCompletion.findMany({
-      where: { studentId: { in: childIds }, date: { gte: weekStart, lte: weekEnd } },
+      where: {
+        studentId: { in: childIds },
+        date: { gte: weekStart, lte: weekEnd },
+        ...(categories ? { task: { category: { in: categories } } } : {}),
+      },
       include: { task: { select: { reward: true } } },
     });
     const result: Record<number, number> = {};

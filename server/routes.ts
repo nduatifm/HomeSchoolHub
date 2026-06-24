@@ -10034,6 +10034,10 @@ export function registerRoutes(app: Express) {
         if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
       } else if (user.role === "teacher") {
         if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+        // Teachers can only assign academic tasks
+        if (category !== "school" && category !== "reading") {
+          return res.status(403).json({ error: "Teachers can only add school or reading tasks" });
+        }
       } else if (user.role === "student") {
         if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
         // Students can only create school/reading tasks
@@ -10091,6 +10095,11 @@ export function registerRoutes(app: Express) {
       });
       const parsed = schema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+      // Teachers can only set academic categories
+      if (user.role === "teacher" && parsed.data.category !== "school" && parsed.data.category !== "reading") {
+        return res.status(403).json({ error: "Teachers can only set school or reading tasks" });
+      }
 
       // If reassigning to a different student, verify caller has access to the new student too
       if (parsed.data.newStudentId && parsed.data.newStudentId !== studentId) {
@@ -10413,10 +10422,12 @@ export function registerRoutes(app: Express) {
       const date = (req.query.date as string) || localDateStr();
       const students = await storage.getStudentsByTeacher(req.session.userId!);
 
+      const ACADEMIC = ["school", "reading"];
       const result: Record<number, any[]> = {};
       await Promise.all(
         students.map(async (s) => {
-          result[s.id] = await storage.getPlannerTasksForDate(s.id, date);
+          const all = await storage.getPlannerTasksForDate(s.id, date);
+          result[s.id] = all.filter((t: any) => ACADEMIC.includes(t.category));
         }),
       );
 
@@ -10436,10 +10447,11 @@ export function registerRoutes(app: Express) {
       const month = parseInt(req.query.month as string, 10) || new Date().getMonth() + 1;
       const students = await storage.getStudentsByTeacher(req.session.userId!);
 
+      const ACADEMIC = ["school", "reading"];
       const result: Record<number, Record<string, { total: number; done: number }>> = {};
       await Promise.all(
         students.map(async (s) => {
-          result[s.id] = await storage.getPlannerMonthSummary(s.id, year, month);
+          result[s.id] = await storage.getPlannerMonthSummary(s.id, year, month, ACADEMIC);
         }),
       );
 
@@ -10463,7 +10475,7 @@ export function registerRoutes(app: Express) {
 
       const students = await storage.getStudentsByTeacher(req.session.userId!);
       const studentIds = students.map((s) => s.id);
-      const rows = await storage.getPlannerFamilyDateRangeSummary(studentIds, fromDate, toDate);
+      const rows = await storage.getPlannerFamilyDateRangeSummary(studentIds, fromDate, toDate, ["school", "reading"]);
       res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), upcoming: rows });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -10490,7 +10502,7 @@ export function registerRoutes(app: Express) {
 
       const students = await storage.getStudentsByTeacher(req.session.userId!);
       const studentIds = students.map((s) => s.id);
-      const starsByStudent = await storage.getPlannerFamilyStars(studentIds, weekStart, weekEnd);
+      const starsByStudent = await storage.getPlannerFamilyStars(studentIds, weekStart, weekEnd, ["school", "reading"]);
       res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), stars: starsByStudent, weekStart, weekEnd });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -363,7 +363,7 @@ function TeacherStarsPanel() {
 
 // ─── Task Card ─────────────────────────────────────────────────────────────────
 function TaskCard({
-  task, date, studentId, canDelete, canEdit, isStudent, parentChildren,
+  task, date, studentId, canDelete, canEdit, isStudent, isTeacher, parentChildren,
 }: {
   task: PlannerTask;
   date: string;
@@ -371,6 +371,7 @@ function TaskCard({
   canDelete: boolean;
   canEdit: boolean;
   isStudent: boolean;
+  isTeacher?: boolean;
   parentChildren: ChildInfo[];
 }) {
   const queryClient = useQueryClient();
@@ -501,6 +502,7 @@ function TaskCard({
           task={task}
           studentId={studentId}
           parentChildren={parentChildren}
+          isTeacher={isTeacher}
         />
       )}
     </div>
@@ -509,7 +511,7 @@ function TaskCard({
 
 // ─── Add Task Dialog ───────────────────────────────────────────────────────────
 function AddTaskDialog({
-  open, onClose, defaultDate, defaultStudentId, children, isStudent,
+  open, onClose, defaultDate, defaultStudentId, children, isStudent, isTeacher,
 }: {
   open: boolean;
   onClose: () => void;
@@ -517,10 +519,12 @@ function AddTaskDialog({
   defaultStudentId: number;
   children: ChildInfo[];
   isStudent: boolean;
+  isTeacher?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const defaultCategory = (isStudent || isTeacher) ? "school" : "chore";
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<string>(isStudent ? "school" : "chore");
+  const [category, setCategory] = useState<string>(defaultCategory);
   const [startDate, setStartDate] = useState(defaultDate);
   const [endDate, setEndDate] = useState("");
   const [note, setNote] = useState("");
@@ -534,7 +538,7 @@ function AddTaskDialog({
   useEffect(() => {
     if (open) {
       setTitle("");
-      setCategory(isStudent ? "school" : "chore");
+      setCategory(defaultCategory);
       setStartDate(defaultDate);
       setEndDate("");
       setNote("");
@@ -639,7 +643,7 @@ function AddTaskDialog({
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(isStudent ? ["school", "reading"] : ["chore", "school", "reading", "activity"]).map((c) => (
+                  {((isStudent || isTeacher) ? ["school", "reading"] : ["chore", "school", "reading", "activity"]).map((c) => (
                     <SelectItem key={c} value={c}>{CATEGORY_META[c].label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -711,12 +715,13 @@ function AddTaskDialog({
 
 // ─── Edit Task Dialog ──────────────────────────────────────────────────────────
 function EditTaskDialog({
-  open, onClose, task, studentId, parentChildren,
+  open, onClose, task, studentId, parentChildren, isTeacher,
 }: {
   open: boolean;
   onClose: () => void;
   task: PlannerTask;
   studentId: number;
+  isTeacher?: boolean;
   parentChildren: ChildInfo[];
 }) {
   const queryClient = useQueryClient();
@@ -803,8 +808,8 @@ function EditTaskDialog({
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(["chore", "school", "reading", "activity"] as const).map((c) => (
-                    <SelectItem key={c} value={c}>{CATEGORY_META[c].label}</SelectItem>
+                  {(isTeacher ? ["school", "reading"] : ["chore", "school", "reading", "activity"]).map((c) => (
+                    <SelectItem key={c} value={c}>{CATEGORY_META[c as keyof typeof CATEGORY_META].label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -889,12 +894,13 @@ function EditTaskDialog({
 
 // ─── Task group by category ────────────────────────────────────────────────────
 function DayTaskGroup({
-  tasks, date, studentId, isStudent, currentUserId, parentChildren,
+  tasks, date, studentId, isStudent, isTeacher, currentUserId, parentChildren,
 }: {
   tasks: PlannerTask[];
   date: string;
   studentId: number;
   isStudent: boolean;
+  isTeacher?: boolean;
   currentUserId: number;
   parentChildren: ChildInfo[];
 }) {
@@ -928,6 +934,7 @@ function DayTaskGroup({
                 date={date}
                 studentId={studentId}
                 isStudent={isStudent}
+                isTeacher={isTeacher}
                 canDelete={isStudent
                   ? task.createdByUserId === currentUserId && (task.category === "school" || task.category === "reading")
                   : true}
@@ -1097,6 +1104,10 @@ function TeacherClassView({
 
   return (
     <div className="space-y-8">
+      <p className="text-xs text-gray-400 flex items-center gap-1.5">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400" />
+        Showing academic tasks only (school &amp; reading)
+      </p>
       {students.map((student) => {
         const tasks: PlannerTask[] = tasksByStudent[student.id] ?? [];
         const total = tasks.length;
@@ -1123,7 +1134,7 @@ function TeacherClassView({
             )}
             {tasks.length === 0
               ? <p className="text-xs text-gray-400 italic py-2">No tasks for this day</p>
-              : <DayTaskGroup tasks={tasks} date={date} studentId={student.id} isStudent={false} currentUserId={currentUserId} parentChildren={students} />
+              : <DayTaskGroup tasks={tasks} date={date} studentId={student.id} isStudent={false} isTeacher={true} currentUserId={currentUserId} parentChildren={students} />
             }
           </div>
         );
@@ -1364,6 +1375,7 @@ export default function PlannerPage() {
             : [{ id: plannerStudentId ?? 0, name: myStudent?.name ?? "" }]
           }
           isStudent={isStudent}
+          isTeacher={isTeacher}
         />
       )}
     </div>
