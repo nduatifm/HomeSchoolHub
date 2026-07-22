@@ -652,3 +652,48 @@ export const gradeBreakdownSchema = z.object({
 });
 export type GradeBreakdown = z.infer<typeof gradeBreakdownSchema>;
 export type GradeBreakdownItem = z.infer<typeof gradeBreakdownItemSchema>;
+
+// ─── Planner ─────────────────────────────────────────────────────────────────
+
+export const plannerCategories = ["chore", "school", "reading", "activity"] as const;
+export type PlannerCategory = (typeof plannerCategories)[number];
+
+export const plannerRepeats = ["once", "daily", "weekdays", "weekly"] as const;
+export type PlannerRepeat = (typeof plannerRepeats)[number];
+
+export const plannerTaskSchema = z.object({
+  id: z.number(),
+  studentId: z.number(),
+  createdByUserId: z.number(),
+  title: z.string(),
+  category: z.enum(plannerCategories).default("chore"),
+  startDate: z.string(),
+  endDate: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  reward: z.string().nullable().optional(),
+  repeat: z.enum(plannerRepeats).default("once"),
+  createdAt: z.string(),
+});
+export const insertPlannerTaskSchema = plannerTaskSchema.omit({ id: true, createdAt: true });
+export type PlannerTask = z.infer<typeof plannerTaskSchema>;
+export type InsertPlannerTask = z.infer<typeof insertPlannerTaskSchema>;
+
+export const plannerTaskCompletionSchema = z.object({
+  id: z.number(),
+  taskId: z.number(),
+  studentId: z.number(),
+  date: z.string(),
+  completedAt: z.string(),
+});
+export type PlannerTaskCompletion = z.infer<typeof plannerTaskCompletionSchema>;
+
+export const plannerTaskWithCompletionsSchema = plannerTaskSchema.extend({
+  completions: z.array(plannerTaskCompletionSchema).default([]),
+});
+export type PlannerTaskWithCompletions = z.infer<typeof plannerTaskWithCompletionsSchema>;
+
+export const plannerDaySummarySchema = z.object({
+  total: z.number(),
+  done: z.number(),
+});
+export type PlannerDaySummary = z.infer<typeof plannerDaySummarySchema>;

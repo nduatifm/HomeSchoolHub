@@ -327,7 +327,13 @@ function TeacherEditor({
 
       // Upload all pending PDF files in parallel.
       const newUrls = await Promise.all(
-        pendingFiles.map((f) => uploadFileToCloudinary(f, "classwork")),
+        pendingFiles.map(async (f) => {
+          try {
+            return await uploadFileToCloudinary(f, "classwork");
+          } catch (err: any) {
+            throw new Error(`Couldn't upload '${f.name}' — ${err?.message ?? "upload failed"}`);
+          }
+        }),
       );
       const attachments = [...existingAttachments, ...newUrls];
 
@@ -354,7 +360,7 @@ function TeacherEditor({
       toast({ title: isEdit ? "Classwork updated" : "Classwork created", type: "success" });
       navigate(`/classrooms/${classroomSlug}/classwork`);
     },
-    onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
+    onError: (err: any) => toast({ title: err?.message || "Couldn't save — try again.", type: "error" }),
   });
 
   const canSave = title.trim().length > 0 && !saveMutation.isPending && !isUploadingImage;

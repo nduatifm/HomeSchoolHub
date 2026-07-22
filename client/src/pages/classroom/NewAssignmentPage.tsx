@@ -276,8 +276,10 @@ export default function NewAssignmentPage() {
             uploadFd.append("file", file);
             uploadFd.append("folder", "classroom-assignments");
             const r = await fetch("/api/upload", { method: "POST", credentials: "include", body: uploadFd });
-            const data = await r.json();
-            if (!r.ok || !data.url) throw new Error(data.error ?? "File upload failed");
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok || !data.url) {
+              throw new Error(`Couldn't upload "${file.name}" — ${data.error ?? "upload failed"}`);
+            }
             return data.url as string;
           }),
         );
@@ -320,7 +322,7 @@ export default function NewAssignmentPage() {
       toast({ title: "Assignment created", type: "success" });
       navigate(`/classrooms/${classroomSlug}/assignments`);
     },
-    onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
+    onError: (err: any) => toast({ title: err?.message || "Couldn't save — try again.", type: "error" }),
   });
 
   const didSubmit = createMutation.isSuccess;

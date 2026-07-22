@@ -29,6 +29,7 @@ import FormBuilderPage from "./pages/FormBuilderPage";
 import ClassroomsPage from "./pages/ClassroomsPage";
 import FolderDetailPage from "./pages/FolderDetailPage";
 import MessagesPage from "./pages/MessagesPage";
+import PlannerPage from "./pages/PlannerPage";
 
 import TeacherStudentsPage from "./pages/TeacherStudentsPage";
 import TutorRequestsPage from "./pages/TutorRequestsPage";
@@ -180,6 +181,9 @@ function AppRoutes() {
         </Route>
         <Route path="/messages">
           <ProtectedRoute component={MessagesPage} />
+        </Route>
+        <Route path="/planner">
+          <ProtectedRoute component={PlannerPage} />
         </Route>
 
         {/* Teacher-only pages */}

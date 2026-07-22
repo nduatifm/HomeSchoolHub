@@ -95,6 +95,7 @@ export interface IStorage {
   getStudentsByTeacher(
     teacherId: number,
   ): Promise<(Student & { email?: string })[]>;
+  isTeacherFor(teacherId: number, studentId: number): Promise<boolean>;
   updateStudent(
     id: number,
     student: Prisma.StudentUpdateInput,
@@ -357,6 +358,41 @@ export interface IStorage {
   }): Promise<any>;
   getAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<any | null>;
   deleteAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null): Promise<void>;
+
+  // ─── Planner ──────────────────────────────────────────────────────────────
+  createPlannerTask(data: {
+    studentId: number;
+    createdByUserId: number;
+    title: string;
+    category: string;
+    startDate: string;
+    endDate?: string | null;
+    note?: string | null;
+    reward?: string | null;
+    repeat: string;
+  }): Promise<any>;
+  updatePlannerTask(taskId: number, data: {
+    title: string;
+    category: string;
+    startDate: string;
+    endDate?: string | null;
+    note?: string | null;
+    reward?: string | null;
+    repeat: string;
+    studentId?: number;
+  }): Promise<any>;
+  getPlannerTasksForDate(studentId: number, date: string): Promise<any[]>;
+  getPlannerTasksForDateRange(studentId: number, startDate: string, endDate: string): Promise<any[]>;
+  getPlannerMonthSummary(studentId: number, year: number, month: number, categories?: string[]): Promise<Record<string, { total: number; done: number }>>;
+  deletePlannerTask(taskId: number): Promise<void>;
+  isPlannerTaskDone(taskId: number, studentId: number, date: string): Promise<boolean>;
+  completePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
+  uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void>;
+  getPlannerTaskById(taskId: number): Promise<any | null>;
+  getPlannerWeeklyStars(studentId: number, weekStart: string, weekEnd: string): Promise<{ total: number; earnedByDate: Record<string, number> }>;
+  getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; total: number; done: number }[]>;
+  getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; childCount: number; total: number; done: number }[]>;
+  getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string, categories?: string[]): Promise<Record<number, number>>;
 }
 
 class PrismaStorage implements IStorage {
@@ -410,7 +446,7 @@ class PrismaStorage implements IStorage {
       data: {
         userId: student.userId,
         name: student.name,
-        gradeLevel: student.gradeLevel,
+        gradeLevel: student.gradeLevel?.trim().toLowerCase() ?? "",
         badges: student.badges ?? [],
         points: student.points ?? 0,
       },
@@ -467,6 +503,9 @@ class PrismaStorage implements IStorage {
   async getStudentsByTeacher(
     teacherId: number,
   ): Promise<(Student & { email?: string; parentName?: string; parentId?: number })[]> {
+    const studentMap = new Map<number, Student & { email?: string; parentName?: string; parentId?: number }>();
+
+    // Primary path: students linked via approved TutorRequest
     const requests = await prisma.tutorRequest.findMany({
       where: { teacherId, status: "approved" },
       include: {
@@ -474,7 +513,6 @@ class PrismaStorage implements IStorage {
           select: {
             id: true,
             name: true,
-            // Use the new family team join table instead of the removed parentStudents relation
             childTeamMemberships: {
               where: { status: "active" },
               include: { child: { include: { user: true } } },
@@ -483,12 +521,10 @@ class PrismaStorage implements IStorage {
         },
       },
     });
-    const studentMap = new Map<number, Student & { email?: string; parentName?: string; parentId?: number }>();
     requests.forEach((r) => {
       const parentName = (r.parent as any).name;
       const memberships: any[] = (r.parent as any).childTeamMemberships ?? [];
       if (r.studentId) {
-        // Specific student was requested — only include that student
         const m = memberships.find((m: any) => m.childId === r.studentId);
         const s = m?.child;
         if (s && !studentMap.has(s.id)) {
@@ -499,12 +535,8 @@ class PrismaStorage implements IStorage {
             parentId: r.parentId,
             user: undefined,
           } as Student & { email?: string; parentName?: string; parentId?: number });
-        } else if (!s && r.studentId) {
-          // Fallback: look up student directly if not found via team membership
-          // (handles edge cases where assignment pre-dates team membership)
         }
       } else {
-        // Legacy requests without studentId — include all of parent's students via team
         memberships.forEach((m: any) => {
           const s = m.child;
           if (s && !studentMap.has(s.id)) {
@@ -519,13 +551,43 @@ class PrismaStorage implements IStorage {
         });
       }
     });
+
+    // Legacy path: students linked via TeacherStudentAssignment (pre-TutorRequest migration)
+    const legacyAssignments = await prisma.teacherStudentAssignment.findMany({
+      where: { teacherId, status: "active" },
+      include: { student: { include: { user: true } } },
+    });
+    for (const tsa of legacyAssignments) {
+      const s = tsa.student as any;
+      if (s && !studentMap.has(s.id)) {
+        studentMap.set(s.id, {
+          ...s,
+          email: s.user?.email,
+          parentName: undefined,
+          parentId: undefined,
+          user: undefined,
+        } as Student & { email?: string; parentName?: string; parentId?: number });
+      }
+    }
+
     return Array.from(studentMap.values());
+  }
+
+  async isTeacherFor(teacherId: number, studentId: number): Promise<boolean> {
+    const [tutorReq, tsa] = await Promise.all([
+      prisma.tutorRequest.findFirst({ where: { teacherId, studentId, status: "approved" } }),
+      prisma.teacherStudentAssignment.findFirst({ where: { teacherId, studentId, status: "active" } }),
+    ]);
+    return !!(tutorReq || tsa);
   }
 
   async updateStudent(
     id: number,
     student: Prisma.StudentUpdateInput,
   ): Promise<Student> {
+    if (typeof student.gradeLevel === "string") {
+      student = { ...student, gradeLevel: student.gradeLevel.trim().toLowerCase() };
+    }
     return (await prisma.student.update({
       where: { id },
       data: student,
@@ -533,7 +595,9 @@ class PrismaStorage implements IStorage {
   }
 
   async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
-    const created = await prisma.assignment.create({ data: assignment });
+    const created = await prisma.assignment.create({
+      data: { ...assignment, gradeLevel: assignment.gradeLevel?.trim().toLowerCase() ?? "" },
+    });
     const slug = slugify(created.title, created.id);
     return (await prisma.assignment.update({ where: { id: created.id }, data: { slug } })) as Assignment;
   }
@@ -571,8 +635,15 @@ class PrismaStorage implements IStorage {
   async createStudentAssignment(
     studentAssignment: InsertStudentAssignment,
   ): Promise<StudentAssignment> {
-    return (await prisma.studentAssignment.create({
-      data: studentAssignment,
+    return (await prisma.studentAssignment.upsert({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: studentAssignment.assignmentId,
+          studentId: studentAssignment.studentId,
+        },
+      },
+      create: studentAssignment,
+      update: {},
     })) as StudentAssignment;
   }
 
@@ -1734,19 +1805,25 @@ class PrismaStorage implements IStorage {
   // Selects the teacher with fewest approved TutorRequests (load-balancing) and
   // returns their userId. Does NOT write any records — callers create TutorRequest.
   async findFirstAvailableTeacherId(studentId: number): Promise<number | null> {
-    const teachers = await prisma.user.findMany({
-      where: { role: "teacher" },
+    // Include both primary teachers and dual-role users who have the teacher role
+    const allTeachers = await prisma.user.findMany({
       select: {
         id: true,
+        role: true,
+        roles: true,
         _count: { select: { tutorRequests: { where: { status: "approved" } } } },
       },
     });
+    const teachers = allTeachers.filter(
+      (u) => u.role === "teacher" || (Array.isArray(u.roles) && (u.roles as string[]).includes("teacher")),
+    );
     if (teachers.length === 0) return null;
-    // Exclude teachers already linked to this student via approved TutorRequest
+    // If student already has an approved tutor, return that teacher
     const existing = await prisma.tutorRequest.findFirst({
       where: { studentId, status: "approved" },
     });
     if (existing) return existing.teacherId;
+    // Load-balance: pick teacher with fewest approved requests
     teachers.sort((a, b) => a._count.tutorRequests - b._count.tutorRequests);
     return teachers[0].id;
   }
@@ -2807,6 +2884,250 @@ class PrismaStorage implements IStorage {
     } else {
       await prisma.assignmentDraft.deleteMany({ where: { teacherId, classroomId, assignmentId: null } });
     }
+  }
+
+  // ─── Planner ──────────────────────────────────────────────────────────────
+
+  async createPlannerTask(data: {
+    studentId: number;
+    createdByUserId: number;
+    title: string;
+    category: string;
+    startDate: string;
+    endDate?: string | null;
+    note?: string | null;
+    reward?: string | null;
+    repeat: string;
+  }): Promise<any> {
+    return prisma.plannerTask.create({
+      data,
+      include: { completions: true },
+    });
+  }
+
+  async updatePlannerTask(taskId: number, data: {
+    title: string;
+    category: string;
+    startDate: string;
+    endDate?: string | null;
+    note?: string | null;
+    reward?: string | null;
+    repeat: string;
+    studentId?: number;
+  }): Promise<any> {
+    return prisma.plannerTask.update({
+      where: { id: taskId },
+      data,
+      include: { completions: true },
+    });
+  }
+
+  async getPlannerTaskById(taskId: number): Promise<any | null> {
+    return prisma.plannerTask.findUnique({
+      where: { id: taskId },
+      include: { completions: true },
+    });
+  }
+
+  // Returns all tasks that are active on `date` for a student, based on repeat rules.
+  // A task is active on `date` if:
+  //   once      → startDate === date
+  //   daily     → startDate <= date
+  //   weekdays  → startDate <= date AND date is Mon–Fri (JS getDay 1-5)
+  //   weekly    → startDate <= date AND same weekday as startDate
+  async getPlannerTasksForDate(studentId: number, date: string): Promise<any[]> {
+    const tasks = await prisma.plannerTask.findMany({
+      where: {
+        studentId,
+        startDate: { lte: date },
+      },
+      include: { completions: { where: { date, studentId } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const d = new Date(date + "T00:00:00");
+    const dayOfWeek = d.getDay(); // 0=Sun … 6=Sat
+
+    return tasks.filter((t) => {
+      // Stop recurring tasks after their endDate (if set)
+      if (t.endDate && date > t.endDate) return false;
+      if (t.repeat === "once") return t.startDate === date;
+      if (t.repeat === "daily") return true;
+      if (t.repeat === "weekdays") return dayOfWeek >= 1 && dayOfWeek <= 5;
+      if (t.repeat === "weekly") {
+        const start = new Date(t.startDate + "T00:00:00");
+        return start.getDay() === dayOfWeek;
+      }
+      return false;
+    });
+  }
+
+  async getPlannerTasksForDateRange(studentId: number, startDate: string, endDate: string): Promise<any[]> {
+    return prisma.plannerTask.findMany({
+      where: {
+        studentId,
+        startDate: { lte: endDate },
+      },
+      include: {
+        completions: {
+          where: { studentId, date: { gte: startDate, lte: endDate } },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  async getPlannerMonthSummary(studentId: number, year: number, month: number, categories?: string[]): Promise<Record<string, { total: number; done: number }>> {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const firstDay = `${year}-${pad(month)}-01`;
+    const lastDay = `${year}-${pad(month)}-${new Date(year, month, 0).getDate()}`;
+
+    const allTasks = await this.getPlannerTasksForDateRange(studentId, firstDay, lastDay);
+    const tasks = categories ? allTasks.filter((t: any) => categories.includes(t.category)) : allTasks;
+
+    const result: Record<string, { total: number; done: number }> = {};
+
+    // Iterate each day in the month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = `${year}-${pad(month)}-${pad(d)}`;
+      const dayOfWeek = new Date(date + "T00:00:00").getDay();
+
+      let total = 0;
+      let done = 0;
+
+      for (const task of tasks) {
+        let active = false;
+        if (task.startDate > date) continue;
+        if (task.endDate && date > task.endDate) continue;
+        if (task.repeat === "once") active = task.startDate === date;
+        else if (task.repeat === "daily") active = true;
+        else if (task.repeat === "weekdays") active = dayOfWeek >= 1 && dayOfWeek <= 5;
+        else if (task.repeat === "weekly") {
+          const start = new Date(task.startDate + "T00:00:00");
+          active = start.getDay() === dayOfWeek;
+        }
+
+        if (active) {
+          total++;
+          if (task.completions.some((c: any) => c.date === date)) done++;
+        }
+      }
+
+      if (total > 0) {
+        result[date] = { total, done };
+      }
+    }
+
+    return result;
+  }
+
+  async deletePlannerTask(taskId: number): Promise<void> {
+    await prisma.plannerTask.delete({ where: { id: taskId } });
+  }
+
+  async isPlannerTaskDone(taskId: number, studentId: number, date: string): Promise<boolean> {
+    const count = await prisma.plannerTaskCompletion.count({
+      where: { taskId, studentId, date },
+    });
+    return count > 0;
+  }
+
+  async completePlannerTask(taskId: number, studentId: number, date: string): Promise<void> {
+    await prisma.plannerTaskCompletion.createMany({
+      data: [{ taskId, studentId, date }],
+      skipDuplicates: true,
+    });
+  }
+
+  async uncompletePlannerTask(taskId: number, studentId: number, date: string): Promise<void> {
+    await prisma.plannerTaskCompletion.deleteMany({ where: { taskId, studentId, date } });
+  }
+
+  async getPlannerWeeklyStars(studentId: number, weekStart: string, weekEnd: string): Promise<{ total: number; earnedByDate: Record<string, number> }> {
+    const completions = await prisma.plannerTaskCompletion.findMany({
+      where: { studentId, date: { gte: weekStart, lte: weekEnd } },
+      include: { task: { select: { reward: true } } },
+    });
+
+    const earnedByDate: Record<string, number> = {};
+    let total = 0;
+
+    for (const c of completions) {
+      const reward = c.task?.reward;
+      const stars = reward === "3stars" ? 3 : reward === "2stars" ? 2 : reward === "1star" ? 1 : 0;
+      if (stars > 0) {
+        earnedByDate[c.date] = (earnedByDate[c.date] ?? 0) + stars;
+        total += stars;
+      }
+    }
+
+    return { total, earnedByDate };
+  }
+
+  async getPlannerDateRangeSummary(studentId: number, fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; total: number; done: number }[]> {
+    const allTasks = await this.getPlannerTasksForDateRange(studentId, fromDate, toDate);
+    const tasks = categories ? allTasks.filter((t: any) => categories.includes(t.category)) : allTasks;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const result: { date: string; total: number; done: number }[] = [];
+
+    let cur = new Date(fromDate + "T00:00:00");
+    const end = new Date(toDate + "T00:00:00");
+    while (cur <= end) {
+      const date = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+      const dow = cur.getDay();
+      let total = 0, done = 0;
+      for (const task of tasks) {
+        if (task.startDate > date) continue;
+        if (task.endDate && date > task.endDate) continue;
+        let active = false;
+        if (task.repeat === "once") active = task.startDate === date;
+        else if (task.repeat === "daily") active = true;
+        else if (task.repeat === "weekdays") active = dow >= 1 && dow <= 5;
+        else if (task.repeat === "weekly") active = new Date(task.startDate + "T00:00:00").getDay() === dow;
+        if (active) {
+          total++;
+          if (task.completions.some((c: any) => c.date === date)) done++;
+        }
+      }
+      if (total > 0) result.push({ date, total, done });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return result;
+  }
+
+  async getPlannerFamilyDateRangeSummary(childIds: number[], fromDate: string, toDate: string, categories?: string[]): Promise<{ date: string; childCount: number; total: number; done: number }[]> {
+    const perChild = await Promise.all(childIds.map((id) => this.getPlannerDateRangeSummary(id, fromDate, toDate, categories)));
+    const merged: Record<string, { total: number; done: number; childCount: number }> = {};
+    for (const childRows of perChild) {
+      for (const row of childRows) {
+        if (!merged[row.date]) merged[row.date] = { total: 0, done: 0, childCount: 0 };
+        merged[row.date].total += row.total;
+        merged[row.date].done += row.done;
+        merged[row.date].childCount += 1;
+      }
+    }
+    return Object.entries(merged)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+  }
+
+  async getPlannerFamilyStars(childIds: number[], weekStart: string, weekEnd: string, categories?: string[]): Promise<Record<number, number>> {
+    const completions = await prisma.plannerTaskCompletion.findMany({
+      where: {
+        studentId: { in: childIds },
+        date: { gte: weekStart, lte: weekEnd },
+        ...(categories ? { task: { category: { in: categories } } } : {}),
+      },
+      include: { task: { select: { reward: true } } },
+    });
+    const result: Record<number, number> = {};
+    for (const c of completions) {
+      const reward = c.task?.reward;
+      const stars = reward === "3stars" ? 3 : reward === "2stars" ? 2 : reward === "1star" ? 1 : 0;
+      if (stars > 0) result[c.studentId] = (result[c.studentId] ?? 0) + stars;
+    }
+    return result;
   }
 }
 

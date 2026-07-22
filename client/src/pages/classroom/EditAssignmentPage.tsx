@@ -352,6 +352,7 @@ export default function EditAssignmentPage() {
         fd.append("file", attachedFile);
         fd.append("folder", "classroom-assignments");
         const uploaded = await apiUpload("/api/upload", fd);
+        if (!uploaded?.url) throw new Error(`Couldn't upload "${attachedFile.name}" — upload returned no URL`);
         fileUrl = JSON.stringify([uploaded.url as string]);
       } else if (clearFile) {
         fileUrl = null;
@@ -385,7 +386,7 @@ export default function EditAssignmentPage() {
       toast({ title: "Assignment updated", type: "success" });
       navigate(`/classrooms/${classroomSlug}/assignments`);
     },
-    onError: () => toast({ title: "Couldn't save — try again.", type: "error" }),
+    onError: (err: any) => toast({ title: err?.message || "Couldn't save — try again.", type: "error" }),
   });
 
   const didSave = saveMutation.isSuccess;

@@ -2410,10 +2410,7 @@ export function registerRoutes(app: Express) {
         const callerId = req.session.userId!;
         const isOwner = student.userId === callerId;
         const isParent = await storage.isTeamMember(callerId, student.id);
-        const relation = await prisma.teacherStudentAssignment.findFirst({
-          where: { teacherId: callerId, studentId: student.id },
-        });
-        const isTeacher = !!relation;
+        const isTeacher = await storage.isTeacherFor(callerId, student.id);
         const caller = await storage.getUserById(callerId);
         const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 
@@ -2541,10 +2538,7 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const isParent = await storage.isTeamMember(callerId, student.id);
       const isOwner = student.userId === callerId;
-      const relation = await prisma.teacherStudentAssignment.findFirst({
-        where: { teacherId: callerId, studentId: student.id },
-      });
-      const isTeacher = !!relation;
+      const isTeacher = await storage.isTeacherFor(callerId, student.id);
       const caller = await storage.getUserById(callerId);
       const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 
@@ -2568,10 +2562,7 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const isParent = await storage.isTeamMember(callerId, existing.id);
       const isOwner = existing.userId === callerId;
-      const relation = await prisma.teacherStudentAssignment.findFirst({
-        where: { teacherId: callerId, studentId: existing.id },
-      });
-      const isTeacher = !!relation;
+      const isTeacher = await storage.isTeacherFor(callerId, existing.id);
       const caller = await storage.getUserById(callerId);
       const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 
@@ -3280,10 +3271,11 @@ export function registerRoutes(app: Express) {
 
       const assignment = await storage.createAssignment(data);
 
-      // Auto-assign to students with matching grade level
+      // Auto-assign to students with matching grade level (case-insensitive)
       const students = await storage.getStudentsByTeacher(user.id);
+      const assignmentGrade = assignment.gradeLevel.toLowerCase().trim();
       const matchingStudents = students.filter(
-        (s) => s.gradeLevel === assignment.gradeLevel,
+        (s) => s.gradeLevel.toLowerCase().trim() === assignmentGrade,
       );
 
       for (const student of matchingStudents) {
@@ -3370,10 +3362,11 @@ export function registerRoutes(app: Express) {
 
         const assignment = await storage.createAssignment(data);
 
-        // Auto-assign to students with matching grade level
+        // Auto-assign to students with matching grade level (case-insensitive)
         const students = await storage.getStudentsByTeacher(user.id);
+        const assignmentGrade = assignment.gradeLevel.toLowerCase().trim();
         const matchingStudents = students.filter(
-          (s) => s.gradeLevel === assignment.gradeLevel,
+          (s) => s.gradeLevel.toLowerCase().trim() === assignmentGrade,
         );
 
         for (const student of matchingStudents) {
@@ -3481,9 +3474,10 @@ export function registerRoutes(app: Express) {
               .filter((a) => {
                 // Include if from an assigned teacher
                 if (assignedTeacherIds.has(a.teacherId)) return true;
-                // Or if matching grade level (for general assignments)
+                // Or if matching grade level for general assignments (case-insensitive)
                 return (
-                  !student?.gradeLevel || a.gradeLevel === student.gradeLevel
+                  !student?.gradeLevel ||
+                  a.gradeLevel.toLowerCase().trim() === student.gradeLevel.toLowerCase().trim()
                 );
               })
               .map(async (assignment) => {
@@ -9918,4 +9912,594 @@ export function registerRoutes(app: Express) {
       }
     },
   );
+
+  // ========== PLANNER ROUTES ==========
+
+  // Return the current local date as YYYY-MM-DD (avoids UTC-offset date shifts)
+  function localDateStr(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  // Helper: assert caller is a parent of the given student (via ChildTeamMember)
+  async function assertPlannerParentAccess(callerId: number, studentId: number, res: Response): Promise<boolean> {
+    const children = await storage.getStudentsByParent(callerId);
+    const ok = children.some((c) => c.id === studentId);
+    if (!ok) {
+      res.status(403).json({ error: "Not authorized to manage this student's planner" });
+      return false;
+    }
+    return true;
+  }
+
+  // Helper: assert caller is the student themselves
+  async function assertPlannerStudentAccess(callerId: number, studentId: number, res: Response): Promise<boolean> {
+    const student = await storage.getStudentByUserId(callerId);
+    if (!student || student.id !== studentId) {
+      res.status(403).json({ error: "Not authorized" });
+      return false;
+    }
+    return true;
+  }
+
+  // Helper: assert caller is a teacher with this student assigned
+  async function assertPlannerTeacherAccess(callerId: number, studentId: number, res: Response): Promise<boolean> {
+    const students = await storage.getStudentsByTeacher(callerId);
+    const ok = students.some((s) => s.id === studentId);
+    if (!ok) {
+      res.status(403).json({ error: "Not authorized to manage this student's planner" });
+      return false;
+    }
+    return true;
+  }
+
+  // GET /api/planner/students/:studentId/day?date=YYYY-MM-DD
+  app.get("/api/planner/students/:studentId/day", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const date = (req.query.date as string) || localDateStr();
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const tasks = await storage.getPlannerTasksForDate(studentId, date);
+      res.json(tasks);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/students/:studentId/month?year=&month=
+  app.get("/api/planner/students/:studentId/month", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const year = parseInt(req.query.year as string, 10) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string, 10) || new Date().getMonth() + 1;
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const summary = await storage.getPlannerMonthSummary(studentId, year, month);
+      res.json(summary);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/planner/students/:studentId/tasks — parent creates task for child, or student creates own school/reading task
+  app.post("/api/planner/students/:studentId/tasks", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const schema = z.object({
+        title: z.string().min(1).max(200),
+        category: z.enum(["chore", "school", "reading", "activity"]),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+        note: z.string().max(500).nullable().optional(),
+        reward: z.string().nullable().optional(),
+        repeat: z.enum(["once", "daily", "weekdays", "weekly"]).default("once"),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+      const { title, category, startDate, endDate, note, reward, repeat } = parsed.data;
+
+      if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+        // Teachers can only assign academic tasks
+        if (category !== "school" && category !== "reading") {
+          return res.status(403).json({ error: "Teachers can only add school or reading tasks" });
+        }
+      } else if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+        // Students can only create school/reading tasks
+        if (category !== "school" && category !== "reading") {
+          return res.status(403).json({ error: "Students can only add school or reading tasks" });
+        }
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const task = await storage.createPlannerTask({
+        studentId,
+        createdByUserId: req.session.userId!,
+        title,
+        category,
+        startDate,
+        endDate: endDate ?? null,
+        note: note ?? null,
+        reward: reward ?? null,
+        repeat,
+      });
+      res.json(task);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/planner/students/:studentId/tasks/:taskId — parent or teacher edits a task
+  app.patch("/api/planner/students/:studentId/tasks/:taskId", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      if (user.role !== "parent" && user.role !== "teacher") return res.status(403).json({ error: "Only parents or teachers can edit tasks" });
+
+      if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      }
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      const schema = z.object({
+        title: z.string().min(1).max(200),
+        category: z.enum(["chore", "school", "reading", "activity"]),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+        note: z.string().max(500).nullable().optional(),
+        reward: z.string().nullable().optional(),
+        repeat: z.enum(["once", "daily", "weekdays", "weekly"]),
+        newStudentId: z.number().int().optional(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0].message });
+
+      // Teachers can only set academic categories
+      if (user.role === "teacher" && parsed.data.category !== "school" && parsed.data.category !== "reading") {
+        return res.status(403).json({ error: "Teachers can only set school or reading tasks" });
+      }
+
+      // If reassigning to a different student, verify caller has access to the new student too
+      if (parsed.data.newStudentId && parsed.data.newStudentId !== studentId) {
+        if (user.role === "parent") {
+          if (!(await assertPlannerParentAccess(req.session.userId!, parsed.data.newStudentId, res))) return;
+        } else {
+          if (!(await assertPlannerTeacherAccess(req.session.userId!, parsed.data.newStudentId, res))) return;
+        }
+      }
+
+      const updated = await storage.updatePlannerTask(taskId, {
+        title: parsed.data.title,
+        category: parsed.data.category,
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate ?? null,
+        note: parsed.data.note ?? null,
+        reward: parsed.data.reward ?? null,
+        repeat: parsed.data.repeat,
+        studentId: parsed.data.newStudentId,
+      });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/planner/students/:studentId/tasks/:taskId
+  app.delete("/api/planner/students/:studentId/tasks/:taskId", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+        // Students can only delete their own school/reading tasks
+        if (task.createdByUserId !== req.session.userId) {
+          return res.status(403).json({ error: "Students can only delete tasks they created" });
+        }
+        if (task.category !== "school" && task.category !== "reading") {
+          return res.status(403).json({ error: "Students can only delete school or reading tasks" });
+        }
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await storage.deletePlannerTask(taskId);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/planner/students/:studentId/tasks/:taskId/complete — student checks off a task for a date
+  app.post("/api/planner/students/:studentId/tasks/:taskId/complete", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const schema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "date is required (YYYY-MM-DD)" });
+
+      // Only the student themselves can check off tasks
+      if (user.role !== "student") return res.status(403).json({ error: "Only students can complete tasks" });
+      if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      await storage.completePlannerTask(taskId, studentId, parsed.data.date);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/planner/students/:studentId/tasks/:taskId/complete — un-check a task
+  app.delete("/api/planner/students/:studentId/tasks/:taskId/complete", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const schema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "date is required (YYYY-MM-DD)" });
+
+      if (user.role !== "student") return res.status(403).json({ error: "Only students can toggle task completion" });
+      if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      await storage.uncompletePlannerTask(taskId, studentId, parsed.data.date);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/students/:studentId/weekly-stars?weekStart=YYYY-MM-DD
+  app.get("/api/planner/students/:studentId/weekly-stars", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // Default weekStart to Monday of the current week
+      let weekStart = req.query.weekStart as string;
+      if (!weekStart) {
+        const now = new Date();
+        const day = now.getDay(); // 0=Sun
+        const diffToMon = (day === 0 ? -6 : 1 - day);
+        const mon = new Date(now);
+        mon.setDate(now.getDate() + diffToMon);
+        weekStart = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, "0")}-${String(mon.getDate()).padStart(2, "0")}`;
+      }
+      const startD = new Date(weekStart + "T00:00:00");
+      const endD = new Date(startD);
+      endD.setDate(startD.getDate() + 6);
+      const weekEnd = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const stars = await storage.getPlannerWeeklyStars(studentId, weekStart, weekEnd);
+      res.json(stars);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/planner/tasks/:taskId/toggle — toggle complete/uncomplete for a date (student or parent)
+  app.patch("/api/planner/tasks/:taskId/toggle", requireAuth, async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || !["student", "parent", "teacher"].includes(user.role)) return res.status(403).json({ error: "Access denied" });
+
+      const schema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), studentId: z.number().int() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "date and studentId required" });
+
+      const { date, studentId } = parsed.data;
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      }
+
+      const task = await storage.getPlannerTaskById(taskId);
+      if (!task || task.studentId !== studentId) return res.status(404).json({ error: "Task not found" });
+
+      // Query the DB directly so orphan completions (wrong studentId) never interfere
+      const isDone = await storage.isPlannerTaskDone(taskId, studentId, date);
+      if (isDone) {
+        await storage.uncompletePlannerTask(taskId, studentId, date);
+        res.json({ ok: true, isDone: false });
+      } else {
+        await storage.completePlannerTask(taskId, studentId, date);
+        res.json({ ok: true, isDone: true, reward: task.reward });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/students/:studentId/upcoming?fromDate=&days=
+  app.get("/api/planner/students/:studentId/upcoming", requireAuth, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId, 10);
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      if (user.role === "student") {
+        if (!(await assertPlannerStudentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "parent") {
+        if (!(await assertPlannerParentAccess(req.session.userId!, studentId, res))) return;
+      } else if (user.role === "teacher") {
+        if (!(await assertPlannerTeacherAccess(req.session.userId!, studentId, res))) return;
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const fromDate = (req.query.fromDate as string) || localDateStr();
+      const days = Math.min(parseInt(req.query.days as string, 10) || 7, 14);
+      const endD = new Date(fromDate + "T00:00:00");
+      endD.setDate(endD.getDate() + days - 1);
+      const toDate = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const rows = await storage.getPlannerDateRangeSummary(studentId, fromDate, toDate);
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/family/upcoming?fromDate=&days=
+  app.get("/api/planner/family/upcoming", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
+
+      const fromDate = (req.query.fromDate as string) || localDateStr();
+      const days = Math.min(parseInt(req.query.days as string, 10) || 7, 14);
+      const endD = new Date(fromDate + "T00:00:00");
+      endD.setDate(endD.getDate() + days - 1);
+      const toDate = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const children = await storage.getStudentsByParent(req.session.userId!);
+      const childIds = children.map((c) => c.id);
+      const rows = await storage.getPlannerFamilyDateRangeSummary(childIds, fromDate, toDate);
+      res.json({ children: children.map((c) => ({ id: c.id, name: c.name })), upcoming: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/family/stars?weekStart=
+  app.get("/api/planner/family/stars", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
+
+      let weekStart = req.query.weekStart as string;
+      if (!weekStart) {
+        const now = new Date();
+        const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
+        const mon = new Date(now);
+        mon.setDate(now.getDate() + diff);
+        weekStart = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, "0")}-${String(mon.getDate()).padStart(2, "0")}`;
+      }
+      const endD = new Date(weekStart + "T00:00:00");
+      endD.setDate(endD.getDate() + 6);
+      const weekEnd = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const children = await storage.getStudentsByParent(req.session.userId!);
+      const childIds = children.map((c) => c.id);
+      const starsByChild = await storage.getPlannerFamilyStars(childIds, weekStart, weekEnd);
+      res.json({ children: children.map((c) => ({ id: c.id, name: c.name })), stars: starsByChild, weekStart, weekEnd });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/family/day?date= — parent: get tasks for all children on a date
+  app.get("/api/planner/family/day", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
+
+      const date = (req.query.date as string) || localDateStr();
+      const children = await storage.getStudentsByParent(req.session.userId!);
+
+      const result: Record<number, any[]> = {};
+      await Promise.all(
+        children.map(async (child) => {
+          result[child.id] = await storage.getPlannerTasksForDate(child.id, date);
+        }),
+      );
+
+      res.json({ children: children.map((c) => ({ id: c.id, name: c.name })), tasks: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/family/month?year=&month= — parent: month summary for all children
+  app.get("/api/planner/family/month", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "parent") return res.status(403).json({ error: "Parent access only" });
+
+      const year = parseInt(req.query.year as string, 10) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string, 10) || new Date().getMonth() + 1;
+      const children = await storage.getStudentsByParent(req.session.userId!);
+
+      const result: Record<number, Record<string, { total: number; done: number }>> = {};
+      await Promise.all(
+        children.map(async (child) => {
+          result[child.id] = await storage.getPlannerMonthSummary(child.id, year, month);
+        }),
+      );
+
+      res.json({ children: children.map((c) => ({ id: c.id, name: c.name })), summaries: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Teacher "class" planner routes (mirrors family/* for parents) ─────────────
+
+  // GET /api/planner/class/day?date= — teacher: get tasks for all their students on a date
+  app.get("/api/planner/class/day", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      const date = (req.query.date as string) || localDateStr();
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+
+      const ACADEMIC = ["school", "reading"];
+      const result: Record<number, any[]> = {};
+      await Promise.all(
+        students.map(async (s) => {
+          const all = await storage.getPlannerTasksForDate(s.id, date);
+          result[s.id] = all.filter((t: any) => ACADEMIC.includes(t.category));
+        }),
+      );
+
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), tasks: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/class/month?year=&month= — teacher: month summary for all their students
+  app.get("/api/planner/class/month", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      const year = parseInt(req.query.year as string, 10) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string, 10) || new Date().getMonth() + 1;
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+
+      const ACADEMIC = ["school", "reading"];
+      const result: Record<number, Record<string, { total: number; done: number }>> = {};
+      await Promise.all(
+        students.map(async (s) => {
+          result[s.id] = await storage.getPlannerMonthSummary(s.id, year, month, ACADEMIC);
+        }),
+      );
+
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), summaries: result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/class/upcoming?fromDate=&days= — teacher: upcoming tasks for all students
+  app.get("/api/planner/class/upcoming", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      const fromDate = (req.query.fromDate as string) || localDateStr();
+      const days = Math.min(parseInt(req.query.days as string, 10) || 7, 14);
+      const endD = new Date(fromDate + "T00:00:00");
+      endD.setDate(endD.getDate() + days - 1);
+      const toDate = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+      const studentIds = students.map((s) => s.id);
+      const rows = await storage.getPlannerFamilyDateRangeSummary(studentIds, fromDate, toDate, ["school", "reading"]);
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), upcoming: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/planner/class/stars?weekStart= — teacher: weekly stars for all students
+  app.get("/api/planner/class/stars", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.session.userId!);
+      if (!user || user.role !== "teacher") return res.status(403).json({ error: "Teacher access only" });
+
+      let weekStart = req.query.weekStart as string;
+      if (!weekStart) {
+        const now = new Date();
+        const diff = now.getDay() === 0 ? -6 : 1 - now.getDay();
+        const mon = new Date(now);
+        mon.setDate(now.getDate() + diff);
+        weekStart = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, "0")}-${String(mon.getDate()).padStart(2, "0")}`;
+      }
+      const endD = new Date(weekStart + "T00:00:00");
+      endD.setDate(endD.getDate() + 6);
+      const weekEnd = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, "0")}-${String(endD.getDate()).padStart(2, "0")}`;
+
+      const students = await storage.getStudentsByTeacher(req.session.userId!);
+      const studentIds = students.map((s) => s.id);
+      const starsByStudent = await storage.getPlannerFamilyStars(studentIds, weekStart, weekEnd, ["school", "reading"]);
+      res.json({ students: students.map((s) => ({ id: s.id, name: s.name })), stars: starsByStudent, weekStart, weekEnd });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
