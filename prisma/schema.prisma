@@ -176,6 +176,7 @@ model StudentAssignment {
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  @@unique([assignmentId, studentId])
   @@index([assignmentId])
   @@index([studentId])
 }

@@ -2568,10 +2568,7 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const isParent = await storage.isTeamMember(callerId, existing.id);
       const isOwner = existing.userId === callerId;
-      const relation = await prisma.teacherStudentAssignment.findFirst({
-        where: { teacherId: callerId, studentId: existing.id },
-      });
-      const isTeacher = !!relation;
+      const isTeacher = await storage.isTeacherFor(callerId, existing.id);
       const caller = await storage.getUserById(callerId);
       const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 
@@ -3280,10 +3277,11 @@ export function registerRoutes(app: Express) {
 
       const assignment = await storage.createAssignment(data);
 
-      // Auto-assign to students with matching grade level
+      // Auto-assign to students with matching grade level (case-insensitive)
       const students = await storage.getStudentsByTeacher(user.id);
+      const assignmentGrade = assignment.gradeLevel.toLowerCase().trim();
       const matchingStudents = students.filter(
-        (s) => s.gradeLevel === assignment.gradeLevel,
+        (s) => s.gradeLevel.toLowerCase().trim() === assignmentGrade,
       );
 
       for (const student of matchingStudents) {
@@ -3370,10 +3368,11 @@ export function registerRoutes(app: Express) {
 
         const assignment = await storage.createAssignment(data);
 
-        // Auto-assign to students with matching grade level
+        // Auto-assign to students with matching grade level (case-insensitive)
         const students = await storage.getStudentsByTeacher(user.id);
+        const assignmentGrade = assignment.gradeLevel.toLowerCase().trim();
         const matchingStudents = students.filter(
-          (s) => s.gradeLevel === assignment.gradeLevel,
+          (s) => s.gradeLevel.toLowerCase().trim() === assignmentGrade,
         );
 
         for (const student of matchingStudents) {
@@ -3481,9 +3480,10 @@ export function registerRoutes(app: Express) {
               .filter((a) => {
                 // Include if from an assigned teacher
                 if (assignedTeacherIds.has(a.teacherId)) return true;
-                // Or if matching grade level (for general assignments)
+                // Or if matching grade level for general assignments (case-insensitive)
                 return (
-                  !student?.gradeLevel || a.gradeLevel === student.gradeLevel
+                  !student?.gradeLevel ||
+                  a.gradeLevel.toLowerCase().trim() === student.gradeLevel.toLowerCase().trim()
                 );
               })
               .map(async (assignment) => {

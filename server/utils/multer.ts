@@ -1,27 +1,37 @@
 import multer from 'multer';
 import path from 'path';
 
-// Memory storage - stores files in memory as Buffer objects
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+]);
+
+const ALLOWED_EXTENSIONS = new Set([
+  '.jpeg', '.jpg', '.png', '.gif', '.webp',
+  '.pdf', '.doc', '.docx', '.txt',
+]);
+
 export const memoryUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB max file size
+    fileSize: 20 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    // Allow images and documents
-    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_MIME_TYPES.has(file.mimetype) && ALLOWED_EXTENSIONS.has(ext)) {
       return cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only images and documents are allowed.'));
     }
+    cb(new Error('Invalid file type. Allowed: JPEG, PNG, GIF, WebP, PDF, DOC, DOCX, TXT.'));
   },
 });
 
-// Disk storage - stores files temporarily on disk
 export const diskUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
@@ -33,6 +43,6 @@ export const diskUpload = multer({
     },
   }),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024,
   },
 });

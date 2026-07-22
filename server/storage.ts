@@ -95,6 +95,7 @@ export interface IStorage {
   getStudentsByTeacher(
     teacherId: number,
   ): Promise<(Student & { email?: string })[]>;
+  isTeacherFor(teacherId: number, studentId: number): Promise<boolean>;
   updateStudent(
     id: number,
     student: Prisma.StudentUpdateInput,
@@ -445,7 +446,7 @@ class PrismaStorage implements IStorage {
       data: {
         userId: student.userId,
         name: student.name,
-        gradeLevel: student.gradeLevel,
+        gradeLevel: student.gradeLevel?.trim() ?? "",
         badges: student.badges ?? [],
         points: student.points ?? 0,
       },
@@ -502,6 +503,9 @@ class PrismaStorage implements IStorage {
   async getStudentsByTeacher(
     teacherId: number,
   ): Promise<(Student & { email?: string; parentName?: string; parentId?: number })[]> {
+    const studentMap = new Map<number, Student & { email?: string; parentName?: string; parentId?: number }>();
+
+    // Primary path: students linked via approved TutorRequest
     const requests = await prisma.tutorRequest.findMany({
       where: { teacherId, status: "approved" },
       include: {
@@ -509,7 +513,6 @@ class PrismaStorage implements IStorage {
           select: {
             id: true,
             name: true,
-            // Use the new family team join table instead of the removed parentStudents relation
             childTeamMemberships: {
               where: { status: "active" },
               include: { child: { include: { user: true } } },
@@ -518,12 +521,10 @@ class PrismaStorage implements IStorage {
         },
       },
     });
-    const studentMap = new Map<number, Student & { email?: string; parentName?: string; parentId?: number }>();
     requests.forEach((r) => {
       const parentName = (r.parent as any).name;
       const memberships: any[] = (r.parent as any).childTeamMemberships ?? [];
       if (r.studentId) {
-        // Specific student was requested — only include that student
         const m = memberships.find((m: any) => m.childId === r.studentId);
         const s = m?.child;
         if (s && !studentMap.has(s.id)) {
@@ -534,12 +535,8 @@ class PrismaStorage implements IStorage {
             parentId: r.parentId,
             user: undefined,
           } as Student & { email?: string; parentName?: string; parentId?: number });
-        } else if (!s && r.studentId) {
-          // Fallback: look up student directly if not found via team membership
-          // (handles edge cases where assignment pre-dates team membership)
         }
       } else {
-        // Legacy requests without studentId — include all of parent's students via team
         memberships.forEach((m: any) => {
           const s = m.child;
           if (s && !studentMap.has(s.id)) {
@@ -554,7 +551,34 @@ class PrismaStorage implements IStorage {
         });
       }
     });
+
+    // Legacy path: students linked via TeacherStudentAssignment (pre-TutorRequest migration)
+    const legacyAssignments = await prisma.teacherStudentAssignment.findMany({
+      where: { teacherId, status: "active" },
+      include: { student: { include: { user: true } } },
+    });
+    for (const tsa of legacyAssignments) {
+      const s = tsa.student as any;
+      if (s && !studentMap.has(s.id)) {
+        studentMap.set(s.id, {
+          ...s,
+          email: s.user?.email,
+          parentName: undefined,
+          parentId: undefined,
+          user: undefined,
+        } as Student & { email?: string; parentName?: string; parentId?: number });
+      }
+    }
+
     return Array.from(studentMap.values());
+  }
+
+  async isTeacherFor(teacherId: number, studentId: number): Promise<boolean> {
+    const [tutorReq, tsa] = await Promise.all([
+      prisma.tutorRequest.findFirst({ where: { teacherId, studentId, status: "approved" } }),
+      prisma.teacherStudentAssignment.findFirst({ where: { teacherId, studentId } }),
+    ]);
+    return !!(tutorReq || tsa);
   }
 
   async updateStudent(
@@ -568,7 +592,9 @@ class PrismaStorage implements IStorage {
   }
 
   async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
-    const created = await prisma.assignment.create({ data: assignment });
+    const created = await prisma.assignment.create({
+      data: { ...assignment, gradeLevel: assignment.gradeLevel?.trim() ?? "" },
+    });
     const slug = slugify(created.title, created.id);
     return (await prisma.assignment.update({ where: { id: created.id }, data: { slug } })) as Assignment;
   }
@@ -606,8 +632,15 @@ class PrismaStorage implements IStorage {
   async createStudentAssignment(
     studentAssignment: InsertStudentAssignment,
   ): Promise<StudentAssignment> {
-    return (await prisma.studentAssignment.create({
-      data: studentAssignment,
+    return (await prisma.studentAssignment.upsert({
+      where: {
+        assignmentId_studentId: {
+          assignmentId: studentAssignment.assignmentId,
+          studentId: studentAssignment.studentId,
+        },
+      },
+      create: studentAssignment,
+      update: {},
     })) as StudentAssignment;
   }
 
@@ -1769,19 +1802,25 @@ class PrismaStorage implements IStorage {
   // Selects the teacher with fewest approved TutorRequests (load-balancing) and
   // returns their userId. Does NOT write any records — callers create TutorRequest.
   async findFirstAvailableTeacherId(studentId: number): Promise<number | null> {
-    const teachers = await prisma.user.findMany({
-      where: { role: "teacher" },
+    // Include both primary teachers and dual-role users who have the teacher role
+    const allTeachers = await prisma.user.findMany({
       select: {
         id: true,
+        role: true,
+        roles: true,
         _count: { select: { tutorRequests: { where: { status: "approved" } } } },
       },
     });
+    const teachers = allTeachers.filter(
+      (u) => u.role === "teacher" || (Array.isArray(u.roles) && (u.roles as string[]).includes("teacher")),
+    );
     if (teachers.length === 0) return null;
-    // Exclude teachers already linked to this student via approved TutorRequest
+    // If student already has an approved tutor, return that teacher
     const existing = await prisma.tutorRequest.findFirst({
       where: { studentId, status: "approved" },
     });
     if (existing) return existing.teacherId;
+    // Load-balance: pick teacher with fewest approved requests
     teachers.sort((a, b) => a._count.tutorRequests - b._count.tutorRequests);
     return teachers[0].id;
   }
