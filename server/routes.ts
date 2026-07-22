@@ -2410,10 +2410,7 @@ export function registerRoutes(app: Express) {
         const callerId = req.session.userId!;
         const isOwner = student.userId === callerId;
         const isParent = await storage.isTeamMember(callerId, student.id);
-        const relation = await prisma.teacherStudentAssignment.findFirst({
-          where: { teacherId: callerId, studentId: student.id },
-        });
-        const isTeacher = !!relation;
+        const isTeacher = await storage.isTeacherFor(callerId, student.id);
         const caller = await storage.getUserById(callerId);
         const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 
@@ -2541,10 +2538,7 @@ export function registerRoutes(app: Express) {
       const callerId = req.session.userId!;
       const isParent = await storage.isTeamMember(callerId, student.id);
       const isOwner = student.userId === callerId;
-      const relation = await prisma.teacherStudentAssignment.findFirst({
-        where: { teacherId: callerId, studentId: student.id },
-      });
-      const isTeacher = !!relation;
+      const isTeacher = await storage.isTeacherFor(callerId, student.id);
       const caller = await storage.getUserById(callerId);
       const isAdmin = !!(caller?.isAdmin || caller?.isSuperAdmin);
 

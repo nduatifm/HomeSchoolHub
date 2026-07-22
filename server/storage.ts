@@ -446,7 +446,7 @@ class PrismaStorage implements IStorage {
       data: {
         userId: student.userId,
         name: student.name,
-        gradeLevel: student.gradeLevel?.trim() ?? "",
+        gradeLevel: student.gradeLevel?.trim().toLowerCase() ?? "",
         badges: student.badges ?? [],
         points: student.points ?? 0,
       },
@@ -576,7 +576,7 @@ class PrismaStorage implements IStorage {
   async isTeacherFor(teacherId: number, studentId: number): Promise<boolean> {
     const [tutorReq, tsa] = await Promise.all([
       prisma.tutorRequest.findFirst({ where: { teacherId, studentId, status: "approved" } }),
-      prisma.teacherStudentAssignment.findFirst({ where: { teacherId, studentId } }),
+      prisma.teacherStudentAssignment.findFirst({ where: { teacherId, studentId, status: "active" } }),
     ]);
     return !!(tutorReq || tsa);
   }
@@ -585,6 +585,9 @@ class PrismaStorage implements IStorage {
     id: number,
     student: Prisma.StudentUpdateInput,
   ): Promise<Student> {
+    if (typeof student.gradeLevel === "string") {
+      student = { ...student, gradeLevel: student.gradeLevel.trim().toLowerCase() };
+    }
     return (await prisma.student.update({
       where: { id },
       data: student,
@@ -593,7 +596,7 @@ class PrismaStorage implements IStorage {
 
   async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
     const created = await prisma.assignment.create({
-      data: { ...assignment, gradeLevel: assignment.gradeLevel?.trim() ?? "" },
+      data: { ...assignment, gradeLevel: assignment.gradeLevel?.trim().toLowerCase() ?? "" },
     });
     const slug = slugify(created.title, created.id);
     return (await prisma.assignment.update({ where: { id: created.id }, data: { slug } })) as Assignment;
