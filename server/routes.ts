@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { logAuthEvent } from "./utils/authLogger";
+import { logAuditEvent } from "./utils/auditLogger";
 import prisma from "./db";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -1662,14 +1663,20 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      // Students cannot self-reset — their parent/admin must do it
+      // Students cannot self-reset — return uniform response
       if (user.role === "student") {
-        return res.json({ success: true, isStudent: true });
+        return res.json({
+          success: true,
+          message: "If that email is registered, a reset link has been sent.",
+        });
       }
 
-      // Google-only accounts have no password to reset
+      // Google-only accounts have no password to reset — return uniform response
       if (!user.password && user.googleId) {
-        return res.json({ success: true, isGoogleAccount: true });
+        return res.json({
+          success: true,
+          message: "If that email is registered, a reset link has been sent.",
+        });
       }
 
       // Generate reset token (1-hour expiry)
@@ -2108,7 +2115,19 @@ export function registerRoutes(app: Express) {
           return res.status(400).json({ error: "No file provided" });
         }
 
-        const folder = req.body.folder || "uploads";
+        const ALLOWED_FOLDERS = new Set([
+          "uploads",
+          "assignments",
+          "avatars",
+          "materials",
+          "submissions",
+        ]);
+        const requestedFolder =
+          typeof req.body.folder === "string" ? req.body.folder.trim() : "";
+        const folder = ALLOWED_FOLDERS.has(requestedFolder)
+          ? requestedFolder
+          : "uploads";
+
         const result: any = await uploadBufferToCloudinary(
           req.file.buffer,
           req.file.originalname,
@@ -2570,7 +2589,22 @@ export function registerRoutes(app: Express) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      const student = await storage.updateStudent(id, req.body);
+      const allowedFields = [
+        "name",
+        "gradeLevel",
+        "badges",
+        "interests",
+        "favoriteSubject",
+        "learningGoals",
+      ];
+      const updatePayload: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updatePayload[field] = req.body[field];
+        }
+      }
+
+      const student = await storage.updateStudent(id, updatePayload);
       res.json(student);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -4749,6 +4783,29 @@ export function registerRoutes(app: Express) {
             });
           }
         }
+
+        // Verify parent is messaging a teacher who actually teaches one of their children
+        if (req.body.receiverId) {
+          const receiverIdNum = parseInt(req.body.receiverId);
+          if (!isNaN(receiverIdNum)) {
+            const receiver = await storage.getUserById(receiverIdNum);
+            if (receiver?.role === "teacher") {
+              const myChildren = await storage.getStudentsByParent(callerId);
+              let connected = false;
+              for (const child of myChildren) {
+                if (await storage.isTeacherFor(receiverIdNum, child.id)) {
+                  connected = true;
+                  break;
+                }
+              }
+              if (!connected) {
+                return res.status(403).json({
+                  error: "Forbidden: Cannot message a teacher not connected to any of your children",
+                });
+              }
+            }
+          }
+        }
       }
 
       const data = insertMessageSchema.parse({
@@ -4809,6 +4866,12 @@ export function registerRoutes(app: Express) {
 
       if (!isTeacher && !isStudent && !isOwner) {
         return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // Verify that teacherUserId actually has an active teaching connection to studentId
+      const isTeacherConnected = await storage.isTeacherFor(teacherUserId, student.id);
+      if (!isTeacherConnected) {
+        return res.status(403).json({ error: "Forbidden: teacher is not assigned to this student" });
       }
 
       // In tutor-request mode, approved TutorRequest is the single source of truth.
@@ -4915,12 +4978,10 @@ export function registerRoutes(app: Express) {
       if (!student) return res.status(404).json({ error: "Student not found" });
 
       const isTeacher = callerId === teacherUserId;
-      const isStudent = callerId === student.userId;
-      const isParent = await storage.isTeamMember(callerId, student.id);
-      if (!isTeacher && !isStudent && !isParent) {
+      if (!isTeacher) {
         return res
           .status(403)
-          .json({ error: "Not a participant of this thread" });
+          .json({ error: "Only the teacher can manage thread labels for their inbox" });
       }
 
       const trimmed = name.trim();
@@ -7315,6 +7376,13 @@ export function registerRoutes(app: Express) {
           .json({ error: "query is required in request body" });
       }
 
+      // Disallow multi-statement queries
+      if (sql.includes(";")) {
+        return res.status(403).json({
+          error: "Multiple statements are not permitted in raw SQL queries.",
+        });
+      }
+
       // Validate read-only intent: first keyword must be SELECT, WITH, or EXPLAIN …
       const statement = sql.split(/\s+/)[0].toUpperCase();
       const ALLOWED_FIRST = ["SELECT", "WITH", "EXPLAIN"];
@@ -7325,20 +7393,32 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      // … AND no DML/DDL keywords are allowed anywhere in the query (guards against CTEs with side-effects)
+      // … AND no DML/DDL or dangerous functions allowed anywhere in the query
       const FORBIDDEN_TOKENS =
-        /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE|GRANT|REVOKE|EXECUTE|EXEC|CALL|DO|COPY|VACUUM|ANALYZE|REINDEX|CLUSTER|LOCK|SET|RESET)\b/i;
+        /\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|REPLACE|MERGE|GRANT|REVOKE|EXECUTE|EXEC|CALL|DO|COPY|VACUUM|ANALYZE|REINDEX|CLUSTER|LOCK|SET|RESET|PG_READ_FILE|PG_READ_BINARY_FILE|LO_EXPORT|DBLINK|PG_SLEEP|PG_ADVISORY_LOCK|SET_CONFIG)\b/i;
       if (FORBIDDEN_TOKENS.test(sql)) {
         return res.status(403).json({
           error:
-            "Query contains disallowed keywords. Only read-only SQL is permitted.",
+            "Query contains disallowed keywords or functions. Only read-only SQL is permitted.",
         });
       }
 
-      const rows = await prisma.$queryRawUnsafe(sql);
+      logAuditEvent({
+        action: "ADMIN_SQL_EXECUTION",
+        userId: req.session.userId,
+        details: { query: sql.slice(0, 200) },
+        ip: req.ip,
+      });
+
+      const rows = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+        return await tx.$queryRawUnsafe(sql);
+      });
+
       return res.json({ rows });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("[Admin SQL Error]", error);
+      res.status(500).json({ error: "Failed to execute SQL query" });
     }
   });
 
@@ -9642,10 +9722,16 @@ export function registerRoutes(app: Express) {
           0,
         );
         if (totalConfiguredWeight > 0) {
-          gradedItems.forEach((b) => {
-            b.effectiveWeight = Math.round(
-              (b.configuredWeight / totalConfiguredWeight) * 100,
-            );
+          let sumEffective = 0;
+          gradedItems.forEach((b, idx) => {
+            if (idx === gradedItems.length - 1) {
+              b.effectiveWeight = 100 - sumEffective;
+            } else {
+              b.effectiveWeight = Math.round(
+                (b.configuredWeight / totalConfiguredWeight) * 100,
+              );
+              sumEffective += b.effectiveWeight;
+            }
           });
         }
 

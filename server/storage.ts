@@ -2008,28 +2008,46 @@ class PrismaStorage implements IStorage {
   }
 
   async enrollStudent(classroomId: number, studentId: number): Promise<ClassroomEnrollment> {
-    const enrollment = await prisma.classroomEnrollment.create({
-      data: { classroomId, studentId },
-    });
-    // Auto-create pending submissions for all existing assignments
-    const assignments = await prisma.classroomAssignment.findMany({ where: { classroomId } });
-    for (const a of assignments) {
-      await prisma.classroomSubmission.upsert({
-        where: { assignmentId_studentId: { assignmentId: a.id, studentId } },
-        create: { assignmentId: a.id, studentId, status: "pending" },
-        update: {},
+    return await prisma.$transaction(async (tx) => {
+      const enrollment = await tx.classroomEnrollment.create({
+        data: { classroomId, studentId },
       });
-    }
-    return {
-      id: enrollment.id,
-      classroomId: enrollment.classroomId,
-      studentId: enrollment.studentId,
-      enrolledAt: enrollment.enrolledAt instanceof Date ? enrollment.enrolledAt.toISOString() : enrollment.enrolledAt,
-    };
+      // Auto-create pending submissions for all existing assignments
+      const assignments = await tx.classroomAssignment.findMany({ where: { classroomId } });
+      for (const a of assignments) {
+        await tx.classroomSubmission.upsert({
+          where: { assignmentId_studentId: { assignmentId: a.id, studentId } },
+          create: { assignmentId: a.id, studentId, status: "pending" },
+          update: {},
+        });
+      }
+      return {
+        id: enrollment.id,
+        classroomId: enrollment.classroomId,
+        studentId: enrollment.studentId,
+        enrolledAt: enrollment.enrolledAt instanceof Date ? enrollment.enrolledAt.toISOString() : enrollment.enrolledAt,
+      };
+    });
   }
 
   async unenrollStudent(classroomId: number, studentId: number): Promise<void> {
-    await prisma.classroomEnrollment.deleteMany({ where: { classroomId, studentId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.classroomEnrollment.deleteMany({ where: { classroomId, studentId } });
+      const assignments = await tx.classroomAssignment.findMany({
+        where: { classroomId },
+        select: { id: true },
+      });
+      const assignmentIds = assignments.map((a) => a.id);
+      if (assignmentIds.length > 0) {
+        await tx.classroomSubmission.deleteMany({
+          where: {
+            studentId,
+            assignmentId: { in: assignmentIds },
+            status: "pending",
+          },
+        });
+      }
+    });
   }
 
   async getEnrollments(classroomId: number): Promise<(ClassroomEnrollment & { student: { id: number; name: string; userId: number } })[]> {
