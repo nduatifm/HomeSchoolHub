@@ -992,7 +992,13 @@ export default function ClassworkDetail() {
                   prose-hr:border-border prose-hr:my-5
                   prose-img:rounded-xl prose-img:my-4 prose-img:max-w-full"
                 dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(materialDialogOpen.description, { USE_PROFILES: { html: true } }),
+                  __html: DOMPurify.sanitize(materialDialogOpen.description, {
+                    ALLOWED_TAGS: [
+                      "p", "b", "i", "em", "strong", "a", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6",
+                      "code", "pre", "blockquote", "img", "table", "thead", "tbody", "tr", "th", "td", "br", "hr", "span", "div"
+                    ],
+                    ALLOWED_ATTR: ["href", "src", "alt", "title", "target", "rel", "class", "style", "width", "height"]
+                  }),
                 }}
               />
             )}

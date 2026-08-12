@@ -75,7 +75,13 @@ import type { Classroom, ClassroomAssignment, ClassroomMaterial } from "@shared/
 import { getAttachmentKind } from "@/lib/classroomUtils";
 
 function sanitize(html: string): string {
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      "p", "b", "i", "em", "strong", "a", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6",
+      "code", "pre", "blockquote", "img", "table", "thead", "tbody", "tr", "th", "td", "br", "hr", "span", "div"
+    ],
+    ALLOWED_ATTR: ["href", "src", "alt", "title", "target", "rel", "class", "style", "width", "height"]
+  });
 }
 
 // ─── Rich content renderer ───────────────────────────────────────────────────

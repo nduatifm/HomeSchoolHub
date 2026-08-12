@@ -86,8 +86,8 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com", "https://replit.com"],
-      scriptSrcElem: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com", "https://replit.com"],
+      scriptSrc: ["'self'", "https://accounts.google.com", "https://apis.google.com", "https://replit.com"],
+      scriptSrcElem: ["'self'", "https://accounts.google.com", "https://apis.google.com", "https://replit.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -204,6 +204,7 @@ app.post("/api/auth/google/complete", authLimiter);
 app.post("/api/auth/forgot-password", authLimiter);
 app.post("/api/auth/reset-password", authLimiter);
 app.post("/api/auth/resend-verification", authLimiter);
+app.get("/api/auth/verify-email/:token", authLimiter);
 // Rate-limit only the student creation endpoint (not all /api/students/* routes).
 // The old `app.use("/api/students", authLimiter)` was blanket-covering dashboard
 // fetch routes (e.g. /api/students/me, /api/students/:id/classroom-notifications)
