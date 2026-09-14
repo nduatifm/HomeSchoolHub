@@ -198,6 +198,7 @@ function TeacherEditor({
     editorProps: {
       attributes: {
         class: "min-h-[280px] px-5 py-4 outline-none text-sm leading-relaxed",
+        spellcheck: "true",
       },
     },
   });
@@ -707,6 +708,7 @@ function TeacherEditor({
             {/* Title */}
             <input
               type="text"
+              spellCheck
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Title"

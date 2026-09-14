@@ -285,6 +285,7 @@ export default function MessageThread({
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <input
               ref={renameInputRef}
+              spellCheck
               value={draftName}
               onChange={(e) => setDraftName(e.target.value.slice(0, 60))}
               onKeyDown={handleRenameKeyDown}
@@ -518,6 +519,7 @@ export default function MessageThread({
             placeholder="Message…"
             value={text}
             rows={1}
+            spellCheck
             onChange={(e) => { setText(e.target.value); autoResize(); }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
