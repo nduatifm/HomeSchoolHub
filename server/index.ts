@@ -86,8 +86,22 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://accounts.google.com", "https://apis.google.com", "https://replit.com"],
-      scriptSrcElem: ["'self'", "https://accounts.google.com", "https://apis.google.com", "https://replit.com"],
+      // Vite injects the React Refresh preamble as inline scripts in development.
+      // Production bundles are external files, so keep the deployed CSP strict.
+      scriptSrc: [
+        "'self'",
+        ...(!isProd ? ["'unsafe-inline'"] : []),
+        "https://accounts.google.com",
+        "https://apis.google.com",
+        "https://replit.com",
+      ],
+      scriptSrcElem: [
+        "'self'",
+        ...(!isProd ? ["'unsafe-inline'"] : []),
+        "https://accounts.google.com",
+        "https://apis.google.com",
+        "https://replit.com",
+      ],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -109,11 +123,21 @@ function buildAllowedOrigins(): Set<string> {
   const origins: (string | undefined)[] = [
     "http://localhost:5000",
     "http://localhost:5001",
-    // Add the canonical Replit deployment domain if provided
-    process.env.REPLIT_DOMAINS
-      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
-      : undefined,
+    "http://127.0.0.1:5000",
+    "http://127.0.0.1:5001",
   ];
+
+  // Replit may provide multiple exact preview/deployment domains.
+  // Add every declared domain rather than trusting only the first entry.
+  if (process.env.REPLIT_DOMAINS) {
+    for (const domain of process.env.REPLIT_DOMAINS.split(",")) {
+      const hostname = domain.trim();
+      if (hostname) origins.push(`https://${hostname}`);
+    }
+  }
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    origins.push(`https://${process.env.REPLIT_DEV_DOMAIN.trim()}`);
+  }
 
   // For each CLIENT_URL, also add the www ↔ non-www counterpart so both
   // variants are always accepted (e.g. lyraprep.com and www.lyraprep.com).
