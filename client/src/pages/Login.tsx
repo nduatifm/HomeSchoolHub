@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,10 @@ export default function Login() {
   const { login, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as
+    | string
+    | undefined;
 
   const teamInviteToken = (() => {
     try { return new URLSearchParams(window.location.search).get("teamInvite") || null; } catch { return null; }
@@ -68,6 +72,94 @@ export default function Login() {
   useEffect(() => {
     loadGoogleSignInAvailability().then(setGoogleAvailable);
   }, []);
+
+  useEffect(() => {
+    if (googleAvailable || !googleClientId || !googleButtonRef.current) return;
+
+    let cancelled = false;
+
+    const renderGoogleButton = () => {
+      if (cancelled || !googleButtonRef.current) return;
+      const google = (window as any).google;
+      if (!google?.accounts?.id) return;
+
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async ({ credential }: { credential?: string }) => {
+          if (!credential) {
+            toast({
+              title: "Google Sign-In failed — no credential received.",
+              type: "error",
+            });
+            return;
+          }
+
+          setIsLoading(true);
+          try {
+            await apiRequest("/api/auth/google", {
+              method: "POST",
+              body: JSON.stringify({ credential }),
+            });
+            await refreshUser();
+            toast({ title: "Welcome back!", type: "success" });
+            if (teamInviteToken) {
+              setLocation(`/team-invite/${teamInviteToken}`);
+            } else {
+              setLocation(nextPath);
+            }
+          } catch (error: unknown) {
+            const apiError = error as ApiError;
+            toast({
+              title:
+                apiError.message ||
+                "Google Sign-In failed. If you are new, create an account first.",
+              type: "error",
+              duration: 6000,
+            });
+          } finally {
+            setIsLoading(false);
+          }
+        },
+      });
+
+      googleButtonRef.current.replaceChildren();
+      google.accounts.id.renderButton(googleButtonRef.current, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "rectangular",
+        width: Math.min(384, googleButtonRef.current.clientWidth || 384),
+      });
+    };
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+    if (existing) {
+      if ((window as any).google?.accounts?.id) renderGoogleButton();
+      else existing.addEventListener("load", renderGoogleButton, { once: true });
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.addEventListener("load", renderGoogleButton, { once: true });
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    googleAvailable,
+    googleClientId,
+    nextPath,
+    refreshUser,
+    setLocation,
+    teamInviteToken,
+    toast,
+  ]);
 
   useEffect(() => {
     try {
@@ -342,6 +434,26 @@ export default function Login() {
                 </svg>
                 <span>Continue with Google</span>
               </Button>
+            </>
+          )}
+
+          {!googleAvailable && googleClientId && (
+            <>
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-background px-3 text-muted-foreground">
+                    or continue with
+                  </span>
+                </div>
+              </div>
+              <div
+                ref={googleButtonRef}
+                className="flex min-h-10 w-full items-center justify-center"
+                aria-label="Continue with Google"
+              />
             </>
           )}
 
