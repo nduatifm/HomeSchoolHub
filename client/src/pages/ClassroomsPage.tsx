@@ -1264,7 +1264,7 @@ export default function ClassroomsPage() {
               ) : (
                 <div className="border border-border rounded-lg overflow-hidden">
                   <div className="p-2 border-b border-border">
-                    <Input placeholder="Search students…" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="h-7 text-sm" />
+                    <Input type="search" placeholder="Search students…" value={studentSearch} onChange={e => setStudentSearch(e.target.value)} className="h-7 text-sm" />
                   </div>
                   <div className="max-h-36 overflow-y-auto">
                     {teacherStudents

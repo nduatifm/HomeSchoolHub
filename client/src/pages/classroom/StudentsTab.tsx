@@ -75,7 +75,7 @@ export default function StudentsTab({ classroomId, isArchived }: { classroomId: 
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle>Add Students</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <Input placeholder="Search by name, username, or email…" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} autoFocus />
+                <Input type="search" placeholder="Search by name, username, or email…" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} autoFocus />
                 <div className="space-y-1 max-h-72 overflow-y-auto">
                   {searchQ.length < 2 && <p className="text-sm text-muted-foreground text-center py-4">Type at least 2 characters to search.</p>}
                   {filteredSearch.length === 0 && searchQ.length >= 2 && <p className="text-sm text-muted-foreground text-center py-4">No students found.</p>}

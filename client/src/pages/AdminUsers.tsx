@@ -245,6 +245,7 @@ export default function AdminUsers() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
+                type="search"
                 placeholder="Search by name, email or role…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -499,6 +500,7 @@ export default function AdminUsers() {
                   Type <span className="font-bold text-foreground">{userToDelete.name}</span> to confirm
                 </label>
                 <Input
+                  spellCheck={false}
                   value={deleteConfirmName}
                   onChange={(e) => setDeleteConfirmName(e.target.value)}
                   placeholder={userToDelete.name}

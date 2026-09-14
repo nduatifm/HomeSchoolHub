@@ -656,6 +656,7 @@ export default function FolderDetailPage() {
                 <div className="border border-border rounded-lg overflow-hidden">
                   <div className="p-2 border-b border-border">
                     <Input
+                      type="search"
                       placeholder="Search students…"
                       value={studentSearch}
                       onChange={e => setStudentSearch(e.target.value)}

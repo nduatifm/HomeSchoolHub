@@ -240,6 +240,8 @@ export default function MessagesPage() {
               <div className="flex items-center gap-2 flex-1 rounded-lg px-3 py-2 border border-border/50 bg-muted/20">
                 <Search className="w-3.5 h-3.5 shrink-0" style={{ color: D.muted }} />
                 <input
+                  type="search"
+                  spellCheck={false}
                   value={convSearch}
                   onChange={(e) => setConvSearch(e.target.value)}
                   placeholder="Search chats"
@@ -445,6 +447,8 @@ export default function MessagesPage() {
                     To:
                   </span>
                   <input
+                    type="search"
+                    spellCheck={false}
                     ref={composeInputRef}
                     value={contactSearch}
                     onChange={(e) => setContactSearch(e.target.value)}

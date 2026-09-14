@@ -93,6 +93,8 @@ export default function ModernCombobox({
           <div className="flex items-center border-b px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50">
             <Search className="mr-2 h-4 w-4 shrink-0 text-purple-600" />
             <input
+              type="search"
+              spellCheck={false}
               placeholder="Search users..."
               className="flex h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               value={searchQuery}

@@ -250,6 +250,7 @@ export default function Login() {
               <Input
                 id="email"
                 type="text"
+                spellCheck={false}
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); clearAlerts(); }}
                 placeholder="you@example.com or username"
