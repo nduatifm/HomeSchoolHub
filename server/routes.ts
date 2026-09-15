@@ -8061,7 +8061,7 @@ export function registerRoutes(app: Express) {
     }
   };
   runExpiredDeletionPurge();
-  setInterval(runExpiredDeletionPurge, 3_600_000);
+  setInterval(runExpiredDeletionPurge, 3_600_000).unref();
 
   // DELETE /api/classrooms/:id — teacher soft-deletes classroom (30-day grace period)
   app.delete("/api/classrooms/:id", requireAuth, async (req, res) => {
@@ -8713,11 +8713,11 @@ export function registerRoutes(app: Express) {
                 active: true,
               },
             });
-        if (activeCategoryCount > 0 && !category) {
-          return res.status(400).json({ error: "An active grading category is required" });
-        }
         if (categoryId != null && !category) {
           return res.status(400).json({ error: "Category does not belong to this classroom" });
+        }
+        if (activeCategoryCount > 0 && !category) {
+          return res.status(400).json({ error: "An active grading category is required" });
         }
         if (category) {
           data.categoryId = category.id;
@@ -10360,6 +10360,7 @@ export function registerRoutes(app: Express) {
           return {
             type: category.key,
             label: category.name,
+            assignmentCount: typeAssignments.length,
             configuredWeight,
             effectiveWeight: 0,
             average,

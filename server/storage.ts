@@ -2300,11 +2300,11 @@ class PrismaStorage implements IStorage {
         select: { id: true, key: true },
       });
     }
-    if (activeCategoryCount > 0 && !category) {
-      throw new Error("An active grading category is required");
-    }
     if (requestedCategoryId != null && !category) {
       throw new Error("Category does not belong to this classroom");
+    }
+    if (activeCategoryCount > 0 && !category) {
+      throw new Error("An active grading category is required");
     }
     const normalizedRest = category
       ? {
