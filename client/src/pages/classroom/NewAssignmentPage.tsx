@@ -27,6 +27,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { BookOpen, Check } from "lucide-react";
 import type { Classroom, ClassroomMaterial, ClassroomGradingCategory, FormQuestion, ItemType } from "@shared/schema";
+import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
 
 const typeLabel: Record<string, string> = {
   short: "Short answer",
@@ -512,13 +513,13 @@ export default function NewAssignmentPage() {
                     </Label>
                     <textarea
                       ref={titleRef}
+                      {...ENGLISH_PROSE_ATTRIBUTES}
                       id="title"
                       value={form.title}
                       onChange={(e) => { setForm({ ...form, title: e.target.value }); autoGrowTitle(); }}
                       onInput={autoGrowTitle}
                       placeholder="Assignment title…"
                       rows={1}
-                      spellCheck
                       autoFocus
                       className="w-full text-xl font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none resize-none leading-snug overflow-hidden"
                       style={{ minHeight: "2rem" }}

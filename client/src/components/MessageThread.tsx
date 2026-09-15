@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Send, ArrowLeft, MessageSquare, Pencil, Check, X, Eye, ArrowRightLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -285,7 +286,7 @@ export default function MessageThread({
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <input
               ref={renameInputRef}
-              spellCheck
+              {...ENGLISH_PROSE_ATTRIBUTES}
               value={draftName}
               onChange={(e) => setDraftName(e.target.value.slice(0, 60))}
               onKeyDown={handleRenameKeyDown}
@@ -516,10 +517,10 @@ export default function MessageThread({
         >
           <textarea
             ref={textareaRef}
+            {...ENGLISH_PROSE_ATTRIBUTES}
             placeholder="Message…"
             value={text}
             rows={1}
-            spellCheck
             onChange={(e) => { setText(e.target.value); autoResize(); }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
