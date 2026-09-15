@@ -65,6 +65,12 @@ const googleClient = new OAuth2Client(getGoogleClientId());
 
 // Normalise any incoming email: trim whitespace and force lowercase
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+const normalizeAssignmentTypeForCategory = (
+  key: string,
+): "assignment" | "test" | "quiz" | "project" =>
+  key === "assignment" || key === "test" || key === "quiz" || key === "project"
+    ? key
+    : "assignment";
 
 // DB-backed session helpers
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -5526,9 +5532,14 @@ export function registerRoutes(app: Express) {
           .json({ error: "This student is not in any of your classrooms" });
       }
 
-      // Data scope: aggregate across ALL classrooms the student is enrolled in (not just this teacher's)
+      // Data scope: teachers may only aggregate classrooms they own. This
+      // prevents a teacher who shares a student from reading another
+      // teacher's classroom grades.
       const enrollments = await prisma.classroomEnrollment.findMany({
-        where: { studentId },
+        where: {
+          studentId,
+          classroomId: { in: teacherClassroomIds },
+        },
         include: { classroom: true },
       });
 
@@ -5543,8 +5554,6 @@ export function registerRoutes(app: Express) {
         late: allAttendance.filter((a: any) => a.status === "late").length,
         total: allAttendance.length,
       };
-
-      const ALL_TYPES = ["assignment", "test", "quiz", "project"] as const;
 
       const classroomRows = await Promise.all(
         enrollments.map(async (enrollment: any) => {
@@ -5573,7 +5582,11 @@ export function registerRoutes(app: Express) {
             orderBy: { id: "desc" },
           });
 
-          const weights = policy
+          const categories = await prisma.classroomGradingCategory.findMany({
+            where: { classroomId: classroom.id, active: true },
+            orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+          });
+          const legacyWeights: Record<string, number> = policy
             ? {
                 assignment: policy.assignmentWeight,
                 test: policy.testWeight,
@@ -5581,20 +5594,31 @@ export function registerRoutes(app: Express) {
                 project: policy.projectWeight,
               }
             : { assignment: 25, test: 25, quiz: 25, project: 25 };
+          const categoryRows = categories.length > 0
+            ? categories
+            : (["assignment", "test", "quiz", "project"] as const).map((key, index) => ({
+                id: 0,
+                key,
+                name: `${key[0].toUpperCase()}${key.slice(1)}s`,
+                weight: legacyWeights[key],
+                displayOrder: index,
+              }));
 
           const subMap = Object.fromEntries(
             submissions.map((s: any) => [s.assignmentId, s]),
           );
 
-          const breakdown = ALL_TYPES.map((type) => {
+          const breakdown = categoryRows.map((category) => {
             const typeAssignments = assignments.filter(
-              (a: any) => a.assignmentType === type,
+              (a: any) =>
+                a.categoryId === category.id ||
+                (a.categoryId == null && a.assignmentType === category.key),
             );
             const gradedSubs = typeAssignments.filter(
               (a: any) => subMap[a.id]?.grade != null,
             );
             if (gradedSubs.length === 0)
-              return { type, w: weights[type], avg: null as number | null };
+              return { type: category.key, w: category.weight, avg: null as number | null };
             const totalPossible = gradedSubs.reduce(
               (s: number, a: any) => s + a.points,
               0,
@@ -5607,7 +5631,7 @@ export function registerRoutes(app: Express) {
               totalPossible > 0
                 ? Math.round((totalEarned / totalPossible) * 100)
                 : 0;
-            return { type, w: weights[type], avg };
+            return { type: category.key, w: category.weight, avg };
           });
 
           const gradedGroups = breakdown.filter(
@@ -6170,17 +6194,28 @@ export function registerRoutes(app: Express) {
           },
         });
         if (!demoClassroom) {
-          demoClassroom = await prisma.classroom.create({
-            data: {
-              name: "Grade 5 English",
-              subject: "English",
-              description:
-                "A comprehensive English classroom covering grammar, literature, and writing.",
-              teacherId: teacher.id,
-              status: "active",
-              slug: "grade-5-english-demo",
-              gradeFolderId: demoFolder.id,
-            },
+          demoClassroom = await prisma.$transaction(async (tx) => {
+            const created = await tx.classroom.create({
+              data: {
+                name: "Grade 5 English",
+                subject: "English",
+                description:
+                  "A comprehensive English classroom covering grammar, literature, and writing.",
+                teacherId: teacher.id,
+                status: "active",
+                slug: "grade-5-english-demo",
+                gradeFolderId: demoFolder.id,
+              },
+            });
+            await tx.classroomGradingCategory.createMany({
+              data: [
+                { classroomId: created.id, key: "assignment", name: "Assignments", weight: 25, displayOrder: 0 },
+                { classroomId: created.id, key: "test", name: "Tests", weight: 25, displayOrder: 1 },
+                { classroomId: created.id, key: "quiz", name: "Quizzes", weight: 25, displayOrder: 2 },
+                { classroomId: created.id, key: "project", name: "Projects", weight: 25, displayOrder: 3 },
+              ],
+            });
+            return created;
           });
         } else if (demoClassroom.gradeFolderId !== demoFolder.id) {
           // Repair missing folder link on existing classroom
@@ -6888,6 +6923,14 @@ export function registerRoutes(app: Express) {
           });
 
           // Two classroom assignments with due dates
+          const demoAssignmentCategory = await prisma.classroomGradingCategory.findFirst({
+            where: { classroomId: demoClassroom.id, key: "assignment", active: true },
+            select: { id: true },
+          });
+          const demoQuizCategory = await prisma.classroomGradingCategory.findFirst({
+            where: { classroomId: demoClassroom.id, key: "quiz", active: true },
+            select: { id: true },
+          });
           const ca1 = await prisma.classroomAssignment.create({
             data: {
               classroomId: demoClassroom.id,
@@ -6899,6 +6942,7 @@ export function registerRoutes(app: Express) {
                 .split("T")[0],
               points: 50,
               assignmentType: "assignment",
+              categoryId: demoAssignmentCategory?.id,
               slug: "reading-comprehension-ch1",
             },
           });
@@ -6914,6 +6958,7 @@ export function registerRoutes(app: Express) {
                 .split("T")[0],
               points: 40,
               assignmentType: "quiz",
+              categoryId: demoQuizCategory?.id,
               slug: "vocabulary-quiz-unit-2",
             },
           });
@@ -8125,6 +8170,7 @@ export function registerRoutes(app: Express) {
             assignmentType: z
               .enum(["assignment", "test", "quiz", "project"])
               .default("assignment"),
+             categoryId: z.number().int().positive().nullable().optional(),
             linkUrl: z
               .string()
               .nullable()
@@ -8148,7 +8194,7 @@ export function registerRoutes(app: Express) {
                   ]),
                   label: z.string(),
                   required: z.boolean().default(false),
-                  options: z.array(z.string()).optional(),
+                  options: z.array(z.string()).default([]),
                 }),
               )
               .nullable()
@@ -8162,6 +8208,26 @@ export function registerRoutes(app: Express) {
 
         const finalData = { ...data };
         if (data.formSchema == null) finalData.answerKey = undefined;
+        const activeCategoryCount = await prisma.classroomGradingCategory.count({
+          where: { classroomId: classroom.id, active: true },
+        });
+        const category = data.categoryId != null
+          ? await prisma.classroomGradingCategory.findFirst({
+              where: { id: data.categoryId, classroomId: classroom.id, active: true },
+            })
+          : await prisma.classroomGradingCategory.findFirst({
+              where: { classroomId: classroom.id, key: data.assignmentType, active: true },
+            });
+        if (activeCategoryCount > 0 && !category) {
+          return res.status(400).json({ error: "An active grading category is required" });
+        }
+        if (data.categoryId != null && !category) {
+          return res.status(400).json({ error: "Category does not belong to this classroom" });
+        }
+        if (category) {
+          finalData.categoryId = category.id;
+          finalData.assignmentType = normalizeAssignmentTypeForCategory(category.key);
+        }
 
         const rawMaterialIds = req.body.materialIds;
         let materialIds: number[] | undefined;
@@ -8253,6 +8319,11 @@ export function registerRoutes(app: Express) {
             assignmentType: z
               .enum(["assignment", "test", "quiz", "project"])
               .default("assignment"),
+             categoryId: z.preprocess((v) => {
+               if (v === undefined || v === null || v === "") return undefined;
+               const n = Number(v);
+               return Number.isInteger(n) ? n : v;
+             }, z.number().int().positive().optional()),
             linkUrl: z
               .string()
               .optional()
@@ -8322,6 +8393,12 @@ export function registerRoutes(app: Express) {
         }
 
         const linkUrl = data.linkUrl || undefined;
+         if (data.categoryId != null) {
+           const category = await prisma.classroomGradingCategory.findFirst({
+             where: { id: data.categoryId, classroomId: classroom.id, active: true },
+           });
+           if (!category) return res.status(400).json({ error: "Category does not belong to this classroom" });
+         }
 
         let materialIds: number[] | undefined;
         const rawMaterialIds = req.body.materialIds;
@@ -8346,10 +8423,30 @@ export function registerRoutes(app: Express) {
             });
         }
 
+        const category = data.categoryId != null
+          ? await prisma.classroomGradingCategory.findFirst({
+              where: { id: data.categoryId, classroomId: classroom.id, active: true },
+            })
+          : await prisma.classroomGradingCategory.findFirst({
+              where: { classroomId: classroom.id, key: data.assignmentType, active: true },
+            });
+        const activeCategoryCount = await prisma.classroomGradingCategory.count({
+          where: { classroomId: classroom.id, active: true },
+        });
+        if (activeCategoryCount > 0 && !category) {
+          return res.status(400).json({ error: "An active grading category is required" });
+        }
+        if (data.categoryId != null && !category) {
+          return res.status(400).json({ error: "Category does not belong to this classroom" });
+        }
         const assignment = await storage.createClassroomAssignment(
           {
             classroomId: classroom.id,
             ...data,
+            ...(category ? { categoryId: category.id } : {}),
+            ...(category ? {
+              assignmentType: normalizeAssignmentTypeForCategory(category.key),
+            } : {}),
             fileUrl,
             linkUrl,
             ...(formSchema !== undefined ? { formSchema } : {}),
@@ -8469,6 +8566,7 @@ export function registerRoutes(app: Express) {
             assignmentType: z
               .enum(["assignment", "test", "quiz", "project"])
               .optional(),
+             categoryId: z.number().int().positive().nullable().optional(),
             fileUrl: z.string().url().nullable().optional(),
             linkUrl: z
               .string()
@@ -8493,7 +8591,7 @@ export function registerRoutes(app: Express) {
                   ]),
                   label: z.string(),
                   required: z.boolean().default(false),
-                  options: z.array(z.string()).optional(),
+                  options: z.array(z.string()).default([]),
                 }),
               )
               .nullable()
@@ -8508,6 +8606,42 @@ export function registerRoutes(app: Express) {
         const data = { ...rawData };
         if (rawData.formSchema === null && rawData.answerKey != null) {
           data.answerKey = null;
+        }
+        const activeCategoryCount = await prisma.classroomGradingCategory.count({
+          where: { classroomId: classroom.id, active: true },
+        });
+        // A changed legacy assignmentType selects its matching baseline category
+        // when categoryId is omitted. Full-payload legacy edits often resend an
+        // unchanged assignmentType, which must not detach a custom category.
+        const legacyTypeChanged =
+          data.assignmentType !== undefined &&
+          data.assignmentType !== existing.assignmentType;
+        const categoryId =
+          data.categoryId !== undefined
+            ? data.categoryId
+            : legacyTypeChanged
+              ? null
+              : existing.categoryId;
+        const category = categoryId != null
+          ? await prisma.classroomGradingCategory.findFirst({
+              where: { id: categoryId, classroomId: classroom.id, active: true },
+            })
+          : await prisma.classroomGradingCategory.findFirst({
+              where: {
+                classroomId: classroom.id,
+                key: data.assignmentType ?? existing.assignmentType,
+                active: true,
+              },
+            });
+        if (activeCategoryCount > 0 && !category) {
+          return res.status(400).json({ error: "An active grading category is required" });
+        }
+        if (categoryId != null && !category) {
+          return res.status(400).json({ error: "Category does not belong to this classroom" });
+        }
+        if (category) {
+          data.categoryId = category.id;
+          data.assignmentType = normalizeAssignmentTypeForCategory(category.key);
         }
 
         const rawMaterialIds = req.body.materialIds;
@@ -9529,6 +9663,280 @@ export function registerRoutes(app: Express) {
 
   // ─── Grading Policy ─────────────────────────────────────────────────────────
 
+  // Normalized category policy. The legacy grading-policy snapshot endpoints
+  // remain below for compatibility, while these endpoints are the source of
+  // truth for current classroom grading.
+  app.get(
+    "/api/classrooms/:classroomId/grading-categories",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomMember(req, res);
+        if (!classroom) return;
+        const categories = await prisma.classroomGradingCategory.findMany({
+          where: { classroomId: classroom.id },
+          orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+        });
+        res.json(categories);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message });
+      }
+    },
+  );
+
+  const categoryName = z.string().trim().min(1, "Category name is required").max(100);
+  const categoryWeight = z.number().int().min(0).max(100);
+
+  async function validateCategoryWeights(
+    classroomId: number,
+    overrides: Record<number, number> = {},
+    activeOverrides: Record<number, boolean> = {},
+  ) {
+    const categories = await prisma.classroomGradingCategory.findMany({
+      where: { classroomId },
+      select: { id: true, weight: true, active: true },
+    });
+    const total = categories.reduce((sum, category) => {
+      const active = activeOverrides[category.id] ?? category.active;
+      return sum + (active ? (overrides[category.id] ?? category.weight) : 0);
+    }, 0);
+    if (total !== 100) {
+      throw new Error("Active category weights must total 100");
+    }
+  }
+
+  // Compatibility projection only: normalized categories remain authoritative.
+  // Custom categories have no legacy column, so their weights are folded into
+  // the legacy assignment bucket (which also preserves old assignmentType
+  // semantics for clients that cannot read category IDs).
+  function projectLegacyWeights(categories: Array<{ key: string; weight: number; active: boolean }>) {
+    const projection = {
+      assignmentWeight: 0,
+      testWeight: 0,
+      quizWeight: 0,
+      projectWeight: 0,
+    };
+    for (const category of categories) {
+      if (!category.active) continue;
+      if (category.key === "assignment") projection.assignmentWeight += category.weight;
+      else if (category.key === "test") projection.testWeight += category.weight;
+      else if (category.key === "quiz") projection.quizWeight += category.weight;
+      else if (category.key === "project") projection.projectWeight += category.weight;
+      else projection.assignmentWeight += category.weight;
+    }
+    return projection;
+  }
+
+  async function createLegacyPolicySnapshot(tx: any, classroomId: number) {
+    const categories = await tx.classroomGradingCategory.findMany({
+      where: { classroomId },
+      select: { key: true, weight: true, active: true },
+    });
+    const projection = projectLegacyWeights(categories);
+    const total = Object.values(projection).reduce((sum, weight) => sum + weight, 0);
+    if (total !== 100) throw new Error("Active category weights must total 100");
+    return tx.gradingPolicy.create({
+      data: { classroomId, ...projection },
+    });
+  }
+
+  app.post(
+    "/api/classrooms/:classroomId/grading-categories",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const data = z.object({
+          name: categoryName,
+          key: z.string().trim().min(1).max(100).optional(),
+          weight: categoryWeight.default(0),
+          displayOrder: z.number().int().min(0).optional(),
+        }).parse(req.body);
+        const duplicate = await prisma.classroomGradingCategory.findFirst({
+          where: {
+            classroomId: classroom.id,
+            name: { equals: data.name, mode: "insensitive" },
+          },
+        });
+        if (duplicate) return res.status(400).json({ error: "Category names must be unique" });
+        const currentCategories = await prisma.classroomGradingCategory.findMany({
+          where: { classroomId: classroom.id, active: true },
+          select: { id: true, weight: true },
+        });
+        const currentTotal = currentCategories.reduce((sum, item) => sum + item.weight, 0);
+        if (currentTotal + data.weight < 0 || data.weight > 100 || (currentCategories.length === 0 && data.weight !== 100)) {
+          return res.status(400).json({ error: "Active category weights must total 100" });
+        }
+        const last = await prisma.classroomGradingCategory.findFirst({
+          where: { classroomId: classroom.id },
+          orderBy: { displayOrder: "desc" },
+          select: { displayOrder: true },
+        });
+        const key = data.key || `${data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${Date.now()}`;
+        const category = await prisma.$transaction(async (tx) => {
+          // Adding a weighted category keeps the policy valid by proportionally
+          // redistributing the existing active weights.
+          const targetExistingTotal = 100 - data.weight;
+          let assigned = 0;
+          for (let index = 0; index < currentCategories.length; index++) {
+            const item = currentCategories[index];
+            const nextWeight = index === currentCategories.length - 1
+              ? targetExistingTotal - assigned
+              : currentTotal > 0
+                ? Math.floor((item.weight / currentTotal) * targetExistingTotal)
+                : 0;
+            assigned += nextWeight;
+            await tx.classroomGradingCategory.update({
+              where: { id: item.id },
+              data: { weight: nextWeight },
+            });
+          }
+          const category = await tx.classroomGradingCategory.create({
+            data: {
+              classroomId: classroom.id,
+              key,
+              name: data.name,
+              weight: data.weight,
+              displayOrder: data.displayOrder ?? (last?.displayOrder ?? -1) + 1,
+            },
+          });
+          await createLegacyPolicySnapshot(tx, classroom.id);
+          return category;
+        });
+        res.status(201).json(category);
+      } catch (error: any) {
+        res.status(error?.name === "ZodError" ? 400 : 400).json({ error: error?.errors?.[0]?.message ?? error.message });
+      }
+    },
+  );
+
+  app.patch(
+    "/api/classrooms/:classroomId/grading-categories/:categoryId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const categoryId = Number(req.params.categoryId);
+        if (!Number.isInteger(categoryId)) return res.status(400).json({ error: "Invalid category ID" });
+        const existing = await prisma.classroomGradingCategory.findFirst({
+          where: { id: categoryId, classroomId: classroom.id },
+        });
+        if (!existing) return res.status(404).json({ error: "Category not found" });
+        const data = z.object({
+          name: categoryName.optional(),
+          weight: categoryWeight.optional(),
+          displayOrder: z.number().int().min(0).optional(),
+          active: z.boolean().optional(),
+        }).refine((value) => Object.keys(value).length > 0, "No changes supplied").parse(req.body);
+        if (data.name && data.name.toLowerCase() !== existing.name.toLowerCase()) {
+          const duplicate = await prisma.classroomGradingCategory.findFirst({
+            where: {
+              classroomId: classroom.id,
+              id: { not: categoryId },
+              name: { equals: data.name, mode: "insensitive" },
+            },
+          });
+          if (duplicate) return res.status(400).json({ error: "Category names must be unique" });
+        }
+        await validateCategoryWeights(
+          classroom.id,
+          data.weight === undefined ? {} : { [categoryId]: data.weight },
+          data.active === undefined ? {} : { [categoryId]: data.active },
+        );
+        const updated = await prisma.$transaction(async (tx) => {
+          const updated = await tx.classroomGradingCategory.update({
+            where: { id: categoryId },
+            data,
+          });
+          await createLegacyPolicySnapshot(tx, classroom.id);
+          return updated;
+        });
+        res.json(updated);
+      } catch (error: any) {
+        res.status(400).json({ error: error?.errors?.[0]?.message ?? error.message });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/classrooms/:classroomId/grading-categories/:categoryId",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const classroom = await requireClassroomOwner(req, res);
+        if (!classroom) return;
+        const categoryId = Number(req.params.categoryId);
+        if (!Number.isInteger(categoryId)) return res.status(400).json({ error: "Invalid category ID" });
+        const category = await prisma.classroomGradingCategory.findFirst({
+          where: { id: categoryId, classroomId: classroom.id },
+        });
+        if (!category) return res.status(404).json({ error: "Category not found" });
+        const linked = await prisma.classroomAssignment.count({ where: { categoryId } });
+        const rawReassign = req.body?.reassignCategoryId;
+        const reassignId = rawReassign == null ? null : Number(rawReassign);
+        if (linked > 0 && (!reassignId || !Number.isInteger(reassignId))) {
+          return res.status(400).json({
+            error: "Reassignment is required before removing a category with assignments",
+          });
+        }
+        const remainingActive = await prisma.classroomGradingCategory.findMany({
+          where: {
+            classroomId: classroom.id,
+            id: { not: categoryId },
+            active: true,
+          },
+          orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+        });
+        const target = reassignId
+          ? await prisma.classroomGradingCategory.findFirst({
+              where: { id: reassignId, classroomId: classroom.id, active: true },
+            })
+          : linked === 0
+            ? remainingActive[0] ?? null
+            : null;
+        if (reassignId && (!target || target.id === category.id)) {
+          return res.status(400).json({ error: "Replacement category must belong to this classroom" });
+        }
+        if (!target) {
+          return res.status(400).json({ error: "At least one grading category must remain" });
+        }
+        const remaining = await prisma.classroomGradingCategory.findMany({
+          where: { classroomId: classroom.id, id: { not: categoryId } },
+          select: { id: true, weight: true, active: true },
+        });
+        const activeTotal = remaining.reduce((sum, item) => sum + (item.active ? item.weight : 0), 0);
+        const replacementWeight = target
+          ? (remaining.find((item) => item.id === target.id)?.weight ?? 0) + category.weight
+          : 0;
+        if (activeTotal - (target ? (target?.weight ?? 0) : 0) + (target ? replacementWeight : 0) !== 100) {
+          return res.status(400).json({ error: "Active category weights must total 100 after removal" });
+        }
+        await prisma.$transaction(async (tx) => {
+          if (target) {
+            await tx.classroomAssignment.updateMany({
+              where: { categoryId },
+              data: {
+                categoryId: target.id,
+                assignmentType: normalizeAssignmentTypeForCategory(target.key),
+              },
+            });
+            await tx.classroomGradingCategory.update({
+              where: { id: target.id },
+              data: { weight: replacementWeight },
+            });
+          }
+          await tx.classroomGradingCategory.delete({ where: { id: category.id } });
+          await createLegacyPolicySnapshot(tx, classroom.id);
+        });
+        res.json({ success: true });
+      } catch (error: any) {
+        res.status(400).json({ error: error.message });
+      }
+    },
+  );
+
   // GET /api/classrooms/:classroomId/grading-policy — latest policy for classroom
   app.get(
     "/api/classrooms/:classroomId/grading-policy",
@@ -9541,7 +9949,17 @@ export function registerRoutes(app: Express) {
           where: { classroomId: classroom.id },
           orderBy: { id: "desc" },
         });
-        res.json(policy ?? null);
+        const categories = await prisma.classroomGradingCategory.findMany({
+          where: { classroomId: classroom.id },
+          orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+        });
+        // Preserve the original null response for classrooms without a
+        // legacy snapshot; members can fetch normalized categories directly.
+        res.json(
+          policy
+            ? { ...policy, ...projectLegacyWeights(categories), categories }
+            : null,
+        );
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -9556,27 +9974,149 @@ export function registerRoutes(app: Express) {
       try {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
-        const data = z
-          .object({
-            assignmentWeight: z.number().int().min(0).max(100),
-            testWeight: z.number().int().min(0).max(100),
-            quizWeight: z.number().int().min(0).max(100),
-            projectWeight: z.number().int().min(0).max(100),
-          })
-          .refine(
-            (d) =>
-              d.assignmentWeight +
-                d.testWeight +
-                d.quizWeight +
-                d.projectWeight ===
-              100,
-            { message: "Weights must sum to 100" },
-          )
-          .parse(req.body);
-        const policy = await prisma.gradingPolicy.create({
-          data: { classroomId: classroom.id, ...data },
+        const body = req.body ?? {};
+        const categoriesInputSchema = z.object({
+          categories: z.array(z.object({
+            id: z.number().int().positive(),
+            weight: categoryWeight,
+            displayOrder: z.number().int().min(0),
+            name: categoryName.optional(),
+          })).min(1),
         });
-        res.status(201).json(policy);
+        const legacyInputSchema = z.object({
+          assignmentWeight: categoryWeight,
+          testWeight: categoryWeight,
+          quizWeight: categoryWeight,
+          projectWeight: categoryWeight,
+        }).refine(
+          (d) => d.assignmentWeight + d.testWeight + d.quizWeight + d.projectWeight === 100,
+          { message: "Weights must sum to 100" },
+        );
+
+        if (Array.isArray(body.categories)) {
+          const input = categoriesInputSchema.parse(body);
+          const existingAll = await prisma.classroomGradingCategory.findMany({
+            where: { classroomId: classroom.id },
+            orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+          });
+          const existing = existingAll.filter((category) => category.active);
+          const byId = new Map(existing.map((category) => [category.id, category]));
+          const ids = input.categories.map((category) => category.id);
+          if (new Set(ids).size !== ids.length) {
+            return res.status(400).json({ error: "Each category may appear only once" });
+          }
+          if (ids.length !== existing.length || ids.some((id) => !byId.has(id))) {
+            return res.status(400).json({
+              error: "Categories must include every active category in this classroom",
+            });
+          }
+          const names = input.categories.map((category) =>
+            (category.name ?? byId.get(category.id)!.name).trim().toLocaleLowerCase(),
+          );
+          if (new Set(names).size !== names.length) {
+            return res.status(400).json({ error: "Category names must be unique" });
+          }
+          const inactiveNames = new Set(
+            existingAll
+              .filter((category) => !category.active)
+              .map((category) => category.name.trim().toLocaleLowerCase()),
+          );
+          if (names.some((name) => inactiveNames.has(name))) {
+            return res.status(400).json({ error: "Category names must be unique" });
+          }
+          const orders = input.categories.map((category) => category.displayOrder);
+          if (new Set(orders).size !== orders.length) {
+            return res.status(400).json({ error: "Category display order values must be unique" });
+          }
+          if (input.categories.reduce((sum, category) => sum + category.weight, 0) !== 100) {
+            return res.status(400).json({ error: "Weights must sum to 100" });
+          }
+
+          const result = await prisma.$transaction(async (tx) => {
+            // Clear unique-name slots first so valid category renames/swaps
+            // cannot fail because updates are applied one row at a time.
+            for (const category of input.categories) {
+              if (category.name !== undefined) {
+                await tx.classroomGradingCategory.update({
+                  where: { id: category.id },
+                  data: { name: `__pending_category_${category.id}` },
+                });
+              }
+            }
+            for (const category of input.categories) {
+              await tx.classroomGradingCategory.update({
+                where: { id: category.id },
+                data: {
+                  weight: category.weight,
+                  displayOrder: category.displayOrder,
+                  ...(category.name !== undefined ? { name: category.name } : {}),
+                },
+              });
+            }
+            const policy = await createLegacyPolicySnapshot(tx, classroom.id);
+            const categories = await tx.classroomGradingCategory.findMany({
+              where: { classroomId: classroom.id },
+              orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+            });
+            return { policy, categories };
+          });
+          return res.status(201).json({
+            ...result.policy,
+            categories: result.categories,
+          });
+        }
+
+        // Legacy four-column payload remains supported for existing clients.
+        const existingCategoriesForLegacy = await prisma.classroomGradingCategory.findMany({
+          where: { classroomId: classroom.id, active: true },
+          select: { key: true },
+        });
+        const baselineKeys = ["assignment", "test", "quiz", "project"];
+        const hasExactlyBaselineCategories =
+          existingCategoriesForLegacy.length === baselineKeys.length &&
+          new Set(existingCategoriesForLegacy.map((category) => category.key)).size === baselineKeys.length &&
+          baselineKeys.every((key) =>
+            existingCategoriesForLegacy.some((category) => category.key === key),
+          );
+        if (!hasExactlyBaselineCategories) {
+          return res.status(409).json({
+            error: "Legacy grading weights require exactly the four active baseline categories; use the normalized category policy format for custom categories",
+          });
+        }
+        const data = legacyInputSchema.parse(body);
+        const result = await prisma.$transaction(async (tx) => {
+          const legacyCategoryWeights: Record<string, number> = {
+            assignment: data.assignmentWeight,
+            test: data.testWeight,
+            quiz: data.quizWeight,
+            project: data.projectWeight,
+          };
+          const categories = await tx.classroomGradingCategory.findMany({
+            where: { classroomId: classroom.id },
+          });
+          const activeCategories = categories.filter((category) => category.active);
+          const isBaselineOnly =
+            activeCategories.length === 4 &&
+            new Set(activeCategories.map((category) => category.key)).size === 4 &&
+            activeCategories.every((category) => legacyCategoryWeights[category.key] !== undefined);
+          if (isBaselineOnly) {
+            for (const category of activeCategories) {
+              await tx.classroomGradingCategory.update({
+                where: { id: category.id },
+                data: { weight: legacyCategoryWeights[category.key] },
+              });
+            }
+          }
+          const policy = await createLegacyPolicySnapshot(tx, classroom.id);
+          return {
+            policy,
+            categories: await tx.classroomGradingCategory.findMany({
+              where: { classroomId: classroom.id },
+              orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+            }),
+          };
+        });
+        res.status(201).json({ ...result.policy, categories: result.categories });
       } catch (error: any) {
         // Distinguish validation errors (user-visible) from server faults
         if (error?.name === "ZodError") {
@@ -9584,6 +10124,7 @@ export function registerRoutes(app: Express) {
             error.errors?.[0]?.message ?? "Weights must sum to exactly 100";
           return res.status(400).json({ error: msg });
         }
+        console.error("Failed to save grading policy", error);
         res.status(500).json({ error: "Failed to save grading policy" });
       }
     },
@@ -9646,43 +10187,44 @@ export function registerRoutes(app: Express) {
           orderBy: { id: "desc" },
         });
 
-        const ALL_TYPES = ["assignment", "test", "quiz", "project"] as const;
-        const TYPE_LABELS: Record<string, string> = {
-          assignment: "Assignments",
-          test: "Tests",
-          quiz: "Quizzes",
-          project: "Projects",
-        };
-
-        const subMap = Object.fromEntries(
-          submissions.map((s) => [s.assignmentId, s]),
-        );
-        const defaultWeights = {
-          assignment: 25,
-          test: 25,
-          quiz: 25,
-          project: 25,
-        };
-        const weights = policy
+        const categories = await prisma.classroomGradingCategory.findMany({
+          where: { classroomId: classroom.id },
+          orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+        });
+        const legacyWeights: Record<string, number> = policy
           ? {
               assignment: policy.assignmentWeight,
               test: policy.testWeight,
               quiz: policy.quizWeight,
               project: policy.projectWeight,
             }
-          : defaultWeights;
+          : { assignment: 25, test: 25, quiz: 25, project: 25 };
+        const categoryRows = categories.length > 0
+          ? categories.filter((category) => category.active)
+          : (["assignment", "test", "quiz", "project"] as const).map((key, index) => ({
+              id: 0,
+              key,
+              name: `${key[0].toUpperCase()}${key.slice(1)}s`,
+              weight: legacyWeights[key],
+              displayOrder: index,
+            }));
 
+        const subMap = Object.fromEntries(
+          submissions.map((s) => [s.assignmentId, s]),
+        );
         type BreakdownStatus = "graded" | "pending" | "zero-weight";
-        const breakdown = ALL_TYPES.map((type) => {
+        const breakdown = categoryRows.map((category) => {
           const typeAssignments = assignments.filter(
-            (a) => a.assignmentType === type,
+            (a) =>
+              a.categoryId === category.id ||
+              (a.categoryId == null && a.assignmentType === category.key),
           );
           const gradedSubs = typeAssignments
             .map((a) => subMap[a.id])
             .filter((s) => s && s.grade !== null && s.grade !== undefined);
 
           const isGraded = gradedSubs.length > 0;
-          const configuredWeight = weights[type];
+          const configuredWeight = category.weight;
 
           let average: number | null = null;
           if (isGraded) {
@@ -9706,8 +10248,8 @@ export function registerRoutes(app: Express) {
           else status = "graded";
 
           return {
-            type,
-            label: TYPE_LABELS[type],
+            type: category.key,
+            label: category.name,
             configuredWeight,
             effectiveWeight: 0,
             average,
@@ -9752,7 +10294,13 @@ export function registerRoutes(app: Express) {
           .map((b) => b.label);
         const isPartial = pendingTypes.length > 0 && gradedItems.length > 0;
 
-        res.json({ overall, isPartial, pendingTypes, policy, breakdown });
+        res.json({
+          overall,
+          isPartial,
+          pendingTypes,
+          policy: policy ? { ...policy, categories } : { categories },
+          breakdown,
+        });
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -9866,11 +10414,20 @@ export function registerRoutes(app: Express) {
           dueDate,
           points,
           assignmentType,
+          categoryId,
           linkUrl,
           formSchema,
           answerKey,
           linkedMaterialIds,
         } = req.body;
+        let normalizedAssignmentType = assignmentType;
+        if (categoryId != null) {
+          const category = await prisma.classroomGradingCategory.findFirst({
+            where: { id: Number(categoryId), classroomId: classroom.id, active: true },
+          });
+          if (!category) return res.status(400).json({ error: "Category does not belong to this classroom" });
+          normalizedAssignmentType = normalizeAssignmentTypeForCategory(category.key);
+        }
         const draft = await storage.upsertAssignmentDraft(
           req.session.userId!,
           classroom.id,
@@ -9880,7 +10437,8 @@ export function registerRoutes(app: Express) {
             description,
             dueDate,
             points,
-            assignmentType,
+            assignmentType: normalizedAssignmentType,
+            categoryId: categoryId == null ? null : Number(categoryId),
             linkUrl,
             formSchema,
             answerKey,
@@ -9950,11 +10508,20 @@ export function registerRoutes(app: Express) {
           dueDate,
           points,
           assignmentType,
+          categoryId,
           linkUrl,
           formSchema,
           answerKey,
           linkedMaterialIds,
         } = req.body;
+        let normalizedAssignmentType = assignmentType;
+        if (categoryId != null) {
+          const category = await prisma.classroomGradingCategory.findFirst({
+            where: { id: Number(categoryId), classroomId: classroom.id, active: true },
+          });
+          if (!category) return res.status(400).json({ error: "Category does not belong to this classroom" });
+          normalizedAssignmentType = normalizeAssignmentTypeForCategory(category.key);
+        }
         const draft = await storage.upsertAssignmentDraft(
           req.session.userId!,
           classroom.id,
@@ -9964,7 +10531,8 @@ export function registerRoutes(app: Express) {
             description,
             dueDate,
             points,
-            assignmentType,
+            assignmentType: normalizedAssignmentType,
+            categoryId: categoryId == null ? null : Number(categoryId),
             linkUrl,
             formSchema,
             answerKey,

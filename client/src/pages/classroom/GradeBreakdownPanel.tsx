@@ -3,12 +3,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 import type { GradeBreakdown } from "@shared/schema";
 
-const TYPE_DOT: Record<string, string> = {
-  assignment: "bg-blue-500",
-  test:       "bg-orange-500",
-  quiz:       "bg-purple-500",
-  project:    "bg-teal-500",
-};
+const CATEGORY_DOTS = [
+  "bg-blue-500",
+  "bg-orange-500",
+  "bg-purple-500",
+  "bg-teal-500",
+  "bg-pink-500",
+  "bg-indigo-500",
+];
 
 export default function GradeBreakdownPanel({
   classroomId,
@@ -81,13 +83,13 @@ export default function GradeBreakdownPanel({
 
       {/* Per-type rows */}
       <div className="divide-y divide-border/50">
-        {items.map((item) => {
-          const dot = TYPE_DOT[item.type] ?? TYPE_DOT.assignment;
+        {items.map((item, index) => {
+          const dot = CATEGORY_DOTS[index % CATEGORY_DOTS.length];
           const isPending = item.status === "pending";
           const isZeroWeight = item.status === "zero-weight";
 
           return (
-            <div key={item.type} className="flex items-center justify-between py-1.5 first:pt-0.5 last:pb-0">
+            <div key={`${item.type}-${index}`} className="flex items-center justify-between py-1.5 first:pt-0.5 last:pb-0">
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${isPending || (isZeroWeight && item.average === null) ? "bg-muted-foreground/30" : dot}`} />
                 <span className={`text-sm ${isPending ? "text-muted-foreground" : "text-foreground"}`}>

@@ -306,7 +306,7 @@ export interface IStorage {
   getClassroomAssignments(classroomId: number): Promise<ClassroomAssignment[]>;
   getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null>;
   getClassroomAssignmentById(classroomId: number, id: number): Promise<ClassroomAssignment | null>;
-  updateClassroomAssignment(id: number, data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "assignmentType" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>, materialIds?: number[]): Promise<ClassroomAssignment>;
+  updateClassroomAssignment(id: number, data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "assignmentType" | "categoryId" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>, materialIds?: number[]): Promise<ClassroomAssignment>;
   deleteClassroomAssignment(id: number): Promise<void>;
   setAssignmentMaterials(assignmentId: number, materialIds: number[]): Promise<void>;
 
@@ -1912,12 +1912,22 @@ class PrismaStorage implements IStorage {
   }
 
   async createClassroom(data: InsertClassroom): Promise<Classroom> {
-    const c = await prisma.classroom.create({ data });
-    const slug = slugify(c.name, c.id);
-    const updated = await prisma.classroom.update({
-      where: { id: c.id },
-      data: { slug },
-      include: { gradeFolder: { select: { name: true } } },
+    const updated = await prisma.$transaction(async (tx) => {
+      const c = await tx.classroom.create({ data });
+      const slug = slugify(c.name, c.id);
+      await tx.classroomGradingCategory.createMany({
+        data: [
+          { classroomId: c.id, key: "assignment", name: "Assignments", weight: 25, displayOrder: 0 },
+          { classroomId: c.id, key: "test", name: "Tests", weight: 25, displayOrder: 1 },
+          { classroomId: c.id, key: "quiz", name: "Quizzes", weight: 25, displayOrder: 2 },
+          { classroomId: c.id, key: "project", name: "Projects", weight: 25, displayOrder: 3 },
+        ],
+      });
+      return tx.classroom.update({
+        where: { id: c.id },
+        data: { slug },
+        include: { gradeFolder: { select: { name: true } } },
+      });
     });
     return this.mapClassroom(updated);
   }
@@ -2104,7 +2114,8 @@ class PrismaStorage implements IStorage {
       description: a.description,
       dueDate: a.dueDate,
       points: a.points,
-      assignmentType: (a.assignmentType === "test" ? "test" : "assignment") as "assignment" | "test",
+      assignmentType: a.assignmentType,
+      categoryId: a.categoryId ?? null,
       fileUrl: a.fileUrl ?? null,
       linkUrl: a.linkUrl ?? null,
       slug: a.slug ?? null,
@@ -2129,9 +2140,36 @@ class PrismaStorage implements IStorage {
     const { answerKey, formSchema, ...rest } = data;
     const safeFormSchema = formSchema !== undefined ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : undefined;
     const safeAnswerKey = answerKey !== undefined ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : undefined;
+    const fallbackCategory = data.categoryId == null
+      ? await prisma.classroomGradingCategory.findFirst({
+          where: { classroomId: data.classroomId, key: data.assignmentType, active: true },
+          select: { id: true, key: true },
+        })
+      : null;
+    const category = data.categoryId != null
+      ? await prisma.classroomGradingCategory.findFirst({
+          where: { id: data.categoryId, classroomId: data.classroomId, active: true },
+          select: { id: true, key: true },
+        })
+      : fallbackCategory;
+    if (data.categoryId != null) {
+      if (!category) throw new Error("Category does not belong to this classroom");
+    }
+    const activeCategoryCount = await prisma.classroomGradingCategory.count({
+      where: { classroomId: data.classroomId, active: true },
+    });
+    if (activeCategoryCount > 0 && data.categoryId == null && !fallbackCategory) {
+      throw new Error("An active grading category is required");
+    }
     const a = await prisma.classroomAssignment.create({
       data: {
         ...rest,
+        ...(category ? {
+          categoryId: category.id,
+          assignmentType: ["assignment", "test", "quiz", "project"].includes(category.key)
+            ? category.key
+            : "assignment",
+        } : {}),
         ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema } : {}),
         ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey } : {}),
       },
@@ -2184,16 +2222,68 @@ class PrismaStorage implements IStorage {
 
   async updateClassroomAssignment(
     id: number,
-    data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "assignmentType" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>,
+    data: Partial<Pick<InsertClassroomAssignment, "title" | "description" | "dueDate" | "points" | "assignmentType" | "categoryId" | "fileUrl" | "linkUrl" | "formSchema" | "answerKey">>,
     materialIds?: number[],
   ): Promise<ClassroomAssignment> {
     const { formSchema, answerKey, ...rest } = data;
+    const existing = await prisma.classroomAssignment.findUnique({
+      where: { id },
+      select: { classroomId: true, categoryId: true, assignmentType: true },
+    });
+    if (!existing) throw new Error("Assignment not found");
+    const activeCategoryCount = await prisma.classroomGradingCategory.count({
+      where: { classroomId: existing.classroomId, active: true },
+    });
+    const legacyTypeChanged =
+      data.assignmentType !== undefined &&
+      data.assignmentType !== existing.assignmentType;
+    const requestedCategoryId =
+      data.categoryId !== undefined
+        ? data.categoryId
+        : legacyTypeChanged
+          ? null
+          : existing.categoryId;
+    let category = requestedCategoryId != null
+      ? await prisma.classroomGradingCategory.findFirst({
+          where: {
+            id: requestedCategoryId,
+            classroomId: existing.classroomId,
+            active: true,
+          },
+          select: { id: true, key: true },
+        })
+      : null;
+    if (!category && requestedCategoryId == null && data.assignmentType) {
+      category = await prisma.classroomGradingCategory.findFirst({
+        where: {
+          classroomId: existing.classroomId,
+          key: data.assignmentType,
+          active: true,
+        },
+        select: { id: true, key: true },
+      });
+    }
+    if (activeCategoryCount > 0 && !category) {
+      throw new Error("An active grading category is required");
+    }
+    if (requestedCategoryId != null && !category) {
+      throw new Error("Category does not belong to this classroom");
+    }
+    const normalizedRest = category
+      ? {
+          ...rest,
+          categoryId: category.id,
+          assignmentType: ["assignment", "test", "quiz", "project"].includes(category.key)
+            ? category.key
+            : "assignment",
+        }
+      : rest;
     const safeFormSchema = formSchema !== undefined && formSchema !== null ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : formSchema ?? undefined;
     const safeAnswerKey = answerKey !== undefined && answerKey !== null ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : answerKey ?? undefined;
     await prisma.classroomAssignment.update({
       where: { id },
       data: {
-        ...rest,
+        ...normalizedRest,
         ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema as Prisma.InputJsonValue | null } : {}),
         ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey as Prisma.InputJsonValue | null } : {}),
       } as Prisma.ClassroomAssignmentUpdateInput,
@@ -2861,7 +2951,7 @@ class PrismaStorage implements IStorage {
 
   async upsertAssignmentDraft(teacherId: number, classroomId: number, assignmentId: number | null, data: {
     title?: string; description?: string; dueDate?: string; points?: number;
-    assignmentType?: string; linkUrl?: string | null;
+    assignmentType?: string; categoryId?: number | null; linkUrl?: string | null;
     formSchema?: any; answerKey?: any; linkedMaterialIds?: number[];
   }): Promise<any> {
     const where = assignmentId !== null

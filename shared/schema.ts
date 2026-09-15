@@ -565,6 +565,7 @@ export const classroomAssignmentSchema = z.object({
   dueDate: z.string(),
   points: z.number(),
   assignmentType: z.enum(itemTypes).default("assignment"),
+  categoryId: z.number().nullable().optional(),
   fileUrl: z.string().nullable().optional(),
   linkUrl: z.string().nullable().optional(),
   slug: z.string().nullable().optional(),
@@ -576,6 +577,27 @@ export const classroomAssignmentSchema = z.object({
 export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true, linkedMaterialIds: true });
 export type ClassroomAssignment = z.infer<typeof classroomAssignmentSchema>;
 export type InsertClassroomAssignment = z.infer<typeof insertClassroomAssignmentSchema>;
+
+// Normalized, classroom-scoped grading category. `key` is stable for the
+// baseline categories and remains stable when a teacher renames a category.
+export const classroomGradingCategorySchema = z.object({
+  id: z.number(),
+  classroomId: z.number(),
+  key: z.string(),
+  name: z.string(),
+  weight: z.number().int().min(0).max(100),
+  displayOrder: z.number().int().min(0),
+  active: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export const insertClassroomGradingCategorySchema = classroomGradingCategorySchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type ClassroomGradingCategory = z.infer<typeof classroomGradingCategorySchema>;
+export type InsertClassroomGradingCategory = z.infer<typeof insertClassroomGradingCategorySchema>;
 
 export const classroomSubmissionSchema = z.object({
   id: z.number(),
@@ -628,6 +650,7 @@ export const gradingPolicySchema = z.object({
   quizWeight: z.number(),
   projectWeight: z.number(),
   effectiveFrom: z.string(),
+  categories: z.array(classroomGradingCategorySchema).optional(),
 });
 export const insertGradingPolicySchema = gradingPolicySchema.omit({ id: true, effectiveFrom: true });
 export type GradingPolicy = z.infer<typeof gradingPolicySchema>;
@@ -636,7 +659,7 @@ export type InsertGradingPolicy = z.infer<typeof insertGradingPolicySchema>;
 // ─── Grade Breakdown ─────────────────────────────────────────────────────────
 
 export const gradeBreakdownItemSchema = z.object({
-  type: z.enum(itemTypes),
+  type: z.string(),
   label: z.string(),
   configuredWeight: z.number(),
   effectiveWeight: z.number(),

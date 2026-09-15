@@ -492,6 +492,7 @@ model Classroom {
   enrollments       ClassroomEnrollment[]
   posts             ClassroomPost[]
   assignments       ClassroomAssignment[]
+  gradingCategories  ClassroomGradingCategory[]
   materials         ClassroomMaterial[]
   gradingPolicies   GradingPolicy[]
   submissionDrafts  SubmissionDraft[]
@@ -538,6 +539,7 @@ model ClassroomAssignment {
   dueDate        String
   points         Int      @default(100)
   assignmentType String   @default("assignment")
+  categoryId     Int?
   fileUrl        String?
   linkUrl        String?
   slug           String?
@@ -546,12 +548,34 @@ model ClassroomAssignment {
   createdAt      DateTime @default(now())
 
   classroom        Classroom                    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  category         ClassroomGradingCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   submissions      ClassroomSubmission[]
   materialLinks    ClassroomAssignmentMaterial[]
   submissionDrafts SubmissionDraft[]
 
   @@unique([classroomId, slug])
   @@index([classroomId])
+  @@index([categoryId])
+}
+
+model ClassroomGradingCategory {
+  id           Int      @id @default(autoincrement())
+  classroomId  Int
+  key          String
+  name         String
+  weight       Int      @default(0)
+  displayOrder Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  classroom    Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  assignments  ClassroomAssignment[]
+  assignmentDrafts AssignmentDraft[]
+
+  @@unique([classroomId, key])
+  @@unique([classroomId, name])
+  @@index([classroomId, displayOrder])
 }
 
 model ClassroomSubmission {
@@ -667,6 +691,7 @@ model AssignmentDraft {
   dueDate          String   @default("")
   points           Int      @default(100)
   assignmentType   String   @default("")
+  categoryId       Int?
   linkUrl          String?
   formSchema       Json?
   answerKey        Json?
@@ -675,10 +700,12 @@ model AssignmentDraft {
 
   teacher   User      @relation("TeacherAssignmentDrafts", fields: [teacherId], references: [id], onDelete: Cascade)
   classroom Classroom @relation("ClassroomAssignmentDrafts", fields: [classroomId], references: [id], onDelete: Cascade)
+  category  ClassroomGradingCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@unique([teacherId, classroomId, assignmentId])
   @@index([teacherId])
   @@index([classroomId])
+  @@index([categoryId])
   @@map("assignment_drafts")
 }
 
