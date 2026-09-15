@@ -1,6 +1,10 @@
 import prisma from "./db";
-import { Prisma } from "@prisma/client";
 import { slugify } from "../shared/slugify";
+import { Prisma } from "@prisma/client";
+import {
+  buildCategorySnapshotPayload,
+  normalizeLegacyAssignmentType,
+} from "./gradingPolicy";
 import type {
   User,
   InsertUser,
@@ -1923,6 +1927,28 @@ class PrismaStorage implements IStorage {
           { classroomId: c.id, key: "project", name: "Projects", weight: 25, displayOrder: 3 },
         ],
       });
+      const categories = await tx.classroomGradingCategory.findMany({
+        where: { classroomId: c.id },
+        select: {
+          id: true,
+          key: true,
+          name: true,
+          weight: true,
+          displayOrder: true,
+          active: true,
+        },
+      });
+      await tx.gradingPolicy.create({
+        data: {
+          classroomId: c.id,
+          assignmentWeight: 25,
+          testWeight: 25,
+          quizWeight: 25,
+          projectWeight: 25,
+          effectiveFrom: c.createdAt,
+          categorySnapshot: buildCategorySnapshotPayload(categories),
+        },
+      });
       return tx.classroom.update({
         where: { id: c.id },
         data: { slug },
@@ -2161,18 +2187,29 @@ class PrismaStorage implements IStorage {
     if (activeCategoryCount > 0 && data.categoryId == null && !fallbackCategory) {
       throw new Error("An active grading category is required");
     }
-    const a = await prisma.classroomAssignment.create({
-      data: {
-        ...rest,
-        ...(category ? {
-          categoryId: category.id,
-          assignmentType: ["assignment", "test", "quiz", "project"].includes(category.key)
-            ? category.key
-            : "assignment",
-        } : {}),
-        ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema } : {}),
-        ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey } : {}),
-      },
+    const a = await prisma.$transaction(async (tx) => {
+      const created = await tx.classroomAssignment.create({
+        data: {
+          ...rest,
+          ...(category ? {
+            categoryId: category.id,
+            assignmentType: ["assignment", "test", "quiz", "project"].includes(category.key)
+              ? category.key
+              : "assignment",
+          } : {}),
+          ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema } : {}),
+          ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey } : {}),
+        },
+      });
+      await tx.assignmentCategoryHistory.create({
+        data: {
+          assignmentId: created.id,
+          categoryId: created.categoryId,
+          legacyType: normalizeLegacyAssignmentType(created.assignmentType),
+          effectiveFrom: created.createdAt,
+        },
+      });
+      return created;
     });
     const slug = slugify(a.title, a.id);
     await prisma.classroomAssignment.update({ where: { id: a.id }, data: { slug } });
@@ -2280,13 +2317,38 @@ class PrismaStorage implements IStorage {
       : rest;
     const safeFormSchema = formSchema !== undefined && formSchema !== null ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : formSchema ?? undefined;
     const safeAnswerKey = answerKey !== undefined && answerKey !== null ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : answerKey ?? undefined;
-    await prisma.classroomAssignment.update({
-      where: { id },
-      data: {
-        ...normalizedRest,
-        ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema as Prisma.InputJsonValue | null } : {}),
-        ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey as Prisma.InputJsonValue | null } : {}),
-      } as Prisma.ClassroomAssignmentUpdateInput,
+    const nextCategoryId =
+      category?.id ??
+      (Object.prototype.hasOwnProperty.call(normalizedRest, "categoryId")
+        ? (normalizedRest as any).categoryId
+        : existing.categoryId);
+    const nextLegacyType = normalizeLegacyAssignmentType(
+      (normalizedRest as any).assignmentType ?? existing.assignmentType,
+    );
+    await prisma.$transaction(async (tx) => {
+      await tx.classroomAssignment.update({
+        where: { id },
+        data: {
+          ...normalizedRest,
+          ...(safeFormSchema !== undefined ? { formSchema: safeFormSchema as Prisma.InputJsonValue | null } : {}),
+          ...(safeAnswerKey !== undefined ? { answerKey: safeAnswerKey as Prisma.InputJsonValue | null } : {}),
+        } as Prisma.ClassroomAssignmentUpdateInput,
+      });
+      if (nextCategoryId !== existing.categoryId) {
+        const effectiveFrom = new Date();
+        await tx.assignmentCategoryHistory.updateMany({
+          where: { assignmentId: id, effectiveTo: null },
+          data: { effectiveTo: effectiveFrom },
+        });
+        await tx.assignmentCategoryHistory.create({
+          data: {
+            assignmentId: id,
+            categoryId: nextCategoryId,
+            legacyType: nextLegacyType,
+            effectiveFrom,
+          },
+        });
+      }
     });
     if (materialIds !== undefined) {
       await this.setAssignmentMaterials(id, materialIds);

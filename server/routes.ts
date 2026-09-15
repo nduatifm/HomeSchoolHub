@@ -33,6 +33,15 @@ import {
   studentGoogleSignupSchema,
   formQuestionSchema,
 } from "@shared/schema";
+import {
+  buildCategorySnapshotPayload,
+  defaultCategorySnapshot,
+  isLegacyPolicySnapshot,
+  parseCategorySnapshot,
+  resolveAssignmentCategoryAtDate,
+  snapshotCategoryMatchesAssignment,
+  selectPolicyForDate,
+} from "./gradingPolicy";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import {
@@ -5576,16 +5585,26 @@ export function registerRoutes(app: Express) {
                   },
                 })
               : [];
+          const categoryHistoryRows =
+            assignments.length > 0
+              ? await prisma.assignmentCategoryHistory.findMany({
+                  where: { assignmentId: { in: assignments.map((a: any) => a.id) } },
+                  orderBy: [{ effectiveFrom: "asc" }, { id: "asc" }],
+                })
+              : [];
+          const categoryHistoryByAssignment = new Map<number, any[]>();
+          for (const row of categoryHistoryRows) {
+            const rows = categoryHistoryByAssignment.get(row.assignmentId) ?? [];
+            rows.push(row);
+            categoryHistoryByAssignment.set(row.assignmentId, rows);
+          }
 
-          const policy = await prisma.gradingPolicy.findFirst({
+          const policies = await prisma.gradingPolicy.findMany({
             where: { classroomId: classroom.id },
-            orderBy: { id: "desc" },
+            orderBy: [{ effectiveFrom: "desc" }, { id: "desc" }],
           });
+          const policy = selectPolicyForDate(policies, to);
 
-          const categories = await prisma.classroomGradingCategory.findMany({
-            where: { classroomId: classroom.id, active: true },
-            orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
-          });
           const legacyWeights: Record<string, number> = policy
             ? {
                 assignment: policy.assignmentWeight,
@@ -5594,26 +5613,34 @@ export function registerRoutes(app: Express) {
                 project: policy.projectWeight,
               }
             : { assignment: 25, test: 25, quiz: 25, project: 25 };
-          const categoryRows = categories.length > 0
-            ? categories
-            : (["assignment", "test", "quiz", "project"] as const).map((key, index) => ({
-                id: 0,
-                key,
-                name: `${key[0].toUpperCase()}${key.slice(1)}s`,
-                weight: legacyWeights[key],
-                displayOrder: index,
-              }));
+          const savedSnapshot = parseCategorySnapshot(policy?.categorySnapshot);
+          const snapshot = savedSnapshot ?? defaultCategorySnapshot(legacyWeights);
+          const categoryRows = snapshot.filter((category) => category.active);
+          // No applicable policy means an explicit immutable legacy default,
+          // not today's mutable category configuration.
+          const legacySnapshot = policy
+            ? isLegacyPolicySnapshot(policy.categorySnapshot)
+            : true;
 
           const subMap = Object.fromEntries(
             submissions.map((s: any) => [s.assignmentId, s]),
           );
 
           const breakdown = categoryRows.map((category) => {
-            const typeAssignments = assignments.filter(
-              (a: any) =>
-                a.categoryId === category.id ||
-                (a.categoryId == null && a.assignmentType === category.key),
-            );
+            const typeAssignments = assignments.filter((a: any) => {
+              const historicalCategory = resolveAssignmentCategoryAtDate(
+                categoryHistoryByAssignment.get(a.id) ?? [],
+                to,
+                a.categoryId ?? null,
+                a.assignmentType,
+              );
+              return snapshotCategoryMatchesAssignment(
+                category,
+                historicalCategory.categoryId,
+                historicalCategory.assignmentType,
+                legacySnapshot,
+              );
+            });
             const gradedSubs = typeAssignments.filter(
               (a: any) => subMap[a.id]?.grade != null,
             );
@@ -5666,6 +5693,15 @@ export function registerRoutes(app: Express) {
             totalAssignments,
             completedAssignments,
             hasData: totalAssignments > 0,
+            ...(policy && snapshot
+              ? {
+                  policy: {
+                    id: policy.id,
+                    effectiveFrom: new Date(policy.effectiveFrom).toISOString(),
+                    categories: snapshot,
+                  },
+                }
+              : {}),
           };
         }),
       );
@@ -6214,6 +6250,28 @@ export function registerRoutes(app: Express) {
                 { classroomId: created.id, key: "quiz", name: "Quizzes", weight: 25, displayOrder: 2 },
                 { classroomId: created.id, key: "project", name: "Projects", weight: 25, displayOrder: 3 },
               ],
+            });
+            const categories = await tx.classroomGradingCategory.findMany({
+              where: { classroomId: created.id },
+              select: {
+                id: true,
+                key: true,
+                name: true,
+                weight: true,
+                displayOrder: true,
+                active: true,
+              },
+            });
+            await tx.gradingPolicy.create({
+              data: {
+                classroomId: created.id,
+                assignmentWeight: 25,
+                testWeight: 25,
+                quizWeight: 25,
+                projectWeight: 25,
+                effectiveFrom: created.createdAt,
+                categorySnapshot: buildCategorySnapshotPayload(categories),
+              },
             });
             return created;
           });
@@ -6931,37 +6989,59 @@ export function registerRoutes(app: Express) {
             where: { classroomId: demoClassroom.id, key: "quiz", active: true },
             select: { id: true },
           });
-          const ca1 = await prisma.classroomAssignment.create({
-            data: {
-              classroomId: demoClassroom.id,
-              title: "Reading Comprehension — Chapter 1",
-              description:
-                "Read Chapter 1 of 'Charlotte's Web' and answer the 5 comprehension questions on the worksheet. Write in full sentences.",
-              dueDate: new Date(Date.now() + 7 * 86400000)
-                .toISOString()
-                .split("T")[0],
-              points: 50,
-              assignmentType: "assignment",
-              categoryId: demoAssignmentCategory?.id,
-              slug: "reading-comprehension-ch1",
-            },
-          });
+           const ca1 = await prisma.$transaction(async (tx) => {
+             const created = await tx.classroomAssignment.create({
+               data: {
+                 classroomId: demoClassroom.id,
+                 title: "Reading Comprehension — Chapter 1",
+                 description:
+                   "Read Chapter 1 of 'Charlotte's Web' and answer the 5 comprehension questions on the worksheet. Write in full sentences.",
+                 dueDate: new Date(Date.now() + 7 * 86400000)
+                   .toISOString()
+                   .split("T")[0],
+                 points: 50,
+                 assignmentType: "assignment",
+                 categoryId: demoAssignmentCategory?.id,
+                 slug: "reading-comprehension-ch1",
+               },
+             });
+             await tx.assignmentCategoryHistory.create({
+               data: {
+                 assignmentId: created.id,
+                 categoryId: created.categoryId,
+                 legacyType: normalizeAssignmentTypeForCategory(created.assignmentType),
+                 effectiveFrom: created.createdAt,
+               },
+             });
+             return created;
+           });
 
-          const ca2 = await prisma.classroomAssignment.create({
-            data: {
-              classroomId: demoClassroom.id,
-              title: "Vocabulary Quiz — Unit 2",
-              description:
-                "Match the 20 vocabulary words to their definitions. Spelling counts.",
-              dueDate: new Date(Date.now() - 2 * 86400000)
-                .toISOString()
-                .split("T")[0],
-              points: 40,
-              assignmentType: "quiz",
-              categoryId: demoQuizCategory?.id,
-              slug: "vocabulary-quiz-unit-2",
-            },
-          });
+           const ca2 = await prisma.$transaction(async (tx) => {
+             const created = await tx.classroomAssignment.create({
+               data: {
+                 classroomId: demoClassroom.id,
+                 title: "Vocabulary Quiz — Unit 2",
+                 description:
+                   "Match the 20 vocabulary words to their definitions. Spelling counts.",
+                 dueDate: new Date(Date.now() - 2 * 86400000)
+                   .toISOString()
+                   .split("T")[0],
+                 points: 40,
+                 assignmentType: "quiz",
+                 categoryId: demoQuizCategory?.id,
+                 slug: "vocabulary-quiz-unit-2",
+               },
+             });
+             await tx.assignmentCategoryHistory.create({
+               data: {
+                 assignmentId: created.id,
+                 categoryId: created.categoryId,
+                 legacyType: normalizeAssignmentTypeForCategory(created.assignmentType),
+                 effectiveFrom: created.createdAt,
+               },
+             });
+             return created;
+           });
 
           // Graded submission for Emily on the past quiz
           await prisma.classroomSubmission.create({
@@ -9730,13 +9810,24 @@ export function registerRoutes(app: Express) {
   async function createLegacyPolicySnapshot(tx: any, classroomId: number) {
     const categories = await tx.classroomGradingCategory.findMany({
       where: { classroomId },
-      select: { key: true, weight: true, active: true },
+      select: {
+        id: true,
+        key: true,
+        name: true,
+        weight: true,
+        displayOrder: true,
+        active: true,
+      },
     });
     const projection = projectLegacyWeights(categories);
     const total = Object.values(projection).reduce((sum, weight) => sum + weight, 0);
     if (total !== 100) throw new Error("Active category weights must total 100");
     return tx.gradingPolicy.create({
-      data: { classroomId, ...projection },
+      data: {
+        classroomId,
+        ...projection,
+        categorySnapshot: buildCategorySnapshotPayload(categories),
+      },
     });
   }
 
@@ -9915,6 +10006,25 @@ export function registerRoutes(app: Express) {
         }
         await prisma.$transaction(async (tx) => {
           if (target) {
+            const affectedAssignments = await tx.classroomAssignment.findMany({
+              where: { categoryId },
+              select: { id: true },
+            });
+            const effectiveFrom = new Date();
+            for (const assignment of affectedAssignments) {
+              await tx.assignmentCategoryHistory.updateMany({
+                where: { assignmentId: assignment.id, effectiveTo: null },
+                data: { effectiveTo: effectiveFrom },
+              });
+              await tx.assignmentCategoryHistory.create({
+                data: {
+                  assignmentId: assignment.id,
+                  categoryId: target.id,
+                  legacyType: normalizeAssignmentTypeForCategory(target.key),
+                  effectiveFrom,
+                },
+              });
+            }
             await tx.classroomAssignment.updateMany({
               where: { categoryId },
               data: {

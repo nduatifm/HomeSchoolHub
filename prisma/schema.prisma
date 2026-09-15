@@ -552,10 +552,25 @@ model ClassroomAssignment {
   submissions      ClassroomSubmission[]
   materialLinks    ClassroomAssignmentMaterial[]
   submissionDrafts SubmissionDraft[]
+  categoryHistory  AssignmentCategoryHistory[]
 
   @@unique([classroomId, slug])
   @@index([classroomId])
   @@index([categoryId])
+}
+
+model AssignmentCategoryHistory {
+  id            Int      @id @default(autoincrement())
+  assignmentId  Int
+  categoryId    Int?
+  legacyType    String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  assignment ClassroomAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, effectiveFrom])
+  @@index([assignmentId, effectiveTo])
 }
 
 model ClassroomGradingCategory {
@@ -719,6 +734,7 @@ model GradingPolicy {
   quizWeight       Int      @default(25)
   projectWeight    Int      @default(25)
   effectiveFrom    DateTime @default(now())
+  categorySnapshot Json?
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 
