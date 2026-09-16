@@ -520,6 +520,7 @@ export default function NewAssignmentPage() {
                       onInput={autoGrowTitle}
                       placeholder="Assignment title…"
                       rows={1}
+                      spellCheck
                       autoFocus
                       className="w-full text-xl font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none resize-none leading-snug overflow-hidden"
                       style={{ minHeight: "2rem" }}

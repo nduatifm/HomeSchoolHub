@@ -521,6 +521,7 @@ export default function MessageThread({
             placeholder="Message…"
             value={text}
             rows={1}
+            spellCheck
             onChange={(e) => { setText(e.target.value); autoResize(); }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }

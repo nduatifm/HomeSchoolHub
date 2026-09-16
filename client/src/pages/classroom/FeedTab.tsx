@@ -103,6 +103,7 @@ export default function FeedTab({
               {...ENGLISH_PROSE_ATTRIBUTES}
               placeholder="Post an announcement to the class…"
               value={content}
+              spellCheck
               onChange={(e) => {
                 setContent(e.target.value.slice(0, MAX_CHARS + 20));
                 e.target.style.height = "auto";

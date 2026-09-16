@@ -422,6 +422,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                 }}
                 placeholder="Write your question here…"
                 rows={1}
+                spellCheck
                 className="w-full text-xl font-semibold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none resize-none leading-snug mb-8 overflow-hidden"
                 style={{ minHeight: "2rem" }}
               />
@@ -464,6 +465,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                         className="option-input flex-1 text-sm text-foreground bg-transparent border-none outline-none border-b border-border pb-1 placeholder:text-muted-foreground/40"
                         value={opt}
                         placeholder={`Option ${oi + 1}`}
+                        spellCheck
                         onChange={(e) => {
                           const opts = [...(activeQuestion.options ?? [])];
                           opts[oi] = e.target.value;

@@ -200,6 +200,7 @@ function TeacherEditor({
       attributes: {
         ...ENGLISH_RICH_TEXT_ATTRIBUTES,
         class: "min-h-[280px] px-5 py-4 outline-none text-sm leading-relaxed",
+        spellcheck: "true",
       },
     },
   });
