@@ -22,12 +22,15 @@ const transporter = nodemailer.createTransport({
 });
 
 // Verify SMTP connection on startup so misconfigured credentials surface immediately
-// rather than failing silently per-email. Non-fatal: the server starts regardless.
-transporter.verify().then(() => {
-  console.log('[email] SMTP connection verified — email delivery is ready');
-}).catch((err: Error) => {
-  console.warn('[email] SMTP connection failed — emails will not be delivered:', err.message);
-});
+// rather than failing silently per-email. Tests import the route graph without
+// starting the application and must not open external SMTP connections.
+if (process.env.NODE_ENV !== "test") {
+  transporter.verify().then(() => {
+    console.log('[email] SMTP connection verified — email delivery is ready');
+  }).catch((err: Error) => {
+    console.warn('[email] SMTP connection failed — emails will not be delivered:', err.message);
+  });
+}
 
 function getBaseUrl(): string {
   if (process.env.CLIENT_URL) return process.env.CLIENT_URL;

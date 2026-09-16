@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Send, Megaphone } from "lucide-react";
 import type { PostWithAuthor } from "./types";
+import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
 
 const MAX_CHARS = 1000;
 
@@ -99,6 +100,7 @@ export default function FeedTab({
               <Megaphone className="h-4 w-4 text-primary" />
             </span>
             <textarea
+              {...ENGLISH_PROSE_ATTRIBUTES}
               placeholder="Post an announcement to the class…"
               value={content}
               spellCheck

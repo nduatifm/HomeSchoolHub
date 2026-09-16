@@ -1,33 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import type { ClassroomAssignment, ClassroomSubmission, GradingPolicy } from "@shared/schema";
+import type { ClassroomAssignment, ClassroomGradingCategory, ClassroomSubmission, GradingPolicy } from "@shared/schema";
 import StatusBadge from "./StatusBadge";
 import GradeBreakdownPanel from "./GradeBreakdownPanel";
 import { Scale } from "lucide-react";
 
-const TYPE_BADGE: Record<string, string> = {
-  assignment: "bg-blue-100 text-blue-700",
-  test: "bg-orange-100 text-orange-700",
-  quiz: "bg-purple-100 text-purple-700",
-  project: "bg-teal-100 text-teal-700",
-};
-const TYPE_LABEL: Record<string, string> = {
-  assignment: "Assignment",
-  test: "Test",
-  quiz: "Quiz",
-  project: "Project",
-};
-
-const POLICY_TYPES = [
-  { key: "assignmentWeight" as const, label: "Assignments", dot: "bg-blue-500", badge: "bg-blue-100 text-blue-700" },
-  { key: "testWeight" as const, label: "Tests", dot: "bg-orange-500", badge: "bg-orange-100 text-orange-700" },
-  { key: "quizWeight" as const, label: "Quizzes", dot: "bg-purple-500", badge: "bg-purple-100 text-purple-700" },
-  { key: "projectWeight" as const, label: "Projects", dot: "bg-teal-500", badge: "bg-teal-100 text-teal-700" },
+const CATEGORY_COLORS = [
+  { dot: "bg-blue-500", badge: "bg-blue-100 text-blue-700" },
+  { dot: "bg-orange-500", badge: "bg-orange-100 text-orange-700" },
+  { dot: "bg-purple-500", badge: "bg-purple-100 text-purple-700" },
+  { dot: "bg-teal-500", badge: "bg-teal-100 text-teal-700" },
+  { dot: "bg-pink-500", badge: "bg-pink-100 text-pink-700" },
+  { dot: "bg-indigo-500", badge: "bg-indigo-100 text-indigo-700" },
 ];
 
-function GradingPolicyCard({ policy }: { policy: GradingPolicy }) {
-  const active = POLICY_TYPES.filter((t) => policy[t.key] > 0);
+function GradingPolicyCard({ policy, categories }: { policy: GradingPolicy; categories: ClassroomGradingCategory[] }) {
+  const active = (categories.length ? categories : (policy.categories ?? [])).filter((category) => category.active && category.weight > 0);
   return (
     <div className="rounded-2xl border border-border bg-card px-4 py-3 space-y-2">
       <div className="flex items-center gap-2">
@@ -40,11 +29,11 @@ function GradingPolicyCard({ policy }: { policy: GradingPolicy }) {
         <p className="text-xs text-muted-foreground">No grading policy set.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {active.map((t) => (
-            <div key={t.key} className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full shrink-0 ${t.dot}`} />
-              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${t.badge}`}>
-                {t.label} · {policy[t.key]}%
+          {active.map((category, index) => (
+            <div key={category.id} className="flex items-center gap-1.5">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${CATEGORY_COLORS[index % CATEGORY_COLORS.length].dot}`} />
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${CATEGORY_COLORS[index % CATEGORY_COLORS.length].badge}`}>
+                {category.name} · {category.weight}%
               </span>
             </div>
           ))}
@@ -78,13 +67,18 @@ export default function StudentGradesTab({
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-policy`),
     enabled: classroomId > 0,
   });
+  const { data: categories = [] } = useQuery<ClassroomGradingCategory[]>({
+    queryKey: ["/api/classrooms", classroomId, "grading-categories"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-categories`),
+    enabled: classroomId > 0,
+  });
 
   const subMap = Object.fromEntries(submissions.map((s) => [s.assignmentId, s]));
 
   if (assignments.length === 0) {
     return (
       <div className="space-y-4">
-        {policy && <GradingPolicyCard policy={policy} />}
+        {policy && <GradingPolicyCard policy={policy} categories={categories} />}
         <div className="text-center py-12 text-muted-foreground text-sm rounded-2xl border border-dashed border-border">
           No assignments yet.
         </div>
@@ -98,7 +92,7 @@ export default function StudentGradesTab({
         <GradeBreakdownPanel classroomId={classroomId} studentId={studentId} />
       )}
 
-      {policy && <GradingPolicyCard policy={policy} />}
+      {policy && <GradingPolicyCard policy={policy} categories={categories} />}
 
       <div className="overflow-x-auto rounded-2xl border border-border">
         <table className="min-w-full text-sm">
@@ -124,8 +118,8 @@ export default function StudentGradesTab({
                   <td className="px-4 py-3 font-medium text-foreground">
                     <div className="flex flex-col gap-0.5">
                       <span>{a.title}</span>
-                      <span className={`text-[10px] font-medium px-1.5 py-0 rounded-full self-start ${TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment}`}>
-                        {TYPE_LABEL[a.assignmentType] ?? a.assignmentType}
+                      <span className={`text-[10px] font-medium px-1.5 py-0 rounded-full self-start ${(() => { const c = categories.find((x) => x.id === a.categoryId) ?? categories.find((x) => x.key === a.assignmentType); return CATEGORY_COLORS[(c?.displayOrder ?? 0) % CATEGORY_COLORS.length].badge; })()}`}>
+                        {categories.find((x) => x.id === a.categoryId)?.name ?? categories.find((x) => x.key === a.assignmentType)?.name ?? a.assignmentType}
                       </span>
                     </div>
                   </td>

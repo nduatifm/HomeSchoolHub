@@ -26,7 +26,8 @@ import Breadcrumb from "@/components/Breadcrumb";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { BookOpen, Check } from "lucide-react";
-import type { Classroom, ClassroomMaterial, FormQuestion, ItemType } from "@shared/schema";
+import type { Classroom, ClassroomMaterial, ClassroomGradingCategory, FormQuestion, ItemType } from "@shared/schema";
+import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
 
 const typeLabel: Record<string, string> = {
   short: "Short answer",
@@ -65,6 +66,7 @@ export default function NewAssignmentPage() {
 
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
   const [assignmentType, setAssignmentType] = useState<ItemType | "">("");
+  const [categoryId, setCategoryId] = useState<number | "">("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const MAX_ATTACH_FILES = 5;
@@ -113,6 +115,18 @@ export default function NewAssignmentPage() {
 
   const classroomId = classroom?.id ?? 0;
 
+  const { data: gradingCategories = [] } = useQuery<ClassroomGradingCategory[]>({
+    queryKey: ["/api/classrooms", classroomId, "grading-categories"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-categories`),
+    enabled: !!classroomId,
+  });
+  const activeCategories = gradingCategories.filter((category) => category.active);
+  useEffect(() => {
+    if (categoryId !== "" || !assignmentType) return;
+    const legacy = activeCategories.find((category) => category.key === assignmentType);
+    if (legacy) setCategoryId(legacy.id);
+  }, [activeCategories, assignmentType, categoryId]);
+
   const { data: materials = [] } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/materials`),
@@ -138,11 +152,12 @@ export default function NewAssignmentPage() {
         dueDate: form.dueDate,
         points: form.points,
         assignmentType,
+        categoryId,
         linkUrl,
         selectedMaterialIds,
       }));
     }
-  }, [form, assignmentType, linkUrl, selectedMaterialIds]);
+  }, [form, assignmentType, categoryId, linkUrl, selectedMaterialIds]);
 
   // Restore on first load: server draft wins; if server has no draft, fall back to localStorage
   // Also fires when server query errors so the save debounce is unblocked
@@ -158,6 +173,10 @@ export default function NewAssignmentPage() {
         points: d.points != null ? String(d.points) : "100",
       });
       if (d.assignmentType) setAssignmentType(d.assignmentType as ItemType);
+      if (d.categoryId != null) {
+        setCategoryId(Number(d.categoryId));
+        if (!d.assignmentType) setAssignmentType("assignment");
+      }
       if (d.linkUrl) setLinkUrl(d.linkUrl);
       if (d.linkedMaterialIds?.length) setSelectedMaterialIds(d.linkedMaterialIds);
       if (d.formSchema?.length) {
@@ -180,6 +199,7 @@ export default function NewAssignmentPage() {
         (d.description ?? "").trim() ||
         d.dueDate ||
         d.assignmentType ||
+        d.categoryId != null ||
         (d.linkUrl ?? "").trim() ||
         (d.linkedMaterialIds?.length ?? 0) > 0 ||
         (d.formSchema?.length ?? 0) > 0 ||
@@ -192,7 +212,7 @@ export default function NewAssignmentPage() {
       const raw = localStorage.getItem(getMainDraftKey(draftId.current));
       if (raw) {
         const local = JSON.parse(raw);
-        const localHasContent = (local.title ?? "").trim() || (local.description ?? "").trim() || local.dueDate || local.assignmentType;
+        const localHasContent = (local.title ?? "").trim() || (local.description ?? "").trim() || local.dueDate || local.assignmentType || local.categoryId != null;
         if (localHasContent) {
           // Merge with formQuestions/answerKey already in localStorage
           const formSchema = (() => { try { return JSON.parse(localStorage.getItem(getDraftKey(draftId.current)) ?? "[]"); } catch { return []; } })();
@@ -226,6 +246,7 @@ export default function NewAssignmentPage() {
           dueDate: form.dueDate,
           points: parseInt(form.points, 10) || 100,
           assignmentType,
+          categoryId,
           linkUrl: linkUrl || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
           answerKey: Object.keys(answerKey).length > 0 ? answerKey : null,
@@ -234,7 +255,7 @@ export default function NewAssignmentPage() {
       }).catch(() => {});
     }, 2000);
     return () => { if (serverDebounceTimerRef.current) clearTimeout(serverDebounceTimerRef.current); };
-  }, [form, assignmentType, linkUrl, formQuestions, answerKey, selectedMaterialIds, classroomId]);
+  }, [form, assignmentType, categoryId, linkUrl, formQuestions, answerKey, selectedMaterialIds, classroomId]);
 
   // Write formQuestions to localStorage whenever they change so FormBuilderPage can read them
   useEffect(() => {
@@ -290,6 +311,7 @@ export default function NewAssignmentPage() {
       fd.append("dueDate", form.dueDate);
       fd.append("points", form.points);
       fd.append("assignmentType", assignmentType);
+      if (categoryId !== "") fd.append("categoryId", String(categoryId));
       if (linkUrl.trim()) fd.append("linkUrl", linkUrl.trim());
       if (fileUrls.length > 0) fd.append("fileUrls", JSON.stringify(fileUrls));
       if (formQuestions.length > 0) {
@@ -328,7 +350,7 @@ export default function NewAssignmentPage() {
   const didSubmit = createMutation.isSuccess;
   const pointsNum = Number(form.points);
   const pointsValid = !!form.points && Number.isInteger(pointsNum) && pointsNum >= 1 && pointsNum <= 10000;
-  const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && !!assignmentType && !createMutation.isPending;
+  const canSave = !!form.title.trim() && !!form.dueDate && pointsValid && (categoryId !== "" || !!assignmentType) && !createMutation.isPending;
   const backUrl = `/classrooms/${classroomSlug}/assignments`;
   const goBack = useGoBack(backUrl);
 
@@ -461,6 +483,7 @@ export default function NewAssignmentPage() {
                   onClick={() => {
                     setForm({ title: "", description: "", dueDate: "", points: "100" });
                     setAssignmentType("");
+                    setCategoryId("");
                     setLinkUrl("");
                     setSelectedMaterialIds([]);
                     setFormQuestions([]);
@@ -490,6 +513,7 @@ export default function NewAssignmentPage() {
                     </Label>
                     <textarea
                       ref={titleRef}
+                      {...ENGLISH_PROSE_ATTRIBUTES}
                       id="title"
                       value={form.title}
                       onChange={(e) => { setForm({ ...form, title: e.target.value }); autoGrowTitle(); }}
@@ -523,20 +547,21 @@ export default function NewAssignmentPage() {
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-4 lg:hidden">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Type <span className="text-destructive text-xs">*</span></Label>
-                    <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as ItemType)}>
+                    <Label className="text-sm font-medium">Category <span className="text-destructive text-xs">*</span></Label>
+                    <Select value={categoryId === "" ? "" : String(categoryId)} onValueChange={(v) => {
+                      const selected = activeCategories.find((category) => String(category.id) === v);
+                      setCategoryId(Number(v));
+                      setAssignmentType(selected && ["assignment", "test", "quiz", "project"].includes(selected.key) ? selected.key as ItemType : "assignment");
+                    }}>
                       <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select a type" />
+                        <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="assignment">Assignment</SelectItem>
-                        <SelectItem value="test">Test</SelectItem>
-                        <SelectItem value="quiz">Quiz</SelectItem>
-                        <SelectItem value="project">Project</SelectItem>
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    {!assignmentType && !!form.title.trim() && (
-                      <p className="text-xs text-destructive">A type is required to save this assignment.</p>
+                    {categoryId === "" && !assignmentType && !!form.title.trim() && (
+                      <p className="text-xs text-destructive">A category is required to save this assignment.</p>
                     )}
                   </div>
                   <MobileDetails form={form} setForm={setForm} formatDueDate={formatDueDate} />
@@ -706,20 +731,21 @@ export default function NewAssignmentPage() {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
 
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Type <span className="text-destructive text-xs">*</span></Label>
-                    <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as ItemType)}>
+                    <Label className="text-sm font-medium">Category <span className="text-destructive text-xs">*</span></Label>
+                    <Select value={categoryId === "" ? "" : String(categoryId)} onValueChange={(v) => {
+                      const selected = activeCategories.find((category) => String(category.id) === v);
+                      setCategoryId(Number(v));
+                      setAssignmentType(selected && ["assignment", "test", "quiz", "project"].includes(selected.key) ? selected.key as ItemType : "assignment");
+                    }}>
                       <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select a type" />
+                        <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="assignment">Assignment</SelectItem>
-                        <SelectItem value="test">Test</SelectItem>
-                        <SelectItem value="quiz">Quiz</SelectItem>
-                        <SelectItem value="project">Project</SelectItem>
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    {!assignmentType && !!form.title.trim() && (
-                      <p className="text-xs text-destructive">A type is required to save this assignment.</p>
+                    {categoryId === "" && !assignmentType && !!form.title.trim() && (
+                      <p className="text-xs text-destructive">A category is required to save this assignment.</p>
                     )}
                   </div>
 

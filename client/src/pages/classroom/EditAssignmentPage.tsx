@@ -26,7 +26,8 @@ import Breadcrumb from "@/components/Breadcrumb";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { BookOpen, Check } from "lucide-react";
-import type { Classroom, ClassroomAssignment, ClassroomMaterial, FormQuestion, ItemType } from "@shared/schema";
+import type { Classroom, ClassroomAssignment, ClassroomGradingCategory, ClassroomMaterial, FormQuestion, ItemType } from "@shared/schema";
+import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
 
 const typeLabel: Record<string, string> = {
   short: "Short answer",
@@ -66,6 +67,7 @@ export default function EditAssignmentPage() {
 
   const [form, setForm] = useState({ title: "", description: "", dueDate: "", points: "100" });
   const [assignmentType, setAssignmentType] = useState<ItemType>("assignment");
+  const [categoryId, setCategoryId] = useState<number | "">("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [clearFile, setClearFile] = useState(false);
@@ -84,6 +86,7 @@ export default function EditAssignmentPage() {
     formQuestions: FormQuestion[];
     answerKey: Record<string, string | string[]>;
     clearFile: boolean;
+    categoryId: number | "";
   } | null>(null);
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -102,11 +105,12 @@ export default function EditAssignmentPage() {
       JSON.stringify(form) !== JSON.stringify(snapshot.form) ||
       assignmentType !== snapshot.assignmentType ||
       linkUrl !== snapshot.linkUrl ||
+      categoryId !== snapshot.categoryId ||
       JSON.stringify(formQuestions) !== JSON.stringify(snapshot.formQuestions) ||
       JSON.stringify(answerKey) !== JSON.stringify(snapshot.answerKey) ||
       clearFile !== snapshot.clearFile
     );
-  }, [snapshot, form, assignmentType, linkUrl, formQuestions, answerKey, attachedFile, clearFile]);
+  }, [snapshot, form, assignmentType, categoryId, linkUrl, formQuestions, answerKey, attachedFile, clearFile]);
 
   function autoGrowTitle() {
     const el = titleRef.current;
@@ -136,6 +140,18 @@ export default function EditAssignmentPage() {
   });
 
   const classroomId = classroom?.id ?? 0;
+
+  const { data: gradingCategories = [] } = useQuery<ClassroomGradingCategory[]>({
+    queryKey: ["/api/classrooms", classroomId, "grading-categories"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-categories`),
+    enabled: !!classroomId,
+  });
+  const activeCategories = gradingCategories.filter((category) => category.active);
+  useEffect(() => {
+    if (categoryId !== "" || !initialized) return;
+    const legacy = activeCategories.find((category) => category.key === assignmentType);
+    if (legacy) setCategoryId(legacy.id);
+  }, [activeCategories, assignmentType, categoryId, initialized]);
 
   const { data: materials = [] } = useQuery<ClassroomMaterial[]>({
     queryKey: ["/api/classrooms", classroomId, "materials"],
@@ -168,11 +184,13 @@ export default function EditAssignmentPage() {
       points: String(assignment.points),
     };
     const seedType = (assignment.assignmentType as ItemType) ?? "assignment";
+    const seedCategoryId = assignment.categoryId ?? "";
     const seedLink = assignment.linkUrl ?? "";
     const existing = (assignment.formSchema as FormQuestion[] | null) ?? [];
     const existingKey = (assignment.answerKey as Record<string, string | string[]> | null) ?? {};
     setForm(seedForm);
     setAssignmentType(seedType);
+    setCategoryId(seedCategoryId);
     setLinkUrl(seedLink);
     setFormQuestions(existing);
     setAnswerKey(existingKey);
@@ -180,7 +198,7 @@ export default function EditAssignmentPage() {
     localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(existing));
     localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(existingKey));
     // Snapshot captured here — isDirty compares against this baseline
-    setSnapshot({ form: seedForm, assignmentType: seedType, linkUrl: seedLink, formQuestions: existing, answerKey: existingKey, clearFile: false });
+    setSnapshot({ form: seedForm, assignmentType: seedType, categoryId: seedCategoryId, linkUrl: seedLink, formQuestions: existing, answerKey: existingKey, clearFile: false });
     setInitialized(true);
     setTimeout(autoGrowTitle, 0);
   }, [assignment, initialized]);
@@ -206,10 +224,11 @@ export default function EditAssignmentPage() {
       dueDate: form.dueDate,
       points: form.points,
       assignmentType,
+      categoryId,
       linkUrl,
       selectedMaterialIds,
     }));
-  }, [form, assignmentType, linkUrl, selectedMaterialIds, initialized]);
+  }, [form, assignmentType, categoryId, linkUrl, selectedMaterialIds, initialized]);
 
   // After initialization, check if server draft is newer than published and differs — offer to restore
   useEffect(() => {
@@ -223,6 +242,7 @@ export default function EditAssignmentPage() {
       (d.description ?? "").trim() ||
       d.dueDate ||
       d.assignmentType ||
+      d.categoryId != null ||
       (d.linkUrl ?? "").trim() ||
       (d.linkedMaterialIds?.length ?? 0) > 0 ||
       (d.formSchema?.length ?? 0) > 0 ||
@@ -240,6 +260,7 @@ export default function EditAssignmentPage() {
       points: String(assignment.points),
     };
     const pubType = (assignment.assignmentType as ItemType) ?? "assignment";
+    const pubCategoryId = assignment.categoryId ?? null;
     const pubLink = assignment.linkUrl ?? "";
     const pubMaterials = assignment.linkedMaterialIds ?? [];
     const pubSchema = (assignment.formSchema as FormQuestion[] | null) ?? [];
@@ -253,6 +274,7 @@ export default function EditAssignmentPage() {
     const serverDiffersFromPublished =
       JSON.stringify(draftForm) !== JSON.stringify(pubForm) ||
       ((d.assignmentType as ItemType) ?? pubType) !== pubType ||
+      (d.categoryId ?? pubCategoryId) !== pubCategoryId ||
       (d.linkUrl ?? pubLink) !== pubLink ||
       JSON.stringify(d.linkedMaterialIds ?? pubMaterials) !== JSON.stringify(pubMaterials) ||
       JSON.stringify(d.formSchema ?? pubSchema) !== JSON.stringify(pubSchema) ||
@@ -273,6 +295,7 @@ export default function EditAssignmentPage() {
       points: d.points != null ? String(d.points) : String(assignment.points),
     });
     if (d.assignmentType) setAssignmentType(d.assignmentType as ItemType);
+      if (d.categoryId !== undefined) setCategoryId(d.categoryId == null ? "" : Number(d.categoryId));
     if (d.linkUrl !== undefined) setLinkUrl(d.linkUrl ?? "");
     // Restore material IDs even when intentionally cleared to empty
     if (d.linkedMaterialIds !== undefined && d.linkedMaterialIds !== null) {
@@ -307,6 +330,7 @@ export default function EditAssignmentPage() {
           dueDate: form.dueDate,
           points: parseInt(form.points, 10) || 100,
           assignmentType,
+          categoryId,
           linkUrl: linkUrl || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
           answerKey: Object.keys(answerKey).length > 0 ? answerKey : null,
@@ -315,7 +339,7 @@ export default function EditAssignmentPage() {
       }).catch(() => {});
     }, 2000);
     return () => { if (serverDebounceTimerRef.current) clearTimeout(serverDebounceTimerRef.current); };
-  }, [form, assignmentType, linkUrl, formQuestions, answerKey, selectedMaterialIds, initialized, classroomId, assignment?.id, isDirty]);
+  }, [form, assignmentType, categoryId, linkUrl, formQuestions, answerKey, selectedMaterialIds, initialized, classroomId, assignment?.id, isDirty]);
 
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
@@ -365,6 +389,7 @@ export default function EditAssignmentPage() {
           dueDate: form.dueDate,
           points: parseInt(form.points, 10),
           assignmentType,
+          categoryId: categoryId === "" ? null : categoryId,
           ...(fileUrl !== undefined ? { fileUrl } : {}),
           linkUrl: linkUrl.trim() || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
@@ -556,6 +581,7 @@ export default function EditAssignmentPage() {
                     </Label>
                     <textarea
                       ref={titleRef}
+                      {...ENGLISH_PROSE_ATTRIBUTES}
                       id="title"
                       value={form.title}
                       onChange={(e) => { setForm({ ...form, title: e.target.value }); autoGrowTitle(); }}
@@ -589,16 +615,17 @@ export default function EditAssignmentPage() {
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-4 lg:hidden">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Type</Label>
-                    <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as ItemType)}>
+                    <Label className="text-sm font-medium">Category</Label>
+                    <Select value={categoryId === "" ? "" : String(categoryId)} onValueChange={(v) => {
+                      const selected = activeCategories.find((category) => String(category.id) === v);
+                      setCategoryId(Number(v));
+                      if (selected && ["assignment", "test", "quiz", "project"].includes(selected.key)) setAssignmentType(selected.key as ItemType);
+                    }}>
                       <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select a type" />
+                        <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="assignment">Assignment</SelectItem>
-                        <SelectItem value="test">Test</SelectItem>
-                        <SelectItem value="quiz">Quiz</SelectItem>
-                        <SelectItem value="project">Project</SelectItem>
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -778,16 +805,17 @@ export default function EditAssignmentPage() {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
 
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Type</Label>
-                    <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as ItemType)}>
+                    <Label className="text-sm font-medium">Category</Label>
+                    <Select value={categoryId === "" ? "" : String(categoryId)} onValueChange={(v) => {
+                      const selected = activeCategories.find((category) => String(category.id) === v);
+                      setCategoryId(Number(v));
+                      if (selected && ["assignment", "test", "quiz", "project"].includes(selected.key)) setAssignmentType(selected.key as ItemType);
+                    }}>
                       <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="Select a type" />
+                        <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="assignment">Assignment</SelectItem>
-                        <SelectItem value="test">Test</SelectItem>
-                        <SelectItem value="quiz">Quiz</SelectItem>
-                        <SelectItem value="project">Project</SelectItem>
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

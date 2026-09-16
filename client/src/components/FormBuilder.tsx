@@ -13,6 +13,7 @@ import {
   Key,
 } from "lucide-react";
 import type { FormQuestion } from "@shared/schema";
+import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
 
 type QType = FormQuestion["type"];
 
@@ -413,6 +414,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
 
               <textarea
                 ref={promptRef}
+                {...ENGLISH_PROSE_ATTRIBUTES}
                 value={activeQuestion.label}
                 onChange={(e) => {
                   updateQuestion(activeQuestion.id, { label: e.target.value });
@@ -459,6 +461,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                         activeQuestion.type === "checkbox" ? "rounded" : "rounded-full"
                       }`} />
                       <input
+                        {...ENGLISH_PROSE_ATTRIBUTES}
                         className="option-input flex-1 text-sm text-foreground bg-transparent border-none outline-none border-b border-border pb-1 placeholder:text-muted-foreground/40"
                         value={opt}
                         placeholder={`Option ${oi + 1}`}

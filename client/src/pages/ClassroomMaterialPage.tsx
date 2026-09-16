@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { ENGLISH_PROSE_ATTRIBUTES, ENGLISH_RICH_TEXT_ATTRIBUTES } from "@/lib/proseInput";
 import StarterKit from "@tiptap/starter-kit";
 import LinkExtension from "@tiptap/extension-link";
 import ImageExtension from "@tiptap/extension-image";
@@ -197,6 +198,7 @@ function TeacherEditor({
     content: initial?.description ?? "",
     editorProps: {
       attributes: {
+        ...ENGLISH_RICH_TEXT_ATTRIBUTES,
         class: "min-h-[280px] px-5 py-4 outline-none text-sm leading-relaxed",
         spellcheck: "true",
       },
@@ -708,7 +710,7 @@ function TeacherEditor({
             {/* Title */}
             <input
               type="text"
-              spellCheck
+              {...ENGLISH_PROSE_ATTRIBUTES}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Title"

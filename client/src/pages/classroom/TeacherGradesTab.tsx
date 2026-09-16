@@ -2,39 +2,35 @@ import { useState } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { ClassroomAssignment, GradingPolicy } from "@shared/schema";
+import type { ClassroomAssignment, ClassroomGradingCategory, GradingPolicy } from "@shared/schema";
 import type { SubmissionWithName, EnrollmentWithStudent } from "./types";
 import GradeBreakdownPanel from "./GradeBreakdownPanel";
 
-const TYPE_BADGE: Record<string, string> = {
-  assignment: "bg-blue-100 text-blue-700",
-  test: "bg-orange-100 text-orange-700",
-  quiz: "bg-purple-100 text-purple-700",
-  project: "bg-teal-100 text-teal-700",
-};
-const TYPE_LABEL: Record<string, string> = {
-  assignment: "Assignment",
-  test: "Test",
-  quiz: "Quiz",
-  project: "Project",
-};
+const CATEGORY_BADGES = [
+  "bg-blue-100 text-blue-700",
+  "bg-orange-100 text-orange-700",
+  "bg-purple-100 text-purple-700",
+  "bg-teal-100 text-teal-700",
+  "bg-pink-100 text-pink-700",
+  "bg-indigo-100 text-indigo-700",
+];
 
 function computeWeightedPct(
   assignments: ClassroomAssignment[],
   subs: Record<number, SubmissionWithName>,
-  policy: GradingPolicy | null | undefined
+  policy: GradingPolicy | null | undefined,
+  categories: ClassroomGradingCategory[],
 ): number | null {
-  const types = ["assignment", "test", "quiz", "project"] as const;
-  const weights = policy
-    ? { assignment: policy.assignmentWeight, test: policy.testWeight, quiz: policy.quizWeight, project: policy.projectWeight }
-    : { assignment: 25, test: 25, quiz: 25, project: 25 };
-  const groups = types.map((type) => {
-    const typeAssigns = assignments.filter((a) => a.assignmentType === type);
+  const rows = categories.length ? categories : (["assignment", "test", "quiz", "project"] as const).map((key, index) => ({
+    id: 0, key, name: key[0].toUpperCase() + key.slice(1), weight: policy?.[`${key}Weight` as keyof GradingPolicy] as number ?? 25, displayOrder: index,
+  }));
+  const groups = rows.map((category) => {
+    const typeAssigns = assignments.filter((a) => a.categoryId === category.id || (a.categoryId == null && a.assignmentType === category.key));
     const graded = typeAssigns.filter((a) => subs[a.id]?.grade != null);
-    if (graded.length === 0) return { w: weights[type], avg: null as number | null };
+    if (graded.length === 0) return { w: category.weight, avg: null as number | null };
     const earned = graded.reduce((s, a) => s + (subs[a.id].grade ?? 0), 0);
     const possible = graded.reduce((s, a) => s + a.points, 0);
-    return { w: weights[type], avg: possible > 0 ? (earned / possible) * 100 : 0 };
+    return { w: category.weight, avg: possible > 0 ? (earned / possible) * 100 : 0 };
   });
   const gradedGroups = groups.filter((g) => g.avg !== null);
   if (gradedGroups.length === 0) return null;
@@ -59,6 +55,12 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
     queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-policy`),
     enabled: classroomId > 0,
   });
+  const { data: categories = [] } = useQuery<ClassroomGradingCategory[]>({
+    queryKey: ["/api/classrooms", classroomId, "grading-categories"],
+    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/grading-categories`),
+    enabled: classroomId > 0,
+  });
+  const displayCategories = categories.length ? categories : (policy?.categories ?? []);
   const allSubsResults = useQueries({
     queries: assignments.map((a) => ({
       queryKey: ["/api/classrooms", classroomId, "assignments", a.id, "submissions"],
@@ -93,14 +95,9 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
       {policy && (
         <div className="rounded-xl border border-border bg-muted/30 px-4 py-2.5 flex flex-wrap gap-x-4 gap-y-1 items-center text-xs">
           <span className="font-semibold text-foreground text-xs uppercase tracking-wider">Grading Policy</span>
-          {[
-            { label: "Assignments", w: policy.assignmentWeight, cls: "text-blue-700" },
-            { label: "Tests", w: policy.testWeight, cls: "text-orange-700" },
-            { label: "Quizzes", w: policy.quizWeight, cls: "text-purple-700" },
-            { label: "Projects", w: policy.projectWeight, cls: "text-teal-700" },
-          ].map((t) => (
-            <span key={t.label} className={`font-medium ${t.cls}`}>{t.label}: {t.w}%</span>
-          ))}
+            {displayCategories.filter((category) => category.active && category.weight > 0).map((category, index) => (
+              <span key={category.id} className={`font-medium ${CATEGORY_BADGES[index % CATEGORY_BADGES.length].split(" ").pop()}`}>{category.name}: {category.weight}%</span>
+            ))}
         </div>
       )}
 
@@ -143,8 +140,8 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
                 <th key={a.id} className="px-3 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[100px]">
                   <div className="truncate max-w-[100px]" title={a.title}>{a.title}</div>
                   <div className="flex items-center justify-center gap-1 mt-0.5">
-                    <span className={`text-[9px] font-medium px-1 rounded-full ${TYPE_BADGE[a.assignmentType] ?? TYPE_BADGE.assignment}`}>
-                      {TYPE_LABEL[a.assignmentType] ?? a.assignmentType}
+                     <span className={`text-[9px] font-medium px-1 rounded-full ${(() => { const c = displayCategories.find((x) => x.id === a.categoryId) ?? displayCategories.find((x) => x.key === a.assignmentType); return CATEGORY_BADGES[(c?.displayOrder ?? 0) % CATEGORY_BADGES.length]; })()}`}>
+                       {displayCategories.find((x) => x.id === a.categoryId)?.name ?? displayCategories.find((x) => x.key === a.assignmentType)?.name ?? a.assignmentType}
                     </span>
                     <span className="text-muted-foreground/60 font-normal">{a.points} pts</span>
                   </div>
@@ -160,7 +157,7 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
               const subs = submissionMap[e.studentId] ?? {};
               const earned = assignments.reduce((s, a) => s + (subs[a.id]?.grade ?? 0), 0);
               const hasAnyGrade = assignments.some((a) => subs[a.id]?.grade != null);
-              const weightedPct = computeWeightedPct(assignments, subs, policy);
+                   const weightedPct = computeWeightedPct(assignments, subs, policy, displayCategories);
               const isSelected = selectedId === e.studentId;
               return (
                 <tr

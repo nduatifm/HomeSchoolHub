@@ -1,2 +1,3 @@
 - [Dual-role teacher-parent auth gap](dual-role-auth.md) — primary `role` field alone is not enough; always check `roles` array too for teacher gates.
 - [Server-side impersonation design](session-auth-design.md) — impersonation uses AuthSession.impersonatingUserId; no tokens in localStorage or Authorization headers.
+- [Custom grading compatibility](custom-grading-compatibility.md) — category IDs are authoritative; keep legacy assignment types and four-weight projections synchronized.
