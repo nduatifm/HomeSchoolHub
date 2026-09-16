@@ -268,7 +268,6 @@ export default function AdminUsers() {
                   <TableHead>Verified</TableHead>
                   <TableHead>Admin</TableHead>
                   <TableHead>Joined</TableHead>
-                  <TableHead>ID</TableHead>
                   {currentUser?.isSuperAdmin && <TableHead className="text-right pr-4">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -285,14 +284,14 @@ export default function AdminUsers() {
                           </div>
                         </div>
                       </TableCell>
-                      {Array.from({ length: currentUser?.isSuperAdmin ? 7 : 6 }).map((_, j) => (
+                      {Array.from({ length: currentUser?.isSuperAdmin ? 6 : 5 }).map((_, j) => (
                         <TableCell key={j}><div className="h-3 w-16 bg-muted animate-pulse rounded" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={currentUser?.isSuperAdmin ? 8 : 7} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={currentUser?.isSuperAdmin ? 7 : 6} className="text-center py-10 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -362,11 +361,6 @@ export default function AdminUsers() {
                             ? new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                             : "—"}
                         </span>
-                      </TableCell>
-
-                      {/* User ID */}
-                      <TableCell>
-                        <span className="text-xs text-muted-foreground font-mono">#{u.id}</span>
                       </TableCell>
 
                       {/* Actions (super admin only) */}

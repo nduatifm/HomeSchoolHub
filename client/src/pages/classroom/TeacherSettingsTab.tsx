@@ -198,7 +198,7 @@ export default function TeacherSettingsTab({ classroomId }: { classroomId: numbe
                 <Select value={replacementId} onValueChange={setReplacementId}>
                   <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="Select a category" /></SelectTrigger>
                   <SelectContent>
-                    {categories.filter((c) => c.id !== categoryToDelete.id).map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    {categories.filter((c) => c.id !== categoryToDelete.id).map((c) => <SelectItem key={c.id} value={String(c.id)} textValue={c.name}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Button size="sm" className="h-8" disabled={!replacementId || reassigning} onClick={removeCategory}>{reassigning ? "Removing…" : "Reassign and remove"}</Button>

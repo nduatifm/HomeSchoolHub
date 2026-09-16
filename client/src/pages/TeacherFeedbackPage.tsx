@@ -96,7 +96,7 @@ function GiveFeedbackDialog({
                       </SelectTrigger>
                       <SelectContent>
                         {students.map((s: any) => (
-                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                          <SelectItem key={s.id} value={s.id.toString()} textValue={s.name}>{s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

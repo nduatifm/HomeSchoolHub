@@ -557,7 +557,7 @@ export default function NewAssignmentPage() {
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)} textValue={category.name}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {categoryId === "" && !assignmentType && !!form.title.trim() && (
@@ -741,7 +741,7 @@ export default function NewAssignmentPage() {
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)} textValue={category.name}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {categoryId === "" && !assignmentType && !!form.title.trim() && (

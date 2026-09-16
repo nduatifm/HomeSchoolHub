@@ -180,7 +180,7 @@ export default function SemesterReportDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {students.map((s) => (
-                    <SelectItem key={s.id} value={String(s.id)}>
+                    <SelectItem key={s.id} value={String(s.id)} textValue={s.name}>
                       {s.name}
                     </SelectItem>
                   ))}

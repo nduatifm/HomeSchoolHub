@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { Children, createContext, isValidElement, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 
@@ -7,9 +7,7 @@ interface SelectContextType {
   onValueChange: (value: string) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
-  labeledValue: string;
-  label: string;
-  setLabelFor: (value: string, label: string) => void;
+  selectedLabel: string;
 }
 
 const SelectContext = createContext<SelectContextType | undefined>(undefined);
@@ -24,16 +22,10 @@ export function Select({
   onValueChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [labeledValue, setLabeledValue] = useState("");
-  const [label, setLabel] = useState("");
-
-  const setLabelFor = (v: string, l: string) => {
-    setLabeledValue(v);
-    setLabel(l);
-  };
+  const selectedLabel = findSelectedLabel(children, value);
 
   return (
-    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, labeledValue, label, setLabelFor }}>
+    <SelectContext.Provider value={{ value, onValueChange, open, setOpen, selectedLabel }}>
       <div className="relative">
         {children}
       </div>
@@ -73,10 +65,7 @@ export function SelectValue({ placeholder }: { placeholder?: string }) {
   const context = useContext(SelectContext);
   if (!context) throw new Error("SelectValue must be used within Select");
 
-  const display =
-    context.value && context.labeledValue === context.value
-      ? context.label || context.value
-      : context.value;
+  const display = context.value ? context.selectedLabel : "";
 
   return (
     <span className={display ? undefined : "text-muted-foreground"}>
@@ -125,8 +114,6 @@ export function SelectItem({
         context.value === value && "bg-accent"
       )}
       onClick={() => {
-        const resolvedLabel = textValue ?? (typeof children === "string" ? children : "");
-        context.setLabelFor(value, resolvedLabel);
         context.onValueChange(value);
         context.setOpen(false);
       }}
@@ -134,4 +121,30 @@ export function SelectItem({
       {children}
     </div>
   );
+}
+
+function textFromChildren(children: React.ReactNode): string {
+  return Children.toArray(children)
+    .map((child) => {
+      if (typeof child === "string" || typeof child === "number") return String(child);
+      if (isValidElement<{ children?: React.ReactNode }>(child)) {
+        return textFromChildren(child.props.children);
+      }
+      return "";
+    })
+    .join("")
+    .trim();
+}
+
+export function findSelectedLabel(children: React.ReactNode, value: string): string {
+  let label = "";
+  Children.forEach(children, (child) => {
+    if (label || !isValidElement<any>(child)) return;
+    if (child.type === SelectItem && child.props.value === value) {
+      label = child.props.textValue ?? textFromChildren(child.props.children);
+      return;
+    }
+    label = findSelectedLabel(child.props.children, value);
+  });
+  return label;
 }

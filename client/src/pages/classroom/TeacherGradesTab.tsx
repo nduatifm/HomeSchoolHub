@@ -113,7 +113,7 @@ export default function TeacherGradesTab({ classroomId }: { classroomId: number 
             </SelectTrigger>
             <SelectContent>
               {enrollments.map((e) => (
-                <SelectItem key={e.studentId} value={String(e.studentId)}>
+                <SelectItem key={e.studentId} value={String(e.studentId)} textValue={e.student.name}>
                   {e.student.name}
                 </SelectItem>
               ))}
