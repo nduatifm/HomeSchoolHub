@@ -6,6 +6,10 @@ import cookieParser from "cookie-parser";
 import prisma from "../db";
 import { registerRoutes } from "../routes";
 import { storage } from "../storage";
+import {
+  buildCategorySnapshotPayload,
+  defaultCategorySnapshot,
+} from "../gradingPolicy";
 
 const runId = `grading-${Date.now()}-${process.pid}`;
 const createdUserIds: number[] = [];
@@ -356,10 +360,36 @@ test("dynamic category breakdown and semester reports honor custom categories in
   const custom = await prisma.classroomGradingCategory.create({
     data: { classroomId: dynamicClassroom.id, key: `${runId}-custom`, name: "Custom work", weight: 20, displayOrder: 4 },
   });
+  const dynamicSnapshot = buildCategorySnapshotPayload(
+    await categories(dynamicClassroom.id),
+  );
   await prisma.gradingPolicy.createMany({
     data: [
-      { classroomId: dynamicClassroom.id, assignmentWeight: 50, testWeight: 50, quizWeight: 0, projectWeight: 0 },
-      { classroomId: legacyClassroom.id, assignmentWeight: 50, testWeight: 50, quizWeight: 0, projectWeight: 0 },
+      {
+        classroomId: dynamicClassroom.id,
+        assignmentWeight: 50,
+        testWeight: 50,
+        quizWeight: 0,
+        projectWeight: 0,
+        categorySnapshot: dynamicSnapshot,
+      },
+      {
+        classroomId: legacyClassroom.id,
+        assignmentWeight: 50,
+        testWeight: 50,
+        quizWeight: 0,
+        projectWeight: 0,
+        categorySnapshot: {
+          version: 1,
+          legacy: true,
+          categories: defaultCategorySnapshot({
+            assignment: 50,
+            test: 50,
+            quiz: 0,
+            project: 0,
+          }),
+        },
+      },
     ],
   });
 

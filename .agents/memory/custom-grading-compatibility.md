@@ -14,3 +14,9 @@ For historical reports, select the immutable policy/category snapshot effective 
 **Why:** Category deletion and reassignment intentionally change current assignment fields. Without both historical values, older normalized and legacy policy snapshots classify the same assignment differently.
 
 **How to apply:** Keep policy snapshot creation and assignment-history writes atomic with their current-state mutations. Historical snapshots must never derive active flags or custom composition from today’s category rows.
+
+Every grading policy record, including test fixtures and one-time data scripts, must include an explicit category snapshot. Use a normalized snapshot for custom categories and an explicitly legacy snapshot for four-bucket policies.
+
+**Why:** A policy with a missing snapshot is neither a valid normalized policy nor an explicitly legacy policy. Historical matching can then compare placeholder category IDs and produce a null grade even when graded submissions exist.
+
+**How to apply:** Never insert a grading policy with only legacy weight columns. Build and persist the matching snapshot in the same write.

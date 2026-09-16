@@ -215,11 +215,12 @@ export const sessionSchema = z.object({
   meetingUrl: z.string().nullable(),
   notes: z.string().nullable(),
   status: z.enum(["scheduled", "completed", "cancelled"]),
+  teacherName: z.string().nullable().optional(),
 });
 
-export const insertSessionSchema = sessionSchema.omit({ id: true });
+export const insertSessionSchema = sessionSchema.omit({ id: true, teacherName: true });
 export const updateSessionSchema = sessionSchema
-  .omit({ id: true, teacherId: true })
+  .omit({ id: true, teacherId: true, teacherName: true })
   .partial();
 export type Session = z.infer<typeof sessionSchema>;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
@@ -513,6 +514,8 @@ export const gradeFolderSchema = z.object({
     name: z.string(),
     subject: z.string(),
     description: z.string().nullable(),
+    teacherId: z.number(),
+    teacherName: z.string().nullable(),
     slug: z.string().nullable().optional(),
     status: z.enum(["active", "archived"]),
   })).optional(),
@@ -579,6 +582,23 @@ export const itemTypeLabels: Record<ItemType, string> = {
   project: "Project",
 };
 
+export const entityLabelSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+});
+
+export const linkedClassroomItemSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  slug: z.string().nullable(),
+});
+
+export const submissionAssignmentLabelSchema = linkedClassroomItemSchema.extend({
+  dueDate: z.string(),
+  points: z.number(),
+  category: entityLabelSchema.nullable(),
+});
+
 export const classroomAssignmentSchema = z.object({
   id: z.number(),
   classroomId: z.number(),
@@ -595,8 +615,16 @@ export const classroomAssignmentSchema = z.object({
   answerKey: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
   createdAt: z.string(),
   linkedMaterialIds: z.array(z.number()).default([]),
+  category: entityLabelSchema.nullable().optional(),
+  linkedMaterials: z.array(linkedClassroomItemSchema).optional(),
 });
-export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({ id: true, createdAt: true, linkedMaterialIds: true });
+export const insertClassroomAssignmentSchema = classroomAssignmentSchema.omit({
+  id: true,
+  createdAt: true,
+  linkedMaterialIds: true,
+  category: true,
+  linkedMaterials: true,
+});
 export type ClassroomAssignment = z.infer<typeof classroomAssignmentSchema>;
 export type InsertClassroomAssignment = z.infer<typeof insertClassroomAssignmentSchema>;
 
@@ -633,8 +661,14 @@ export const classroomSubmissionSchema = z.object({
   grade: z.number().nullable(),
   feedback: z.string().nullable(),
   returnNote: z.string().nullable().optional(),
+  student: entityLabelSchema.nullable().optional(),
+  assignmentSummary: submissionAssignmentLabelSchema.nullable().optional(),
 });
-export const insertClassroomSubmissionSchema = classroomSubmissionSchema.omit({ id: true });
+export const insertClassroomSubmissionSchema = classroomSubmissionSchema.omit({
+  id: true,
+  student: true,
+  assignmentSummary: true,
+});
 export type ClassroomSubmission = z.infer<typeof classroomSubmissionSchema>;
 export type InsertClassroomSubmission = z.infer<typeof insertClassroomSubmissionSchema>;
 
@@ -648,8 +682,14 @@ export const classroomMaterialSchema = z.object({
   slug: z.string().nullable().optional(),
   uploadedAt: z.string(),
   linkedAssignmentIds: z.array(z.number()).default([]),
+  linkedAssignments: z.array(submissionAssignmentLabelSchema).optional(),
 });
-export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({ id: true, uploadedAt: true, linkedAssignmentIds: true });
+export const insertClassroomMaterialSchema = classroomMaterialSchema.omit({
+  id: true,
+  uploadedAt: true,
+  linkedAssignmentIds: true,
+  linkedAssignments: true,
+});
 export type ClassroomMaterial = z.infer<typeof classroomMaterialSchema>;
 export type InsertClassroomMaterial = z.infer<typeof insertClassroomMaterialSchema>;
 

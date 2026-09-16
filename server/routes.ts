@@ -4321,18 +4321,7 @@ export function registerRoutes(app: Express) {
         sessions = await storage.getAllSessions();
       }
 
-      // Add teacher name to each session
-      const sessionsWithTeacher = await Promise.all(
-        sessions.map(async (session) => {
-          const teacher = await storage.getUserById(session.teacherId);
-          return {
-            ...session,
-            teacherName: teacher?.name || null,
-          };
-        }),
-      );
-
-      res.json(sessionsWithTeacher);
+      res.json(sessions);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -9356,28 +9345,13 @@ export function registerRoutes(app: Express) {
       try {
         const classroom = await requireClassroomMember(req, res);
         if (!classroom) return;
-        const material = await prisma.classroomMaterial.findFirst({
-          where: { classroomId: classroom.id, slug: req.params.slug },
-          include: { assignmentLinks: { select: { assignmentId: true } } },
-        });
+        const material = await storage.getClassroomMaterialBySlug(
+          classroom.id,
+          req.params.slug,
+        );
         if (!material)
           return res.status(404).json({ error: "Classwork not found" });
-        res.json({
-          id: material.id,
-          classroomId: material.classroomId,
-          title: material.title,
-          description: material.description,
-          url: material.url ?? null,
-          attachments: material.attachments ?? [],
-          slug: material.slug ?? null,
-          uploadedAt:
-            material.uploadedAt instanceof Date
-              ? material.uploadedAt.toISOString()
-              : material.uploadedAt,
-          linkedAssignmentIds: material.assignmentLinks.map(
-            (l) => l.assignmentId,
-          ),
-        });
+        res.json(material);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -9395,28 +9369,13 @@ export function registerRoutes(app: Express) {
         const materialId = parseInt(req.params.materialId);
         if (isNaN(materialId))
           return res.status(400).json({ error: "Invalid material ID" });
-        const material = await prisma.classroomMaterial.findFirst({
-          where: { id: materialId, classroomId: classroom.id },
-          include: { assignmentLinks: { select: { assignmentId: true } } },
-        });
+        const material = await storage.getClassroomMaterialById(
+          classroom.id,
+          materialId,
+        );
         if (!material)
           return res.status(404).json({ error: "Classwork not found" });
-        res.json({
-          id: material.id,
-          classroomId: material.classroomId,
-          title: material.title,
-          description: material.description,
-          url: material.url ?? null,
-          attachments: material.attachments ?? [],
-          slug: material.slug ?? null,
-          uploadedAt:
-            material.uploadedAt instanceof Date
-              ? material.uploadedAt.toISOString()
-              : material.uploadedAt,
-          linkedAssignmentIds: material.assignmentLinks.map(
-            (l) => l.assignmentId,
-          ),
-        });
+        res.json(material);
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }

@@ -323,6 +323,8 @@ export interface IStorage {
 
   createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial>;
   getClassroomMaterials(classroomId: number): Promise<ClassroomMaterial[]>;
+  getClassroomMaterialById(classroomId: number, id: number): Promise<ClassroomMaterial | null>;
+  getClassroomMaterialBySlug(classroomId: number, slug: string): Promise<ClassroomMaterial | null>;
   updateClassroomMaterial(id: number, data: Partial<InsertClassroomMaterial>): Promise<ClassroomMaterial>;
   deleteClassroomMaterial(id: number): Promise<void>;
 
@@ -777,39 +779,59 @@ class PrismaStorage implements IStorage {
     await prisma.schedule.delete({ where: { id } });
   }
 
+  private mapSession(session: any): Session {
+    return {
+      ...session,
+      teacherName: session.teacher?.name ?? null,
+    } as Session;
+  }
+
   async createSession(session: Prisma.SessionCreateInput): Promise<Session> {
-    return (await prisma.session.create({
+    const row = await prisma.session.create({
       data: session,
-    })) as unknown as Session;
+      include: { teacher: { select: { name: true } } },
+    });
+    return this.mapSession(row);
   }
 
   async getSessionById(id: number): Promise<Session | null> {
-    return (await prisma.session.findUnique({
+    const row = await prisma.session.findUnique({
       where: { id },
-    })) as unknown as Session | null;
+      include: { teacher: { select: { name: true } } },
+    });
+    return row ? this.mapSession(row) : null;
   }
 
   async getSessionsByTeacher(teacherId: number): Promise<Session[]> {
-    return (await prisma.session.findMany({
+    const rows = await prisma.session.findMany({
       where: { teacherId },
-    })) as unknown as Session[];
+      include: { teacher: { select: { name: true } } },
+    });
+    return rows.map((row) => this.mapSession(row));
   }
 
   async getSessionsByStudent(studentId: number): Promise<Session[]> {
-    return (await prisma.session.findMany({
+    const rows = await prisma.session.findMany({
       where: { studentIds: { has: studentId } },
-    })) as unknown as Session[];
+      include: { teacher: { select: { name: true } } },
+    });
+    return rows.map((row) => this.mapSession(row));
   }
 
   async getAllSessions(): Promise<Session[]> {
-    return (await prisma.session.findMany()) as unknown as Session[];
+    const rows = await prisma.session.findMany({
+      include: { teacher: { select: { name: true } } },
+    });
+    return rows.map((row) => this.mapSession(row));
   }
 
   async updateSession(id: number, session: any): Promise<Session> {
-    return (await prisma.session.update({
+    const row = await prisma.session.update({
       where: { id },
       data: session,
-    })) as unknown as Session;
+      include: { teacher: { select: { name: true } } },
+    });
+    return this.mapSession(row);
   }
 
   async deleteSession(id: number): Promise<void> {
@@ -1878,6 +1900,8 @@ class PrismaStorage implements IStorage {
             name: c.name,
             subject: c.subject,
             description: c.description ?? null,
+            teacherId: c.teacherId,
+            teacherName: c.teacher?.name ?? null,
             slug: c.slug ?? null,
             status: c.status as "active" | "archived",
           }))
@@ -1900,6 +1924,7 @@ class PrismaStorage implements IStorage {
         classrooms: {
           where: { deletedAt: null },
           orderBy: { createdAt: "asc" },
+          include: { teacher: { select: { name: true } } },
         },
       },
     });
@@ -1952,7 +1977,7 @@ class PrismaStorage implements IStorage {
       return tx.classroom.update({
         where: { id: c.id },
         data: { slug },
-        include: { gradeFolder: { select: { name: true } } },
+        include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } },
       });
     });
     return this.mapClassroom(updated);
@@ -1961,7 +1986,7 @@ class PrismaStorage implements IStorage {
   async getClassroomBySlug(slug: string): Promise<Classroom | null> {
     const c = await prisma.classroom.findFirst({
       where: { slug, deletedAt: null },
-      include: { gradeFolder: { select: { name: true } } },
+      include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } },
     });
     return c ? this.mapClassroom(c) : null;
   }
@@ -1969,7 +1994,7 @@ class PrismaStorage implements IStorage {
   async getClassroomById(id: number): Promise<Classroom | null> {
     const c = await prisma.classroom.findFirst({
       where: { id, deletedAt: null },
-      include: { gradeFolder: { select: { name: true } } },
+      include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } },
     });
     return c ? this.mapClassroom(c) : null;
   }
@@ -1977,7 +2002,7 @@ class PrismaStorage implements IStorage {
   async getSoftDeletedClassroomById(id: number): Promise<(Classroom & { deletedAt: Date | null }) | null> {
     const c = await prisma.classroom.findUnique({
       where: { id },
-      include: { gradeFolder: { select: { name: true } } },
+      include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } },
     });
     if (!c || c.deletedAt === null) return null;
     return { ...this.mapClassroom(c), deletedAt: c.deletedAt };
@@ -1986,7 +2011,7 @@ class PrismaStorage implements IStorage {
   async getDeletedClassroomsByTeacher(teacherId: number): Promise<(Classroom & { deletedAt: Date })[]> {
     const rows = await prisma.classroom.findMany({
       where: { teacherId, deletedAt: { not: null } },
-      include: { gradeFolder: { select: { name: true } } },
+      include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } },
       orderBy: { deletedAt: "desc" },
     });
     return rows.map(c => ({ ...this.mapClassroom(c), deletedAt: c.deletedAt! }));
@@ -1995,7 +2020,7 @@ class PrismaStorage implements IStorage {
   async getClassroomsByTeacher(teacherId: number): Promise<Classroom[]> {
     const rows = await prisma.classroom.findMany({
       where: { teacherId, deletedAt: null },
-      include: { gradeFolder: { select: { name: true } } },
+      include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     });
     return rows.map(this.mapClassroom.bind(this));
@@ -2018,7 +2043,7 @@ class PrismaStorage implements IStorage {
     const c = await prisma.classroom.update({
       where: { id },
       data,
-      include: { gradeFolder: { select: { name: true } } },
+      include: { teacher: { select: { name: true } }, gradeFolder: { select: { name: true } } },
     });
     return this.mapClassroom(c);
   }
@@ -2133,6 +2158,14 @@ class PrismaStorage implements IStorage {
   }
 
   private mapClassroomAssignment(a: any): ClassroomAssignment {
+    const linkedMaterials = Array.isArray(a.materialLinks)
+      ? a.materialLinks
+          .map((link: any) => link.material && link.material.classroomId === a.classroomId
+            ? { id: link.material.id, title: link.material.title, slug: link.material.slug ?? null }
+            : null)
+          .filter(Boolean)
+          .sort((left: any, right: any) => left.title.localeCompare(right.title) || left.id - right.id)
+      : [];
     return {
       id: a.id,
       classroomId: a.classroomId,
@@ -2148,21 +2181,47 @@ class PrismaStorage implements IStorage {
       formSchema: Array.isArray(a.formSchema) ? a.formSchema : null,
       answerKey: a.answerKey && typeof a.answerKey === "object" && !Array.isArray(a.answerKey) ? a.answerKey : null,
       createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
-      linkedMaterialIds: Array.isArray(a.materialLinks) ? a.materialLinks.map((l: any) => l.materialId) : [],
+      linkedMaterialIds: linkedMaterials.map((material: any) => material.id),
+      category: a.category ? { id: a.category.id, name: a.category.name } : null,
+      linkedMaterials,
     };
   }
 
-  async setAssignmentMaterials(assignmentId: number, materialIds: number[]): Promise<void> {
-    await prisma.classroomAssignmentMaterial.deleteMany({ where: { assignmentId } });
-    if (materialIds.length > 0) {
-      await prisma.classroomAssignmentMaterial.createMany({
-        data: materialIds.map((materialId) => ({ assignmentId, materialId })),
-        skipDuplicates: true,
-      });
+  private async assertClassroomMaterials(classroomId: number, materialIds: number[]): Promise<number[]> {
+    const uniqueMaterialIds = Array.from(new Set(materialIds));
+    const matchingCount = uniqueMaterialIds.length === 0
+      ? 0
+      : await prisma.classroomMaterial.count({
+          where: { id: { in: uniqueMaterialIds }, classroomId },
+        });
+    if (matchingCount !== uniqueMaterialIds.length) {
+      throw new Error("Linked classwork must belong to the same classroom");
     }
+    return uniqueMaterialIds;
+  }
+
+  async setAssignmentMaterials(assignmentId: number, materialIds: number[]): Promise<void> {
+    const assignment = await prisma.classroomAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { classroomId: true },
+    });
+    if (!assignment) throw new Error("Assignment not found");
+    const uniqueMaterialIds = await this.assertClassroomMaterials(assignment.classroomId, materialIds);
+    await prisma.$transaction(async (tx) => {
+      await tx.classroomAssignmentMaterial.deleteMany({ where: { assignmentId } });
+      if (uniqueMaterialIds.length > 0) {
+        await tx.classroomAssignmentMaterial.createMany({
+          data: uniqueMaterialIds.map((materialId) => ({ assignmentId, materialId })),
+          skipDuplicates: true,
+        });
+      }
+    });
   }
 
   async createClassroomAssignment(data: InsertClassroomAssignment, materialIds?: number[]): Promise<ClassroomAssignment> {
+    if (materialIds !== undefined) {
+      await this.assertClassroomMaterials(data.classroomId, materialIds);
+    }
     const { answerKey, formSchema, ...rest } = data;
     const safeFormSchema = formSchema !== undefined ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : undefined;
     const safeAnswerKey = answerKey !== undefined ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : undefined;
@@ -2227,7 +2286,10 @@ class PrismaStorage implements IStorage {
     }
     const result = await prisma.classroomAssignment.findFirstOrThrow({
       where: { id: a.id },
-      include: { materialLinks: { select: { materialId: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        materialLinks: { include: { material: { select: { id: true, classroomId: true, title: true, slug: true } } } },
+      },
     });
     return this.mapClassroomAssignment(result);
   }
@@ -2236,7 +2298,10 @@ class PrismaStorage implements IStorage {
     const rows = await prisma.classroomAssignment.findMany({
       where: { classroomId },
       orderBy: { createdAt: "desc" },
-      include: { materialLinks: { select: { materialId: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        materialLinks: { include: { material: { select: { id: true, classroomId: true, title: true, slug: true } } } },
+      },
     });
     return rows.map((a) => this.mapClassroomAssignment(a));
   }
@@ -2244,7 +2309,10 @@ class PrismaStorage implements IStorage {
   async getClassroomAssignmentBySlug(classroomId: number, slug: string): Promise<ClassroomAssignment | null> {
     const a = await prisma.classroomAssignment.findFirst({
       where: { classroomId, slug },
-      include: { materialLinks: { select: { materialId: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        materialLinks: { include: { material: { select: { id: true, classroomId: true, title: true, slug: true } } } },
+      },
     });
     return a ? this.mapClassroomAssignment(a) : null;
   }
@@ -2252,7 +2320,10 @@ class PrismaStorage implements IStorage {
   async getClassroomAssignmentById(classroomId: number, id: number): Promise<ClassroomAssignment | null> {
     const a = await prisma.classroomAssignment.findFirst({
       where: { classroomId, id },
-      include: { materialLinks: { select: { materialId: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        materialLinks: { include: { material: { select: { id: true, classroomId: true, title: true, slug: true } } } },
+      },
     });
     return a ? this.mapClassroomAssignment(a) : null;
   }
@@ -2268,6 +2339,9 @@ class PrismaStorage implements IStorage {
       select: { classroomId: true, categoryId: true, assignmentType: true },
     });
     if (!existing) throw new Error("Assignment not found");
+    if (materialIds !== undefined) {
+      await this.assertClassroomMaterials(existing.classroomId, materialIds);
+    }
     const activeCategoryCount = await prisma.classroomGradingCategory.count({
       where: { classroomId: existing.classroomId, active: true },
     });
@@ -2355,7 +2429,10 @@ class PrismaStorage implements IStorage {
     }
     const result = await prisma.classroomAssignment.findFirstOrThrow({
       where: { id },
-      include: { materialLinks: { select: { materialId: true } } },
+      include: {
+        category: { select: { id: true, name: true } },
+        materialLinks: { include: { material: { select: { id: true, classroomId: true, title: true, slug: true } } } },
+      },
     });
     return this.mapClassroomAssignment(result);
   }
@@ -2367,13 +2444,22 @@ class PrismaStorage implements IStorage {
   async getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]> {
     const assignment = await prisma.classroomAssignment.findUnique({
       where: { id: assignmentId },
-      select: { classroomId: true },
+      select: {
+        id: true,
+        classroomId: true,
+        title: true,
+        slug: true,
+        dueDate: true,
+        points: true,
+        category: { select: { id: true, name: true } },
+      },
     });
+    const assignmentSummary = assignment ? this.mapSubmissionAssignmentLabel(assignment) : null;
 
     const [rows, enrollments] = await Promise.all([
       prisma.classroomSubmission.findMany({
         where: { assignmentId },
-        include: { student: { select: { name: true } } },
+        include: { student: { select: { id: true, name: true } } },
         orderBy: { studentId: "asc" },
       }),
       assignment
@@ -2393,13 +2479,15 @@ class PrismaStorage implements IStorage {
       studentId: r.studentId,
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
-      formAnswers: r.formAnswers ?? null,
+      formAnswers: (r.formAnswers as Record<string, string | string[]> | null) ?? null,
       status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
       returnNote: r.returnNote ?? null,
       studentName: r.student?.name ?? "Unknown",
+      student: r.student ? { id: r.student.id, name: r.student.name } : null,
+      assignmentSummary,
     }));
 
     for (const e of enrollments) {
@@ -2417,6 +2505,8 @@ class PrismaStorage implements IStorage {
           feedback: null,
           returnNote: null,
           studentName: e.student.name,
+          student: { id: e.student.id, name: e.student.name },
+          assignmentSummary,
         });
       }
     }
@@ -2428,8 +2518,13 @@ class PrismaStorage implements IStorage {
     const r = await prisma.classroomSubmission.findUnique({
       where: { id: submissionId },
       include: {
-        student: { select: { name: true } },
-        assignment: { include: { materialLinks: { select: { materialId: true } } } },
+        student: { select: { id: true, name: true } },
+        assignment: {
+          include: {
+            category: { select: { id: true, name: true } },
+            materialLinks: { include: { material: { select: { id: true, classroomId: true, title: true, slug: true } } } },
+          },
+        },
       },
     });
     if (!r) return null;
@@ -2439,22 +2534,34 @@ class PrismaStorage implements IStorage {
       studentId: r.studentId,
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
-      formAnswers: r.formAnswers ?? null,
+      formAnswers: (r.formAnswers as Record<string, string | string[]> | null) ?? null,
       status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
       returnNote: r.returnNote ?? null,
       studentName: r.student?.name ?? "Unknown",
+      student: r.student ? { id: r.student.id, name: r.student.name } : null,
+      assignmentSummary: this.mapSubmissionAssignmentLabel(r.assignment),
       assignment: this.mapClassroomAssignment(r.assignment),
     };
   }
 
   async getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]> {
-    const assignments = await prisma.classroomAssignment.findMany({ where: { classroomId }, select: { id: true } });
-    const assignmentIds = assignments.map((a) => a.id);
     const rows = await prisma.classroomSubmission.findMany({
-      where: { studentId, assignmentId: { in: assignmentIds } },
+      where: { studentId, assignment: { classroomId } },
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            dueDate: true,
+            points: true,
+            category: { select: { id: true, name: true } },
+          },
+        },
+      },
     });
     return rows.map((r) => ({
       id: r.id,
@@ -2462,12 +2569,13 @@ class PrismaStorage implements IStorage {
       studentId: r.studentId,
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
-      formAnswers: r.formAnswers ?? null,
+      formAnswers: (r.formAnswers as Record<string, string | string[]> | null) ?? null,
       status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
       feedback: r.feedback ?? null,
       returnNote: r.returnNote ?? null,
+      assignmentSummary: this.mapSubmissionAssignmentLabel(r.assignment),
     }));
   }
 
@@ -2655,19 +2763,7 @@ class PrismaStorage implements IStorage {
       // On first-time create: explicitly null out fileUrl when no file was uploaded
       create: { assignmentId, studentId, grade: null, feedback: null, fileUrl: null, ...baseData },
     });
-    return {
-      id: updated.id,
-      assignmentId: updated.assignmentId,
-      studentId: updated.studentId,
-      content: updated.content ?? null,
-      fileUrl: updated.fileUrl ?? null,
-      formAnswers: updated.formAnswers ?? null,
-      status: updated.status as ClassroomSubmission["status"],
-      submittedAt: updated.submittedAt ?? null,
-      grade: updated.grade ?? null,
-      feedback: updated.feedback ?? null,
-      returnNote: updated.returnNote ?? null,
-    };
+    return this.getHydratedSubmissionResult(updated.id);
   }
 
   async gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission> {
@@ -2676,19 +2772,7 @@ class PrismaStorage implements IStorage {
       where: { id: submissionId },
       data: { grade: clampedGrade, feedback, status: "graded" },
     });
-    return {
-      id: updated.id,
-      assignmentId: updated.assignmentId,
-      studentId: updated.studentId,
-      content: updated.content ?? null,
-      fileUrl: updated.fileUrl ?? null,
-      formAnswers: (updated.formAnswers as Record<string, string | string[]> | null) ?? null,
-      status: updated.status as ClassroomSubmission["status"],
-      submittedAt: updated.submittedAt ?? null,
-      grade: updated.grade ?? null,
-      feedback: updated.feedback ?? null,
-      returnNote: updated.returnNote ?? null,
-    };
+    return this.getHydratedSubmissionResult(updated.id);
   }
 
   async returnClassroomSubmission(submissionId: number, returnNote: string): Promise<ClassroomSubmission> {
@@ -2696,22 +2780,65 @@ class PrismaStorage implements IStorage {
       where: { id: submissionId },
       data: { status: "returned", returnNote, grade: null },
     });
+    return this.getHydratedSubmissionResult(updated.id);
+  }
+
+  private mapSubmissionAssignmentLabel(assignment: any) {
     return {
-      id: updated.id,
-      assignmentId: updated.assignmentId,
-      studentId: updated.studentId,
-      content: updated.content ?? null,
-      fileUrl: updated.fileUrl ?? null,
-      formAnswers: (updated.formAnswers as Record<string, string | string[]> | null) ?? null,
-      status: updated.status as ClassroomSubmission["status"],
-      submittedAt: updated.submittedAt ?? null,
-      grade: null,
-      feedback: updated.feedback ?? null,
-      returnNote: updated.returnNote ?? null,
+      id: assignment.id,
+      title: assignment.title,
+      slug: assignment.slug ?? null,
+      dueDate: assignment.dueDate,
+      points: assignment.points,
+      category: assignment.category
+        ? { id: assignment.category.id, name: assignment.category.name }
+        : null,
+    };
+  }
+
+  private async getHydratedSubmissionResult(submissionId: number): Promise<ClassroomSubmission> {
+    const submission = await prisma.classroomSubmission.findUniqueOrThrow({
+      where: { id: submissionId },
+      include: {
+        student: { select: { id: true, name: true } },
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            dueDate: true,
+            points: true,
+            category: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    return {
+      id: submission.id,
+      assignmentId: submission.assignmentId,
+      studentId: submission.studentId,
+      content: submission.content ?? null,
+      fileUrl: submission.fileUrl ?? null,
+      formAnswers: (submission.formAnswers as Record<string, string | string[]> | null) ?? null,
+      status: submission.status as ClassroomSubmission["status"],
+      submittedAt: submission.submittedAt ?? null,
+      grade: submission.grade ?? null,
+      feedback: submission.feedback ?? null,
+      returnNote: submission.returnNote ?? null,
+      student: { id: submission.student.id, name: submission.student.name },
+      assignmentSummary: this.mapSubmissionAssignmentLabel(submission.assignment),
     };
   }
 
   private mapClassroomMaterial(m: any): ClassroomMaterial {
+    const linkedAssignments = Array.isArray(m.assignmentLinks)
+      ? m.assignmentLinks
+          .map((link: any) => link.assignment && link.assignment.classroomId === m.classroomId
+            ? this.mapSubmissionAssignmentLabel(link.assignment)
+            : null)
+          .filter(Boolean)
+          .sort((left: any, right: any) => left.title.localeCompare(right.title) || left.id - right.id)
+      : [];
     return {
       id: m.id,
       classroomId: m.classroomId,
@@ -2721,14 +2848,30 @@ class PrismaStorage implements IStorage {
       attachments: m.attachments ?? [],
       slug: m.slug ?? null,
       uploadedAt: m.uploadedAt instanceof Date ? m.uploadedAt.toISOString() : m.uploadedAt,
-      linkedAssignmentIds: Array.isArray(m.assignmentLinks) ? m.assignmentLinks.map((l: any) => l.assignmentId) : [],
+      linkedAssignmentIds: linkedAssignments.map((assignment: any) => assignment.id),
+      linkedAssignments,
     };
   }
 
   async createClassroomMaterial(data: InsertClassroomMaterial): Promise<ClassroomMaterial> {
-    const m = await prisma.classroomMaterial.create({ data, include: { assignmentLinks: { select: { assignmentId: true } } } });
+    const m = await prisma.classroomMaterial.create({ data });
     const slug = slugify(m.title, m.id);
-    const updated = await prisma.classroomMaterial.update({ where: { id: m.id }, data: { slug }, include: { assignmentLinks: { select: { assignmentId: true } } } });
+    const updated = await prisma.classroomMaterial.update({
+      where: { id: m.id },
+      data: { slug },
+      include: {
+        assignmentLinks: {
+          include: {
+            assignment: {
+              select: {
+                id: true, classroomId: true, title: true, slug: true, dueDate: true, points: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
     return this.mapClassroomMaterial(updated);
   }
 
@@ -2736,9 +2879,58 @@ class PrismaStorage implements IStorage {
     const rows = await prisma.classroomMaterial.findMany({
       where: { classroomId },
       orderBy: { uploadedAt: "desc" },
-      include: { assignmentLinks: { select: { assignmentId: true } } },
+      include: {
+        assignmentLinks: {
+          include: {
+            assignment: {
+              select: {
+                id: true, classroomId: true, title: true, slug: true, dueDate: true, points: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
     });
     return rows.map((m) => this.mapClassroomMaterial(m));
+  }
+
+  async getClassroomMaterialById(classroomId: number, id: number): Promise<ClassroomMaterial | null> {
+    const material = await prisma.classroomMaterial.findFirst({
+      where: { id, classroomId },
+      include: {
+        assignmentLinks: {
+          include: {
+            assignment: {
+              select: {
+                id: true, classroomId: true, title: true, slug: true, dueDate: true, points: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return material ? this.mapClassroomMaterial(material) : null;
+  }
+
+  async getClassroomMaterialBySlug(classroomId: number, slug: string): Promise<ClassroomMaterial | null> {
+    const material = await prisma.classroomMaterial.findFirst({
+      where: { classroomId, slug },
+      include: {
+        assignmentLinks: {
+          include: {
+            assignment: {
+              select: {
+                id: true, classroomId: true, title: true, slug: true, dueDate: true, points: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    return material ? this.mapClassroomMaterial(material) : null;
   }
 
   async updateClassroomMaterial(id: number, data: Partial<InsertClassroomMaterial>): Promise<ClassroomMaterial> {
@@ -2749,7 +2941,18 @@ class PrismaStorage implements IStorage {
         ...rest,
         ...(attachments !== undefined ? { attachments: { set: attachments } } : {}),
       },
-      include: { assignmentLinks: { select: { assignmentId: true } } },
+      include: {
+        assignmentLinks: {
+          include: {
+            assignment: {
+              select: {
+                id: true, classroomId: true, title: true, slug: true, dueDate: true, points: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
     });
     return this.mapClassroomMaterial(updated);
   }

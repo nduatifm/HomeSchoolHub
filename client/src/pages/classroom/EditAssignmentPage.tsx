@@ -625,7 +625,7 @@ export default function EditAssignmentPage() {
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)} textValue={category.name}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -815,7 +815,7 @@ export default function EditAssignmentPage() {
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)}>{category.name}</SelectItem>)}
+                        {activeCategories.map((category) => <SelectItem key={category.id} value={String(category.id)} textValue={category.name}>{category.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>

@@ -931,18 +931,15 @@ function TeacherEditor({
             <div className="border-t border-border" />
 
             {/* Linked assignments (read-only — set from the assignment's edit page) */}
-            {initial && (initial.linkedAssignmentIds ?? []).length > 0 && (
+            {initial && (initial.linkedAssignments ?? []).length > 0 && (
               <div className="space-y-1.5">
                 <p className="text-sm font-medium text-foreground">Linked assignments</p>
-                {(initial.linkedAssignmentIds ?? []).map((aid) => {
-                  const a = assignments.find((x) => x.id === aid);
-                  return a ? (
-                    <div key={aid} className="flex items-center gap-2 text-xs text-primary bg-primary/8 rounded-lg px-3 py-1.5">
+                {(initial.linkedAssignments ?? []).map((a) => (
+                    <div key={a.id} className="flex items-center gap-2 text-xs text-primary bg-primary/8 rounded-lg px-3 py-1.5">
                       <BookOpen className="h-3 w-3 shrink-0" />
                       <span className="truncate">{a.title}</span>
                     </div>
-                  ) : null;
-                })}
+                ))}
               </div>
             )}
           </div>
@@ -998,17 +995,14 @@ function TeacherEditor({
                   </div>
                 );
               })}
-              {initial && (initial.linkedAssignmentIds ?? []).length > 0 && (
+              {initial && (initial.linkedAssignments ?? []).length > 0 && (
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">Linked assignments</p>
-                  {(initial.linkedAssignmentIds ?? []).map((aid) => {
-                    const a = assignments.find((x) => x.id === aid);
-                    return a ? (
-                      <div key={aid} className="flex items-center gap-2 text-xs text-primary bg-primary/8 rounded-lg px-3 py-1.5">
+                  {(initial.linkedAssignments ?? []).map((a) => (
+                      <div key={a.id} className="flex items-center gap-2 text-xs text-primary bg-primary/8 rounded-lg px-3 py-1.5">
                         <BookOpen className="h-3 w-3 shrink-0" /><span className="truncate">{a.title}</span>
                       </div>
-                    ) : null;
-                  })}
+                  ))}
                 </div>
               )}
               <Button disabled={!canSave} onClick={() => saveMutation.mutate()} className="w-full rounded-xl">
@@ -1063,12 +1057,6 @@ function ReadView({
   const sp = new URLSearchParams(window.location.search);
   const parentStudentId = sp.get("studentId") ?? "";
 
-  const { data: assignments = [] } = useQuery<ClassroomAssignment[]>({
-    queryKey: ["/api/classrooms", classroomId, "assignments"],
-    queryFn: () => apiRequest(`/api/classrooms/${classroomId}/assignments`),
-    enabled: !!classroomId && (material.linkedAssignmentIds ?? []).length > 0,
-  });
-
   const backHref = `/classrooms/${classroomSlug}/classwork${
     isParent && parentStudentId ? `?studentId=${parentStudentId}` : ""
   }`;
@@ -1080,9 +1068,7 @@ function ReadView({
   }, [classroomId, material.id, isTeacher]);
 
   const urlKind = material.url ? getAttachmentKind(material.url) : null;
-  const linkedAssignments = (material.linkedAssignmentIds ?? [])
-    .map((aid) => assignments.find((a) => a.id === aid))
-    .filter(Boolean) as ClassroomAssignment[];
+  const linkedAssignments = material.linkedAssignments ?? [];
 
   const hasBody = material.description &&
     material.description !== "<p></p>" &&
