@@ -43,10 +43,12 @@ async function patch(path: string, cookie: string, data: unknown) {
   return { status: response.status, body: await response.json() };
 }
 
-async function submit(classroomId: number, assignmentId: number, cookie: string, answers?: string, content = "") {
+async function submit(classroomId: number, assignmentId: number, cookie: string, answers?: string, content = "", attachmentAction?: string, fileUrls?: string) {
   const form = new FormData();
   form.set("content", content);
   if (answers !== undefined) form.set("formAnswers", answers);
+  if (attachmentAction !== undefined) form.set("attachmentAction", attachmentAction);
+  if (fileUrls !== undefined) form.set("fileUrls", fileUrls);
   const response = await fetch(`${baseUrl}/api/classrooms/${classroomId}/assignments/${assignmentId}/submit`, {
     method: "POST", headers: { cookie }, body: form,
   });
@@ -225,4 +227,50 @@ test("returned drafts discard answers to removed questions and obsolete choices"
   const stale = { short: "Old prompt", choice: "Beta", checks: ["One", "Removed"], unknown: "orphan" };
   assert.deepEqual(compatibleDraftAnswers(current, stale), { checks: ["One"] });
   assert.deepEqual(compatibleDraftAnswers(current, "invalid"), {});
+});
+
+test("returned work can keep, replace or remove attachments without changing answer snapshots or access rules", async () => {
+  const teacher = await actor("teacher");
+  const learner = await actor("student");
+  const outsider = await actor("student");
+  const student = await prisma.student.create({ data: { userId: learner.user.id, name: "Attachments learner", gradeLevel: "8", badges: [] } });
+  const classroom = await prisma.classroom.create({ data: { name: "Attachment revisions", subject: "Math", teacherId: teacher.user.id } });
+  await prisma.classroomEnrollment.create({ data: { classroomId: classroom.id, studentId: student.id } });
+  const assignment = await prisma.classroomAssignment.create({
+    data: { classroomId: classroom.id, title: "Revisions", description: "", dueDate: "2099-01-01", points: 10, formSchema: questions },
+  });
+  const oldFiles = JSON.stringify(["https://res.cloudinary.com/demo/old.pdf"]);
+  const newFiles = JSON.stringify(["https://res.cloudinary.com/demo/new.pdf"]);
+  const answers = JSON.stringify({ short: "Revised" });
+  const initial = await submit(classroom.id, assignment.id, learner.cookie, answers, "Original", undefined, oldFiles);
+  assert.equal(initial.status, 200, JSON.stringify(initial.body));
+  const path = `/api/classrooms/${classroom.id}/submissions/${initial.body.id}`;
+  assert.equal((await submit(classroom.id, assignment.id, learner.cookie, answers, "", "remove")).status, 400);
+  assert.equal((await patch(`${path}/return`, teacher.cookie, { returnNote: "Try again" })).status, 200);
+  assert.equal((await submit(classroom.id, assignment.id, outsider.cookie, answers, "", "remove")).status, 403);
+  assert.equal((await submit(classroom.id, assignment.id, teacher.cookie, answers, "", "remove")).status, 403);
+  assert.equal((await submit(classroom.id, assignment.id, learner.cookie, answers, "", "replace")).status, 400);
+  assert.equal((await submit(classroom.id, assignment.id, learner.cookie, answers, "", "remove", newFiles)).status, 400);
+  const kept = await submit(classroom.id, assignment.id, learner.cookie, answers, "Kept", "keep");
+  assert.equal(kept.status, 200, JSON.stringify(kept.body));
+  assert.equal(kept.body.fileUrl, oldFiles);
+  assert.deepEqual(kept.body.questionSnapshot, questions);
+  assert.deepEqual(kept.body.formAnswers, { short: "Revised" });
+  assert.equal(kept.body.grade, null);
+
+  assert.equal((await patch(`${path}/return`, teacher.cookie, { returnNote: "Replace" })).status, 200);
+  const replaced = await submit(classroom.id, assignment.id, learner.cookie, answers, "Replaced", "replace", newFiles);
+  assert.equal(replaced.status, 200, JSON.stringify(replaced.body));
+  assert.equal(replaced.body.fileUrl, newFiles);
+  assert.deepEqual(replaced.body.questionSnapshot, questions);
+  assert.deepEqual(replaced.body.formAnswers, { short: "Revised" });
+
+  assert.equal((await patch(`${path}/return`, teacher.cookie, { returnNote: "Remove" })).status, 200);
+  const removed = await submit(classroom.id, assignment.id, learner.cookie, answers, "Removed", "remove");
+  assert.equal(removed.status, 200, JSON.stringify(removed.body));
+  assert.equal(removed.body.fileUrl, null);
+  assert.deepEqual(removed.body.questionSnapshot, questions);
+  assert.deepEqual(removed.body.formAnswers, { short: "Revised" });
+  assert.equal(removed.body.grade, null);
+  assert.equal((await get(path, teacher.cookie)).body.fileUrl, null);
 });

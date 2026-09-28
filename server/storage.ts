@@ -318,7 +318,7 @@ export interface IStorage {
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
   getClassroomSubmissionById(submissionId: number): Promise<(ClassroomSubmission & { studentName: string; assignment: ClassroomAssignment }) | null>;
   getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
-  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null, questions?: FormQuestion[] | null): Promise<ClassroomSubmission>;
+  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string | null, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null, questions?: FormQuestion[] | null): Promise<ClassroomSubmission>;
   gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
   returnClassroomSubmission(submissionId: number, returnNote: string): Promise<ClassroomSubmission>;
 
@@ -2744,15 +2744,14 @@ class PrismaStorage implements IStorage {
     return result;
   }
 
-  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null, questions?: FormQuestion[] | null): Promise<ClassroomSubmission> {
+  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string | null, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null, questions?: FormQuestion[] | null): Promise<ClassroomSubmission> {
     const now = new Date();
     const dueDatePart = dueDate.includes("T") ? dueDate.split("T")[0] : dueDate;
     const dueDateTime = new Date(dueDatePart + "T23:59:59");
     const status = now > dueDateTime ? "late" : "submitted";
     const baseData = {
       content,
-      // Only include fileUrl in the update payload when a new file was actually uploaded.
-      // Omitting it preserves the existing fileUrl on resubmissions that don't attach a new file.
+      // undefined keeps the existing attachment, null removes it, and a URL replaces it.
       ...(fileUrl !== undefined ? { fileUrl } : {}),
       status,
       submittedAt: now.toISOString(),
