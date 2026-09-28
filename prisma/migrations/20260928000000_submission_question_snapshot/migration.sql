@@ -1,0 +1,1 @@
+ALTER TABLE "ClassroomSubmission" ADD COLUMN "questionSnapshot" JSONB;

@@ -600,6 +600,7 @@ model ClassroomSubmission {
   content      String?
   fileUrl      String?
   formAnswers  Json?
+  questionSnapshot Json?
   status       String  @default("pending")
   submittedAt  String?
   grade        Int?
