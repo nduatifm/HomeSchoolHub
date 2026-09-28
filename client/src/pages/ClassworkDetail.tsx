@@ -24,6 +24,8 @@ import { toast } from "@/hooks/use-toast";
 import { getAttachmentKind } from "@/lib/classroomUtils";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission, ClassroomMaterial } from "@shared/schema";
 import FormResponse from "@/components/FormResponse";
+import AssessmentReview from "@/components/AssessmentReview";
+import { compatibleDraftAnswers } from "@/components/assessmentReviewModel";
 import StatusBadge from "./classroom/StatusBadge";
 
 type SubmissionWithName = ClassroomSubmission & { studentName: string };
@@ -230,10 +232,10 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     if (mySubmission?.status === "returned") {
       if (mySubmission.content) setText(mySubmission.content);
       if (mySubmission.formAnswers) {
-        setFormAnswers(mySubmission.formAnswers as Record<string, string | string[]>);
+        setFormAnswers(compatibleDraftAnswers(assignment.formSchema, mySubmission.formAnswers));
       }
     }
-  }, [mySubmission?.id, mySubmission?.status]);
+  }, [mySubmission?.id, mySubmission?.status, assignment.formSchema]);
 
   // Restore from localStorage (fast, on mount)
   useEffect(() => {
@@ -243,13 +245,14 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     try {
       const { text: savedText, formAnswers: savedAnswers } = JSON.parse(saved);
       if (savedText) { setText(savedText); setDraftRestored(true); }
-      if (savedAnswers && Object.keys(savedAnswers).length > 0) {
-        setFormAnswers(savedAnswers);
+      const compatible = compatibleDraftAnswers(assignment.formSchema, savedAnswers);
+      if (Object.keys(compatible).length > 0) {
+        setFormAnswers(compatible);
         setDraftRestored(true);
       }
-      lastSavedRef.current = saved;
+      lastSavedRef.current = JSON.stringify({ text: savedText ?? "", formAnswers: compatible });
     } catch {}
-  }, [draftKey]);
+  }, [draftKey, assignment.formSchema]);
 
   // Auto-fade "Draft restored" banner after 3s
   useEffect(() => {
@@ -266,7 +269,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     if (!serverDraft) return;
     if (mySubmission && mySubmission.status !== "returned") return;
     const serverContent = serverDraft.content ?? "";
-    const serverAnswers = (serverDraft.formAnswers as Record<string, string | string[]>) ?? {};
+    const serverAnswers = compatibleDraftAnswers(assignment.formSchema, serverDraft.formAnswers);
     const hasServerContent = serverContent.trim().length > 0 || Object.keys(serverAnswers).length > 0;
     if (!hasServerContent) return;
     setText(serverContent);
@@ -275,7 +278,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     const snapshot = JSON.stringify({ text: serverContent, formAnswers: serverAnswers });
     lastSavedRef.current = snapshot;
     localStorage.setItem(draftKey, snapshot);
-  }, [serverDraftLoaded, serverDraft, mySubmission?.status, draftKey]);
+  }, [serverDraftLoaded, serverDraft, mySubmission?.status, draftKey, assignment.formSchema]);
 
   useEffect(() => {
     const currentSnapshot = JSON.stringify({ text, formAnswers });
@@ -440,22 +443,10 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-2">
-            {hasFormSchema && mySubmission.formAnswers ? (
-              <div className="bg-gray-50 rounded p-3">
-                <FormResponse
-                  questions={assignment.formSchema!}
-                  answers={mySubmission.formAnswers as Record<string, string | string[]>}
-                  onChange={() => {}}
-                  disabled
-                  answerKey={mySubmission.status !== "pending"
-                    ? (assignment.answerKey ?? undefined)
-                    : undefined}
-                  hideNeedsReview
-                />
-              </div>
-            ) : mySubmission.content ? (
+            <AssessmentReview submission={mySubmission} currentQuestions={assignment.formSchema} />
+            {mySubmission.content && (
               <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
-            ) : null}
+            )}
             {parseFileUrls(mySubmission.fileUrl).length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {parseFileUrls(mySubmission.fileUrl).map((url, i) => (
@@ -464,15 +455,6 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                     <FileText className="h-3.5 w-3.5" />File {parseFileUrls(mySubmission.fileUrl).length > 1 ? i + 1 : "attachment"}
                   </a>
                 ))}
-              </div>
-            )}
-            {mySubmission.status !== "graded" && mySubmission.grade !== null && assignment.answerKey && (
-              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3.5 py-2.5 flex gap-2.5 items-start mt-2">
-                <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-blue-700">Your score so far: {mySubmission.grade}/{assignment.points} pts</p>
-                  <p className="text-[11px] text-blue-500 mt-0.5">This is not your final grade yet — your teacher will look at your answers and give you your real score soon.</p>
-                </div>
               </div>
             )}
             {mySubmission.status === "graded" && mySubmission.grade !== null && (
@@ -656,19 +638,10 @@ function ParentPanel({ assignment, classroomId, studentId }: { assignment: Class
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-2">
-            {assignment.formSchema && assignment.formSchema.length > 0 && mySubmission.formAnswers ? (
-              <div className="bg-gray-50 rounded p-3">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">Your answers</p>
-                <FormResponse
-                  questions={assignment.formSchema}
-                  answers={mySubmission.formAnswers as Record<string, string | string[]>}
-                  onChange={() => {}}
-                  disabled
-                />
-              </div>
-            ) : mySubmission.content ? (
+            <AssessmentReview submission={mySubmission} currentQuestions={assignment.formSchema} />
+            {mySubmission.content && (
               <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
-            ) : null}
+            )}
             {parseFileUrls(mySubmission.fileUrl).length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {parseFileUrls(mySubmission.fileUrl).map((url, i) => (

@@ -32,6 +32,7 @@ import {
   studentSignupSchema,
   studentGoogleSignupSchema,
   formQuestionSchema,
+  type FormQuestion,
 } from "@shared/schema";
 import {
   buildCategorySnapshotPayload,
@@ -5631,7 +5632,7 @@ export function registerRoutes(app: Express) {
               );
             });
             const gradedSubs = typeAssignments.filter(
-              (a: any) => subMap[a.id]?.grade != null,
+              (a: any) => subMap[a.id]?.status === "graded" && subMap[a.id]?.grade != null,
             );
             if (gradedSubs.length === 0)
               return { type: category.key, w: category.weight, avg: null as number | null };
@@ -7810,6 +7811,23 @@ export function registerRoutes(app: Express) {
     return null;
   }
 
+  // The classroom owner's key is private until the teacher publishes a grade.
+  // Assignment list/detail is shared with students and parents, so never serialize it there.
+  function visibleAssignment<T extends { answerKey?: unknown }>(assignment: T, owner: boolean): T {
+    if (owner) return assignment;
+    const { answerKey: _answerKey, ...publicAssignment } = assignment;
+    return publicAssignment as T;
+  }
+
+  function visibleStudentSubmission<T extends { grade: number | null; status: string }>(submission: T): T {
+    return submission.status === "graded" ? submission : { ...submission, grade: null };
+  }
+
+  function hasInvalidQuestionIds(questions: FormQuestion[] | null | undefined): boolean {
+    return !!questions?.some((question) => !question.id.trim()) ||
+      (questions != null && new Set(questions.map((question) => question.id)).size !== questions.length);
+  }
+
   // ─── Grade Folders ────────────────────────────────────────────────────────
 
   const isActorTeacher = (actor: any) =>
@@ -8276,6 +8294,8 @@ export function registerRoutes(app: Express) {
           .parse(req.body);
 
         const finalData = { ...data };
+        if (hasInvalidQuestionIds(data.formSchema))
+          return res.status(422).json({ error: "Assessment question IDs must be unique and non-empty" });
         if (data.formSchema == null) finalData.answerKey = undefined;
         const activeCategoryCount = await prisma.classroomGradingCategory.count({
           where: { classroomId: classroom.id, active: true },
@@ -8415,6 +8435,8 @@ export function registerRoutes(app: Express) {
             formSchema = undefined;
           }
         }
+        if (hasInvalidQuestionIds(formSchema))
+          return res.status(422).json({ error: "Assessment question IDs must be unique and non-empty" });
 
         let answerKey: Record<string, string | string[]> | undefined;
         const rawAnswerKey = req.body.answerKey;
@@ -8567,7 +8589,7 @@ export function registerRoutes(app: Express) {
         const classroom = await requireClassroomMember(req, res);
         if (!classroom) return;
         const assignments = await storage.getClassroomAssignments(classroom.id);
-        res.json(assignments);
+        res.json(assignments.map((assignment) => visibleAssignment(assignment, classroom.teacherId === req.session.userId)));
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -8591,7 +8613,7 @@ export function registerRoutes(app: Express) {
           : await storage.getClassroomAssignmentBySlug(classroom.id, param);
         if (!assignment)
           return res.status(404).json({ error: "Assignment not found" });
-        res.json(assignment);
+        res.json(visibleAssignment(assignment, classroom.teacherId === req.session.userId));
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -8673,6 +8695,8 @@ export function registerRoutes(app: Express) {
           .parse(req.body);
 
         const data = { ...rawData };
+        if (hasInvalidQuestionIds(rawData.formSchema))
+          return res.status(422).json({ error: "Assessment question IDs must be unique and non-empty" });
         if (rawData.formSchema === null && rawData.answerKey != null) {
           data.answerKey = null;
         }
@@ -8776,8 +8800,11 @@ export function registerRoutes(app: Express) {
       try {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
+        const assignmentId = Number(req.params.assignmentId);
+        if (!Number.isInteger(assignmentId) || !(await storage.getClassroomAssignmentById(classroom.id, assignmentId)))
+          return res.status(404).json({ error: "Assignment not found" });
         const submissions = await storage.getSubmissionsForAssignment(
-          parseInt(req.params.assignmentId),
+          assignmentId,
         );
         res.json(submissions);
       } catch (error: any) {
@@ -8813,11 +8840,16 @@ export function registerRoutes(app: Express) {
         } else {
           return res.status(403).json({ error: "Forbidden" });
         }
+        const enrolled = await prisma.classroomEnrollment.findFirst({
+          where: { classroomId, studentId },
+          select: { id: true },
+        });
+        if (!enrolled) return res.status(403).json({ error: "Student is not enrolled in this classroom" });
         const submissions = await storage.getSubmissionsForStudent(
           studentId,
           classroomId,
         );
-        res.json(submissions);
+        res.json(submissions.map(visibleStudentSubmission));
       } catch (error: any) {
         res.status(500).json({ error: error.message });
       }
@@ -8846,6 +8878,12 @@ export function registerRoutes(app: Express) {
         const student = await storage.getStudentByUserId(user.id);
         if (!student)
           return res.status(403).json({ error: "Student profile not found" });
+        const enrollment = await prisma.classroomEnrollment.findFirst({
+          where: { classroomId: classroom.id, studentId: student.id },
+          select: { id: true },
+        });
+        if (!enrollment)
+          return res.status(403).json({ error: "Not enrolled in this classroom" });
         const { content, formAnswers: formAnswersRaw } = z
           .object({
             content: z.string().optional().default(""),
@@ -8888,27 +8926,46 @@ export function registerRoutes(app: Express) {
         }
 
         let formAnswers: Record<string, string | string[]> | undefined;
-        if (formAnswersRaw) {
+        if (formAnswersRaw !== undefined) {
           try {
-            formAnswers = JSON.parse(formAnswersRaw);
+            const parsed = JSON.parse(formAnswersRaw);
+            const validated = z.record(z.string(), z.union([z.string(), z.array(z.string())])).safeParse(parsed);
+            if (!validated.success) return res.status(422).json({ error: "Invalid form answers" });
+            formAnswers = validated.data;
           } catch {
-            formAnswers = undefined;
+            return res.status(422).json({ error: "Invalid form answers" });
           }
         }
 
+        // Match responses only to the active schema by stable question ID.
+        const questions = Array.isArray(assignment.formSchema)
+          ? z.array(formQuestionSchema).safeParse(assignment.formSchema)
+          : null;
+        if (questions && !questions.success)
+          return res.status(422).json({ error: "Assessment questions are invalid; ask your teacher to review them" });
+        const schema: FormQuestion[] = questions?.success ? questions.data : [];
+        if (hasInvalidQuestionIds(schema))
+          return res.status(422).json({ error: "Assessment question IDs must be unique and non-empty" });
+        if (formAnswers && Object.keys(formAnswers).some((id) => !schema.some((q) => q.id === id)))
+          return res.status(422).json({ error: "Answers do not match this assessment" });
+        for (const q of schema) {
+          const answer = formAnswers?.[q.id];
+          if (answer === undefined) continue;
+          if (q.type === "checkbox") {
+            if (!Array.isArray(answer) || answer.some((value) => !q.options.includes(value)))
+              return res.status(422).json({ error: `Invalid response to ${q.label || "question"}` });
+          } else if (typeof answer !== "string" ||
+            (q.type === "multiple_choice" && answer !== "" && !q.options.includes(answer)) ||
+            (q.type === "true_false" && answer !== "" && answer !== "True" && answer !== "False"))
+            return res.status(422).json({ error: `Invalid response to ${q.label || "question"}` });
+        }
         // Validate required questions server-side
         if (
-          Array.isArray(assignment.formSchema) &&
-          assignment.formSchema.length > 0
+          schema.length > 0
         ) {
           const answers = formAnswers ?? {};
           const missingLabels: string[] = [];
-          for (const q of assignment.formSchema as Array<{
-            id: string;
-            label: string;
-            type: string;
-            required: boolean;
-          }>) {
+          for (const q of schema) {
             if (!q.required) continue;
             const answer = answers[q.id];
             const empty =
@@ -9003,6 +9060,7 @@ export function registerRoutes(app: Express) {
           fileUrl,
           formAnswers,
           autoGrade,
+          schema,
         );
 
         // Notify the teacher on every submission (first-time or resubmission).
@@ -9045,9 +9103,9 @@ export function registerRoutes(app: Express) {
           }
         }
 
-        res.json(submission);
+        res.json(visibleStudentSubmission(submission));
       } catch (error: any) {
-        res.status(400).json({ error: error.message });
+        res.status(error.status ?? (error.code === "P2002" ? 409 : 400)).json({ error: error.message });
       }
     },
   );
@@ -10290,7 +10348,7 @@ export function registerRoutes(app: Express) {
           );
           const gradedSubs = typeAssignments
             .map((a) => subMap[a.id])
-            .filter((s) => s && s.grade !== null && s.grade !== undefined);
+            .filter((s) => s && s.status === "graded" && s.grade !== null && s.grade !== undefined);
 
           const isGraded = gradedSubs.length > 0;
           const configuredWeight = category.weight;
@@ -10298,7 +10356,7 @@ export function registerRoutes(app: Express) {
           let average: number | null = null;
           if (isGraded) {
             const totalPossible = typeAssignments
-              .filter((a) => subMap[a.id]?.grade != null)
+              .filter((a) => subMap[a.id]?.status === "graded" && subMap[a.id]?.grade != null)
               .reduce((s, a) => s + a.points, 0);
             const totalEarned = gradedSubs.reduce(
               (s, sub) => s + (sub.grade ?? 0),

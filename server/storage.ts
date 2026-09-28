@@ -55,6 +55,7 @@ import type {
   ClassroomAssignment,
   InsertClassroomAssignment,
   ClassroomSubmission,
+  FormQuestion,
   ClassroomMaterial,
   InsertClassroomMaterial,
 } from "@shared/schema";
@@ -317,7 +318,7 @@ export interface IStorage {
   getSubmissionsForAssignment(assignmentId: number): Promise<(ClassroomSubmission & { studentName: string })[]>;
   getClassroomSubmissionById(submissionId: number): Promise<(ClassroomSubmission & { studentName: string; assignment: ClassroomAssignment }) | null>;
   getSubmissionsForStudent(studentId: number, classroomId: number): Promise<ClassroomSubmission[]>;
-  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null): Promise<ClassroomSubmission>;
+  submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null, questions?: FormQuestion[] | null): Promise<ClassroomSubmission>;
   gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission>;
   returnClassroomSubmission(submissionId: number, returnNote: string): Promise<ClassroomSubmission>;
 
@@ -2480,6 +2481,7 @@ class PrismaStorage implements IStorage {
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
       formAnswers: (r.formAnswers as Record<string, string | string[]> | null) ?? null,
+      questionSnapshot: (r.questionSnapshot as FormQuestion[] | null) ?? null,
       status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
@@ -2499,6 +2501,7 @@ class PrismaStorage implements IStorage {
           content: null,
           fileUrl: null,
           formAnswers: null,
+          questionSnapshot: null,
           status: "not-submitted" as ClassroomSubmission["status"],
           submittedAt: null,
           grade: null,
@@ -2535,6 +2538,7 @@ class PrismaStorage implements IStorage {
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
       formAnswers: (r.formAnswers as Record<string, string | string[]> | null) ?? null,
+      questionSnapshot: (r.questionSnapshot as FormQuestion[] | null) ?? null,
       status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
@@ -2570,6 +2574,7 @@ class PrismaStorage implements IStorage {
       content: r.content ?? null,
       fileUrl: r.fileUrl ?? null,
       formAnswers: (r.formAnswers as Record<string, string | string[]> | null) ?? null,
+      questionSnapshot: (r.questionSnapshot as FormQuestion[] | null) ?? null,
       status: r.status as ClassroomSubmission["status"],
       submittedAt: r.submittedAt ?? null,
       grade: r.grade ?? null,
@@ -2739,7 +2744,7 @@ class PrismaStorage implements IStorage {
     return result;
   }
 
-  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null): Promise<ClassroomSubmission> {
+  async submitClassroomAssignment(assignmentId: number, studentId: number, content: string, dueDate: string, fileUrl?: string, formAnswers?: Record<string, string | string[]>, autoGrade?: number | null, questions?: FormQuestion[] | null): Promise<ClassroomSubmission> {
     const now = new Date();
     const dueDatePart = dueDate.includes("T") ? dueDate.split("T")[0] : dueDate;
     const dueDateTime = new Date(dueDatePart + "T23:59:59");
@@ -2754,16 +2759,31 @@ class PrismaStorage implements IStorage {
       // Intentionally do NOT clear returnNote here — preserving it lets the teacher see
       // on the review page that this was previously returned. The student-facing banner
       // already gates on status === "returned" so the note won't re-appear to them.
-      ...(formAnswers !== undefined ? { formAnswers: JSON.parse(JSON.stringify(formAnswers)) as Prisma.InputJsonValue } : {}),
-      ...(autoGrade !== undefined && autoGrade !== null ? { grade: autoGrade } : {}),
+      formAnswers: formAnswers ? JSON.parse(JSON.stringify(formAnswers)) as Prisma.InputJsonValue : Prisma.DbNull,
+      questionSnapshot: questions?.length ? JSON.parse(JSON.stringify(questions)) as Prisma.InputJsonValue : Prisma.DbNull,
+      // A resubmission must not retain a score or feedback from an earlier revision.
+      grade: autoGrade ?? null,
+      feedback: null,
     } as const;
-    const updated = await prisma.classroomSubmission.upsert({
-      where: { assignmentId_studentId: { assignmentId, studentId } },
-      update: baseData,
-      // On first-time create: explicitly null out fileUrl when no file was uploaded
-      create: { assignmentId, studentId, grade: null, feedback: null, fileUrl: null, ...baseData },
+    const submissionId = await prisma.$transaction(async (tx) => {
+      const existing = await tx.classroomSubmission.findUnique({
+        where: { assignmentId_studentId: { assignmentId, studentId } },
+        select: { id: true, status: true },
+      });
+      if (existing) {
+        const result = await tx.classroomSubmission.updateMany({
+          where: { id: existing.id, status: { in: ["pending", "returned"] } },
+          data: baseData,
+        });
+        if (!result.count) throw Object.assign(new Error("Submission is not open for revision"), { status: 409 });
+        return existing.id;
+      }
+      const created = await tx.classroomSubmission.create({
+        data: { assignmentId, studentId, fileUrl: null, ...baseData },
+      });
+      return created.id;
     });
-    return this.getHydratedSubmissionResult(updated.id);
+    return this.getHydratedSubmissionResult(submissionId);
   }
 
   async gradeClassroomSubmission(submissionId: number, grade: number, feedback: string | null, maxPoints: number): Promise<ClassroomSubmission> {
@@ -2820,6 +2840,7 @@ class PrismaStorage implements IStorage {
       content: submission.content ?? null,
       fileUrl: submission.fileUrl ?? null,
       formAnswers: (submission.formAnswers as Record<string, string | string[]> | null) ?? null,
+      questionSnapshot: (submission.questionSnapshot as FormQuestion[] | null) ?? null,
       status: submission.status as ClassroomSubmission["status"],
       submittedAt: submission.submittedAt ?? null,
       grade: submission.grade ?? null,

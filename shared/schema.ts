@@ -656,6 +656,7 @@ export const classroomSubmissionSchema = z.object({
   content: z.string().nullable(),
   fileUrl: z.string().nullable(),
   formAnswers: z.record(z.string(), z.union([z.string(), z.array(z.string())])).nullable().optional(),
+  questionSnapshot: z.array(formQuestionSchema).nullable().optional(),
   status: z.enum(["pending", "submitted", "graded", "late", "returned"]),
   submittedAt: z.string().nullable(),
   grade: z.number().nullable(),

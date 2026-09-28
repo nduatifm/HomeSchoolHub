@@ -12,7 +12,7 @@ import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
-import FormResponse from "@/components/FormResponse";
+import AssessmentReview from "@/components/AssessmentReview";
 import StatusBadge from "./StatusBadge";
 
 type FullSubmission = ClassroomSubmission & {
@@ -158,28 +158,17 @@ export default function SubmissionReviewPage() {
 
           {/* Submission content */}
           <div className="bg-white rounded-2xl border border-border shadow-sm p-6 space-y-5">
-            {assignment.formSchema && assignment.formSchema.length > 0 && submission.formAnswers ? (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Form Responses</p>
-                <div className="rounded-xl border border-border bg-muted/30 px-4 py-4">
-                  <FormResponse
-                    questions={assignment.formSchema}
-                    answers={submission.formAnswers as Record<string, string | string[]>}
-                    onChange={() => {}}
-                    disabled
-                    answerKey={assignment.answerKey ?? undefined}
-                  />
-                </div>
-              </div>
-            ) : submission.content ? (
+            <AssessmentReview submission={submission} currentQuestions={assignment.formSchema} />
+            {submission.content && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Student Answer</p>
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                   {submission.content}
                 </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">No text answer submitted.</p>
+            )}
+            {!submission.content && !submission.fileUrl && !submission.questionSnapshot?.length && !assignment.formSchema?.length && !submission.formAnswers && (
+              <p className="text-sm text-muted-foreground italic">No response submitted.</p>
             )}
 
             {(() => {
