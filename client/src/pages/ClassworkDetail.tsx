@@ -197,6 +197,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   const draftKey = `draft:${classroomId}:${assignment.id}`;
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [attachmentAction, setAttachmentAction] = useState<"keep" | "replace" | "remove">("keep");
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
@@ -218,6 +219,8 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
   });
 
   const mySubmission = submissions.find((s) => s.assignmentId === assignment.id);
+  const isReturned = mySubmission?.status === "returned";
+  const previousFiles = isReturned ? parseFileUrls(mySubmission.fileUrl) : [];
 
   // Fetch server draft — source of truth across devices
   const { data: serverDraft, isSuccess: serverDraftLoaded } = useQuery<any | null>({
@@ -388,6 +391,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       }
       const formData = new FormData();
       formData.append("content", text);
+      if (isReturned) formData.append("attachmentAction", previousFiles.length ? attachmentAction : files.length ? "replace" : "keep");
       if (fileUrls.length > 0) formData.append("fileUrls", JSON.stringify(fileUrls));
       if (hasFormSchema && Object.keys(formAnswers).length > 0) {
         formData.append("formAnswers", JSON.stringify(formAnswers));
@@ -406,6 +410,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
       queryClient.invalidateQueries({ queryKey: ["/api/classrooms", classroomId, "assignments", assignment.id, "draft"] });
       setText("");
       setFiles([]);
+      setAttachmentAction("keep");
       setFormAnswers({});
       setDraftRestored(false);
       setAutoSaveStatus("idle");
@@ -414,7 +419,6 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
     onError: (err: any) => toast({ title: err?.message ?? "Couldn't submit — try again.", type: "error" }),
   });
 
-  const isReturned = mySubmission?.status === "returned";
   const isSubmitted = mySubmission && (mySubmission.status === "submitted" || mySubmission.status === "graded" || mySubmission.status === "late");
 
   return (
@@ -532,6 +536,27 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                   {files.length > 0 && <span className="ml-1.5 text-primary">{files.length}/{MAX_FILES}</span>}
                 </p>
               </div>
+              {previousFiles.length > 0 && (
+                <div className="mb-3 rounded-lg border border-border p-3 space-y-2">
+                  <p className="text-sm font-medium">Previously submitted attachments</p>
+                  {previousFiles.map((url, i) => (
+                    <a key={`${url}-${i}`} href={url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline break-all">
+                      View attachment {i + 1}
+                    </a>
+                  ))}
+                  <div className="flex flex-wrap gap-3 pt-1" role="radiogroup" aria-label="Previous attachments">
+                    {(["keep", "replace", "remove"] as const).map((action) => (
+                      <label key={action} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <input type="radio" name="attachmentAction" value={action} checked={attachmentAction === action}
+                          onChange={() => { setAttachmentAction(action); setFiles([]); setFileError(null); }} />
+                        {action === "keep" ? "Keep existing" : action === "replace" ? "Replace with new files" : "Remove existing"}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(!previousFiles.length || attachmentAction === "replace") && (
+              <>
               {files.length > 0 && (
                 <div className="space-y-2 mb-2">
                   {files.map((f, i) => (
@@ -584,6 +609,8 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               {fileError && (
                 <p className="mt-1.5 text-xs text-destructive">{fileError}</p>
               )}
+              </>
+              )}
             </div>
 
             {missingRequiredQuestions.length > 0 && (
@@ -598,7 +625,8 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
               disabled={
                 submitMutation.isPending ||
                 missingRequiredQuestions.length > 0 ||
-                (!hasFormSchema && !text.trim() && !files.length)
+                (previousFiles.length > 0 && attachmentAction === "replace" && !files.length) ||
+                (!hasFormSchema && !text.trim() && !files.length && !previousFiles.length)
               }
               onClick={() => submitMutation.mutate()}
             >

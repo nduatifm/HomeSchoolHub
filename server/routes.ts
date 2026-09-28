@@ -8895,22 +8895,37 @@ export function registerRoutes(app: Express) {
         if (!assignment)
           return res.status(404).json({ error: "Assignment not found" });
 
-        let fileUrl: string | undefined;
+        const priorSub = await prisma.classroomSubmission.findUnique({
+          where: { assignmentId_studentId: { assignmentId, studentId: student.id } },
+          select: { status: true },
+        });
+        const isResubmission = priorSub?.status === "returned";
+        const attachmentAction = req.body.attachmentAction;
+        if (attachmentAction !== undefined &&
+            (!isResubmission || !["keep", "replace", "remove"].includes(attachmentAction))) {
+          return res.status(400).json({ error: "Invalid attachment action for this submission" });
+        }
+        const hasUpload = !!req.file || req.body.fileUrls !== undefined;
+        if ((attachmentAction === "keep" || attachmentAction === "remove") && hasUpload) {
+          return res.status(400).json({ error: "Cannot upload files when keeping or removing attachments" });
+        }
+        if (attachmentAction === "replace" && !hasUpload) {
+          return res.status(400).json({ error: "Choose replacement files" });
+        }
+
+        let fileUrl: string | null | undefined;
         const rawFileUrlsSub = req.body.fileUrls;
-        if (rawFileUrlsSub) {
+        if (rawFileUrlsSub !== undefined) {
           try {
             const parsed = JSON.parse(rawFileUrlsSub);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const validated = parsed.filter(
-                (u: unknown) => typeof u === "string" && u &&
-                  (u.startsWith("https://res.cloudinary.com/") || u.startsWith("https://cloudinary.com/"))
-              );
-              if (validated.length > 10)
-                return res.status(400).json({ error: "Too many file attachments (max 10)" });
-              if (validated.length > 0)
-                fileUrl = JSON.stringify(validated);
-            }
-          } catch { /* ignore */ }
+            if (!Array.isArray(parsed) || !parsed.length ||
+                parsed.some((u: unknown) => typeof u !== "string" ||
+                  !(u.startsWith("https://res.cloudinary.com/") || u.startsWith("https://cloudinary.com/"))))
+              return res.status(400).json({ error: "Invalid file attachments" });
+            if (parsed.length > 10)
+              return res.status(400).json({ error: "Too many file attachments (max 10)" });
+            fileUrl = JSON.stringify(parsed);
+          } catch { return res.status(400).json({ error: "Invalid file attachments" }); }
         } else if (req.file) {
           const uploadResult = await uploadBufferToCloudinary(
             req.file.buffer,
@@ -8924,6 +8939,9 @@ export function registerRoutes(app: Express) {
           }
           fileUrl = JSON.stringify([uploadResult.url]);
         }
+        if (attachmentAction === "replace" && !fileUrl)
+          return res.status(400).json({ error: "Choose replacement files" });
+        if (attachmentAction === "remove") fileUrl = null;
 
         let formAnswers: Record<string, string | string[]> | undefined;
         if (formAnswersRaw !== undefined) {
@@ -9044,14 +9062,6 @@ export function registerRoutes(app: Express) {
         }
 
         // Check if this is a resubmission of a returned submission (to notify teacher)
-        const priorSub = await prisma.classroomSubmission.findUnique({
-          where: {
-            assignmentId_studentId: { assignmentId, studentId: student.id },
-          },
-          select: { status: true },
-        });
-        const isResubmission = priorSub?.status === "returned";
-
         const submission = await storage.submitClassroomAssignment(
           assignmentId,
           student.id,
