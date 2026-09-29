@@ -79,19 +79,18 @@ function GiveFeedbackDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent>
+      <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Give Student Feedback</DialogTitle></DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-5 py-1">
             <FormField
               control={form.control}
               name="studentId"
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <FormItem>
-                  <FormLabel>Student</FormLabel>
-                  <FormControl>
+                  <FormLabel htmlFor="feedback-student-select">Student</FormLabel>
                     <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value ? field.value.toString() : ""}>
-                      <SelectTrigger data-testid="select-feedback-student">
+                      <SelectTrigger id="feedback-student-select" aria-invalid={!!fieldState.error} aria-describedby={fieldState.error ? "feedback-student-error" : undefined} className="h-11 text-base sm:text-sm" data-testid="select-feedback-student">
                         <SelectValue placeholder="Select a student" />
                       </SelectTrigger>
                       <SelectContent>
@@ -100,20 +99,18 @@ function GiveFeedbackDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                  </FormControl>
-                  <FormMessage />
+                  <FormMessage id="feedback-student-error" />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
               name="type"
-              render={({ field }) => (
+              render={({ field, fieldState }) => (
                 <FormItem>
-                  <FormLabel>Feedback Type</FormLabel>
-                  <FormControl>
+                  <FormLabel htmlFor="feedback-type-select">Feedback Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger data-testid="select-feedback-type">
+                      <SelectTrigger id="feedback-type-select" aria-invalid={!!fieldState.error} aria-describedby={fieldState.error ? "feedback-type-error" : undefined} className="h-11 text-base sm:text-sm" data-testid="select-feedback-type">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -122,8 +119,7 @@ function GiveFeedbackDialog({
                         <SelectItem value="general">General</SelectItem>
                       </SelectContent>
                     </Select>
-                  </FormControl>
-                  <FormMessage />
+                  <FormMessage id="feedback-type-error" />
                 </FormItem>
               )}
             />
@@ -134,13 +130,13 @@ function GiveFeedbackDialog({
                 <FormItem>
                   <FormLabel>Message</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter your feedback..." rows={4} {...field} data-testid="input-feedback-message" />
+                    <Textarea placeholder="Enter your feedback..." rows={6} className="min-h-36 resize-y text-base sm:text-sm" {...field} data-testid="input-feedback-message" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" disabled={mutation.isPending} className="w-full" data-testid="button-submit-feedback">
+            <Button type="submit" disabled={mutation.isPending} className="w-full h-11" data-testid="button-submit-feedback">
               {mutation.isPending ? "Sending..." : "Send Feedback"}
             </Button>
           </form>

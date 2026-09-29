@@ -525,7 +525,7 @@ export default function EditAssignmentPage() {
 
         {/* ── Page body ── */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-16">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-16">
             <Breadcrumb crumbs={[
               { label: "Classrooms", href: "/classrooms" },
               ...(classroom.gradeFolderId && classroom.gradeFolderName
@@ -568,13 +568,13 @@ export default function EditAssignmentPage() {
             )}
 
             {/* ── Two-column layout ── */}
-            <div className="flex flex-col lg:flex-row gap-6 items-start">
+            <div className="flex flex-col xl:flex-row gap-6 items-start">
 
               {/* ── Left — main content ── */}
               <div className="flex-1 min-w-0 space-y-4">
 
                 {/* Title + Instructions */}
-                <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+                <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-5">
                   <div className="space-y-1.5">
                     <Label htmlFor="title" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Title <span className="text-destructive">*</span>
@@ -590,7 +590,7 @@ export default function EditAssignmentPage() {
                       rows={1}
                       spellCheck
                       autoFocus
-                      className="w-full text-xl font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none resize-none leading-snug overflow-hidden"
+                      className="w-full rounded-md text-xl font-bold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none leading-snug overflow-hidden"
                       style={{ minHeight: "2rem" }}
                     />
                   </div>
@@ -605,23 +605,23 @@ export default function EditAssignmentPage() {
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
                       placeholder="What should students do for this assignment?"
-                      rows={5}
-                      className="text-sm resize-none"
+                      rows={7}
+                      className="min-h-40 text-sm resize-y"
                     />
                   </div>
                 </div>
 
                 {/* Due date + points — mobile only */}
-                <div className="rounded-2xl border border-border bg-card p-5 space-y-4 lg:hidden">
+                <div className="rounded-2xl border border-border bg-card p-5 space-y-4 xl:hidden">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Category</Label>
+                    <Label htmlFor="category-mobile" className="text-sm font-medium">Category</Label>
                     <Select value={categoryId === "" ? "" : String(categoryId)} onValueChange={(v) => {
                       const selected = activeCategories.find((category) => String(category.id) === v);
                       setCategoryId(Number(v));
                       if (selected && ["assignment", "test", "quiz", "project"].includes(selected.key)) setAssignmentType(selected.key as ItemType);
                     }}>
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger id="category-mobile" className="h-10 text-sm">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -634,7 +634,7 @@ export default function EditAssignmentPage() {
 
                 {/* Materials — mobile only */}
                 {materials.length > 0 && (
-                  <div className="rounded-2xl border border-border bg-card p-5 space-y-3 lg:hidden">
+                  <div className="rounded-2xl border border-border bg-card p-5 space-y-3 xl:hidden">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <BookOpen className="h-3.5 w-3.5" /> Materials
                     </p>
@@ -685,7 +685,7 @@ export default function EditAssignmentPage() {
                 )}
 
                 {/* ── Link card ── */}
-                <div className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
                       <Link2 className="h-4 w-4 text-blue-600" />
@@ -798,20 +798,20 @@ export default function EditAssignmentPage() {
               </div>
 
               {/* ── Right sidebar — desktop only ── */}
-              <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col gap-4 sticky top-20 self-start">
+              <div className="hidden xl:flex w-72 2xl:w-80 shrink-0 flex-col gap-4 sticky top-20 self-start">
 
                 {/* Due date + points */}
                 <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</p>
 
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium">Category</Label>
+                    <Label htmlFor="category" className="text-sm font-medium">Category</Label>
                     <Select value={categoryId === "" ? "" : String(categoryId)} onValueChange={(v) => {
                       const selected = activeCategories.find((category) => String(category.id) === v);
                       setCategoryId(Number(v));
                       if (selected && ["assignment", "test", "quiz", "project"].includes(selected.key)) setAssignmentType(selected.key as ItemType);
                     }}>
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger id="category" className="h-10 text-sm">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>

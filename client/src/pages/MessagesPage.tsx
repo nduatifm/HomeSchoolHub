@@ -237,19 +237,20 @@ export default function MessagesPage() {
           >
             {/* Search + compose */}
             <div className="flex items-center gap-2 p-3 shrink-0">
-              <div className="flex items-center gap-2 flex-1 rounded-lg px-3 py-2 border border-border/50 bg-muted/20">
+              <div className="flex items-center gap-2 flex-1 min-w-0 h-11 rounded-lg px-3 py-2 border border-border/50 bg-muted/20">
                 <Search className="w-3.5 h-3.5 shrink-0" style={{ color: D.muted }} />
                 <input
                   type="search"
                   spellCheck={false}
                   value={convSearch}
                   onChange={(e) => setConvSearch(e.target.value)}
-                  placeholder="Search chats"
-                  className="flex-1 text-sm bg-transparent outline-none"
+                  placeholder="Search chats or names"
+                  aria-label="Search conversations by name"
+                  className="flex-1 min-w-0 h-full text-base md:text-sm bg-transparent outline-none"
                   style={{ color: D.text }}
                 />
                 {convSearch && (
-                  <button onClick={() => setConvSearch("")}>
+                  <button type="button" aria-label="Clear conversation search" onClick={() => setConvSearch("")}>
                     <X className="w-3 h-3" style={{ color: D.muted }} />
                   </button>
                 )}
@@ -257,11 +258,12 @@ export default function MessagesPage() {
               {canUseDirect && (
                 <button
                   onClick={openCompose}
-                  className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors shrink-0"
+                  className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors shrink-0"
                   style={{ color: showCompose ? D.accent : D.muted }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = D.hover)}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   title="New direct message"
+                  aria-label="New direct message"
                 >
                   <PenSquare className="w-4 h-4" />
                 </button>
@@ -440,7 +442,7 @@ export default function MessagesPage() {
               <div className="flex flex-col h-full">
                 {/* "To:" header with inline search */}
                 <div
-                  className="flex items-center gap-3 px-5 py-3.5 shrink-0"
+                  className="flex items-center gap-3 px-5 py-3.5 min-h-14 shrink-0"
                   style={{ borderBottom: `1px solid ${D.border}` }}
                 >
                   <span className="text-sm font-semibold shrink-0" style={{ color: D.muted }}>
@@ -453,11 +455,12 @@ export default function MessagesPage() {
                     value={contactSearch}
                     onChange={(e) => setContactSearch(e.target.value)}
                     placeholder="Search people…"
-                    className="flex-1 text-sm bg-transparent outline-none"
+                    aria-label="Search people by name"
+                    className="flex-1 min-w-0 min-h-10 text-base md:text-sm bg-transparent outline-none"
                     style={{ color: D.text }}
                   />
                   {contactSearch && (
-                    <button onClick={() => setContactSearch("")}>
+                    <button type="button" aria-label="Clear people search" onClick={() => setContactSearch("")}>
                       <X className="w-3.5 h-3.5" style={{ color: D.muted }} />
                     </button>
                   )}

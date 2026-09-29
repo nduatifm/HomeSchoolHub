@@ -322,27 +322,38 @@ export default function StudentClassroomsPage() {
         open={submitDialogAssignmentId !== null}
         onOpenChange={(open) => { if (!open) setSubmitDialogAssignmentId(null); }}
       >
-        <DialogContent>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Submit Assignment</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="Your answer or response..."
-              value={submissionForm.submission}
-              onChange={(e) => setSubmissionForm({ ...submissionForm, submission: e.target.value })}
-              rows={5}
-            />
-            <Textarea
-              placeholder="Notes for your teacher (optional)"
-              value={submissionForm.notes}
-              onChange={(e) => setSubmissionForm({ ...submissionForm, notes: e.target.value })}
-              rows={2}
-            />
+          <div className="space-y-5 py-1">
+            <div className="space-y-1.5">
+              <label htmlFor="assignment-answer" className="text-sm font-medium">Your answer or response</label>
+              <Textarea
+                id="assignment-answer"
+                placeholder="Your answer or response..."
+                value={submissionForm.submission}
+                onChange={(e) => setSubmissionForm({ ...submissionForm, submission: e.target.value })}
+                rows={6}
+                className="min-h-36 resize-y"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="assignment-notes" className="text-sm font-medium">Notes for your teacher <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Textarea
+                id="assignment-notes"
+                placeholder="Notes for your teacher (optional)"
+                value={submissionForm.notes}
+                onChange={(e) => setSubmissionForm({ ...submissionForm, notes: e.target.value })}
+                rows={2}
+                className="min-h-20 resize-y"
+              />
+            </div>
             <div>
-              <label className="text-sm font-medium block mb-1">Attach file (optional)</label>
+              <label htmlFor="assignment-file" className="text-sm font-medium block mb-1.5">Attach file <span className="text-muted-foreground font-normal">(optional)</span></label>
               <input
+                id="assignment-file"
                 type="file"
                 onChange={(e) => setSubmissionFile(e.target.files?.[0] ?? null)}
-                className="text-sm"
+                className="block w-full rounded-md border border-input px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm"
               />
             </div>
           </div>

@@ -141,7 +141,7 @@ export default function FormBuilderPage() {
       </div>
 
       {/* ── Builder — fills remaining height ── */}
-      <div style={{ height: "calc(100vh - 3.5rem)" }}>
+      <div className="min-h-[calc(100dvh-3.5rem)] lg:h-[calc(100dvh-3.5rem)]">
         <FormBuilder
           questions={questions}
           onChange={setQuestions}

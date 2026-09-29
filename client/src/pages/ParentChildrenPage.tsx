@@ -388,7 +388,7 @@ export default function ParentChildrenPage() {
                           {iAmOwner || iAmMember ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="p-0.5 rounded hover:bg-muted transition-colors shrink-0">
+                                <button aria-label={`More options for ${child.name}`} className="h-10 w-10 -mr-2 rounded-md hover:bg-muted transition-colors shrink-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                   <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -448,11 +448,12 @@ export default function ParentChildrenPage() {
                           {/* Only owners can send messages — members are read-only */}
                           {assignedTeacher && iAmOwner && (
                             <button
+                              type="button"
                               onClick={() => {
                                 sessionStorage.setItem("mp_openStudentId", String(child.id));
                                 navigate("/messages");
                               }}
-                              className="text-xs text-primary hover:underline flex items-center gap-1"
+                              className="min-h-10 px-2 text-xs text-primary hover:underline flex items-center gap-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               <MessageSquare className="w-3 h-3" />
                               Message
@@ -482,7 +483,8 @@ export default function ParentChildrenPage() {
 
                         {/* Family team toggle — visible to all roles */}
                         <button
-                          className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+                          aria-expanded={isTeamPanelOpen}
+                          className="mt-3 min-h-10 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           onClick={() => setTeamPanelChildId(isTeamPanelOpen ? null : child.id)}
                         >
                           <Users className="w-3.5 h-3.5" />
@@ -540,26 +542,30 @@ export default function ParentChildrenPage() {
                                   </Badge>
                                   {/* Team management controls — owners only */}
                                   {iAmOwner && member.status === "pending" ? (
-                                    <div className="flex items-center gap-1">
-                                      <button
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
                                         title="Resend invite"
-                                        className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+                                         aria-label="Resend invite"
+                                         className="h-10 w-10 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-primary flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                         onClick={() => resendInviteMutation.mutate({ childId: child.id, token: member.inviteToken! })}
                                       >
                                         <RefreshCw className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
+                                        </button>
+                                        <button
+                                          type="button"
                                         title="Cancel invite"
-                                        className="p-0.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive"
+                                         aria-label="Cancel invite"
+                                         className="h-10 w-10 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-destructive flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                         onClick={() => cancelInviteMutation.mutate({ childId: child.id, token: member.inviteToken! })}
                                       >
                                         <XCircle className="w-3.5 h-3.5" />
-                                      </button>
+                                        </button>
                                     </div>
                                   ) : iAmOwner && member.status === "active" ? (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <button className="p-0.5 rounded hover:bg-muted transition-colors">
+                                        <button aria-label={`Manage ${member.parentName ?? member.inviteEmail ?? "team member"}`} className="h-10 w-10 rounded-md hover:bg-muted transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                           <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
                                         </button>
                                       </DropdownMenuTrigger>
@@ -652,7 +658,7 @@ export default function ParentChildrenPage() {
         setSendMessageOpen(open);
         if (!open) setMessageForm({ receiverId: 0, content: "", studentId: 0 });
       }}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>Send Message</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
@@ -666,12 +672,14 @@ export default function ParentChildrenPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Message</label>
+              <Label htmlFor="parent-message-content" className="text-sm font-medium">Message</Label>
               <Textarea
+                id="parent-message-content"
                 placeholder="Type your message..."
                 value={messageForm.content}
                 onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-                rows={4}
+                rows={6}
+                className="min-h-36 resize-y"
                 data-testid="input-message-content"
               />
             </div>
@@ -693,7 +701,7 @@ export default function ParentChildrenPage() {
 
       {/* Reset login dialog */}
       <Dialog open={resetChildId !== null} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Temporary password generated</DialogTitle>
           </DialogHeader>
@@ -751,7 +759,7 @@ export default function ParentChildrenPage() {
           setInviteEmailError(null);
         }
       }}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Invite a co-parent</DialogTitle>
           </DialogHeader>
@@ -821,7 +829,7 @@ export default function ParentChildrenPage() {
 
       {/* Edit student details dialog */}
       <Dialog open={editChildId !== null} onOpenChange={(open) => { if (!open) { setEditChildId(null); setEditError(null); } }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-4 h-4 text-primary" />
@@ -900,7 +908,7 @@ export default function ParentChildrenPage() {
 
       {/* Reset login dialog — two steps: confirmation, then temp password reveal */}
       <Dialog open={resetChildId !== null} onOpenChange={(open) => { if (!open) closeResetDialog(); }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-amber-500" />
@@ -954,8 +962,9 @@ export default function ParentChildrenPage() {
                     {resetTempPassword}
                   </code>
                   <button
+                    type="button"
                     onClick={copyTempPw}
-                    className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                    className="h-10 w-10 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     title="Copy to clipboard"
                   >
                     {copiedPw ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}

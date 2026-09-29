@@ -449,7 +449,7 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
           <CardContent className="px-4 pb-4 space-y-2">
             <AssessmentReview submission={mySubmission} currentQuestions={assignment.formSchema} />
             {mySubmission.content && (
-              <div className="bg-gray-50 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap">{mySubmission.content}</div>
+              <div className="rounded-lg bg-muted/30 p-4 text-base leading-relaxed text-foreground whitespace-pre-wrap break-words">{mySubmission.content}</div>
             )}
             {parseFileUrls(mySubmission.fileUrl).length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -518,11 +518,11 @@ function StudentPanel({ assignment, classroomId, studentId, isArchived }: {
                 />
               ) : (
                 <Textarea
+                  aria-label="Your written answer"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Write your answer here…"
-                  rows={4}
-                  className="resize-none text-sm"
+                  fieldSize="writing"
                 />
               )}
             </div>
