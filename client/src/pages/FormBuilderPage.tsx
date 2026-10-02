@@ -5,6 +5,7 @@ import FormBuilder from "@/components/FormBuilder";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowLeft, ClipboardList, Loader2 } from "lucide-react";
 import type { FormQuestion } from "@shared/schema";
+import { reconcileAnswerKey } from "@shared/answerKey";
 
 function getDraftKey(draftId: string) {
   return `lyra_form_draft_${draftId}`;
@@ -28,7 +29,7 @@ function loadAnswerKey(draftId: string): Record<string, string | string[]> {
   try {
     const raw = localStorage.getItem(getAnswerKeyDraftKey(draftId));
     if (!raw) return {};
-    return JSON.parse(raw) as Record<string, string | string[]>;
+    return reconcileAnswerKey(loadDraft(draftId), JSON.parse(raw));
   } catch {
     return {};
   }

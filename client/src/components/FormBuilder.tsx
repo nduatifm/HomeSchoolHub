@@ -13,6 +13,7 @@ import {
   Key,
 } from "lucide-react";
 import type { FormQuestion } from "@shared/schema";
+import { editQuestionOption, reconcileAnswerKey } from "@shared/answerKey";
 import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
 
 type QType = FormQuestion["type"];
@@ -59,7 +60,8 @@ interface Props {
   fullPage?: boolean;
 }
 
-export default function FormBuilder({ questions, onChange, answerKey = {}, onAnswerKeyChange, fullPage = false }: Props) {
+export default function FormBuilder({ questions, onChange, answerKey: rawAnswerKey = {}, onAnswerKeyChange, fullPage = false }: Props) {
+  const answerKey = reconcileAnswerKey(questions, rawAnswerKey);
   const [activeId, setActiveId] = useState<string | null>(
     questions[0]?.id ?? null,
   );
@@ -136,8 +138,9 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
   function removeOption(qId: string, optIndex: number) {
     const q = questions.find((q) => q.id === qId);
     if (!q || (q.options ?? []).length <= 1) return;
-    const opts = (q.options ?? []).filter((_, i) => i !== optIndex);
-    updateQuestion(qId, { options: opts });
+    const updated = editQuestionOption(questions, answerKey, qId, optIndex);
+    onChange(updated.questions);
+    onAnswerKeyChange?.(updated.answerKey);
   }
 
   function changeType(qId: string, type: QType) {
@@ -165,12 +168,13 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
       const { [qId]: _removed, ...remaining } = answerKey;
       onAnswerKeyChange(remaining);
     } else {
-      onAnswerKeyChange({ ...answerKey, [qId]: value });
+      onAnswerKeyChange(reconcileAnswerKey(questions, { ...answerKey, [qId]: value }));
     }
   }
 
   function toggleCheckboxAnswer(qId: string, option: string) {
-    const current = (answerKey[qId] as string[] | undefined) ?? [];
+    const value = answerKey[qId];
+    const current = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
     const next = current.includes(option)
       ? current.filter((v) => v !== option)
       : [...current, option];
@@ -470,9 +474,9 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                         placeholder={`Option ${oi + 1}`}
                         spellCheck
                         onChange={(e) => {
-                          const opts = [...(activeQuestion.options ?? [])];
-                          opts[oi] = e.target.value;
-                          updateQuestion(activeQuestion.id, { options: opts });
+                          const updated = editQuestionOption(questions, answerKey, activeQuestion.id, oi, e.target.value);
+                          onChange(updated.questions);
+                          onAnswerKeyChange?.(updated.answerKey);
                         }}
                       />
                       <button

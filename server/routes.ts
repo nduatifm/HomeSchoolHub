@@ -10619,6 +10619,9 @@ export function registerRoutes(app: Express) {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
         const assignmentId = parseInt(req.params.aId, 10);
+        if (!Number.isInteger(assignmentId) || !await prisma.classroomAssignment.findFirst({
+          where: { id: assignmentId, classroomId: classroom.id }, select: { id: true },
+        })) return res.status(404).json({ error: "Assignment not found" });
         const draft = await storage.getAssignmentDraft(
           req.session.userId!,
           classroom.id,
@@ -10640,6 +10643,9 @@ export function registerRoutes(app: Express) {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
         const assignmentId = parseInt(req.params.aId, 10);
+        if (!Number.isInteger(assignmentId) || !await prisma.classroomAssignment.findFirst({
+          where: { id: assignmentId, classroomId: classroom.id }, select: { id: true },
+        })) return res.status(404).json({ error: "Assignment not found" });
         const {
           title,
           description,
@@ -10693,6 +10699,9 @@ export function registerRoutes(app: Express) {
         const classroom = await requireClassroomOwner(req, res);
         if (!classroom) return;
         const assignmentId = parseInt(req.params.aId, 10);
+        if (!Number.isInteger(assignmentId) || !await prisma.classroomAssignment.findFirst({
+          where: { id: assignmentId, classroomId: classroom.id }, select: { id: true },
+        })) return res.status(404).json({ error: "Assignment not found" });
         await storage.deleteAssignmentDraft(
           req.session.userId!,
           classroom.id,

@@ -28,6 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import { BookOpen, Check } from "lucide-react";
 import type { Classroom, ClassroomAssignment, ClassroomGradingCategory, ClassroomMaterial, FormQuestion, ItemType } from "@shared/schema";
 import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
+import { reconcileAnswerKey } from "@shared/answerKey";
 
 const typeLabel: Record<string, string> = {
   short: "Short answer",
@@ -187,7 +188,7 @@ export default function EditAssignmentPage() {
     const seedCategoryId = assignment.categoryId ?? "";
     const seedLink = assignment.linkUrl ?? "";
     const existing = (assignment.formSchema as FormQuestion[] | null) ?? [];
-    const existingKey = (assignment.answerKey as Record<string, string | string[]> | null) ?? {};
+    const existingKey = reconcileAnswerKey(existing, assignment.answerKey);
     setForm(seedForm);
     setAssignmentType(seedType);
     setCategoryId(seedCategoryId);
@@ -277,8 +278,8 @@ export default function EditAssignmentPage() {
       (d.categoryId ?? pubCategoryId) !== pubCategoryId ||
       (d.linkUrl ?? pubLink) !== pubLink ||
       JSON.stringify(d.linkedMaterialIds ?? pubMaterials) !== JSON.stringify(pubMaterials) ||
-      JSON.stringify(d.formSchema ?? pubSchema) !== JSON.stringify(pubSchema) ||
-      JSON.stringify(d.answerKey ?? pubKey) !== JSON.stringify(pubKey);
+      JSON.stringify(d.formSchema === undefined ? pubSchema : d.formSchema ?? []) !== JSON.stringify(pubSchema) ||
+      JSON.stringify(d.answerKey === undefined ? pubKey : d.answerKey ?? {}) !== JSON.stringify(pubKey);
     if (!serverDiffersFromPublished) return;
     // Surface restore prompt — user must explicitly choose to restore
     setShowRestorePrompt(true);
@@ -302,16 +303,16 @@ export default function EditAssignmentPage() {
       setSelectedMaterialIds(d.linkedMaterialIds);
     }
     // Restore form questions — even if draft has empty schema (user cleared all questions)
-    if (d.formSchema !== undefined && d.formSchema !== null) {
+    if (d.formSchema !== undefined) {
       const qs = Array.isArray(d.formSchema) ? d.formSchema : [];
       setFormQuestions(qs);
       localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(qs));
     }
     // Restore answer key — even if cleared
-    if (d.answerKey !== undefined && d.answerKey !== null) {
-      setAnswerKey(d.answerKey);
-      localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(d.answerKey));
-    }
+    const restoredKey = reconcileAnswerKey(d.formSchema === undefined ? formQuestions : d.formSchema,
+      d.answerKey === undefined ? answerKey : d.answerKey);
+    setAnswerKey(restoredKey);
+    localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(restoredKey));
     setShowRestorePrompt(false);
     setTimeout(autoGrowTitle, 0);
   }
@@ -333,7 +334,7 @@ export default function EditAssignmentPage() {
           categoryId,
           linkUrl: linkUrl || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
-          answerKey: Object.keys(answerKey).length > 0 ? answerKey : null,
+          answerKey: reconcileAnswerKey(formQuestions, answerKey),
           linkedMaterialIds: selectedMaterialIds,
         }),
       }).catch(() => {});
@@ -344,15 +345,12 @@ export default function EditAssignmentPage() {
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key === getDraftKey(draftId.current)) {
+      if (e.key === getDraftKey(draftId.current) || e.key === getAnswerKeyDraftKey(draftId.current)) {
         try {
-          const updated = JSON.parse(e.newValue ?? "[]") as FormQuestion[];
+          const updated = JSON.parse(localStorage.getItem(getDraftKey(draftId.current)) ?? "[]") as FormQuestion[];
+          const key = JSON.parse(localStorage.getItem(getAnswerKeyDraftKey(draftId.current)) ?? "{}");
           setFormQuestions(updated);
-        } catch { }
-      } else if (e.key === getAnswerKeyDraftKey(draftId.current)) {
-        try {
-          const updated = JSON.parse(e.newValue ?? "{}") as Record<string, string | string[]>;
-          setAnswerKey(updated);
+          setAnswerKey(reconcileAnswerKey(updated, key));
         } catch { }
       }
     }
@@ -393,7 +391,7 @@ export default function EditAssignmentPage() {
           ...(fileUrl !== undefined ? { fileUrl } : {}),
           linkUrl: linkUrl.trim() || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
-          answerKey: formQuestions.length > 0 && Object.keys(answerKey).length > 0 ? answerKey : null,
+          answerKey: reconcileAnswerKey(formQuestions, answerKey),
           materialIds: selectedMaterialIds,
         }),
       });

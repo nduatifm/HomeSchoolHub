@@ -1,5 +1,6 @@
 import prisma from "./db";
 import { slugify } from "../shared/slugify";
+import { reconcileAnswerKey } from "../shared/answerKey";
 import { Prisma } from "@prisma/client";
 import {
   buildCategorySnapshotPayload,
@@ -2225,7 +2226,7 @@ class PrismaStorage implements IStorage {
     }
     const { answerKey, formSchema, ...rest } = data;
     const safeFormSchema = formSchema !== undefined ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : undefined;
-    const safeAnswerKey = answerKey !== undefined ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : undefined;
+    const safeAnswerKey = answerKey !== undefined ? reconcileAnswerKey(formSchema, answerKey) : undefined;
     const fallbackCategory = data.categoryId == null
       ? await prisma.classroomGradingCategory.findFirst({
           where: { classroomId: data.classroomId, key: data.assignmentType, active: true },
@@ -2337,7 +2338,7 @@ class PrismaStorage implements IStorage {
     const { formSchema, answerKey, ...rest } = data;
     const existing = await prisma.classroomAssignment.findUnique({
       where: { id },
-      select: { classroomId: true, categoryId: true, assignmentType: true },
+      select: { classroomId: true, categoryId: true, assignmentType: true, formSchema: true, answerKey: true },
     });
     if (!existing) throw new Error("Assignment not found");
     if (materialIds !== undefined) {
@@ -2390,8 +2391,10 @@ class PrismaStorage implements IStorage {
             : "assignment",
         }
       : rest;
-    const safeFormSchema = formSchema !== undefined && formSchema !== null ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : formSchema ?? undefined;
-    const safeAnswerKey = answerKey !== undefined && answerKey !== null ? JSON.parse(JSON.stringify(answerKey)) as Prisma.InputJsonValue : answerKey ?? undefined;
+    const safeFormSchema = formSchema === null ? Prisma.DbNull : formSchema !== undefined ? JSON.parse(JSON.stringify(formSchema)) as Prisma.InputJsonValue : undefined;
+    const safeAnswerKey = answerKey !== undefined || formSchema !== undefined
+      ? reconcileAnswerKey(formSchema !== undefined ? formSchema : existing.formSchema, answerKey !== undefined ? answerKey : existing.answerKey)
+      : undefined;
     const nextCategoryId =
       category?.id ??
       (Object.prototype.hasOwnProperty.call(normalizedRest, "categoryId")
@@ -3239,6 +3242,29 @@ class PrismaStorage implements IStorage {
     assignmentType?: string; categoryId?: number | null; linkUrl?: string | null;
     formSchema?: any; answerKey?: any; linkedMaterialIds?: number[];
   }): Promise<any> {
+    // A valid classroom owner must not seed a draft from an assignment in a
+    // different classroom. Validate association before any draft lookup/write.
+    const published = assignmentId !== null
+      ? await prisma.classroomAssignment.findFirst({
+          where: { id: assignmentId, classroomId, classroom: { teacherId } },
+          select: { formSchema: true, answerKey: true },
+        })
+      : null;
+    if (assignmentId !== null && !published) throw new Error("Assignment not found");
+    const previous = await this.getAssignmentDraft(teacherId, classroomId, assignmentId);
+    // Seed partial edit drafts from the published form. Subsequent null schema
+    // values then represent an intentional clear, not an omitted initial field.
+    if (!previous && published) data = {
+      ...data,
+      formSchema: data.formSchema === undefined ? published.formSchema : data.formSchema,
+      answerKey: data.answerKey === undefined ? published.answerKey : data.answerKey,
+    };
+    if (data.formSchema !== undefined || data.answerKey !== undefined) {
+      const schema = data.formSchema !== undefined ? data.formSchema : previous ? previous.formSchema : published?.formSchema;
+      const key = data.answerKey !== undefined ? data.answerKey : previous ? previous.answerKey : published?.answerKey;
+      data = { ...data, answerKey: reconcileAnswerKey(schema, key) };
+    }
+    if (data.formSchema === null) data = { ...data, formSchema: Prisma.DbNull };
     const where = assignmentId !== null
       ? { teacherId_classroomId_assignmentId: { teacherId, classroomId, assignmentId } }
       : undefined;
