@@ -12,7 +12,7 @@ import ModernSidebar from "@/components/ModernSidebar";
 import Breadcrumb from "@/components/Breadcrumb";
 import { toast } from "@/hooks/use-toast";
 import type { Classroom, ClassroomAssignment, ClassroomSubmission } from "@shared/schema";
-import AssessmentReview from "@/components/AssessmentReview";
+import TeacherAssessmentReview from "@/components/TeacherAssessmentReview";
 import StatusBadge from "./StatusBadge";
 
 type FullSubmission = ClassroomSubmission & {
@@ -158,7 +158,7 @@ export default function SubmissionReviewPage() {
 
           {/* Submission content */}
           <div className="bg-white rounded-2xl border border-border shadow-sm p-6 space-y-5">
-            <AssessmentReview submission={submission} currentQuestions={assignment.formSchema} />
+            <TeacherAssessmentReview submission={submission} currentQuestions={assignment.formSchema} answerKey={assignment.answerKey} />
             {submission.content && (
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Student Answer</p>
