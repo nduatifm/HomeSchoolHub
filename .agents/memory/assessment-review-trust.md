@@ -9,6 +9,12 @@ Treat saved submission-time question snapshots as the authoritative wording and 
 
 **How to apply:** Any future review, export, or report should prefer the saved snapshot. If it is missing or malformed, warn about the uncertainty and keep unmatched answers visible separately.
 
+Individual correctness cannot be recovered from a saved total grade. Until historical keys/results are persisted, comparisons must explicitly reference the current answer key and exclude changed or unverifiable questions.
+
+**Why:** Submission snapshots preserve prompts, not the historical key or per-question grading results. Current keys may have been edited even when prompts still match.
+
+**How to apply:** Treat teacher display comparisons as provisional checks, never as historical verification or a reason to overwrite saved grades. Keep malformed-data classification separate from family review behavior.
+
 Treat answer keys and provisional auto-scores as private until the teacher explicitly grades or releases them. Student and parent views must be filtered at the API boundary, including aggregates, rather than merely hiding values in the UI.
 
 **Why:** Shared assignment responses and grade summaries can disclose correct answers or unreviewed results even if the review page itself hides them.

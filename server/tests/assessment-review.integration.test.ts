@@ -9,6 +9,8 @@ import type { FormQuestion } from "../../shared/schema";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import AssessmentReview from "../../client/src/components/AssessmentReview";
+import TeacherAssessmentReview from "../../client/src/components/TeacherAssessmentReview";
+import { buildTeacherAssessmentReview } from "../../client/src/components/teacherAssessmentReviewModel";
 
 const runId = `review-${Date.now()}-${process.pid}`;
 const userIds: number[] = [];
@@ -135,6 +137,13 @@ test("review preserves prompt/answer pairing and blocks other roles and classroo
   assert.equal(review.status, 200);
   assert.deepEqual(review.body.questionSnapshot, questions);
   assert.deepEqual(review.body.formAnswers, answers);
+  assert.deepEqual(review.body.assignment.answerKey, { choice: "Alpha" });
+  const teacherCheck = buildTeacherAssessmentReview(review.body.questionSnapshot, review.body.assignment.formSchema, review.body.formAnswers, review.body.assignment.answerKey, review.body.status);
+  assert.equal(teacherCheck.items[2].status, "Incorrect / needs correction");
+  assert.deepEqual(teacherCheck.items[2].expected, ["Alpha"]);
+  const beforeDisplay = await prisma.classroomSubmission.findUniqueOrThrow({ where: { id: review.body.id } });
+  renderToStaticMarkup(React.createElement(TeacherAssessmentReview, { submission: review.body, currentQuestions: review.body.assignment.formSchema, answerKey: review.body.assignment.answerKey }));
+  assert.deepEqual(await prisma.classroomSubmission.findUniqueOrThrow({ where: { id: review.body.id } }), beforeDisplay);
   assert.equal(review.body.content, "Extra text");
   assert.equal((await get(teacherPath, otherTeacher.cookie)).status, 403);
   assert.equal((await get(teacherPath, parent.cookie)).status, 403);
@@ -165,12 +174,142 @@ test("review preserves prompt/answer pairing and blocks other roles and classroo
     assert.equal(result.body[0].grade, null);
     assert.deepEqual(result.body[0].questionSnapshot, changed);
     assert.deepEqual(result.body[0].formAnswers, { choice: "Gamma" });
+    assert.doesNotMatch(JSON.stringify(result.body), /"answerKey"|"correctness"|"accuracy"|"autoGrade"/);
   }
   assert.equal((await patch(`${teacherPath}/grade`, teacher.cookie, { grade: 75, feedback: "Reviewed" })).status, 200);
   assert.equal((await get(`/api/classrooms/${classroom.id}/my-submissions`, learner.cookie)).body[0].grade, 75);
   assert.equal((await submit(classroom.id, assignment.id, learner.cookie, "{}")).status, 409);
   const breakdownAfter = await get(`/api/classrooms/${classroom.id}/grade-breakdown/${student.id}`, learner.cookie);
   assert.match(JSON.stringify(breakdownAfter.body), /"average":75/);
+});
+
+const reviewKeys = { short: "Brief", long: "Essay", choice: "Alpha", checks: ["One", "Two"], boolean: "True" };
+const teacherReview = (snapshot: unknown, current: unknown = questions, answers: unknown = {}, keys: unknown = reviewKeys, status = "submitted") =>
+  buildTeacherAssessmentReview(snapshot, current, answers, keys, status);
+
+test("teacher comparison normalizes supported answers, counts keyed blanks, and never grades paragraphs", () => {
+  const result = teacherReview(questions, [...questions].reverse(), {
+    short: "  bRiEf ", long: "Essay", choice: "Beta", checks: [" two ", "ONE"], boolean: null,
+  });
+  assert.deepEqual(result.items.map((i) => i.status), ["Correct", "Needs manual review", "Incorrect / needs correction", "Correct", "No response"]);
+  assert.equal(result.eligible, 4);
+  assert.equal(result.correct, 2);
+  assert.equal(result.accuracy, 50);
+  assert.equal(result.manual, 1);
+  assert.equal(result.unanswered, 1);
+  assert.deepEqual(result.items[2].expected, ["Alpha"]);
+  const optionsReordered = questions.map((q) => ({ ...q, options: [...q.options].reverse() }));
+  assert.equal(teacherReview(questions, optionsReordered, { choice: "Alpha" }).items[2].status, "Correct");
+  const defaults = questions.map(({ required, options, ...q }) => q.type === "short" || q.type === "paragraph" || q.type === "true_false" ? q : { ...q, options });
+  assert.equal(teacherReview(defaults, questions, { short: "Brief" }).items[0].status, "Correct");
+});
+
+test("teacher historical identity handles missing, empty, malformed, duplicate and unsupported snapshots locally", () => {
+  for (const snapshot of [null, undefined, [], {}, "unknown"]) {
+    const result = teacherReview(snapshot, questions, { choice: "Alpha", removed: "Old" });
+    assert.equal(result.eligible, 0);
+    assert.equal(result.accuracy, null);
+    assert.ok(result.items.every((i) => i.status === "Needs manual review"));
+    assert.match(result.warning!, /unverified/);
+    assert.equal(result.items.at(-1)?.answer, "Old");
+  }
+  for (const bad of [
+    { ...questions[1], type: "unsupported" },
+    { ...questions[1], id: "" },
+    { ...questions[1], id: "  " },
+    { ...questions[1], options: 42 },
+    null,
+  ]) {
+    const result = teacherReview([questions[0], bad], questions, { short: "Brief", long: { text: "Retained" } });
+    assert.equal(result.items[0].status, "Correct");
+    assert.equal(result.items[1].status, "Needs manual review");
+    assert.deepEqual(result.items.at(-1)?.answer, { text: "Retained" });
+  }
+  for (const [snapshot, current] of [
+    [[questions[0], questions[0]], questions],
+    [questions, [...questions, questions[0]]],
+    [questions, questions.slice(1)],
+    [questions, questions.map((q) => q.id === "short" ? { ...q, label: "Edited" } : q)],
+    [questions, questions.map((q) => q.id === "short" ? { ...q, type: "paragraph" } : q)],
+    [questions, questions.map((q) => q.id === "choice" ? { ...q, options: ["New"] } : q)],
+  ] as [unknown, unknown][]) {
+    const result = teacherReview(snapshot, current, { short: "Brief", choice: "Alpha" });
+    const changedId = Array.isArray(current) && current.some((q) => q.id === "choice" && q.options[0] === "New") ? "choice" : "short";
+    assert.equal(result.items.find((i) => i.id === changedId)?.status, "Needs manual review");
+  }
+  assert.equal(teacherReview(questions, questions, { short: "Brief" }, { ...reviewKeys, short: "Changed key" }).items[0].status, "Incorrect / needs correction");
+});
+
+test("teacher eligibility distinguishes absent answers from invalid keys and corrupted answers", () => {
+  for (const value of [undefined, null, "", "  ", [], [" "]]) {
+    const result = teacherReview(questions, questions, { short: value });
+    assert.equal(result.items[0].status, "No response");
+    assert.equal(result.items[0].eligible, true);
+  }
+  for (const value of [42, true, {}, ["Brief", "Extra"], [null]]) {
+    const item = teacherReview(questions, questions, { short: value }).items[0];
+    assert.equal(item.status, "Needs manual review");
+    assert.equal(item.eligible, false);
+    assert.deepEqual(item.answer, value);
+  }
+  for (const key of [undefined, null, "", " ", [], ["Brief", "Extra"], 42, {}]) {
+    const item = teacherReview(questions, questions, { short: "Brief" }, { short: key }).items[0];
+    assert.equal(item.status, "Needs manual review");
+    assert.equal(item.expected, null);
+  }
+  for (const answers of [[], "bad", 42]) {
+    assert.ok(teacherReview(questions, questions, answers).items.every((i) => i.status === "Needs manual review"));
+    assert.equal(teacherReview(null, null, answers).items.length, 1);
+  }
+  for (const value of [["One", "one"], ["One", "Removed"], ["", "One"], ["", ""]]) {
+    assert.equal(teacherReview(questions, questions, { checks: value }).items[3].status, "Needs manual review");
+    assert.equal(teacherReview(questions, questions, { checks: ["One"] }, { checks: value }).items[3].status, "Needs manual review");
+  }
+  assert.equal(teacherReview(questions, questions, { checks: "One", short: ["Brief"] }, { checks: ["One"], short: ["Brief"] }).items[3].status, "Correct");
+  assert.equal(teacherReview(questions, questions, { short: ["Brief"] }, { short: ["Brief"] }).items[0].status, "Correct");
+  assert.equal(teacherReview(questions, questions, { choice: "Removed" }).items[2].status, "Needs manual review");
+  assert.equal(teacherReview(questions, questions, { choice: "Alpha" }, { choice: "Removed" }).items[2].status, "Needs manual review");
+  for (const options of [["Alpha", " alpha "], ["Alpha", "Alpha"], ["Alpha", ""]]) {
+    const ambiguous = [{ ...questions[2], options }];
+    assert.equal(teacherReview(ambiguous, ambiguous, { choice: "Alpha" }).items[0].status, "Needs manual review");
+  }
+});
+
+test("teacher lifecycle and rendering use the retained or replacement submission without mutating it", () => {
+  for (const status of ["submitted", "late", "graded", "returned"]) {
+    const submission = { status, questionSnapshot: questions, formAnswers: { short: "Brief", choice: "Beta", long: "Essay" }, grade: 75, returnNote: "Old", feedback: "Old" };
+    const original = structuredClone(submission);
+    const markup = renderToStaticMarkup(React.createElement(TeacherAssessmentReview, { submission, currentQuestions: questions, answerKey: reviewKeys }));
+    assert.match(markup, /Compared with current answer key/);
+    assert.match(markup, /Incorrect \/ needs correction/);
+    assert.match(markup, /Expected answer \(current key\)/);
+    assert.match(markup, /Needs manual review/);
+    assert.match(markup, /aria-hidden="true"/);
+    assert.match(markup, /not the final grade/);
+    assert.deepEqual(submission, original);
+    const replaced = teacherReview(questions, questions, { choice: "Alpha" }, reviewKeys, status);
+    assert.equal(replaced.items[0].status, "No response");
+    assert.equal(replaced.items[2].status, "Correct");
+  }
+  for (const status of ["pending", "not-submitted"]) {
+    const result = teacherReview(questions, questions, { choice: "Beta" }, reviewKeys, status);
+    assert.equal(result.accuracy, null);
+    assert.ok(result.items.every((i) => i.status === "Not submitted"));
+    const markup = renderToStaticMarkup(React.createElement(TeacherAssessmentReview, {
+      submission: { status, questionSnapshot: questions, formAnswers: { choice: "Beta" } }, currentQuestions: questions, answerKey: reviewKeys,
+    }));
+    assert.match(markup, /Not submitted/);
+    assert.doesNotMatch(markup, /Accuracy:|Compared with|Expected answer/);
+  }
+  const noKey = renderToStaticMarkup(React.createElement(TeacherAssessmentReview, {
+    submission: { status: "graded", questionSnapshot: questions, formAnswers: { short: "Brief" } }, currentQuestions: questions, answerKey: null,
+  }));
+  assert.match(noKey, /No automatically checkable questions/);
+  assert.doesNotMatch(noKey, /Accuracy:/);
+  const family = renderToStaticMarkup(React.createElement(AssessmentReview, {
+    submission: { status: "graded", questionSnapshot: questions, formAnswers: { choice: "Beta" } }, currentQuestions: questions,
+  }));
+  assert.doesNotMatch(family, /current answer key|Expected answer|Incorrect|Accuracy|Needs manual review/);
 });
 
 test("legacy, missing, and malformed response shapes never shift answers to another question", () => {
