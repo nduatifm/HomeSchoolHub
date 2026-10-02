@@ -162,7 +162,7 @@ export default function SemesterReportDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-lg w-[calc(100vw-2rem)] rounded-2xl">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">{stepTitle}</DialogTitle>
         </DialogHeader>
@@ -173,9 +173,9 @@ export default function SemesterReportDialog({
         {step === 0 && (
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-sm">Student</Label>
+              <Label htmlFor="report-student" className="text-sm">Student</Label>
               <Select value={studentId} onValueChange={setStudentId}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger id="report-student" className="h-11">
                   <SelectValue placeholder="Select a student…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -189,7 +189,7 @@ export default function SemesterReportDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-sm">
+              <Label htmlFor="report-period" className="text-sm">
                 Period label
                 <span className="ml-1 text-xs text-muted-foreground font-normal">(optional)</span>
               </Label>
@@ -197,7 +197,8 @@ export default function SemesterReportDialog({
                 placeholder="e.g. Fall 2025, Spring Semester…"
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
-                className="h-10"
+                id="report-period"
+                className="h-11 w-full"
               />
               <p className="text-[11px] text-muted-foreground">
                 If left blank, the date range will be used as the period label.
@@ -222,21 +223,23 @@ export default function SemesterReportDialog({
             {/* Stack on mobile, side-by-side on sm+ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-sm">From</Label>
+                <Label htmlFor="report-from" className="text-sm">From</Label>
                 <Input
+                  id="report-from"
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-10 w-full"
+                  className="h-11 w-full"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-sm">To</Label>
+                <Label htmlFor="report-to" className="text-sm">To</Label>
                 <Input
+                  id="report-to"
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="h-10 w-full"
+                  className="h-11 w-full"
                 />
               </div>
             </div>
@@ -377,13 +380,14 @@ export default function SemesterReportDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-sm">Teacher Comments <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Label htmlFor="report-comments" className="text-sm">Teacher Comments <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Textarea
+                id="report-comments"
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 placeholder="Add overall notes, highlights, or recommendations for the student and family…"
-                rows={5}
-                className="resize-none text-sm"
+                rows={7}
+                className="min-h-40 resize-y text-sm"
               />
             </div>
 

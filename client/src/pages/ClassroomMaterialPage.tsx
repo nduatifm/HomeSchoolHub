@@ -15,6 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -1015,23 +1016,22 @@ function TeacherEditor({
       </div>
 
       {/* ── Link insertion dialog ── */}
-      {showLinkDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setShowLinkDialog(false)}>
-          <div className="bg-background rounded-2xl border border-border shadow-xl p-5 w-full max-w-sm mx-4"
-            onClick={(e) => e.stopPropagation()}>
-            <p className="text-sm font-semibold mb-3 text-foreground">Insert link</p>
-            <Input type="url" placeholder="https://…" value={linkDialogUrl}
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
+          <DialogHeader><DialogTitle>Insert link</DialogTitle></DialogHeader>
+            <div className="space-y-2 mb-5">
+              <label htmlFor="insert-link-url" className="text-sm font-medium text-foreground">URL</label>
+              <Input id="insert-link-url" type="url" placeholder="https://…" value={linkDialogUrl}
               onChange={(e) => setLinkDialogUrl(e.target.value)}
-              className="h-9 font-mono text-sm mb-3" autoFocus
+              className="h-11 w-full font-mono text-sm" autoFocus
               onKeyDown={(e) => { if (e.key === "Enter") applyLink(); if (e.key === "Escape") setShowLinkDialog(false); }} />
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setShowLinkDialog(false)}>Cancel</Button>
-              <Button size="sm" onClick={applyLink}>Apply</Button>
             </div>
-          </div>
-        </div>
-      )}
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+              <Button variant="outline" className="h-10" onClick={() => setShowLinkDialog(false)}>Cancel</Button>
+              <Button className="h-10" onClick={applyLink}>Apply</Button>
+            </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

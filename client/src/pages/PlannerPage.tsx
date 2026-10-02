@@ -594,21 +594,25 @@ function AddTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Task</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 py-1">
+        <div className="space-y-4 py-1">
           {/* Title */}
-          <Input
-            placeholder="What needs to be done?"
-            className="text-sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && canSubmit && createMutation.mutate()}
-            autoFocus
-          />
+          <div className="space-y-1.5">
+            <label htmlFor="add-task-title" className="text-sm font-medium">Task</label>
+            <Input
+              id="add-task-title"
+              placeholder="What needs to be done?"
+              className="h-11 text-base"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && canSubmit && createMutation.mutate()}
+              autoFocus
+            />
+          </div>
 
           {/* For — child chips (parent with multiple children only) */}
           {!isStudent && children.length > 1 && (
@@ -637,11 +641,11 @@ function AddTaskDialog({
           )}
 
           {/* Category + Repeat */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <p className="text-xs text-gray-400 mb-1">Category</p>
+              <label htmlFor="add-task-category" className="text-sm font-medium block mb-1.5">Category</label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="add-task-category" className="h-10 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {((isStudent || isTeacher) ? ["school", "reading"] : ["chore", "school", "reading", "activity"]).map((c) => (
                     <SelectItem key={c} value={c}>{CATEGORY_META[c].label}</SelectItem>
@@ -650,9 +654,9 @@ function AddTaskDialog({
               </Select>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">Repeat</p>
+              <label htmlFor="add-task-repeat" className="text-sm font-medium block mb-1.5">Repeat</label>
               <Select value={repeat} onValueChange={setRepeat}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="add-task-repeat" className="h-10 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="once">Once</SelectItem>
                   <SelectItem value="daily">Every day</SelectItem>
@@ -664,23 +668,23 @@ function AddTaskDialog({
           </div>
 
           {/* Start date + End date */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <p className="text-xs text-gray-400 mb-1">Start date</p>
-              <Input type="date" className="h-9 text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <label htmlFor="add-task-start-date" className="text-sm font-medium block mb-1.5">Start date</label>
+              <Input id="add-task-start-date" type="date" className="h-10 text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">End date <span className="text-gray-300">(optional)</span></p>
-              <Input type="date" className="h-9 text-sm" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+              <label htmlFor="add-task-end-date" className="text-sm font-medium block mb-1.5">End date <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Input id="add-task-end-date" type="date" className="h-10 text-sm" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
           </div>
 
           {/* Reward — parent only */}
           {!isStudent && (
             <div>
-              <p className="text-xs text-gray-400 mb-1">Reward</p>
+              <label htmlFor="add-task-reward" className="text-sm font-medium block mb-1.5">Reward</label>
               <Select value={reward} onValueChange={setReward}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="add-task-reward" className="h-10 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No reward</SelectItem>
                   <SelectItem value="1star">⭐ 1 Star</SelectItem>
@@ -692,13 +696,17 @@ function AddTaskDialog({
           )}
 
           {/* Note */}
-          <Textarea
-            className="text-sm resize-none"
-            placeholder="Add a note… (optional)"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
+          <div className="space-y-1.5">
+            <label htmlFor="add-task-note" className="text-sm font-medium">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <Textarea
+              id="add-task-note"
+              className="text-sm resize-y min-h-20"
+              placeholder="Add a note… (optional)"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
         </div>
 
         <DialogFooter className="mt-1">
@@ -787,26 +795,30 @@ function EditTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Task</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 py-1">
-          <Input
-            placeholder="What needs to be done?"
-            className="text-sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && canSubmit && updateMutation.mutate()}
-            autoFocus
-          />
+        <div className="space-y-4 py-1">
+          <div className="space-y-1.5">
+            <label htmlFor="edit-task-title" className="text-sm font-medium">Task</label>
+            <Input
+              id="edit-task-title"
+              placeholder="What needs to be done?"
+              className="h-11 text-base"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && canSubmit && updateMutation.mutate()}
+              autoFocus
+            />
+          </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <p className="text-xs text-gray-400 mb-1">Category</p>
+              <label htmlFor="edit-task-category" className="text-sm font-medium block mb-1.5">Category</label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="edit-task-category" className="h-10 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(isTeacher ? ["school", "reading"] : ["chore", "school", "reading", "activity"]).map((c) => (
                     <SelectItem key={c} value={c}>{CATEGORY_META[c as keyof typeof CATEGORY_META].label}</SelectItem>
@@ -815,9 +827,9 @@ function EditTaskDialog({
               </Select>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">Repeat</p>
+              <label htmlFor="edit-task-repeat" className="text-sm font-medium block mb-1.5">Repeat</label>
               <Select value={repeat} onValueChange={setRepeat}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="edit-task-repeat" className="h-10 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="once">Once</SelectItem>
                   <SelectItem value="daily">Every day</SelectItem>
@@ -828,23 +840,23 @@ function EditTaskDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <p className="text-xs text-gray-400 mb-1">Start date</p>
-              <Input type="date" className="h-9 text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <label htmlFor="edit-task-start-date" className="text-sm font-medium block mb-1.5">Start date</label>
+              <Input id="edit-task-start-date" type="date" className="h-10 text-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1">End date <span className="text-gray-300">(optional)</span></p>
-              <Input type="date" className="h-9 text-sm" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+              <label htmlFor="edit-task-end-date" className="text-sm font-medium block mb-1.5">End date <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Input id="edit-task-end-date" type="date" className="h-10 text-sm" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
           </div>
 
           {/* Child selector — only shown when parent has more than one child */}
           {parentChildren.length > 1 && (
             <div>
-              <p className="text-xs text-gray-400 mb-1">Assigned to</p>
+              <label htmlFor="edit-task-assigned-student" className="text-sm font-medium block mb-1.5">Assigned to</label>
               <Select value={assignedStudentId} onValueChange={setAssignedStudentId}>
-                <SelectTrigger className="h-9 text-sm">
+                <SelectTrigger id="edit-task-assigned-student" className="h-10 text-sm">
                   <span className="text-sm">
                     {parentChildren.find((c) => String(c.id) === assignedStudentId)?.name ?? "Select child"}
                   </span>
@@ -859,9 +871,9 @@ function EditTaskDialog({
           )}
 
           <div>
-            <p className="text-xs text-gray-400 mb-1">Reward</p>
+            <label htmlFor="edit-task-reward" className="text-sm font-medium block mb-1.5">Reward</label>
             <Select value={reward} onValueChange={setReward}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="edit-task-reward" className="h-10 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No reward</SelectItem>
                 <SelectItem value="1star">⭐ 1 Star</SelectItem>
@@ -871,13 +883,17 @@ function EditTaskDialog({
             </Select>
           </div>
 
-          <Textarea
-            className="text-sm resize-none"
-            placeholder="Add a note… (optional)"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
+          <div className="space-y-1.5">
+            <label htmlFor="edit-task-note" className="text-sm font-medium">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <Textarea
+              id="edit-task-note"
+              className="text-sm resize-y min-h-20"
+              placeholder="Add a note… (optional)"
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
         </div>
 
         <DialogFooter className="mt-1">

@@ -177,7 +177,7 @@ export default function MessageThread({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+    el.style.height = Math.min(el.scrollHeight, Math.max(96, Math.min(window.visualViewport?.height ?? window.innerHeight, 480) * 0.4)) + "px";
   };
 
   const sendMutation = useMutation({
@@ -518,6 +518,7 @@ export default function MessageThread({
           <textarea
             ref={textareaRef}
             {...ENGLISH_PROSE_ATTRIBUTES}
+            aria-label="Write a message"
             placeholder="Message…"
             value={text}
             rows={1}
@@ -526,12 +527,12 @@ export default function MessageThread({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
             }}
-            className="flex-1 resize-none outline-none leading-6 overflow-y-auto rounded-xl border transition-colors duration-150"
+            className="min-w-0 flex-1 resize-none outline-none leading-6 overflow-y-auto rounded-xl border transition-colors duration-150"
             style={{
-              fontSize: 13.5,
-              minHeight: 38,
-              maxHeight: 120,
-              padding: "7px 12px",
+              fontSize: 16,
+              minHeight: 48,
+              maxHeight: "min(40dvh, 12rem)",
+              padding: "10px 14px",
               color: RECV_TEXT,
               fontFamily: "inherit",
               background: RECV_BG,

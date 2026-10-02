@@ -1,7 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import type { FormQuestion } from "@shared/schema";
@@ -110,23 +109,30 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
   function renderQuestion(q: FormQuestion, i: number) {
     const hasKey = !!(answerKey && answerKey[q.id] !== undefined);
     const result = hasKey ? checkCorrect(q, answers[q.id], answerKey![q.id]) : null;
+    const labelId = `question-${q.id}`;
+    const errorId = `question-error-${q.id}`;
+    const hasError = !!stepError && questions[step]?.id === q.id;
 
     return (
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-foreground">
+      <div className="space-y-2.5 max-w-3xl">
+        <p id={labelId} className="text-base font-medium text-foreground leading-relaxed break-words">
           {i + 1}. {q.label}
-          {q.required && <span className="text-red-500 ml-0.5">*</span>}
+          {q.required && <span aria-label="required" className="text-red-500 ml-0.5">*</span>}
           {renderCorrectnessBadge(q)}
-        </Label>
+        </p>
 
         {q.type === "short" && (
           <div>
             <Input
+              aria-labelledby={labelId}
+              aria-required={q.required}
+              aria-invalid={hasError || undefined}
+              aria-describedby={hasError ? errorId : undefined}
               value={(answers[q.id] as string) ?? ""}
               onChange={(e) => setAnswer(q.id, e.target.value)}
               placeholder="Your answer…"
               disabled={disabled}
-              className={`text-sm ${disabled && hasKey ? (result === true ? "border-green-300 bg-green-50/40" : result === false ? "border-red-300 bg-red-50/40" : "") : ""}`}
+              className={`${disabled && hasKey ? (result === true ? "border-green-300 bg-green-50/40" : result === false ? "border-red-300 bg-red-50/40" : "") : ""}`}
             />
             {renderCorrectAnswerHint(q)}
           </div>
@@ -135,24 +141,28 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
         {q.type === "paragraph" && (
           <div>
             <Textarea
+              aria-labelledby={labelId}
+              aria-required={q.required}
+              aria-invalid={hasError || undefined}
+              aria-describedby={hasError ? errorId : undefined}
               value={(answers[q.id] as string) ?? ""}
               onChange={(e) => setAnswer(q.id, e.target.value)}
               placeholder="Your answer…"
               rows={4}
               disabled={disabled}
-              className="text-sm resize-none"
+              fieldSize="writing"
             />
           </div>
         )}
 
         {q.type === "multiple_choice" && (
-          <div className="space-y-2">
+          <div role="radiogroup" aria-labelledby={labelId} aria-required={q.required} aria-describedby={hasError ? errorId : undefined} className="space-y-1.5">
             {(q.options ?? []).map((opt) => {
               const isSelected = (answers[q.id] as string) === opt;
               const isKeyCorrect = disabled && hasKey && answerKey![q.id] === opt;
               const isKeyWrong = disabled && hasKey && isSelected && answerKey![q.id] !== opt;
               return (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+                <label key={opt} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 cursor-pointer group hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring">
                   <input
                     type="radio"
                     name={`q-${q.id}`}
@@ -160,9 +170,9 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
                     checked={isSelected}
                     onChange={() => setAnswer(q.id, opt)}
                     disabled={disabled}
-                    className="accent-primary"
+                    className="accent-primary h-4 w-4 shrink-0"
                   />
-                  <span className={`text-sm transition-colors ${
+                  <span className={`text-base leading-relaxed break-words transition-colors ${
                     isKeyCorrect
                       ? "text-green-700 font-medium"
                       : isKeyWrong
@@ -180,7 +190,7 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
         )}
 
         {q.type === "checkbox" && (
-          <div className="space-y-2">
+          <div role="group" aria-labelledby={labelId} aria-describedby={hasError ? errorId : undefined} className="space-y-1.5">
             {(q.options ?? []).map((opt) => {
               const checked = ((answers[q.id] as string[]) ?? []).includes(opt);
               const keyArr = hasKey
@@ -189,15 +199,15 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
               const isKeyCorrect = disabled && hasKey && keyArr.includes(opt);
               const isKeyWrong = disabled && hasKey && checked && !isKeyCorrect;
               return (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+                <label key={opt} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 cursor-pointer group hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring">
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => !disabled && toggleCheckbox(q.id, opt)}
                     disabled={disabled}
-                    className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                    className="accent-primary h-4 w-4 shrink-0 cursor-pointer"
                   />
-                  <span className={`text-sm transition-colors ${
+                  <span className={`text-base leading-relaxed break-words transition-colors ${
                     isKeyCorrect
                       ? "text-green-700 font-medium"
                       : isKeyWrong
@@ -216,18 +226,15 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
 
         {q.type === "true_false" && (
           <div className="space-y-1">
-          <div className="flex gap-3">
+          <div role="radiogroup" aria-labelledby={labelId} aria-required={q.required} aria-describedby={hasError ? errorId : undefined} className="flex gap-3">
             {["True", "False"].map((opt) => {
               const selected = (answers[q.id] as string) === opt;
               const isKeyCorrect = disabled && hasKey && answerKey![q.id] === opt;
               const isKeyWrong = disabled && hasKey && selected && answerKey![q.id] !== opt;
               return (
-                <button
+                <label
                   key={opt}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => !disabled && setAnswer(q.id, opt)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                  className={`flex-1 flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-base font-medium transition-all focus-within:ring-2 focus-within:ring-ring ${
                     isKeyCorrect && selected
                       ? "border-green-400 bg-green-50 text-green-700"
                       : isKeyWrong
@@ -237,8 +244,10 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
                           : selected
                             ? "border-primary bg-primary/10 text-primary"
                             : "border-border bg-muted/20 text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                  } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
                 >
+                  <input type="radio" name={`q-${q.id}`} value={opt} checked={selected}
+                    onChange={() => setAnswer(q.id, opt)} disabled={disabled} className="sr-only" />
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                     selected ? "border-primary" : "border-border"
                   }`}>
@@ -246,7 +255,7 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
                   </div>
                   {opt}
                   {isKeyCorrect && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
-                </button>
+                </label>
               );
             })}
           </div>
@@ -287,7 +296,7 @@ export default function FormResponse({ questions, answers, onChange, disabled, s
         </div>
 
         {stepError && (
-          <p className="text-xs text-red-500">{stepError}</p>
+          <p id={`question-error-${current.id}`} role="alert" className="text-sm text-red-600">{stepError}</p>
         )}
 
         <div className="flex items-center justify-between pt-1">

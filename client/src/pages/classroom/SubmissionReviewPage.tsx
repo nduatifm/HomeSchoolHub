@@ -228,7 +228,7 @@ export default function SubmissionReviewPage() {
           )}
 
           {/* Grading section */}
-          <div className="bg-white rounded-2xl border border-border shadow-sm p-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-border shadow-sm p-4 sm:p-6 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-sm font-semibold text-foreground">
                 {submission.status === "graded" ? "Update Grade" : "Grade Submission"}
@@ -248,8 +248,8 @@ export default function SubmissionReviewPage() {
               </div>
             )}
 
-            <div className="flex gap-4 items-start">
-              <div className="w-36 shrink-0 space-y-1.5">
+            <div className="flex flex-col sm:flex-row gap-4 items-start">
+              <div className="w-full sm:w-36 sm:shrink-0 space-y-1.5">
                 <Label htmlFor="grade" className="text-sm font-medium">
                   Score <span className="text-gray-400 font-normal">(0–{assignment.points})</span>
                 </Label>
@@ -261,7 +261,7 @@ export default function SubmissionReviewPage() {
                   placeholder={`0–${assignment.points}`}
                   value={gradeVal}
                   onChange={(e) => setGradeVal(e.target.value)}
-                  className="text-sm"
+                  className="w-full text-sm"
                 />
               </div>
               <div className="flex-1 space-y-1.5">
@@ -273,8 +273,8 @@ export default function SubmissionReviewPage() {
                   placeholder="Leave feedback for the student…"
                   value={feedbackVal}
                   onChange={(e) => setFeedbackVal(e.target.value)}
-                  rows={4}
-                  className="text-sm resize-none"
+                  rows={6}
+                  className="min-h-36 text-sm resize-y"
                 />
               </div>
             </div>
@@ -312,8 +312,8 @@ export default function SubmissionReviewPage() {
                     placeholder="Explain what needs to be revised or improved…"
                     value={returnNote}
                     onChange={(e) => setReturnNote(e.target.value)}
-                    rows={3}
-                    className="text-sm resize-none border-amber-200 focus-visible:ring-amber-400"
+                    rows={4}
+                    className="min-h-28 text-sm resize-y border-amber-200 focus-visible:ring-amber-400"
                   />
                 </div>
                 <div className="flex justify-end">

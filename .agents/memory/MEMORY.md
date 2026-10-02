@@ -2,3 +2,4 @@
 - [Server-side impersonation design](session-auth-design.md) — impersonation uses AuthSession.impersonatingUserId; no tokens in localStorage or Authorization headers.
 - [Custom grading compatibility](custom-grading-compatibility.md) — category IDs are authoritative; keep legacy assignment types and four-weight projections synchronized.
 - [Assessment review trust boundaries](assessment-review-trust.md) — historical prompts need submission-time snapshots; never release answer keys or provisional scores through shared routes.
+- [Input sizing principle](input-sizing-principle.md) — favor purpose-based, adaptive fields over uniformly enlarging every control.

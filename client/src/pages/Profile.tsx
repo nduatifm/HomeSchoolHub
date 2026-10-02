@@ -64,27 +64,29 @@ function Row({
           </p>
           {isEditing ? (
             <div className="space-y-3">
-              <div className="flex flex-wrap gap-2 items-start">
-                {editContent}
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={onSave}
-                  disabled={isPending}
-                  className="h-10 px-5 bg-gray-900 hover:bg-gray-700 text-white"
-                >
-                  {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={onCancel}
-                  disabled={isPending}
-                  className="h-10 text-gray-700 hover:bg-gray-100"
-                >
-                  Cancel
-                </Button>
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-start">
+                <div className="min-w-0 flex-1">{editContent}</div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={onSave}
+                    disabled={isPending}
+                    className="h-10 px-5 bg-gray-900 hover:bg-gray-700 text-white"
+                  >
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onCancel}
+                    disabled={isPending}
+                    className="h-10 text-gray-700 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
@@ -100,7 +102,7 @@ function Row({
           <button
             type="button"
             onClick={onEdit}
-            className="rounded-full px-5 h-9 text-sm font-medium text-gray-700 border border-gray-300 bg-white hover:bg-gray-100 hover:border-gray-400 transition-colors flex-shrink-0"
+            className="rounded-full px-5 h-10 text-sm font-medium text-gray-700 border border-gray-300 bg-white hover:bg-gray-100 hover:border-gray-400 transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Edit
           </button>
@@ -429,7 +431,7 @@ export default function Profile() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your full name"
                   data-testid="input-name"
-                  className="h-10 max-w-xs border-gray-300"
+                  className="h-10 w-full max-w-md border-gray-300"
                   autoFocus
                 />
               }
@@ -521,7 +523,7 @@ export default function Profile() {
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     placeholder="Tell us about yourself..."
-                    className="min-h-[90px] resize-none border-gray-300"
+                    className="min-h-36 resize-y border-gray-300"
                     maxLength={500}
                   />
                   <p className="text-xs text-gray-400">{bio.length}/500</p>
@@ -561,7 +563,7 @@ export default function Profile() {
                           onChange={(e) => setSubjectInput(e.target.value)}
                           onKeyPress={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubject(); } }}
                           placeholder="e.g. Mathematics"
-                          className="h-10 border-gray-300 max-w-xs"
+                          className="h-10 min-w-0 flex-1 border-gray-300"
                         />
                         <Button type="button" variant="outline" onClick={addSubject} data-testid="button-add-subject" className="h-10">
                           Add
@@ -614,7 +616,7 @@ export default function Profile() {
                       value={qualifications}
                       onChange={(e) => setQualifications(e.target.value)}
                       placeholder="e.g. Bachelor's in Education"
-                      className="h-10 max-w-xs border-gray-300"
+                      className="h-10 w-full max-w-md border-gray-300"
                       autoFocus
                     />
                   }
@@ -634,7 +636,7 @@ export default function Profile() {
                       value={specialization}
                       onChange={(e) => setSpecialization(e.target.value)}
                       placeholder="e.g. STEM Education"
-                      className="h-10 max-w-xs border-gray-300"
+                      className="h-10 w-full max-w-md border-gray-300"
                       autoFocus
                     />
                   }
@@ -660,7 +662,7 @@ export default function Profile() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="+1 234 567 8900"
-                      className="h-10 max-w-xs border-gray-300"
+                      className="h-10 w-full max-w-md border-gray-300"
                       autoFocus
                     />
                   }
@@ -680,7 +682,7 @@ export default function Profile() {
                       value={preferredContact}
                       onChange={(e) => setPreferredContact(e.target.value)}
                       placeholder="e.g. Email, Phone, App Messaging"
-                      className="h-10 max-w-xs border-gray-300"
+                      className="h-10 w-full max-w-md border-gray-300"
                       autoFocus
                     />
                   }
@@ -720,7 +722,7 @@ export default function Profile() {
                           onChange={(e) => setInterestInput(e.target.value)}
                           onKeyPress={(e) => { if (e.key === "Enter") { e.preventDefault(); addInterest(); } }}
                           placeholder="e.g. Reading"
-                          className="h-10 border-gray-300 max-w-xs"
+                          className="h-10 min-w-0 flex-1 border-gray-300"
                         />
                         <Button type="button" variant="outline" onClick={addInterest} data-testid="button-add-interest" className="h-10">
                           Add
@@ -745,7 +747,7 @@ export default function Profile() {
                       value={favoriteSubject}
                       onChange={(e) => setFavoriteSubject(e.target.value)}
                       placeholder="e.g. Science"
-                      className="h-10 max-w-xs border-gray-300"
+                      className="h-10 w-full max-w-md border-gray-300"
                       autoFocus
                     />
                   }
@@ -769,7 +771,7 @@ export default function Profile() {
                       value={learningGoals}
                       onChange={(e) => setLearningGoals(e.target.value)}
                       placeholder="What do you want to achieve?"
-                      className="min-h-[90px] resize-none border-gray-300 w-full max-w-sm"
+                      className="min-h-36 resize-y border-gray-300 w-full max-w-xl"
                     />
                   }
                 />

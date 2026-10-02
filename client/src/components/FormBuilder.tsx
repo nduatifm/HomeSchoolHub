@@ -201,10 +201,12 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
             <Key className="h-3 w-3" />Answer Key
           </p>
           <Input
+            aria-label={`Correct answer for ${q.label || "untitled question"}`}
+            density="compact"
             value={current}
             onChange={(e) => setAnswerKey(q.id, e.target.value)}
             placeholder="Exact answer…"
-            className="h-7 text-xs"
+            className="text-sm"
           />
           <p className="text-[10px] text-muted-foreground/60">Case-insensitive exact match</p>
         </div>
@@ -224,7 +226,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                 key={opt}
                 type="button"
                 onClick={() => setAnswerKey(q.id, current === opt ? null : opt)}
-                className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                 className={`flex-1 min-h-11 py-2 rounded-lg border text-sm font-medium transition-all ${
                   current === opt
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/40"
@@ -249,15 +251,15 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
           </p>
           <div className="space-y-1">
             {options.map((opt) => (
-              <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+              <label key={opt} className="flex min-h-10 items-center gap-2 rounded-md px-2 py-1 cursor-pointer group hover:bg-muted/50 focus-within:ring-2 focus-within:ring-ring">
                 <input
                   type="radio"
                   name={`ak-${q.id}`}
                   checked={current === opt}
                   onChange={() => setAnswerKey(q.id, current === opt ? null : opt)}
-                  className="accent-primary w-3 h-3"
+                   className="accent-primary w-4 h-4 shrink-0"
                 />
-                <span className="text-xs text-foreground truncate">{opt || <span className="text-muted-foreground/50 italic">Empty option</span>}</span>
+                 <span className="text-sm text-foreground break-words min-w-0">{opt || <span className="text-muted-foreground italic">Empty option</span>}</span>
               </label>
             ))}
           </div>
@@ -281,14 +283,14 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
           </p>
           <div className="space-y-1">
             {options.map((opt) => (
-              <label key={opt} className="flex items-center gap-2 cursor-pointer group">
+              <label key={opt} className="flex min-h-10 items-center gap-2 rounded-md px-2 py-1 cursor-pointer group hover:bg-muted/50 focus-within:ring-2 focus-within:ring-ring">
                 <input
                   type="checkbox"
                   checked={current.includes(opt)}
                   onChange={() => toggleCheckboxAnswer(q.id, opt)}
-                  className="accent-primary w-3 h-3"
+                   className="accent-primary w-4 h-4 shrink-0"
                 />
-                <span className="text-xs text-foreground truncate">{opt || <span className="text-muted-foreground/50 italic">Empty option</span>}</span>
+                 <span className="text-sm text-foreground break-words min-w-0">{opt || <span className="text-muted-foreground italic">Empty option</span>}</span>
               </label>
             ))}
           </div>
@@ -305,10 +307,10 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
   }
 
   return (
-    <div className="flex bg-card" style={fullPage ? { height: "100%" } : { height: "520px" }}>
+    <div className={`flex flex-col lg:flex-row bg-card ${fullPage ? "min-h-full lg:h-full" : "min-h-[520px]"}`}>
 
       {/* ── Left panel — question list ── */}
-      <div className="w-52 shrink-0 flex flex-col border-r border-border bg-muted/30">
+      <div className="w-full lg:w-52 max-h-48 lg:max-h-none shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-border bg-muted/30">
         <div className="px-3 py-3 border-b border-border">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
             Questions
@@ -330,7 +332,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                 key={q.id}
                 type="button"
                 onClick={() => setActiveId(q.id)}
-                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all duration-100 ${
+                  className={`w-full min-h-10 flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all duration-100 ${
                   isActive
                     ? "bg-background border border-border border-l-[3px] border-l-primary rounded-l-none"
                     : "hover:bg-background/70 border border-transparent"
@@ -389,10 +391,10 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
       </div>
 
       {/* ── Center panel — question editor ── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-[24rem] lg:min-h-0 overflow-visible lg:overflow-hidden">
         {activeQuestion ? (
           <>
-            <div className="flex-1 overflow-y-auto px-10 py-10">
+            <div className="flex-1 overflow-visible lg:overflow-y-auto px-4 sm:px-7 xl:px-10 py-6 sm:py-10">
               <div className="flex items-center gap-2 mb-5">
                 <span className="text-xs font-medium text-muted-foreground">
                   Question {activeIndex + 1}
@@ -414,6 +416,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
 
               <textarea
                 ref={promptRef}
+                aria-label={`Question ${activeIndex + 1} prompt`}
                 {...ENGLISH_PROSE_ATTRIBUTES}
                 value={activeQuestion.label}
                 onChange={(e) => {
@@ -423,8 +426,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                 placeholder="Write your question here…"
                 rows={1}
                 spellCheck
-                className="w-full text-xl font-semibold text-foreground placeholder:text-muted-foreground/30 bg-transparent border-none outline-none resize-none leading-snug mb-8 overflow-hidden"
-                style={{ minHeight: "2rem" }}
+                className="w-full min-h-16 max-h-[min(45dvh,26rem)] overflow-y-auto text-xl font-semibold text-foreground placeholder:text-muted-foreground bg-transparent border-b border-border focus-visible:ring-2 focus-visible:ring-ring outline-none resize-y leading-snug mb-8"
               />
 
               {activeQuestion.type === "short" && (
@@ -462,7 +464,8 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                       }`} />
                       <input
                         {...ENGLISH_PROSE_ATTRIBUTES}
-                        className="option-input flex-1 text-sm text-foreground bg-transparent border-none outline-none border-b border-border pb-1 placeholder:text-muted-foreground/40"
+                        aria-label={`Option ${oi + 1} for question ${activeIndex + 1}`}
+                        className="option-input flex-1 min-w-0 min-h-10 text-base text-foreground bg-transparent border-none outline-none focus-visible:ring-2 focus-visible:ring-ring border-b border-border px-2 py-2 placeholder:text-muted-foreground"
                         value={opt}
                         placeholder={`Option ${oi + 1}`}
                         spellCheck
@@ -475,7 +478,8 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                       <button
                         type="button"
                         onClick={() => removeOption(activeQuestion.id, oi)}
-                        className="opacity-0 group-hover/opt:opacity-100 transition-opacity h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                         aria-label={`Remove option ${oi + 1}`}
+                         className="opacity-100 sm:opacity-0 group-hover/opt:opacity-100 group-focus-within/opt:opacity-100 focus:opacity-100 transition-opacity h-10 w-10 rounded flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -492,7 +496,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
               )}
             </div>
 
-            <div className="border-t border-border px-10 py-3 flex items-center justify-between bg-muted/10">
+            <div className="border-t border-border px-4 sm:px-7 xl:px-10 py-3 flex items-center justify-between bg-muted/10">
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
                 <kbd className="px-1.5 py-0.5 rounded border border-border text-[10px] bg-background">Tab</kbd>
                 <span>next field</span>
@@ -521,7 +525,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
       </div>
 
       {/* ── Right panel — question settings ── */}
-      <div className="w-52 shrink-0 flex flex-col border-l border-border bg-muted/30">
+      <div className="w-full lg:w-52 max-h-[24rem] lg:max-h-none shrink-0 flex flex-col border-t lg:border-t-0 lg:border-l border-border bg-muted/30">
         <div className="px-3 py-3 border-b border-border">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
             Settings
@@ -561,7 +565,7 @@ export default function FormBuilder({ questions, onChange, answerKey = {}, onAns
                       key={t}
                       type="button"
                       onClick={() => changeType(activeQuestion.id, t)}
-                      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-left transition-all ${
+                       className={`flex min-h-10 items-center gap-2 px-2.5 py-2 rounded-lg text-sm font-medium text-left transition-all ${
                         isActive
                           ? `${m.pill} border border-current/20`
                           : "text-muted-foreground hover:bg-background hover:text-foreground border border-transparent"

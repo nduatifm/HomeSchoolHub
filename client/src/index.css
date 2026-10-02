@@ -109,6 +109,20 @@
 }
 
 @layer components {
+  .assessment-review-card {
+    container: assessment-review / inline-size;
+  }
+  @container assessment-review (min-width: 38rem) {
+    .assessment-review-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+    .assessment-review-response {
+      border-left: 1px solid hsl(var(--border));
+      padding-left: 1.25rem;
+    }
+  }
+
   /* Clean dialog styles */
   [data-radix-dialog-content] {
     @apply rounded-xl border shadow-lg;
@@ -140,6 +154,17 @@
   /* Select trigger */
   [data-radix-select-trigger] {
     @apply rounded-md border transition-colors;
+  }
+
+  /* Mobile Safari zooms text fields smaller than 16px. Keep specialized
+     large title editors large, but make ordinary locally styled fields usable. */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not(.text-lg):not(.text-xl):not(.text-2xl):not(.text-3xl),
+    textarea:not(.text-lg):not(.text-xl):not(.text-2xl):not(.text-3xl),
+    select,
+    [data-ui-select-trigger] {
+      font-size: 1rem;
+    }
   }
 
   /* Sidebar nav item */
