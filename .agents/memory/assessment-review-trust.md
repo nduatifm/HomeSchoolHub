@@ -20,3 +20,15 @@ Treat answer keys and provisional auto-scores as private until the teacher expli
 **Why:** Shared assignment responses and grade summaries can disclose correct answers or unreviewed results even if the review page itself hides them.
 
 **How to apply:** Audit every new classroom assignment or grade-reporting endpoint for both direct fields and derived values available to family roles.
+
+When cleaning text-backed choice keys, preserve a renamed selection only when the editor knows which unique option was changed. Do not infer renames from a schema-only server update or transfer a key between duplicate labels.
+
+**Why:** Text labels do not provide stable option identity. Guessing a replacement can silently mark a different answer as correct, especially when labels become duplicates under grading normalization.
+
+**How to apply:** Purge missing, blank, or ambiguous choices at current-assignment and teacher-draft write boundaries. Keep cleanup separate from saved submission answers, snapshots, and grades.
+
+Authorizing a classroom does not authorize arbitrary assignment IDs supplied alongside it. Validate parent-child association before fetching private form data or seeding a teacher draft.
+
+**Why:** Foreign keys guarantee that both records exist, not that an assignment belongs to the authorized classroom. Copying published keys into drafts can otherwise disclose another teacher's key through a partial request.
+
+**How to apply:** Scope assignment lookups to the authorized classroom, including draft initialization, and reject mismatches before reading or writing a draft. Cover the boundary with two-teacher/two-classroom tests.

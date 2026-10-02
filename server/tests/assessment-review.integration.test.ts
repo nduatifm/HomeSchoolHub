@@ -11,6 +11,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import AssessmentReview from "../../client/src/components/AssessmentReview";
 import TeacherAssessmentReview from "../../client/src/components/TeacherAssessmentReview";
 import { buildTeacherAssessmentReview } from "../../client/src/components/teacherAssessmentReviewModel";
+import { reconcileAnswerKey, editQuestionOption } from "../../shared/answerKey";
+import { storage } from "../storage";
 
 const runId = `review-${Date.now()}-${process.pid}`;
 const userIds: number[] = [];
@@ -83,6 +85,143 @@ const questions: FormQuestion[] = [
   { id: "checks", label: "Choose several", type: "checkbox", required: false, options: ["One", "Two"] },
   { id: "boolean", label: "True or false?", type: "true_false", required: false, options: [] },
 ];
+
+test("option deletion and renaming purge stale keys without changing other question keys", () => {
+  const original = { choice: "Alpha", checks: ["One", "Two"], short: "Brief", boolean: "True" };
+  const deleted = editQuestionOption(questions, original, "choice", 0);
+  assert.deepEqual(deleted.questions[2].options, ["Beta"]);
+  assert.deepEqual(deleted.answerKey, { checks: ["One", "Two"], short: "Brief", boolean: "True" });
+  assert.equal(editQuestionOption(questions, original, "choice", 1).answerKey.choice, "Alpha");
+  assert.deepEqual(editQuestionOption(questions, original, "checks", 0).answerKey.checks, ["Two"]);
+  assert.equal(editQuestionOption(questions, { checks: ["One"] }, "checks", 0).answerKey.checks, undefined);
+  for (const empty of ["", "   "]) {
+    assert.equal(editQuestionOption(questions, original, "choice", 0, empty).answerKey.choice, undefined);
+  }
+  assert.equal(editQuestionOption(questions, original, "choice", 0, "Gamma").answerKey.choice, "Gamma");
+  assert.deepEqual(editQuestionOption(questions, original, "checks", 0, "Three").answerKey.checks, ["Three", "Two"]);
+  for (const ambiguous of ["Beta", " beta "]) {
+    assert.equal(editQuestionOption(questions, original, "choice", 0, ambiguous).answerKey.choice, undefined);
+  }
+  const duplicate = questions.map((q) => q.id === "choice" ? { ...q, options: ["Alpha", "Alpha", "Beta"] } : q);
+  assert.equal(editQuestionOption(duplicate, original, "choice", 0).answerKey.choice, undefined);
+  assert.deepEqual(reconcileAnswerKey(questions, { choice: ["Alpha"], checks: "One", short: "", boolean: "True" }),
+    { choice: "Alpha", checks: ["One"], short: "", boolean: "True" });
+  for (const value of [null, "", " ", [], ["Alpha", "Beta"], ["Missing"]]) {
+    assert.equal(reconcileAnswerKey(questions, { choice: value }).choice, undefined);
+  }
+  assert.deepEqual(reconcileAnswerKey(questions, { checks: ["One", "Missing", "", "One", null], removed: "Old" }), { checks: ["One"] });
+  assert.deepEqual(reconcileAnswerKey(duplicate, original).choice, undefined);
+  assert.deepEqual(reconcileAnswerKey([], original), {});
+  assert.deepEqual(original, { choice: "Alpha", checks: ["One", "Two"], short: "Brief", boolean: "True" });
+});
+
+test("edit drafts cannot copy or expose another classroom's assignment answer key", async () => {
+  const owner = await actor("teacher");
+  const other = await actor("teacher");
+  const ownClass = await prisma.classroom.create({ data: { name: "Own classroom", subject: "Math", teacherId: owner.user.id } });
+  const foreignClass = await prisma.classroom.create({ data: { name: "Foreign classroom", subject: "Math", teacherId: other.user.id } });
+  const assignment = await prisma.classroomAssignment.create({ data: {
+    classroomId: foreignClass.id, title: "Foreign assignment", description: "", dueDate: "2099-01-01", points: 100,
+    formSchema: questions, answerKey: { choice: "Alpha" },
+  } });
+  const path = `/api/classrooms/${ownClass.id}/assignment-draft/${assignment.id}`;
+  for (const data of [{ title: "Partial draft" }, { formSchema: questions }, { answerKey: { choice: "Beta" } }]) {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "PUT", headers: { cookie: owner.cookie, "content-type": "application/json" }, body: JSON.stringify(data),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 404);
+    assert.deepEqual(body, { error: "Assignment not found" });
+  }
+  assert.equal((await get(path, owner.cookie)).status, 404);
+  assert.equal((await fetch(`${baseUrl}${path}`, { method: "DELETE", headers: { cookie: owner.cookie } })).status, 404);
+  await assert.rejects(storage.upsertAssignmentDraft(owner.user.id, ownClass.id, assignment.id, { title: "Direct partial" }), /Assignment not found/);
+  await assert.rejects(storage.upsertAssignmentDraft(owner.user.id, foreignClass.id, assignment.id, { title: "Wrong owner" }), /Assignment not found/);
+  assert.equal(await prisma.assignmentDraft.count({ where: { assignmentId: assignment.id } }), 0);
+  assert.deepEqual((await prisma.classroomAssignment.findUniqueOrThrow({ where: { id: assignment.id } })).answerKey, { choice: "Alpha" });
+});
+
+test("choice key removals persist through partial API updates, draft saves, and reopening without changing submissions", async () => {
+  const teacher = await actor("teacher");
+  const learner = await actor("student");
+  const student = await prisma.student.create({ data: { userId: learner.user.id, name: "Key learner", gradeLevel: "8", badges: [] } });
+  const classroom = await prisma.classroom.create({ data: { name: "Key cleanup", subject: "Math", teacherId: teacher.user.id } });
+  await prisma.classroomEnrollment.create({ data: { classroomId: classroom.id, studentId: student.id } });
+  const list = `/api/classrooms/${classroom.id}/assignments`;
+  const response = await fetch(`${baseUrl}${list}`, {
+    method: "POST", headers: { cookie: teacher.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ title: "Keys", description: "", dueDate: "2099-01-01", points: 100, formSchema: questions, answerKey: { choice: "", checks: ["One", "Missing"], short: "Brief" } }),
+  });
+  const assignment = await response.json();
+  assert.equal(response.status, 201, JSON.stringify(assignment));
+  assert.deepEqual(assignment.answerKey, { checks: ["One"], short: "Brief" });
+  const path = `${list}/${assignment.id}`;
+  const detail = `${list}/slug/${assignment.id}`;
+  const saved = await prisma.classroomSubmission.update({
+    where: { assignmentId_studentId: { assignmentId: assignment.id, studentId: student.id } },
+    data: { status: "graded", grade: 75, questionSnapshot: questions, formAnswers: { choice: "Alpha" } },
+  });
+  assert.equal((await patch(path, teacher.cookie, { answerKey: { choice: ["Alpha"], checks: ["One", "Two"], short: "Brief" } })).status, 200);
+  assert.equal((await patch(path, teacher.cookie, { title: "Renamed" })).status, 200);
+  assert.deepEqual((await get(detail, teacher.cookie)).body.answerKey, { choice: "Alpha", checks: ["One", "Two"], short: "Brief" });
+  const changed = questions.map((q) => q.id === "choice" ? { ...q, options: ["Beta"] } : q.id === "checks" ? { ...q, options: ["Two"] } : q);
+  const schemaOnly = await patch(path, teacher.cookie, { formSchema: changed });
+  assert.equal(schemaOnly.status, 200, JSON.stringify(schemaOnly.body));
+  assert.deepEqual((await get(detail, teacher.cookie)).body.answerKey, { checks: ["Two"], short: "Brief" });
+  const stale = await patch(path, teacher.cookie, { answerKey: { choice: "Alpha", checks: ["One"], short: "Brief" } });
+  assert.equal(stale.status, 200);
+  assert.deepEqual(stale.body.answerKey, { short: "Brief" });
+  assert.equal((await patch(path, teacher.cookie, { answerKey: null })).status, 200);
+  assert.deepEqual((await get(detail, teacher.cookie)).body.answerKey, {});
+  assert.equal((await patch(path, teacher.cookie, { answerKey: { choice: "Beta" } })).status, 200);
+  assert.equal((await patch(path, teacher.cookie, { answerKey: {} })).status, 200);
+  assert.deepEqual((await get(detail, teacher.cookie)).body.answerKey, {});
+  assert.equal((await patch(path, teacher.cookie, { answerKey: { choice: "Beta" } })).status, 200);
+  const draftPath = `/api/classrooms/${classroom.id}/assignment-draft/${assignment.id}`;
+  async function putDraft(data: unknown, target = draftPath) {
+    const res = await fetch(`${baseUrl}${target}`, { method: "PUT", headers: { cookie: teacher.cookie, "content-type": "application/json" }, body: JSON.stringify(data) });
+    const body = await res.json();
+    assert.equal(res.status, 200, JSON.stringify(body));
+    return body;
+  }
+  // A partial initial draft retains published choices and keys.
+  await putDraft({ title: "Draft title" });
+  assert.deepEqual((await get(draftPath, teacher.cookie)).body.answerKey, { choice: "Beta" });
+  await putDraft({ formSchema: changed, answerKey: { choice: "Alpha", checks: ["Two", "One"] } });
+  assert.deepEqual((await get(draftPath, teacher.cookie)).body.answerKey, { checks: ["Two"] });
+  await putDraft({ answerKey: null });
+  assert.deepEqual((await get(draftPath, teacher.cookie)).body.answerKey, {});
+  await putDraft({ answerKey: { choice: "Beta" } });
+  await putDraft({ formSchema: changed.filter((q) => q.id !== "choice") });
+  assert.deepEqual((await get(draftPath, teacher.cookie)).body.answerKey, {});
+  await putDraft({ formSchema: null });
+  const clearedDraft = (await get(draftPath, teacher.cookie)).body;
+  assert.equal(clearedDraft.formSchema, null);
+  assert.deepEqual(clearedDraft.answerKey, {});
+  assert.deepEqual(reconcileAnswerKey(clearedDraft.formSchema, clearedDraft.answerKey), {});
+  const newDraft = `/api/classrooms/${classroom.id}/assignment-draft`;
+  await putDraft({ formSchema: questions, answerKey: { choice: "", checks: ["One", "Missing"] } }, newDraft);
+  assert.deepEqual((await get(newDraft, teacher.cookie)).body.answerKey, { checks: ["One"] });
+  await putDraft({ formSchema: questions.map((q) => q.id === "checks" ? { ...q, options: ["Two"] } : q) }, newDraft);
+  assert.deepEqual((await get(newDraft, teacher.cookie)).body.answerKey, {});
+  assert.equal((await patch(path, teacher.cookie, { formSchema: null })).status, 200);
+  const clearedAssignment = (await get(detail, teacher.cookie)).body;
+  assert.equal(clearedAssignment.formSchema, null);
+  assert.deepEqual(clearedAssignment.answerKey, {});
+  assert.deepEqual(await prisma.classroomSubmission.findUniqueOrThrow({ where: { id: saved.id } }), saved);
+  assert.equal((await get(detail, learner.cookie)).body.answerKey, undefined);
+  const form = new FormData();
+  form.set("title", "Multipart keys");
+  form.set("description", "");
+  form.set("dueDate", "2099-01-01");
+  form.set("points", "100");
+  form.set("formSchema", JSON.stringify(questions));
+  form.set("answerKey", JSON.stringify({ choice: "Missing", checks: ["One", "Missing"] }));
+  const multipart = await fetch(`${baseUrl}${list}/with-file`, { method: "POST", headers: { cookie: teacher.cookie }, body: form });
+  const multipartAssignment = await multipart.json();
+  assert.equal(multipart.status, 201, JSON.stringify(multipartAssignment));
+  assert.deepEqual(multipartAssignment.answerKey, { checks: ["One"] });
+});
 
 test("review preserves prompt/answer pairing and blocks other roles and classrooms", async () => {
   const teacher = await actor("teacher");

@@ -28,6 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import { BookOpen, Check } from "lucide-react";
 import type { Classroom, ClassroomMaterial, ClassroomGradingCategory, FormQuestion, ItemType } from "@shared/schema";
 import { ENGLISH_PROSE_ATTRIBUTES } from "@/lib/proseInput";
+import { reconcileAnswerKey } from "@shared/answerKey";
 
 const typeLabel: Record<string, string> = {
   short: "Short answer",
@@ -183,10 +184,9 @@ export default function NewAssignmentPage() {
         setFormQuestions(d.formSchema);
         localStorage.setItem(getDraftKey(draftId.current), JSON.stringify(d.formSchema));
       }
-      if (d.answerKey && Object.keys(d.answerKey).length) {
-        setAnswerKey(d.answerKey);
-        localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(d.answerKey));
-      }
+      const restoredKey = reconcileAnswerKey(d.formSchema, d.answerKey);
+      setAnswerKey(restoredKey);
+      localStorage.setItem(getAnswerKeyDraftKey(draftId.current), JSON.stringify(restoredKey));
       setDraftRestored(true);
       setTimeout(autoGrowTitle, 0);
     };
@@ -249,7 +249,7 @@ export default function NewAssignmentPage() {
           categoryId,
           linkUrl: linkUrl || null,
           formSchema: formQuestions.length > 0 ? formQuestions : null,
-          answerKey: Object.keys(answerKey).length > 0 ? answerKey : null,
+          answerKey: reconcileAnswerKey(formQuestions, answerKey),
           linkedMaterialIds: selectedMaterialIds,
         }),
       }).catch(() => {});
@@ -265,15 +265,12 @@ export default function NewAssignmentPage() {
   // Listen for storage events from the FormBuilderPage tab
   useEffect(() => {
     function handleStorage(e: StorageEvent) {
-      if (e.key === getDraftKey(draftId.current)) {
+      if (e.key === getDraftKey(draftId.current) || e.key === getAnswerKeyDraftKey(draftId.current)) {
         try {
-          const updated = JSON.parse(e.newValue ?? "[]") as FormQuestion[];
+          const updated = JSON.parse(localStorage.getItem(getDraftKey(draftId.current)) ?? "[]") as FormQuestion[];
+          const key = JSON.parse(localStorage.getItem(getAnswerKeyDraftKey(draftId.current)) ?? "{}");
           setFormQuestions(updated);
-        } catch { }
-      } else if (e.key === getAnswerKeyDraftKey(draftId.current)) {
-        try {
-          const updated = JSON.parse(e.newValue ?? "{}") as Record<string, string | string[]>;
-          setAnswerKey(updated);
+          setAnswerKey(reconcileAnswerKey(updated, key));
         } catch { }
       }
     }
@@ -318,7 +315,7 @@ export default function NewAssignmentPage() {
         fd.append("formSchema", JSON.stringify(formQuestions));
       }
       if (formQuestions.length > 0 && Object.keys(answerKey).length > 0) {
-        fd.append("answerKey", JSON.stringify(answerKey));
+        fd.append("answerKey", JSON.stringify(reconcileAnswerKey(formQuestions, answerKey)));
       }
       if (selectedMaterialIds.length > 0) {
         fd.append("materialIds", JSON.stringify(selectedMaterialIds));
